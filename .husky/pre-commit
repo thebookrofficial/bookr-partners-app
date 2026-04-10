@@ -1,0 +1,1 @@
+pnpm tsc && pnpm format && pnpm format-check && pnpm test
