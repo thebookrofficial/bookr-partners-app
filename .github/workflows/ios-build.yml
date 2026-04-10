@@ -18,7 +18,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 10 # Matches your local setup
+          version: 10 
 
       - name: Set up Node.js 18
         uses: actions/setup-node@v4
@@ -63,8 +63,8 @@ jobs:
       # --- IOS SIMULATOR DRY-RUN ---
       - name: Build iOS App (Simulator)
         run: |
-          xcodebuild -workspace ios/BookrUserApp.xcworkspace \
-          -scheme BookrUserApp \
+          xcodebuild -workspace ios/BookrBusinessApp.xcworkspace \
+          -scheme BookrBusinessApp \
           -configuration Debug \
           -sdk iphonesimulator \
           -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \

@@ -1,1 +1,1 @@
-pnpm tsc && pnpm exec lint-staged pnpm format && pnpm format-check && pnpm test
+pnpm tsc && pnpm exec lint-staged && pnpm format && pnpm format-check && pnpm test
