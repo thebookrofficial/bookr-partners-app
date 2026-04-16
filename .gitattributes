@@ -1,0 +1,19 @@
+# 1. Enforce LF line endings for all text files (Fixes Windows/Prettier conflicts)
+* text=auto eol=lf
+
+# 2. Define binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+
+# 3. Exclude generated/native code from GitHub language statistics
+ios/* linguist-generated=true
+android/* linguist-generated=true
+node_modules/* linguist-generated=true
+dist/* linguist-generated=true
+coverage/* linguist-generated=true
+
+# 4. Treat lockfiles as binary to prevent messy merge diffs
+pnpm-lock.yaml binary
