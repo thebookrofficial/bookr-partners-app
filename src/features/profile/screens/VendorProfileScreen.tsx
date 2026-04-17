@@ -9,9 +9,14 @@ import { ServiceCard } from "../components/ServiceCard";
 import { StaffCard } from "../components/StaffCard";
 import { ArrowLeft, Bell, Settings, Contact, Plus } from "lucide-react-native";
 import { vs, hs, ms } from "@/utils/responsive.utils";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { MainStackParamList } from "@/navigation/navigation.types";
 
 export const VendorProfileScreen = () => {
   const [activeTab, setActiveTab] = useState("All Services");
+
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 
   return (
     <ScreenContainer scrollable backgroundColor="#FFFFFF" paddingHorizontal={hs(12)}>
@@ -29,7 +34,7 @@ export const VendorProfileScreen = () => {
           <TouchableOpacity style={styles.iconBtn}>
             <Bell size={ms(24)} color="#000000" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate("Settings")}>
             <Settings size={ms(24)} color="#000000" />
           </TouchableOpacity>
         </View>

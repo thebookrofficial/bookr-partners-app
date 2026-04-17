@@ -16,6 +16,7 @@ export type MainStackParamList = {
   AddStaff: undefined;
   EditProfile: undefined;
   AddService: undefined;
+  Settings: undefined;
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 
