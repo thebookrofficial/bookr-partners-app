@@ -9,8 +9,8 @@ const { width, height } = Dimensions.get("window");
  * 🚨 BASELINE DIMENSIONS 🚨
  * These match the iPhone 14 Pro Figma design frame.
  */
-const FIGMA_WIDTH = 390;
-const FIGMA_HEIGHT = 844;
+const FIGMA_WIDTH = 440;
+const FIGMA_HEIGHT = 956;
 
 // Guard against landscape rotation anomalies
 const shortDimension = width < height ? width : height;

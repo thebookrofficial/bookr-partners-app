@@ -12,6 +12,11 @@ export type AuthStackParamList = {
 // 2. Define the screens in the Main Business flow
 export type MainStackParamList = {
   Dashboard: undefined;
+  VendorProfile: undefined;
+  AddStaff: undefined;
+  EditProfile: undefined;
+  AddService: undefined;
+  Settings: undefined;
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

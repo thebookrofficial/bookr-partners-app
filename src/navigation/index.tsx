@@ -4,11 +4,15 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { RootStackParamList, AuthStackParamList } from "./navigation.types";
+import { RootStackParamList, AuthStackParamList, MainStackParamList } from "./navigation.types";
 import { View, Text, StyleSheet } from "react-native";
+import { VendorProfileScreen } from "@/features/profile/screens/VendorProfileScreen";
+import { SettingsScreen } from "@/features/settings/screens/SettingsScreen";
+import { EditProfileScreen } from "@/features/profile/screens/EditProfileScreen";
+import { AddStaffScreen } from "@/features/profile/screens/AddStaffScreen";
 
-// --- TEMPORARY PLACEHOLDERS ---
-// We will replace these with our actual UI screens next!
+import { COLORS } from "@/constants/theme";
+
 const PlaceholderScreen = ({ title }: { title: string }) => (
   <View style={styles.placeholderContainer}>
     <Text style={styles.placeholderText}>{title}</Text>
@@ -16,13 +20,12 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 );
 const LoginScreen = () => <PlaceholderScreen title="Login Screen" />;
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
-const DashboardScreen = () => <PlaceholderScreen title="Vendor Dashboard" />;
-// ------------------------------
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+const MainStack = createNativeStackNavigator<MainStackParamList>(); // Added Main Stack
 
-// The Auth Flow (Users who are NOT logged in)
+// The Auth Flow
 const AuthNavigator = () => {
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
@@ -32,19 +35,28 @@ const AuthNavigator = () => {
   );
 };
 
+// The Main Business Flow (Authenticated)
+const MainNavigator = () => {
+  return (
+    <MainStack.Navigator screenOptions={{ headerShown: false }}>
+      <MainStack.Screen name="VendorProfile" component={VendorProfileScreen} />
+      <MainStack.Screen name="Settings" component={SettingsScreen} />
+      <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
+      <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
+    </MainStack.Navigator>
+  );
+};
+
 // The Root Flow (The gatekeeper)
 export const AppNavigator = () => {
-  // TODO: We will replace this with Zustand / Supabase auth state later
-  const isAuthenticated = false;
+  const isAuthenticated = true; // Placeholder for Auth State
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
-          // If logged in, show the business dashboard
-          <RootStack.Screen name="Main" component={DashboardScreen} />
+          <RootStack.Screen name="Main" component={MainNavigator} />
         ) : (
-          // If NOT logged in, force them to the Auth flow
           <RootStack.Screen name="Auth" component={AuthNavigator} />
         )}
       </RootStack.Navigator>
@@ -57,11 +69,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.background,
   },
   placeholderText: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#1A1A1A",
+    color: COLORS.text.primary,
   },
 });

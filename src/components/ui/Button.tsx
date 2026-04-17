@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Text } from "./Text";
 import { hs, vs, ms } from "@/utils/responsive.utils";
+import { COLORS } from "@/constants/theme";
 
 export interface ButtonProps extends TouchableOpacityProps {
   title: string;
@@ -33,9 +34,9 @@ export const Button = ({
   const isGhost = variant === "ghost";
 
   // Determine text color based on variant and disabled state
-  let textColor = "#FFFFFF";
-  if (isOutline || isGhost) textColor = "#000000";
-  if (disabled) textColor = "#A0A0A0";
+  let textColor = COLORS.text.inverse;
+  if (isOutline || isGhost) textColor = COLORS.text.primary;
+  if (disabled) textColor = COLORS.text.secondary;
 
   return (
     <TouchableOpacity
@@ -75,21 +76,21 @@ const styles = StyleSheet.create({
     borderRadius: ms(12), // Moderately scaled border radius
   },
   primary: {
-    backgroundColor: "#000000", // Bookr primary dark
+    backgroundColor: COLORS.text.primary, // Bookr primary dark
   },
   secondary: {
-    backgroundColor: "#F5F5F5",
+    backgroundColor: COLORS.surface.secondary,
   },
   outline: {
     backgroundColor: "transparent",
     borderWidth: 1.5,
-    borderColor: "#E5E5E5",
+    borderColor: COLORS.border.pillActive,
   },
   ghost: {
     backgroundColor: "transparent",
   },
   disabled: {
-    backgroundColor: "#EAEAEA",
-    borderColor: "#EAEAEA",
+    backgroundColor: COLORS.surface.fallback,
+    borderColor: COLORS.surface.fallback,
   },
 });
