@@ -11,10 +11,11 @@ import { useNavigation } from "@react-navigation/native";
 
 interface ServiceHeaderProps {
   title: string;
-  subtitle?: string; // <-- Added subtitle prop
-  category: string;
+  subtitle?: string;
+  category?: string; // Made optional so we can omit it on the dashboard
   imageUri?: string;
-  onCategoryPress?: () => void; // <-- Added interaction prop
+  onCategoryPress?: () => void;
+  rightComponent?: React.ReactNode; // <-- NEW PROP for the Edit button
 }
 
 export const ServiceHeader = ({
@@ -23,6 +24,7 @@ export const ServiceHeader = ({
   category,
   imageUri,
   onCategoryPress,
+  rightComponent,
 }: ServiceHeaderProps) => {
   const navigation = useNavigation();
 
@@ -35,7 +37,6 @@ export const ServiceHeader = ({
       <View style={styles.content}>
         <Image source={{ uri: imageUri || "https://placeholder.com/100" }} style={styles.image} />
 
-        {/* Updated text wrapper to handle subtitle */}
         <View style={styles.textWrapper}>
           <Text family="nichrome" style={styles.title} numberOfLines={1}>
             {title}
@@ -48,12 +49,17 @@ export const ServiceHeader = ({
         </View>
       </View>
 
-      <TouchableOpacity style={styles.dropdown} onPress={onCategoryPress} activeOpacity={0.7}>
-        <Text variant="body2" weight="semiBold" style={styles.categoryText}>
-          {category}
-        </Text>
-        <ChevronDown size={ms(16)} color={COLORS.text.primary} />
-      </TouchableOpacity>
+      {/* Render rightComponent if provided, otherwise render the default category dropdown */}
+      {rightComponent ? (
+        rightComponent
+      ) : category ? (
+        <TouchableOpacity style={styles.dropdown} onPress={onCategoryPress} activeOpacity={0.7}>
+          <Text variant="body2" weight="semiBold" style={styles.categoryText}>
+            {category}
+          </Text>
+          <ChevronDown size={ms(16)} color={COLORS.text.primary} />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 };
