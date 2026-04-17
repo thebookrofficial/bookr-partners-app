@@ -30,6 +30,7 @@ export type MainStackParamList = {
   Settings: undefined;
 
   SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;
+  BookingDetails: { bookingId: string };
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

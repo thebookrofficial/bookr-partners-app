@@ -17,6 +17,7 @@ interface BookingCardProps {
   status: "Online" | "Offline" | "Advance" | "Settlement" | "Full";
   avatarUrl?: string;
   isOfflineRecord?: boolean; // Controls the greyed-out UI
+  onPress?: () => void;
   onCallPress?: () => void;
 }
 
@@ -29,6 +30,7 @@ export const BookingCard = ({
   status,
   avatarUrl,
   isOfflineRecord = false,
+  onPress,
   onCallPress,
 }: BookingCardProps) => {
   // Figma colors based on active vs offline state
@@ -49,7 +51,10 @@ export const BookingCard = ({
   };
 
   return (
-    <View style={[styles.cardContainer, { backgroundColor: cardBg }]}>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={[styles.cardContainer, { backgroundColor: cardBg }]}>
       <Image source={{ uri: avatarUrl || "https://placeholder.com/50" }} style={styles.avatar} />
 
       <View style={styles.rightContent}>
@@ -101,7 +106,7 @@ export const BookingCard = ({
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 

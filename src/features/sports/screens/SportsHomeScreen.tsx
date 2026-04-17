@@ -12,6 +12,9 @@ import { BookingCard } from "../components/BookingCard";
 import { Calendar as CalendarIcon, Plus } from "lucide-react-native";
 import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { MainStackParamList } from "@/navigation/navigation.types";
 
 // --- DUMMY DATA MATCHING FIGMA ---
 const DUMMY_SLOTS: TimeSlotData[] = [
@@ -37,6 +40,8 @@ const DUMMY_SLOTS: TimeSlotData[] = [
 
 export const SportsHomeScreen = () => {
   const [activeGround, setActiveGround] = useState("Ground 1");
+
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 
   return (
     <View style={styles.root}>
@@ -79,6 +84,7 @@ export const SportsHomeScreen = () => {
             time="7 Pm - 8 Pm"
             price="₹800"
             status="Online"
+            onPress={() => navigation.navigate("BookingDetails", { bookingId: "123" })}
           />
           <BookingCard
             name="Yash Jadhav"
@@ -87,6 +93,7 @@ export const SportsHomeScreen = () => {
             time="8 Pm - 9 Pm"
             price="₹100"
             status="Online"
+            onPress={() => navigation.navigate("BookingDetails", { bookingId: "124" })}
           />
           <BookingCard
             name="Rohit Sharma"
@@ -96,6 +103,7 @@ export const SportsHomeScreen = () => {
             price="₹800"
             status="Offline"
             isOfflineRecord={true}
+            onPress={() => navigation.navigate("BookingDetails", { bookingId: "125" })}
           />
         </View>
 
