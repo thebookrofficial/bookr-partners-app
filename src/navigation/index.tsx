@@ -6,6 +6,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { RootStackParamList, AuthStackParamList } from "./navigation.types";
 import { View, Text, StyleSheet } from "react-native";
+import { VendorProfileScreen } from "@/features/profile/screens/VendorProfileScreen";
 
 // --- TEMPORARY PLACEHOLDERS ---
 // We will replace these with our actual UI screens next!
@@ -16,7 +17,7 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 );
 const LoginScreen = () => <PlaceholderScreen title="Login Screen" />;
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
-const DashboardScreen = () => <PlaceholderScreen title="Vendor Dashboard" />;
+// const DashboardScreen = () => <PlaceholderScreen title="Vendor Dashboard" />;
 // ------------------------------
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -35,14 +36,14 @@ const AuthNavigator = () => {
 // The Root Flow (The gatekeeper)
 export const AppNavigator = () => {
   // TODO: We will replace this with Zustand / Supabase auth state later
-  const isAuthenticated = false;
+  const isAuthenticated = true;
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           // If logged in, show the business dashboard
-          <RootStack.Screen name="Main" component={DashboardScreen} />
+          <RootStack.Screen name="Main" component={VendorProfileScreen} />
         ) : (
           // If NOT logged in, force them to the Auth flow
           <RootStack.Screen name="Auth" component={AuthNavigator} />
