@@ -69,6 +69,12 @@ export const VendorProfileScreen = () => {
           title="Elite Strikers Club"
           location="Skyline Open Grounds, Kolhapur"
           image={{ uri: "https://placeholder.com/100" }}
+          onPress={() =>
+            navigation.navigate("SportsServiceTabs", {
+              screen: "SportsHome",
+              params: { serviceId: "1" },
+            })
+          }
         />
         <ServiceCard
           title="Spice Symphony"

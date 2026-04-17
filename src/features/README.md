@@ -8,6 +8,10 @@ This directory contains domain-specific, self-contained modules. Following the B
 
 Encapsulates the Vendor Profile dashboard, staff management, and service listings.
 
+### `sports/`
+
+Dedicated module for sports-related service management (Turfs, Courts, Grounds), including hourly slot booking and real-time availability.
+
 - **`components/`**: Feature-private UI blocks (`ServiceCard.tsx`, `StaffCard.tsx`). These are not exported globally because they contain specific layout rules (like the exact 4-column flex row for Staff) that only apply to the profile domain.
 - **`screens/`**: Heavy UI assembly (`VendorProfileScreen.tsx`). Contains the complex layout logic, local state (e.g., active tabs), and Figma-matched padding/margins.
 

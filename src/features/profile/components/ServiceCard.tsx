@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import { View, Image, StyleSheet, ImageSourcePropType } from "react-native";
+import { View, Image, StyleSheet, ImageSourcePropType, TouchableOpacity } from "react-native";
 import { Text } from "@/components/ui";
 import { MapPin } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -12,13 +12,17 @@ interface ServiceCardProps {
   title: string;
   location: string;
   image: ImageSourcePropType;
+  onPress?: () => void; // ADDED THIS LINE
 }
 
-export const ServiceCard = ({ title, location, image }: ServiceCardProps) => (
-  <View style={styles.container}>
+export const ServiceCard = ({ title, location, image, onPress }: ServiceCardProps) => (
+  // CHANGED View to TouchableOpacity
+  <TouchableOpacity style={styles.container} activeOpacity={0.8} onPress={onPress}>
     <Image source={image} style={styles.image} />
     <View style={styles.info}>
-      <Text style={styles.title}>{title}</Text>
+      <Text family="nichrome" style={styles.title}>
+        {title}
+      </Text>
       <View style={styles.locationRow}>
         <MapPin size={fs(14)} color={COLORS.primary} strokeWidth={2.5} />
         <Text
@@ -31,7 +35,7 @@ export const ServiceCard = ({ title, location, image }: ServiceCardProps) => (
         </Text>
       </View>
     </View>
-  </View>
+  </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({
@@ -52,7 +56,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: fs(22),
-    fontWeight: "700",
     lineHeight: fs(24),
     color: COLORS.text.primary,
   },

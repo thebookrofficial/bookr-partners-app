@@ -2,6 +2,8 @@
 // Confidential and Proprietary.
 
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import { NavigatorScreenParams } from "@react-navigation/native";
 
 // 1. Define the screens in the Authentication flow
 export type AuthStackParamList = {
@@ -9,7 +11,16 @@ export type AuthStackParamList = {
   Signup: undefined;
 };
 
-// 2. Define the screens in the Main Business flow
+// 2. Define the Bottom Tab screens for Sports
+export type SportsTabParamList = {
+  SportsHome: { serviceId: string };
+  SportsHistory: { serviceId: string };
+  SportsDashboard: { serviceId: string };
+  SportsEssentials: { serviceId: string };
+  SportsProfile: { serviceId: string };
+};
+
+// 3. Define the screens in the Main Business flow
 export type MainStackParamList = {
   Dashboard: undefined;
   VendorProfile: undefined;
@@ -17,16 +28,18 @@ export type MainStackParamList = {
   EditProfile: undefined;
   AddService: undefined;
   Settings: undefined;
+
+  SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 
-// 3. Define the Root flow (Switches between Auth and Main)
+// 4. Define the Root flow (Switches between Auth and Main)
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
 };
 
-// 4. Export Screen Props for easy typing inside the screen components
+// 5. Export Screen Props for easy typing inside the screen components
 export type AuthScreenProps<T extends keyof AuthStackParamList> = NativeStackScreenProps<
   AuthStackParamList,
   T
@@ -40,7 +53,12 @@ export type RootScreenProps<T extends keyof RootStackParamList> = NativeStackScr
   T
 >;
 
-// 5. Global declaration so the `useNavigation` hook is strictly typed everywhere
+export type SportsTabScreenProps<T extends keyof SportsTabParamList> = BottomTabScreenProps<
+  SportsTabParamList,
+  T
+>;
+
+// 6. Global declaration so the `useNavigation` hook is strictly typed everywhere
 declare global {
   namespace ReactNavigation {
     interface RootParamList extends RootStackParamList {}
