@@ -38,7 +38,9 @@ export const VendorProfileScreen = () => {
       </View>
 
       <View style={styles.headerContainer}>
-        <TouchableOpacity style={styles.editBadge}>
+        <TouchableOpacity
+          style={styles.editBadge}
+          onPress={() => navigation.navigate("EditProfile")}>
           <Text variant="body1" weight="semiBold">
             {STRINGS.profile.edit}
           </Text>

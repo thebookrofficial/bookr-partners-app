@@ -14,10 +14,11 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
 export interface TextInputProps extends RNTextInputProps {
-  label?: string;
+  label?: React.ReactNode | string; // Updated to allow custom layouts like checkboxes
   error?: string;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  variant?: "outlined" | "filled"; // Added variant support
 }
 
 export const TextInput = ({
@@ -27,33 +28,46 @@ export const TextInput = ({
   rightIcon,
   style,
   secureTextEntry,
+  variant = "outlined",
+  editable = true,
   ...rest
 }: TextInputProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(secureTextEntry);
 
+  const isFilled = variant === "filled";
+
   return (
     <View style={styles.container}>
-      {label && (
-        <Text variant="body2" weight="medium" color={COLORS.text.secondary} style={styles.label}>
-          {label}
-        </Text>
-      )}
+      {label &&
+        (typeof label === "string" ? (
+          <Text
+            variant="body2"
+            weight="medium"
+            color={editable === false ? COLORS.text.muted : COLORS.text.primary}
+            style={styles.label}>
+            {label}
+          </Text>
+        ) : (
+          <View style={styles.label}>{label}</View>
+        ))}
 
       <View
         style={[
-          styles.inputContainer,
-          isFocused && styles.focusedContainer,
+          styles.inputBase,
+          isFilled ? styles.filledContainer : styles.outlinedContainer,
+          isFocused && !isFilled && styles.focusedContainer,
           error ? styles.errorContainer : undefined,
         ]}>
         {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
 
         <RNTextInput
-          style={[styles.input, style]}
+          style={[styles.input, isFilled && styles.filledInput, style]}
           placeholderTextColor={COLORS.text.muted}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           secureTextEntry={isPasswordVisible}
+          editable={editable}
           {...rest}
         />
 
@@ -82,19 +96,30 @@ export const TextInput = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: vs(16),
+    width: "100%",
   },
   label: {
-    marginBottom: vs(8),
+    marginBottom: vs(4),
   },
-  inputContainer: {
+  inputBase: {
     flexDirection: "row",
     alignItems: "center",
+    width: "100%",
+  },
+  outlinedContainer: {
     minHeight: vs(54),
     borderWidth: 1.5,
     borderColor: COLORS.border.pillActive,
     borderRadius: ms(12),
     backgroundColor: COLORS.background,
     paddingHorizontal: hs(16),
+  },
+  filledContainer: {
+    height: vs(38), // Exact Figma height
+    borderWidth: 0,
+    borderRadius: ms(10),
+    backgroundColor: COLORS.surface.primary,
+    paddingHorizontal: hs(10),
   },
   focusedContainer: {
     borderColor: COLORS.text.primary,
@@ -105,8 +130,13 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: fs(16),
+    fontFamily: "Gilroy-SemiBold", // Matches Figma text style
     color: COLORS.text.primary,
     paddingVertical: vs(12),
+  },
+  filledInput: {
+    fontSize: fs(14), // Smaller text for the filled variant
+    paddingVertical: 0, // Let the container handle height
   },
   leftIcon: {
     marginRight: hs(12),

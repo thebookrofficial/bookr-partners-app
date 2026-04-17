@@ -7,7 +7,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { RootStackParamList, AuthStackParamList, MainStackParamList } from "./navigation.types";
 import { View, Text, StyleSheet } from "react-native";
 import { VendorProfileScreen } from "@/features/profile/screens/VendorProfileScreen";
-import { SettingsScreen } from "@/features/settings/screens/SettingsScreen"; // Added Import
+import { SettingsScreen } from "@/features/settings/screens/SettingsScreen";
+import { EditProfileScreen } from "@/features/profile/screens/EditProfileScreen";
 import { COLORS } from "@/constants/theme";
 
 const PlaceholderScreen = ({ title }: { title: string }) => (
@@ -38,6 +39,7 @@ const MainNavigator = () => {
     <MainStack.Navigator screenOptions={{ headerShown: false }}>
       <MainStack.Screen name="VendorProfile" component={VendorProfileScreen} />
       <MainStack.Screen name="Settings" component={SettingsScreen} />
+      <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
     </MainStack.Navigator>
   );
 };
