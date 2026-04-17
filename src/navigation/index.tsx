@@ -29,6 +29,8 @@ import { BookingDetailsScreen } from "@/features/sports/screens/BookingDetailsSc
 import { GuestHistoryScreen } from "@/features/sports/screens/GuestHistoryScreen";
 import { SportsHistoryScreen } from "@/features/sports/screens/SportsHistoryScreen";
 import { SportsDashboardScreen } from "@/features/sports/screens/SportsDashboardScreen";
+import { SportsEssentialsScreen } from "@/features/sports/screens/SportsEssentialsScreen";
+import { BlockUnblockScreen } from "@/features/sports/screens/BlockUnblockScreen";
 import { Text } from "@/components/ui";
 
 import { COLORS } from "@/constants/theme";
@@ -44,7 +46,6 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 
 const LoginScreen = () => <PlaceholderScreen title="Login Screen" />;
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
-const SportsEssentialsScreen = () => <PlaceholderScreen title="Sports Essentials" />;
 const SportsProfileScreen = () => <PlaceholderScreen title="Sports Profile" />;
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -134,6 +135,7 @@ const MainNavigator = () => (
     <MainStack.Screen name="SportsServiceTabs" component={SportsTabNavigator} />
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
     <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />
+    <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
   </MainStack.Navigator>
 );
 
