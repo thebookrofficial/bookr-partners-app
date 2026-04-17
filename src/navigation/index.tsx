@@ -24,6 +24,7 @@ import { VendorProfileScreen } from "@/features/profile/screens/VendorProfileScr
 import { SettingsScreen } from "@/features/settings/screens/SettingsScreen";
 import { EditProfileScreen } from "@/features/profile/screens/EditProfileScreen";
 import { AddStaffScreen } from "@/features/profile/screens/AddStaffScreen";
+import { SportsHomeScreen } from "@/features/sports/screens/SportsHomeScreen";
 import { Text } from "@/components/ui";
 
 import { COLORS } from "@/constants/theme";
@@ -39,7 +40,6 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 
 const LoginScreen = () => <PlaceholderScreen title="Login Screen" />;
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
-const SportsHomeScreen = () => <PlaceholderScreen title="Sports Home" />;
 const SportsHistoryScreen = () => <PlaceholderScreen title="Sports History" />;
 const SportsDashboardScreen = () => <PlaceholderScreen title="Sports Dashboard" />;
 const SportsEssentialsScreen = () => <PlaceholderScreen title="Sports Essentials" />;
