@@ -4,21 +4,23 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { Text } from "@/components/ui";
-import { Phone, Calendar } from "lucide-react-native";
+import { Phone, Calendar, Clock } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
 interface BookingCardProps {
   name: string;
-  phone?: string; // Made optional
-  subtitle?: string; // Added for the "Ground 2 (11 v 11)" text
+  phone?: string;
+  subtitle?: string;
   date: string;
   time: string;
   price: string;
   status: "Online" | "Offline" | "Advance" | "Settlement" | "Full";
   avatarUrl?: string;
   isOfflineRecord?: boolean;
-  hideCallButton?: boolean; // Added to hide the call button in History View
+  hideCallButton?: boolean;
+  hideDateText?: boolean;
+  useClockIcon?: boolean;
   onPress?: () => void;
   onCallPress?: () => void;
 }
@@ -34,6 +36,8 @@ export const BookingCard = ({
   avatarUrl,
   isOfflineRecord = false,
   hideCallButton = false,
+  hideDateText = false,
+  useClockIcon = false,
   onPress,
   onCallPress,
 }: BookingCardProps) => {
@@ -66,7 +70,6 @@ export const BookingCard = ({
               {name}
             </Text>
 
-            {/* Render Phone OR Subtitle */}
             {phone ? (
               <View style={styles.phoneRow}>
                 <Phone size={ms(18)} color={iconColor} fill={iconColor} />
@@ -98,15 +101,27 @@ export const BookingCard = ({
         </View>
 
         <View style={styles.bottomRow}>
-          <Calendar size={ms(20)} color={iconColor} />
-          <Text variant="body2" weight="semiBold" color={textColor} style={styles.dateText}>
-            {date}
-          </Text>
-          <Text variant="body2" weight="semiBold" color={textColor} style={styles.timeText}>
+          {useClockIcon ? (
+            <Clock size={ms(16)} color={iconColor} />
+          ) : (
+            <Calendar size={ms(20)} color={iconColor} />
+          )}
+
+          {!hideDateText && (
+            <Text variant="body2" weight="semiBold" color={textColor} style={styles.dateText}>
+              {date}
+            </Text>
+          )}
+
+          <Text
+            variant="body2"
+            weight="semiBold"
+            color={textColor}
+            /* FIXED: Using predefined style instead of inline object */
+            style={[styles.timeText, hideDateText && styles.timeTextExpanded]}>
             {time}
           </Text>
 
-          {/* Conditionally hide the call button */}
           {!hideCallButton && (
             <TouchableOpacity style={styles.callButton} onPress={onCallPress} activeOpacity={0.7}>
               <Text
@@ -189,6 +204,10 @@ const styles = StyleSheet.create({
   },
   timeText: {
     marginRight: hs(6),
+  },
+  timeTextExpanded: {
+    flex: 1,
+    marginLeft: hs(4),
   },
   callButton: {
     backgroundColor: "#000000",

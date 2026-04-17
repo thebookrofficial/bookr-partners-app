@@ -27,6 +27,7 @@ import { AddStaffScreen } from "@/features/profile/screens/AddStaffScreen";
 import { SportsHomeScreen } from "@/features/sports/screens/SportsHomeScreen";
 import { BookingDetailsScreen } from "@/features/sports/screens/BookingDetailsScreen";
 import { GuestHistoryScreen } from "@/features/sports/screens/GuestHistoryScreen";
+import { SportsHistoryScreen } from "@/features/sports/screens/SportsHistoryScreen";
 import { Text } from "@/components/ui";
 
 import { COLORS } from "@/constants/theme";
@@ -42,7 +43,6 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 
 const LoginScreen = () => <PlaceholderScreen title="Login Screen" />;
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
-const SportsHistoryScreen = () => <PlaceholderScreen title="Sports History" />;
 const SportsDashboardScreen = () => <PlaceholderScreen title="Sports Dashboard" />;
 const SportsEssentialsScreen = () => <PlaceholderScreen title="Sports Essentials" />;
 const SportsProfileScreen = () => <PlaceholderScreen title="Sports Profile" />;

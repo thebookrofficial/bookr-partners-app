@@ -11,11 +11,19 @@ import { useNavigation } from "@react-navigation/native";
 
 interface ServiceHeaderProps {
   title: string;
+  subtitle?: string; // <-- Added subtitle prop
   category: string;
   imageUri?: string;
+  onCategoryPress?: () => void; // <-- Added interaction prop
 }
 
-export const ServiceHeader = ({ title, category, imageUri }: ServiceHeaderProps) => {
+export const ServiceHeader = ({
+  title,
+  subtitle,
+  category,
+  imageUri,
+  onCategoryPress,
+}: ServiceHeaderProps) => {
   const navigation = useNavigation();
 
   return (
@@ -26,12 +34,21 @@ export const ServiceHeader = ({ title, category, imageUri }: ServiceHeaderProps)
 
       <View style={styles.content}>
         <Image source={{ uri: imageUri || "https://placeholder.com/100" }} style={styles.image} />
-        <Text family="nichrome" style={styles.title} numberOfLines={1}>
-          {title}
-        </Text>
+
+        {/* Updated text wrapper to handle subtitle */}
+        <View style={styles.textWrapper}>
+          <Text family="nichrome" style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+          {subtitle && (
+            <Text variant="body1" weight="bold" style={styles.subtitle}>
+              {subtitle}
+            </Text>
+          )}
+        </View>
       </View>
 
-      <TouchableOpacity style={styles.dropdown}>
+      <TouchableOpacity style={styles.dropdown} onPress={onCategoryPress} activeOpacity={0.7}>
         <Text variant="body2" weight="semiBold" style={styles.categoryText}>
           {category}
         </Text>
@@ -47,7 +64,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     width: "100%",
-    height: vs(50),
+    minHeight: vs(50),
     marginBottom: vs(10),
   },
   backBtn: {
@@ -63,13 +80,19 @@ const styles = StyleSheet.create({
     width: ms(50),
     height: ms(50),
     borderRadius: ms(20),
-    backgroundColor: COLORS.danger, // Red fallback from Figma
+    backgroundColor: COLORS.danger,
+  },
+  textWrapper: {
+    flex: 1,
+    justifyContent: "center",
   },
   title: {
     fontSize: fs(22),
     lineHeight: fs(22),
     color: COLORS.text.primary,
-    flex: 1,
+  },
+  subtitle: {
+    marginTop: vs(2),
   },
   dropdown: {
     flexDirection: "row",
