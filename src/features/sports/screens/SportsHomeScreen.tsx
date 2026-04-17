@@ -15,6 +15,7 @@ import { COLORS } from "@/constants/theme";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
+import { OfflineBookingSheet } from "../components/OfflineBookingSheet";
 
 // --- DUMMY DATA MATCHING FIGMA ---
 const DUMMY_SLOTS: TimeSlotData[] = [
@@ -40,6 +41,7 @@ const DUMMY_SLOTS: TimeSlotData[] = [
 
 export const SportsHomeScreen = () => {
   const [activeGround, setActiveGround] = useState("Ground 1");
+  const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
 
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 
@@ -112,9 +114,17 @@ export const SportsHomeScreen = () => {
       </ScreenContainer>
 
       {/* 6. Floating Action Button (FAB) */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.8}
+        onPress={() => setIsBottomSheetOpen(true)}>
         <Plus size={ms(30)} color={COLORS.text.inverse} />
       </TouchableOpacity>
+
+      <OfflineBookingSheet
+        isVisible={isBottomSheetOpen}
+        onClose={() => setIsBottomSheetOpen(false)}
+      />
     </View>
   );
 };
