@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { hs } from "@/utils/responsive.utils";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { COLORS } from "@/constants/theme";
 
 export interface ScreenContainerProps {
   children: React.ReactNode;
@@ -26,7 +27,7 @@ export const ScreenContainer = ({
   scrollable = false,
   style,
   paddingHorizontal = hs(24),
-  backgroundColor = "#FFFFFF",
+  backgroundColor = COLORS.background,
 }: ScreenContainerProps) => {
   const Container = scrollable ? ScrollView : View;
 

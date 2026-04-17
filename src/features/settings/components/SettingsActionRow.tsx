@@ -6,6 +6,7 @@ import { TouchableOpacity, StyleSheet, View } from "react-native";
 import { Text } from "@/components/ui";
 import { ChevronRight } from "lucide-react-native";
 import { hs, vs, ms } from "@/utils/responsive.utils";
+import { COLORS } from "@/constants/theme";
 
 interface SettingsActionRowProps {
   icon: React.ReactNode;
@@ -21,7 +22,7 @@ export const SettingsActionRow = ({
   onPress,
 }: SettingsActionRowProps) => {
   // If danger is true, use red, otherwise standard black text
-  const textColor = danger ? "#E55959" : "#000000";
+  const textColor = danger ? `${COLORS.danger}` : `${COLORS.text.primary}`;
 
   return (
     <TouchableOpacity style={styles.container} activeOpacity={0.7} onPress={onPress}>
@@ -38,7 +39,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F4F7FC",
+    backgroundColor: COLORS.surface.primary,
     height: vs(36),
     borderRadius: ms(10),
     paddingHorizontal: hs(6),

@@ -1,9 +1,7 @@
-// Copyright (c) 2026 Bookr. All rights reserved.
-// Confidential and Proprietary.
-
 import React from "react";
 import { Text as RNText, TextProps as RNTextProps, StyleSheet, TextStyle } from "react-native";
 import { fs } from "@/utils/responsive.utils";
+import { COLORS } from "@/constants/theme";
 
 export interface TextProps extends RNTextProps {
   variant?: "h1" | "h2" | "h3" | "body1" | "body2" | "caption";
@@ -18,15 +16,14 @@ export const Text = ({
   variant = "body1",
   weight = "regular",
   family = "gilroy",
-  color = "#000000",
+  color = COLORS.text.primary,
   align = "left",
   style,
   children,
   ...rest
 }: TextProps) => {
-  // Map the weight and family strictly to the PostScript/File name of the font
   const getFontFamily = () => {
-    if (family === "nichrome") return "MDNichromeTest-Bold"; // Adjust this to match your exact file name
+    if (family === "nichrome") return "MDNichromeTest-Bold";
     switch (weight) {
       case "bold":
         return "Gilroy-ExtraBold";
@@ -41,11 +38,7 @@ export const Text = ({
 
   const textStyles: TextStyle[] = [
     styles[variant],
-    {
-      fontFamily: getFontFamily(),
-      color,
-      textAlign: align,
-    },
+    { fontFamily: getFontFamily(), color, textAlign: align },
     style as TextStyle,
   ];
 
@@ -57,11 +50,10 @@ export const Text = ({
 };
 
 const styles = StyleSheet.create({
-  // Using exact sizes from Figma CSS
   h1: { fontSize: fs(32), lineHeight: fs(40) },
   h2: { fontSize: fs(24), lineHeight: fs(32) },
-  h3: { fontSize: fs(20), lineHeight: fs(25) }, // Profile Title
-  body1: { fontSize: fs(16), lineHeight: fs(20) }, // David Minter, Edit
-  body2: { fontSize: fs(14), lineHeight: fs(17) }, // Hello Owner
+  h3: { fontSize: fs(20), lineHeight: fs(25) },
+  body1: { fontSize: fs(16), lineHeight: fs(20) },
+  body2: { fontSize: fs(14), lineHeight: fs(17) },
   caption: { fontSize: fs(12), lineHeight: fs(15) },
 });

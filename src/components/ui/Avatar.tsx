@@ -1,10 +1,9 @@
-// Copyright (c) 2026 Bookr. All rights reserved.
-// Confidential and Proprietary.
-
 import React from "react";
 import { View, Image, StyleSheet, ImageSourcePropType } from "react-native";
 import { Text } from "./Text";
 import { ms, fs } from "@/utils/responsive.utils";
+import { COLORS } from "@/constants/theme";
+import { STRINGS } from "@/constants/strings";
 
 export interface AvatarProps {
   source?: ImageSourcePropType | { uri: string };
@@ -12,7 +11,11 @@ export interface AvatarProps {
   size?: number;
 }
 
-export const Avatar = ({ source, fallbackInitials = "?", size = 64 }: AvatarProps) => {
+export const Avatar = ({
+  source,
+  fallbackInitials = STRINGS.common.avatarFallback,
+  size = 64,
+}: AvatarProps) => {
   const scaledSize = ms(size);
   const borderRadius = scaledSize / 2;
 
@@ -29,7 +32,7 @@ export const Avatar = ({ source, fallbackInitials = "?", size = 64 }: AvatarProp
           <Text
             variant="body1"
             weight="semiBold"
-            color="#666666"
+            color={COLORS.text.secondary}
             style={{ fontSize: fs(size * 0.4) }}>
             {fallbackInitials}
           </Text>
@@ -41,14 +44,14 @@ export const Avatar = ({ source, fallbackInitials = "?", size = 64 }: AvatarProp
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#F5F5F5",
+    backgroundColor: COLORS.surface.secondary,
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
   },
   fallback: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#EAEAEA",
+    backgroundColor: COLORS.surface.fallback,
     justifyContent: "center",
     alignItems: "center",
   },

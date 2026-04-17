@@ -8,6 +8,7 @@ import { RootStackParamList, AuthStackParamList, MainStackParamList } from "./na
 import { View, Text, StyleSheet } from "react-native";
 import { VendorProfileScreen } from "@/features/profile/screens/VendorProfileScreen";
 import { SettingsScreen } from "@/features/settings/screens/SettingsScreen"; // Added Import
+import { COLORS } from "@/constants/theme";
 
 const PlaceholderScreen = ({ title }: { title: string }) => (
   <View style={styles.placeholderContainer}>
@@ -63,11 +64,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.background,
   },
   placeholderText: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#1A1A1A",
+    color: COLORS.text.primary,
   },
 });

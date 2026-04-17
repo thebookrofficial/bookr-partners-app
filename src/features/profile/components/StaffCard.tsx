@@ -6,6 +6,7 @@ import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { Text, Avatar } from "@/components/ui";
 import { Trash2, Ban } from "lucide-react-native";
 import { hs, vs, ms } from "@/utils/responsive.utils";
+import { COLORS } from "@/constants/theme";
 
 interface StaffCardProps {
   name: string;
@@ -23,14 +24,14 @@ export const StaffCard = ({ name, role, type }: StaffCardProps) => (
       <Text variant="h3" weight="bold">
         {name}
       </Text>
-      <Text variant="body2" weight="semiBold" color="#000000" style={styles.roleText}>
+      <Text variant="body2" weight="semiBold" color={COLORS.text.primary} style={styles.roleText}>
         {role}
       </Text>
     </View>
 
     {/* Column 3: Type (Centered vertically) */}
     <View style={styles.typeContainer}>
-      <Text variant="body1" weight="semiBold" color="#000000">
+      <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
         {type}
       </Text>
     </View>
@@ -38,10 +39,10 @@ export const StaffCard = ({ name, role, type }: StaffCardProps) => (
     {/* Column 4: Actions (Stacked vertically) */}
     <View style={styles.actionsContainer}>
       <TouchableOpacity style={styles.iconBtn}>
-        <Trash2 size={ms(20)} color="#E55959" />
+        <Trash2 size={ms(20)} color={COLORS.danger} />
       </TouchableOpacity>
       <TouchableOpacity style={styles.iconBtn}>
-        <Ban size={ms(20)} color="#FFC107" />
+        <Ban size={ms(20)} color={COLORS.warning} />
       </TouchableOpacity>
     </View>
   </View>
@@ -51,7 +52,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F4F7FC",
+    backgroundColor: COLORS.surface.primary,
     paddingHorizontal: hs(6),
     paddingVertical: vs(10),
     borderRadius: ms(10),

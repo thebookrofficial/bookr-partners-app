@@ -17,16 +17,17 @@ import {
 } from "lucide-react-native";
 import { vs, hs, ms } from "@/utils/responsive.utils";
 import { useNavigation } from "@react-navigation/native";
+import { COLORS } from "@/constants/theme";
 
 export const SettingsScreen = () => {
   const navigation = useNavigation();
 
   return (
-    <ScreenContainer scrollable backgroundColor="#FFFFFF" paddingHorizontal={hs(12)}>
+    <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       {/* 1. App Bar */}
       <View style={styles.appBar}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={ms(20)} color="#000000" />
+          <ArrowLeft size={ms(20)} color={COLORS.text.primary} />
         </TouchableOpacity>
         <Text variant="h3" weight="bold">
           Settings
@@ -40,19 +41,19 @@ export const SettingsScreen = () => {
         </Text>
         <View style={styles.listContainer}>
           <SettingsActionRow
-            icon={<Ticket size={ms(20)} color="#63A2FD" />}
+            icon={<Ticket size={ms(20)} color={COLORS.primary} />}
             label="Privacy Policy"
           />
           <SettingsActionRow
-            icon={<FileText size={ms(20)} color="#63A2FD" />}
+            icon={<FileText size={ms(20)} color={COLORS.primary} />}
             label="Terms and condition"
           />
           <SettingsActionRow
-            icon={<HelpCircle size={ms(20)} color="#63A2FD" />}
+            icon={<HelpCircle size={ms(20)} color={COLORS.primary} />}
             label="Support and Help"
           />
           <SettingsActionRow
-            icon={<AlertTriangle size={ms(20)} color="#63A2FD" />}
+            icon={<AlertTriangle size={ms(20)} color={COLORS.primary} />}
             label="Report a Grievance"
           />
         </View>
@@ -64,9 +65,12 @@ export const SettingsScreen = () => {
           ACCOUNT SETTINGS
         </Text>
         <View style={styles.listContainer}>
-          <SettingsActionRow icon={<LogOut size={ms(20)} color="#63A2FD" />} label="Log out" />
           <SettingsActionRow
-            icon={<Trash2 size={ms(20)} color="#E55959" />}
+            icon={<LogOut size={ms(20)} color={COLORS.primary} />}
+            label="Log out"
+          />
+          <SettingsActionRow
+            icon={<Trash2 size={ms(20)} color={COLORS.danger} />}
             label="Delete account"
             danger
           />
@@ -75,7 +79,7 @@ export const SettingsScreen = () => {
 
       {/* 4. Footer */}
       <View style={styles.footer}>
-        <Text variant="caption" weight="bold" color="#8C8C8C">
+        <Text variant="caption" weight="bold" color={COLORS.text.muted}>
           Version 1.0.0 (Beta)
         </Text>
       </View>

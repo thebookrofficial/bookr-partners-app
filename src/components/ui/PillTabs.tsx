@@ -1,10 +1,8 @@
-// Copyright (c) 2026 Bookr. All rights reserved.
-// Confidential and Proprietary.
-
 import React from "react";
 import { ScrollView, TouchableOpacity, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { hs, vs, ms } from "@/utils/responsive.utils";
+import { COLORS } from "@/constants/theme";
 
 export interface PillTabsProps {
   tabs: string[];
@@ -29,8 +27,8 @@ export const PillTabs = ({ tabs, activeTab, onTabChange }: PillTabsProps) => {
               style={[styles.pill, isActive ? styles.activePill : styles.inactivePill]}>
               <Text
                 variant="body2"
-                weight={isActive ? "semiBold" : "semiBold"}
-                color={isActive ? "#1A1A1A" : "#A0A0A0"}>
+                weight="semiBold"
+                color={isActive ? COLORS.text.primary : COLORS.text.muted}>
                 {tab}
               </Text>
             </TouchableOpacity>
@@ -42,12 +40,8 @@ export const PillTabs = ({ tabs, activeTab, onTabChange }: PillTabsProps) => {
 };
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginVertical: vs(16),
-  },
-  scrollContainer: {
-    gap: hs(10),
-  },
+  wrapper: { marginVertical: vs(16) },
+  scrollContainer: { gap: hs(10) },
   pill: {
     paddingHorizontal: hs(20),
     paddingVertical: vs(8),
@@ -56,12 +50,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   activePill: {
-    backgroundColor: "#F0F4F8", // Light blue-ish grey from design
+    backgroundColor: COLORS.surface.pillActive,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border.pillActive,
   },
   inactivePill: {
-    backgroundColor: "#F8F9FA",
+    backgroundColor: COLORS.surface.pillInactive,
     borderWidth: 1,
     borderColor: "transparent",
   },

@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Text } from "./Text";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
+import { COLORS } from "@/constants/theme";
 
 export interface TextInputProps extends RNTextInputProps {
   label?: string;
@@ -34,7 +35,7 @@ export const TextInput = ({
   return (
     <View style={styles.container}>
       {label && (
-        <Text variant="body2" weight="medium" color="#666666" style={styles.label}>
+        <Text variant="body2" weight="medium" color={COLORS.text.secondary} style={styles.label}>
           {label}
         </Text>
       )}
@@ -49,7 +50,7 @@ export const TextInput = ({
 
         <RNTextInput
           style={[styles.input, style]}
-          placeholderTextColor="#A0A0A0"
+          placeholderTextColor={COLORS.text.muted}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           secureTextEntry={isPasswordVisible}
@@ -60,7 +61,7 @@ export const TextInput = ({
           <TouchableOpacity
             style={styles.rightIcon}
             onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
-            <Text variant="caption" weight="semiBold" color="#666666">
+            <Text variant="caption" weight="semiBold" color={COLORS.text.secondary}>
               {isPasswordVisible ? "SHOW" : "HIDE"}
             </Text>
           </TouchableOpacity>
@@ -70,7 +71,7 @@ export const TextInput = ({
       </View>
 
       {error && (
-        <Text variant="caption" color="#FF3B30" style={styles.errorText}>
+        <Text variant="caption" color={COLORS.danger} style={styles.errorText}>
           {error}
         </Text>
       )}
@@ -90,21 +91,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minHeight: vs(54),
     borderWidth: 1.5,
-    borderColor: "#E5E5E5",
+    borderColor: COLORS.border.pillActive,
     borderRadius: ms(12),
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.background,
     paddingHorizontal: hs(16),
   },
   focusedContainer: {
-    borderColor: "#000000",
+    borderColor: COLORS.text.primary,
   },
   errorContainer: {
-    borderColor: "#FF3B30",
+    borderColor: COLORS.danger,
   },
   input: {
     flex: 1,
     fontSize: fs(16),
-    color: "#1A1A1A",
+    color: COLORS.text.primary,
     paddingVertical: vs(12),
   },
   leftIcon: {

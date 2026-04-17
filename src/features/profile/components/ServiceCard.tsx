@@ -6,6 +6,7 @@ import { View, Image, StyleSheet, ImageSourcePropType } from "react-native";
 import { Text } from "@/components/ui";
 import { MapPin } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
+import { COLORS } from "@/constants/theme";
 
 interface ServiceCardProps {
   title: string;
@@ -19,11 +20,11 @@ export const ServiceCard = ({ title, location, image }: ServiceCardProps) => (
     <View style={styles.info}>
       <Text style={styles.title}>{title}</Text>
       <View style={styles.locationRow}>
-        <MapPin size={fs(14)} color="#63A1FD" strokeWidth={2.5} />
+        <MapPin size={fs(14)} color={COLORS.primary} strokeWidth={2.5} />
         <Text
           variant="caption"
           weight="bold"
-          color="#000000"
+          color={COLORS.text.primary}
           numberOfLines={1}
           style={styles.locationText}>
           {location}
@@ -43,7 +44,7 @@ const styles = StyleSheet.create({
     width: hs(100),
     height: hs(100),
     borderRadius: ms(20),
-    backgroundColor: "#F0F0F0",
+    backgroundColor: COLORS.surface.imagePlaceholder,
   },
   info: {
     flex: 1,
@@ -53,13 +54,13 @@ const styles = StyleSheet.create({
     fontSize: fs(22),
     fontWeight: "700",
     lineHeight: fs(24),
-    color: "#000000",
+    color: COLORS.text.primary,
   },
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: vs(6),
-    backgroundColor: "#F4F7FC",
+    backgroundColor: COLORS.surface.primary,
     paddingHorizontal: hs(8),
     paddingVertical: vs(4),
     borderRadius: ms(10),
