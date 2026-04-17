@@ -9,6 +9,8 @@ import { View, Text, StyleSheet } from "react-native";
 import { VendorProfileScreen } from "@/features/profile/screens/VendorProfileScreen";
 import { SettingsScreen } from "@/features/settings/screens/SettingsScreen";
 import { EditProfileScreen } from "@/features/profile/screens/EditProfileScreen";
+import { AddStaffScreen } from "@/features/profile/screens/AddStaffScreen";
+
 import { COLORS } from "@/constants/theme";
 
 const PlaceholderScreen = ({ title }: { title: string }) => (
@@ -40,6 +42,7 @@ const MainNavigator = () => {
       <MainStack.Screen name="VendorProfile" component={VendorProfileScreen} />
       <MainStack.Screen name="Settings" component={SettingsScreen} />
       <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
+      <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
     </MainStack.Navigator>
   );
 };

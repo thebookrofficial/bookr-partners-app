@@ -82,7 +82,7 @@ export const VendorProfileScreen = () => {
           {STRINGS.profile.yourStaff}
         </Text>
       </View>
-      <TouchableOpacity style={styles.actionRowBtn}>
+      <TouchableOpacity style={styles.actionRowBtn} onPress={() => navigation.navigate("AddStaff")}>
         <Contact size={ms(24)} color={COLORS.primary} />
         <Text variant="body2" weight="bold">
           {STRINGS.profile.addStaff}
