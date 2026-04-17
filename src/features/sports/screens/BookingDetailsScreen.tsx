@@ -19,9 +19,11 @@ import {
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { MainStackParamList } from "@/navigation/navigation.types";
 
 export const BookingDetailsScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const [isAddingPayment, setIsAddingPayment] = useState(false);
 
   return (
@@ -185,14 +187,16 @@ export const BookingDetailsScreen = () => {
       </TouchableOpacity>
 
       {/* 9. Previous History Row */}
-      <TouchableOpacity style={styles.historyRow} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={styles.historyRow}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate("GuestHistory", { guestId: "chirag_123" })}>
         <FileText size={ms(20)} color={COLORS.text.primary} />
         <Text variant="body2" weight="semiBold" style={styles.historyText}>
           Previous History
         </Text>
         <ChevronRight size={ms(20)} color={COLORS.text.primary} />
       </TouchableOpacity>
-
       <View style={{ height: vs(40) }} />
     </ScreenContainer>
   );

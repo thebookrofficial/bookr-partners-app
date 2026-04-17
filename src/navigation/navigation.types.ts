@@ -31,6 +31,7 @@ export type MainStackParamList = {
 
   SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;
   BookingDetails: { bookingId: string };
+  GuestHistory: { guestId: string };
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

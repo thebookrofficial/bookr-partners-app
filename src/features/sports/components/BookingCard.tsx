@@ -10,13 +10,15 @@ import { COLORS } from "@/constants/theme";
 
 interface BookingCardProps {
   name: string;
-  phone: string;
+  phone?: string; // Made optional
+  subtitle?: string; // Added for the "Ground 2 (11 v 11)" text
   date: string;
   time: string;
   price: string;
   status: "Online" | "Offline" | "Advance" | "Settlement" | "Full";
   avatarUrl?: string;
-  isOfflineRecord?: boolean; // Controls the greyed-out UI
+  isOfflineRecord?: boolean;
+  hideCallButton?: boolean; // Added to hide the call button in History View
   onPress?: () => void;
   onCallPress?: () => void;
 }
@@ -24,16 +26,17 @@ interface BookingCardProps {
 export const BookingCard = ({
   name,
   phone,
+  subtitle,
   date,
   time,
   price,
   status,
   avatarUrl,
   isOfflineRecord = false,
+  hideCallButton = false,
   onPress,
   onCallPress,
 }: BookingCardProps) => {
-  // Figma colors based on active vs offline state
   const textColor = isOfflineRecord ? COLORS.text.muted : COLORS.text.primary;
   const iconColor = isOfflineRecord ? COLORS.text.muted : COLORS.text.primary;
   const cardBg = isOfflineRecord ? "#E0E0E0" : COLORS.surface.primary;
@@ -41,11 +44,10 @@ export const BookingCard = ({
   const getStatusColor = () => {
     if (status === "Offline") return COLORS.danger;
     if (status === "Online") return COLORS.primary;
-    return COLORS.text.muted; // Advance, Full, Settlement
+    return COLORS.text.muted;
   };
 
   const getPriceColor = () => {
-    // Figma shows green price even for some offline records, matching CSS precisely
     if (isOfflineRecord && status === "Offline") return COLORS.danger;
     return "#00B562";
   };
@@ -58,18 +60,27 @@ export const BookingCard = ({
       <Image source={{ uri: avatarUrl || "https://placeholder.com/50" }} style={styles.avatar} />
 
       <View style={styles.rightContent}>
-        {/* Top Row: Name, Phone, Price & Status */}
         <View style={styles.topRow}>
           <View style={styles.namePhoneWrapper}>
             <Text variant="body1" weight="bold" color={textColor}>
               {name}
             </Text>
-            <View style={styles.phoneRow}>
-              <Phone size={ms(18)} color={iconColor} fill={iconColor} />
-              <Text variant="body2" weight="medium" color={textColor}>
-                {phone}
-              </Text>
-            </View>
+
+            {/* Render Phone OR Subtitle */}
+            {phone ? (
+              <View style={styles.phoneRow}>
+                <Phone size={ms(18)} color={iconColor} fill={iconColor} />
+                <Text variant="body2" weight="medium" color={textColor}>
+                  {phone}
+                </Text>
+              </View>
+            ) : subtitle ? (
+              <View style={styles.phoneRow}>
+                <Text variant="body2" weight="medium" color={textColor}>
+                  {subtitle}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.priceStatusWrapper}>
@@ -86,7 +97,6 @@ export const BookingCard = ({
           </View>
         </View>
 
-        {/* Bottom Row: Date, Time & Call Action */}
         <View style={styles.bottomRow}>
           <Calendar size={ms(20)} color={iconColor} />
           <Text variant="body2" weight="semiBold" color={textColor} style={styles.dateText}>
@@ -95,15 +105,19 @@ export const BookingCard = ({
           <Text variant="body2" weight="semiBold" color={textColor} style={styles.timeText}>
             {time}
           </Text>
-          <TouchableOpacity style={styles.callButton} onPress={onCallPress} activeOpacity={0.7}>
-            <Text
-              variant="caption"
-              weight="bold"
-              color={COLORS.text.inverse}
-              style={styles.callText}>
-              Call
-            </Text>
-          </TouchableOpacity>
+
+          {/* Conditionally hide the call button */}
+          {!hideCallButton && (
+            <TouchableOpacity style={styles.callButton} onPress={onCallPress} activeOpacity={0.7}>
+              <Text
+                variant="caption"
+                weight="bold"
+                color={COLORS.text.inverse}
+                style={styles.callText}>
+                Call
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -115,18 +129,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: vs(10),
-    paddingHorizontal: hs(6), // Exact Figma padding
+    paddingHorizontal: hs(6),
     gap: hs(10),
     borderRadius: ms(10),
     marginBottom: vs(10),
     width: "100%",
-    minHeight: vs(97), // Exact Figma height
+    minHeight: vs(97),
   },
   avatar: {
     width: ms(50),
     height: ms(50),
     borderRadius: ms(25),
-    backgroundColor: COLORS.danger, // Figma default red
+    backgroundColor: COLORS.danger,
   },
   rightContent: {
     flex: 1,
@@ -145,7 +159,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     paddingBottom: vs(4),
     borderBottomWidth: 1,
-    borderBottomColor: "#CBDFFE", // Line only sits under the name/phone
+    borderBottomColor: "#CBDFFE",
     marginRight: hs(10),
   },
   phoneRow: {
@@ -171,7 +185,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   dateText: {
-    flex: 1, // Pushes time and call button to the right seamlessly
+    flex: 1,
   },
   timeText: {
     marginRight: hs(6),

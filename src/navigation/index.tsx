@@ -26,6 +26,7 @@ import { EditProfileScreen } from "@/features/profile/screens/EditProfileScreen"
 import { AddStaffScreen } from "@/features/profile/screens/AddStaffScreen";
 import { SportsHomeScreen } from "@/features/sports/screens/SportsHomeScreen";
 import { BookingDetailsScreen } from "@/features/sports/screens/BookingDetailsScreen";
+import { GuestHistoryScreen } from "@/features/sports/screens/GuestHistoryScreen";
 import { Text } from "@/components/ui";
 
 import { COLORS } from "@/constants/theme";
@@ -132,6 +133,7 @@ const MainNavigator = () => (
     <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
     <MainStack.Screen name="SportsServiceTabs" component={SportsTabNavigator} />
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
+    <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />
   </MainStack.Navigator>
 );
 

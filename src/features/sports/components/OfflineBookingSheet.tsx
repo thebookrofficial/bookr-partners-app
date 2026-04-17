@@ -16,14 +16,16 @@ import {
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
+// --- NEW IMPORTS FOR NAVIGATION ---
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { MainStackParamList } from "@/navigation/navigation.types";
+
 interface OfflineBookingSheetProps {
   isVisible: boolean;
   onClose: () => void;
 }
 
-/**
- * FIX: Moved outside to prevent 'react/no-unstable-nested-components'
- */
 const CustomLabel = ({ icon: Icon, text }: { icon: any; text: string }) => (
   <View style={styles.labelRow}>
     <Icon size={ms(16)} color={COLORS.primary} />
@@ -34,6 +36,9 @@ const CustomLabel = ({ icon: Icon, text }: { icon: any; text: string }) => (
 );
 
 export const OfflineBookingSheet = ({ isVisible, onClose }: OfflineBookingSheetProps) => {
+  // Initialize navigation
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+
   return (
     <Modal visible={isVisible} animationType="slide" transparent={true} onRequestClose={onClose}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
@@ -116,7 +121,14 @@ export const OfflineBookingSheet = ({ isVisible, onClose }: OfflineBookingSheetP
               </View>
             </View>
 
-            <TouchableOpacity style={styles.historyRow} activeOpacity={0.7}>
+            {/* --- FIXED: Added onPress to close modal and navigate --- */}
+            <TouchableOpacity
+              style={styles.historyRow}
+              activeOpacity={0.7}
+              onPress={() => {
+                onClose(); // Dismiss the bottom sheet
+                navigation.navigate("GuestHistory", { guestId: "chirag_123" }); // Navigate to history
+              }}>
               <FileText size={ms(20)} color={COLORS.text.primary} />
               <Text variant="body2" weight="semiBold" style={styles.historyText}>
                 Previous History
