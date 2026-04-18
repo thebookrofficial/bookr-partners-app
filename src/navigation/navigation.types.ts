@@ -8,6 +8,7 @@ import { NavigatorScreenParams } from "@react-navigation/native";
 // 1. Define the screens in the Authentication flow
 export type AuthStackParamList = {
   Login: undefined;
+  Otp: { email: string };
   Signup: undefined;
 };
 

@@ -33,6 +33,8 @@ import { SportsEssentialsScreen } from "@/features/sports/screens/SportsEssentia
 import { BlockUnblockScreen } from "@/features/sports/screens/BlockUnblockScreen";
 import { BulkBookingScreen } from "@/features/sports/screens/BulkBookingScreen";
 import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingDetailsScreen";
+import { LoginScreen } from "@/screens/auth/LoginScreen";
+import { OtpScreen } from "@/screens/auth/OtpScreen";
 import { Text } from "@/components/ui";
 
 import { COLORS } from "@/constants/theme";
@@ -50,7 +52,6 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
   </View>
 );
 
-const LoginScreen = () => <PlaceholderScreen title="Login Screen" />;
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
 const SportsProfileScreen = () => <PlaceholderScreen title="Sports Profile" />;
 
@@ -59,10 +60,6 @@ const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainStack = createNativeStackNavigator<MainStackParamList>();
 const SportsTab = createBottomTabNavigator<SportsTabParamList>();
 
-/**
- * FIX: Defining Icons outside the render function to prevent
- * 'react/no-unstable-nested-components' and re-mounting issues.
- */
 const TabIcon =
   (IconComponent: any) =>
   ({ color }: { color: string }) =>
@@ -82,18 +79,18 @@ const SportsTabNavigator = () => {
           borderTopColor: COLORS.border.navBar,
           borderTopLeftRadius: ms(20),
           borderTopRightRadius: ms(20),
-          height: vs(80), // Exact Figma height
+          height: vs(80),
           paddingTop: vs(4),
-          paddingBottom: vs(25), // Handles visual centering & safe area
+          paddingBottom: vs(25),
           paddingHorizontal: hs(10),
           boxShadow: "0px -1px 10px rgba(203, 223, 254, 1)",
           gap: vs(10),
         },
         tabBarLabelStyle: {
-          fontFamily: "Gilroy-Bold", // Exact Figma font
+          fontFamily: "Gilroy-Bold",
           fontSize: fs(12),
           lineHeight: fs(12),
-          marginTop: vs(2), // 2px gap from Figma
+          marginTop: vs(2),
         },
       }}>
       <SportsTab.Screen
@@ -128,6 +125,7 @@ const SportsTabNavigator = () => {
 const AuthNavigator = () => (
   <AuthStack.Navigator screenOptions={{ headerShown: false }}>
     <AuthStack.Screen name="Login" component={LoginScreen} />
+    <AuthStack.Screen name="Otp" component={OtpScreen} />
     <AuthStack.Screen name="Signup" component={SignupScreen} />
   </AuthStack.Navigator>
 );
@@ -148,17 +146,14 @@ const MainNavigator = () => (
 );
 
 export const AppNavigator = () => {
-  // Pulling state and actions directly from our global Zustand store
   const { session, isInitialized, setSession, setInitialized } = useAuthStore();
 
   useEffect(() => {
-    // 1. Fetch initial session from AsyncStorage (handles auto-login)
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setInitialized(true);
     });
 
-    // 2. Listen to real-time auth changes (login, logout, token refresh)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
@@ -168,7 +163,6 @@ export const AppNavigator = () => {
     return () => subscription.unsubscribe();
   }, [setSession, setInitialized]);
 
-  // Show a loading screen while verifying the session token
   if (!isInitialized) {
     return (
       <View style={styles.placeholderContainer}>
