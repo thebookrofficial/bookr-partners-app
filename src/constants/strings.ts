@@ -11,7 +11,7 @@ export const STRINGS = {
     addStaff: "Add Staff",
     addMoreService: "ADD MORE SERVICE",
     addServices: "Add Services",
-    tabs: ["All Services", "Event", "Sport", "Restaurant", "Staycation"],
+    tabs: ["All Venues", "Events", "Sports", "Dining", "Staycation"],
   },
   settings: {
     title: "Settings",
