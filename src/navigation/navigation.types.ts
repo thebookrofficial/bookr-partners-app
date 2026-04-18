@@ -33,6 +33,8 @@ export type MainStackParamList = {
   BookingDetails: { bookingId: string };
   GuestHistory: { guestId: string };
   BlockUnblock: undefined;
+  BulkBooking: undefined;
+  BulkBookingDetails: { bookingId: string; type: "multi" | "single" };
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

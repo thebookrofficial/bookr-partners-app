@@ -31,6 +31,8 @@ import { SportsHistoryScreen } from "@/features/sports/screens/SportsHistoryScre
 import { SportsDashboardScreen } from "@/features/sports/screens/SportsDashboardScreen";
 import { SportsEssentialsScreen } from "@/features/sports/screens/SportsEssentialsScreen";
 import { BlockUnblockScreen } from "@/features/sports/screens/BlockUnblockScreen";
+import { BulkBookingScreen } from "@/features/sports/screens/BulkBookingScreen";
+import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingDetailsScreen";
 import { Text } from "@/components/ui";
 
 import { COLORS } from "@/constants/theme";
@@ -136,6 +138,8 @@ const MainNavigator = () => (
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
     <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />
     <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
+    <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />
+    <MainStack.Screen name="BulkBookingDetails" component={BulkBookingDetailsScreen} />
   </MainStack.Navigator>
 );
 

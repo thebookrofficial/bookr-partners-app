@@ -57,8 +57,7 @@ export const SportsEssentialsScreen = () => {
         <EssentialActionRow
           title="Bulk Booking"
           icon={Files}
-          // eslint-disable-next-line no-console
-          onPress={() => console.log("Bulk Booking Tapped")}
+          onPress={() => navigation.navigate("BulkBooking")}
         />
         <EssentialActionRow
           title="Block / Unblock"
