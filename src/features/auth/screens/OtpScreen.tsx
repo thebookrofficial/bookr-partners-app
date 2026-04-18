@@ -1,14 +1,14 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useRef, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput, Alert } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput } from "react-native";
 import { Text } from "@/components/ui";
 import { AuthScreenProps } from "@/navigation/navigation.types";
 import { COLORS } from "@/constants/theme";
 import { vs, hs, ms, fs } from "@/utils/responsive.utils";
 import { ChevronLeft } from "lucide-react-native";
-import { supabase } from "@/lib/supabase";
+import { useAuthLogic } from "../hooks/useAuthLogic";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const OTP_LENGTH = 6;
@@ -16,10 +16,12 @@ const TIMER_SECONDS = 30;
 
 export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
   const { email } = route.params;
-  const [otp, setOtp] = useState<string[]>(new Array(OTP_LENGTH).fill(""));
-  const [isLoading, setIsLoading] = useState(false);
+  const { isLoading, verifyOtpCode, resendOtpCode } = useAuthLogic();
+
+  // Now we just use a simple string instead of an array!
+  const [code, setCode] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
   const [timer, setTimer] = useState(TIMER_SECONDS);
-  const inputRefs = useRef<Array<RNTextInput | null>>([]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -29,48 +31,21 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
     return () => clearInterval(interval);
   }, [timer]);
 
-  const handleChange = (text: string, index: number) => {
-    const newOtp = [...otp];
-    newOtp[index] = text;
-    setOtp(newOtp);
-
-    // Auto-advance to next input
-    if (text && index < OTP_LENGTH - 1) {
-      inputRefs.current[index + 1]?.focus();
+  // Trigger API call the exact millisecond the 6th digit is typed
+  useEffect(() => {
+    if (code.length === OTP_LENGTH) {
+      verifyOtpCode(email, code);
     }
+  }, [code, email, verifyOtpCode]);
 
-    // Auto-submit if full
-    if (index === OTP_LENGTH - 1 && text) {
-      verifyOtp(newOtp.join(""));
-    }
+  const handleChangeText = (text: string) => {
+    // Sanitize: Only allow numbers
+    const numericText = text.replace(/[^0-9]/g, "");
+    setCode(numericText);
   };
 
-  const handleKeyPress = (e: any, index: number) => {
-    // Handle backspace auto-delete and move back
-    if (e.nativeEvent.key === "Backspace" && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const verifyOtp = async (code: string) => {
-    setIsLoading(true);
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: code,
-      type: "email",
-    });
-    setIsLoading(false);
-
-    if (error) {
-      Alert.alert("Verification Failed", error.message);
-    }
-    // If successful, the auth listener in RootNavigator will automatically route us to Main!
-  };
-
-  const handleResend = async () => {
-    setTimer(TIMER_SECONDS);
-    const { error } = await supabase.auth.signInWithOtp({ email });
-    if (error) Alert.alert("Error", error.message);
+  const handleResend = () => {
+    resendOtpCode(email, () => setTimer(TIMER_SECONDS));
   };
 
   return (
@@ -95,27 +70,40 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
           Enter the 6-digit code sent to {email}
         </Text>
 
+        {/* The New OTP Container */}
         <View style={styles.otpContainer}>
-          {otp.map((digit, index) => (
-            <RNTextInput
-              key={index}
-              ref={ref => {
-                inputRefs.current[index] = ref;
-              }}
-              style={[
-                styles.otpInput,
-                digit !== "" && styles.otpInputFilled,
-                // Highlight current empty box logic could go here
-              ]}
-              maxLength={1}
-              keyboardType="number-pad"
-              value={digit}
-              onChangeText={text => handleChange(text, index)}
-              onKeyPress={e => handleKeyPress(e, index)}
-              editable={!isLoading}
-              selectTextOnFocus
-            />
-          ))}
+          {/* 1. Render the 6 visual UI boxes */}
+          {new Array(OTP_LENGTH).fill(0).map((_, index) => {
+            const digit = code[index] || "";
+            const isCurrentBox = isFocused && code.length === index;
+
+            return (
+              <View
+                key={index}
+                style={[
+                  styles.otpBox,
+                  digit !== "" && styles.otpBoxFilled,
+                  isCurrentBox && styles.otpBoxFocused, // Highlights the box you are currently on!
+                ]}>
+                <Text style={styles.otpText}>{digit}</Text>
+              </View>
+            );
+          })}
+
+          {/* 2. The single, invisible master input sitting on top */}
+          <RNTextInput
+            value={code}
+            onChangeText={handleChangeText}
+            maxLength={OTP_LENGTH}
+            keyboardType="number-pad"
+            style={styles.hiddenInput}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            autoFocus
+            editable={!isLoading}
+            autoComplete="one-time-code" // Helps with native OTP autofill
+            textContentType="oneTimeCode"
+          />
         </View>
 
         <View style={styles.resendContainer}>
@@ -127,7 +115,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
               Resend in {timer}s
             </Text>
           ) : (
-            <TouchableOpacity onPress={handleResend}>
+            <TouchableOpacity onPress={handleResend} disabled={isLoading}>
               <Text variant="body2" weight="bold" color={COLORS.text.primary}>
                 Resend
               </Text>
@@ -136,7 +124,6 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
         </View>
       </View>
 
-      {/* Footer Terms */}
       <View style={styles.footer}>
         <Text variant="caption" color={COLORS.text.secondary}>
           By continuing, you agree to our
@@ -195,7 +182,7 @@ const styles = StyleSheet.create({
     paddingBottom: vs(40),
   },
   logoContainer: {
-    marginBottom: vs(80),
+    marginBottom: vs(40),
   },
   logoText: {
     fontSize: fs(48),
@@ -211,27 +198,44 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: vs(40),
   },
+
+  // Updated Styles for the new pattern
   otpContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
     marginBottom: vs(30),
+    position: "relative", // Required for absolute positioning the hidden input
   },
-  otpInput: {
+  otpBox: {
     width: ms(48),
     height: ms(56),
     borderWidth: 1.5,
     borderColor: COLORS.surface.fallback,
     borderRadius: ms(12),
-    textAlign: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.background,
+  },
+  otpBoxFilled: {
+    borderColor: COLORS.warning,
+  },
+  otpBoxFocused: {
+    borderColor: COLORS.primary, // Gives a nice visual cue for where you are typing
+  },
+  otpText: {
     fontSize: fs(24),
     fontFamily: "Gilroy-Bold",
     color: COLORS.text.primary,
-    backgroundColor: COLORS.background,
   },
-  otpInputFilled: {
-    borderColor: COLORS.warning, // The yellow border from your Figma
+  hiddenInput: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    opacity: 0, // This makes it completely invisible!
+    zIndex: 99, // Keeps it on top so taps register
   },
+
   resendContainer: {
     flexDirection: "row",
     alignItems: "center",

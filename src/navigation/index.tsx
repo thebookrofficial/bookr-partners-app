@@ -33,8 +33,8 @@ import { SportsEssentialsScreen } from "@/features/sports/screens/SportsEssentia
 import { BlockUnblockScreen } from "@/features/sports/screens/BlockUnblockScreen";
 import { BulkBookingScreen } from "@/features/sports/screens/BulkBookingScreen";
 import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingDetailsScreen";
-import { LoginScreen } from "@/screens/auth/LoginScreen";
-import { OtpScreen } from "@/screens/auth/OtpScreen";
+import { LoginScreen } from "@/features/auth/screens/LoginScreen";
+import { OtpScreen } from "@/features/auth/screens/OtpScreen";
 import { Text } from "@/components/ui";
 
 import { COLORS } from "@/constants/theme";

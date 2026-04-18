@@ -2,78 +2,61 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Alert } from "react-native";
-import { Text, TextInput, Button } from "@/components/ui";
+import { View, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { Text, Button } from "@/components/ui";
 import { AuthScreenProps } from "@/navigation/navigation.types";
 import { COLORS } from "@/constants/theme";
 import { vs, hs, ms, fs } from "@/utils/responsive.utils";
-import { supabase } from "@/lib/supabase";
+import { useAuthLogic } from "../hooks/useAuthLogic";
+import { AuthTextInput } from "../components/AuthTextInput";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
   const [email, setEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const { isLoading, loginWithEmail, loginWithGoogle } = useAuthLogic();
 
-  const handleEmailLogin = async () => {
-    if (!email.trim() || !email.includes("@")) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.");
-      return;
-    }
-
-    setIsLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-    });
-    setIsLoading(false);
-
-    if (error) {
-      Alert.alert("Login Error", error.message);
-    } else {
-      // Navigate to OTP screen and pass the email
+  const handleEmailContinue = () => {
+    loginWithEmail(email, () => {
       navigation.navigate("Otp", { email: email.trim() });
-    }
-  };
-
-  const handleGoogleLogin = () => {
-    Alert.alert("Google Auth", "Requires Native Google Sign-In package setup.");
+    });
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Background patterns would go here as an absolute ImageBackground */}
-
       <View style={styles.content}>
-        {/* Logo */}
         <View style={styles.logoContainer}>
           <Text variant="h1" style={styles.logoText}>
             bookr
           </Text>
         </View>
-        {/* Google Login */}
+
         <Button
           title="Sign in with Google"
           variant="outline"
-          onPress={handleGoogleLogin}
+          onPress={loginWithGoogle}
           style={styles.googleButton}
           leftIcon={
-            <View style={styles.googleIconPlaceholder}>
-              <Text style={styles.googleIconText}>G</Text>
-            </View>
+            <Image
+              source={{ uri: "https://img.icons8.com/color/48/google-logo.png" }}
+              style={styles.googleIconPlaceholder}
+            />
           }
         />
 
-        {/* Divider */}
         <View style={styles.dividerContainer}>
           <View style={styles.dividerLine} />
-          <Text variant="caption" color={COLORS.text.muted} style={styles.dividerText}>
+          <Text
+            variant="caption"
+            weight="bold"
+            color={COLORS.text.muted}
+            style={styles.dividerText}>
             OR
           </Text>
           <View style={styles.dividerLine} />
         </View>
 
-        {/* Email Login */}
-        <TextInput
-          variant="filled"
+        {/* Replaced with the custom Auth-specific input */}
+        <AuthTextInput
           placeholder="Email Address"
           value={email}
           onChangeText={setEmail}
@@ -81,19 +64,19 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
           autoCapitalize="none"
           autoCorrect={false}
           editable={!isLoading}
+          style={styles.emailInput}
         />
 
         <Button
           title="Continue"
           variant="primary"
-          onPress={handleEmailLogin}
+          onPress={handleEmailContinue}
           isLoading={isLoading}
           disabled={!email.trim() || isLoading}
           style={styles.continueButton}
         />
       </View>
 
-      {/* Footer Terms */}
       <View style={styles.footer}>
         <Text variant="caption" color={COLORS.text.secondary}>
           By continuing, you agree to our
@@ -143,10 +126,10 @@ const styles = StyleSheet.create({
     marginBottom: vs(80),
   },
   logoText: {
-    fontSize: fs(61),
+    fontSize: fs(64),
     fontFamily: "Gilroy-ExtraBold",
-    color: "#4A00E0", // Exact purple from your Figma image
-    letterSpacing: 1,
+    color: "#4A00E0",
+    letterSpacing: -2,
   },
   googleButton: {
     borderRadius: ms(30),
@@ -156,10 +139,6 @@ const styles = StyleSheet.create({
   googleIconPlaceholder: {
     width: 24,
     height: 24,
-    borderRadius: 12,
-    backgroundColor: "#DB4437", // Google Red
-    alignItems: "center",
-    justifyContent: "center",
   },
   googleIconText: {
     color: "#fff",
@@ -174,13 +153,28 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: COLORS.surface.fallback,
+    backgroundColor: COLORS.text.muted,
   },
   dividerText: {
     marginHorizontal: hs(16),
   },
+  emailInput: {
+    marginBottom: vs(20),
+    height: vs(54),
+    // Use your theme's grey (#F5F5F5) instead of the bluish-white
+    backgroundColor: COLORS.surface.secondary,
+    // Increase thickness slightly to make it visible
+    borderWidth: 1.5,
+    // Use the darker fallback grey (#EAEAEA) for a visible outline
+    borderColor: COLORS.surface.fallback,
+    borderRadius: ms(30),
+    paddingHorizontal: hs(24),
+    fontSize: fs(16),
+    fontFamily: "Gilroy-SemiBold",
+    color: COLORS.text.primary,
+    width: "100%",
+  },
   continueButton: {
-    marginTop: vs(8),
     borderRadius: ms(30),
   },
   footer: {
