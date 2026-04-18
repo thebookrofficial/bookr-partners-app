@@ -1,0 +1,21 @@
+// Copyright (c) 2026 Bookr. All rights reserved.
+// Confidential and Proprietary.
+
+import { create } from "zustand";
+import { Session, User } from "@supabase/supabase-js";
+
+interface AuthState {
+  session: Session | null;
+  user: User | null;
+  isInitialized: boolean;
+  setSession: (session: Session | null) => void;
+  setInitialized: (status: boolean) => void;
+}
+
+export const useAuthStore = create<AuthState>(set => ({
+  session: null,
+  user: null,
+  isInitialized: false,
+  setSession: session => set({ session, user: session?.user ?? null }),
+  setInitialized: status => set({ isInitialized: status }),
+}));

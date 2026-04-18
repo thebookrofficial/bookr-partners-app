@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React from "react";
+import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -11,7 +11,7 @@ import {
   MainStackParamList,
   SportsTabParamList,
 } from "./navigation.types";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, ActivityIndicator } from "react-native";
 import {
   Calendar,
   History as HistoryIcon,
@@ -37,6 +37,10 @@ import { Text } from "@/components/ui";
 
 import { COLORS } from "@/constants/theme";
 import { vs, ms, fs, hs } from "@/utils/responsive.utils";
+
+// --- AUTHENTICATION IMPORTS ---
+import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/store";
 
 const PlaceholderScreen = ({ title }: { title: string }) => (
   <View style={styles.placeholderContainer}>
@@ -144,12 +148,39 @@ const MainNavigator = () => (
 );
 
 export const AppNavigator = () => {
-  const isAuthenticated = true;
+  // Pulling state and actions directly from our global Zustand store
+  const { session, isInitialized, setSession, setInitialized } = useAuthStore();
+
+  useEffect(() => {
+    // 1. Fetch initial session from AsyncStorage (handles auto-login)
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setInitialized(true);
+    });
+
+    // 2. Listen to real-time auth changes (login, logout, token refresh)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [setSession, setInitialized]);
+
+  // Show a loading screen while verifying the session token
+  if (!isInitialized) {
+    return (
+      <View style={styles.placeholderContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {isAuthenticated ? (
+        {session ? (
           <RootStack.Screen name="Main" component={MainNavigator} />
         ) : (
           <RootStack.Screen name="Auth" component={AuthNavigator} />
