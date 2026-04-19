@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import { View, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image, Linking, Alert } from "react-native";
 import { Text } from "@/components/ui";
 import { Phone, Calendar, Clock } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -44,6 +44,26 @@ export const BookingCard = ({
   const textColor = isOfflineRecord ? COLORS.text.muted : COLORS.text.primary;
   const iconColor = isOfflineRecord ? COLORS.text.muted : COLORS.text.primary;
   const cardBg = isOfflineRecord ? "#E0E0E0" : COLORS.surface.primary;
+
+  const handleCall = () => {
+    // If a custom onCallPress is provided, use it. Otherwise, trigger deep link.
+    if (onCallPress) {
+      onCallPress();
+      return;
+    }
+
+    if (phone) {
+      // Remove spaces and special characters for the dialer
+      const cleanPhone = phone.replace(/[^\d+]/g, "");
+      const url = `tel:${cleanPhone}`;
+
+      Linking.openURL(url).catch(() => {
+        Alert.alert("Error", "Could not open dialer.");
+      });
+    } else {
+      Alert.alert("Notice", "No phone number available for this booking.");
+    }
+  };
 
   const getStatusColor = () => {
     if (status === "Offline") return COLORS.danger;
@@ -117,13 +137,12 @@ export const BookingCard = ({
             variant="body2"
             weight="semiBold"
             color={textColor}
-            /* FIXED: Using predefined style instead of inline object */
             style={[styles.timeText, hideDateText && styles.timeTextExpanded]}>
             {time}
           </Text>
 
           {!hideCallButton && (
-            <TouchableOpacity style={styles.callButton} onPress={onCallPress} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.callButton} onPress={handleCall} activeOpacity={0.7}>
               <Text
                 variant="caption"
                 weight="bold"

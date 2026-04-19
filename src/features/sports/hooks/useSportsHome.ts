@@ -19,8 +19,20 @@ interface GroundData {
 export interface SlotData {
   id: string;
   time: string;
-  status: "available" | "booked" | "blocked" | "maintenance"; // DB enums
+  status: "available" | "booked" | "blocked" | "maintenance";
   raw_start_time: string;
+}
+
+export interface BookingData {
+  id: string;
+  name: string;
+  phone: string;
+  date: string;
+  time: string;
+  price: string;
+  status: "Online" | "Offline" | "Advance" | "Settlement" | "Full";
+  avatarUrl?: string;
+  isOfflineRecord: boolean;
 }
 
 export const useSportsHome = (venueId: string) => {
@@ -30,10 +42,14 @@ export const useSportsHome = (venueId: string) => {
   const [loading, setLoading] = useState(true);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
   const [slots, setSlots] = useState<SlotData[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
 
-  // 1. Fetch Venue & Grounds (Runs once on mount)
+  const [bookings, setBookings] = useState<BookingData[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+
+  // 1. Fetch Venue & Grounds
   const fetchVenueDetails = useCallback(async () => {
     setLoading(true);
     try {
@@ -71,7 +87,6 @@ export const useSportsHome = (venueId: string) => {
 
     setSlotsLoading(true);
     try {
-      // Format date to YYYY-MM-DD for Postgres
       const dateString = selectedDate.toISOString().split("T")[0];
 
       const { data: slotsData, error } = await supabase
@@ -84,9 +99,7 @@ export const useSportsHome = (venueId: string) => {
 
       if (error) throw error;
 
-      // Map DB slots to UI friendly format
       const formattedSlots: SlotData[] = (slotsData || []).map(slot => {
-        // Convert "14:00:00" to "2 Pm"
         const [hours] = slot.start_time.split(":");
         const hourInt = parseInt(hours, 10);
         const ampm = hourInt >= 12 ? "Pm" : "AM";
@@ -108,14 +121,80 @@ export const useSportsHome = (venueId: string) => {
     }
   }, [venueId, activeGroundId, selectedDate]);
 
+  // 3. Fetch Bookings for active Ground & Date
+  const fetchBookings = useCallback(async () => {
+    if (!activeGroundId) return;
+
+    setBookingsLoading(true);
+    try {
+      const dateString = selectedDate.toISOString().split("T")[0];
+
+      const { data: bookingsData, error } = await supabase
+        .from("sports_bookings")
+        .select(
+          `
+          id,
+          total_amount,
+          profiles ( full_name, phone, avatar_url ),
+          sports_slots!inner ( start_time, end_time, ground_id, slot_date )
+        `,
+        )
+        .eq("venue_id", venueId)
+        .eq("sports_slots.ground_id", activeGroundId)
+        .eq("sports_slots.slot_date", dateString);
+
+      if (error) throw error;
+
+      const formattedBookings: BookingData[] = (bookingsData || []).map((b: any) => {
+        const formatHour = (timeStr: string) => {
+          const [h] = timeStr.split(":");
+          const hourInt = parseInt(h, 10);
+          const ampm = hourInt >= 12 ? "Pm" : "Am";
+          const displayHour = hourInt % 12 || 12;
+          return `${displayHour} ${ampm}`;
+        };
+
+        const slotDate = new Date(b.sports_slots.slot_date);
+        const formattedDate = slotDate.toLocaleDateString("en-GB", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+
+        // Determine online vs offline (We will assume Online for now until offline logic is solidified)
+        const isOffline = false;
+
+        return {
+          id: b.id,
+          name: b.profiles?.full_name || "Guest User",
+          phone: b.profiles?.phone || "",
+          date: formattedDate,
+          time: `${formatHour(b.sports_slots.start_time)} - ${formatHour(b.sports_slots.end_time)}`,
+          price: `₹${b.total_amount || 0}`,
+          status: isOffline ? "Offline" : "Online",
+          avatarUrl: b.profiles?.avatar_url,
+          isOfflineRecord: isOffline,
+        };
+      });
+
+      setBookings(formattedBookings);
+    } catch (error) {
+      console.error("Error fetching bookings:", error);
+    } finally {
+      setBookingsLoading(false);
+    }
+  }, [venueId, activeGroundId, selectedDate]);
+
   useEffect(() => {
     if (venueId) fetchVenueDetails();
   }, [venueId, fetchVenueDetails]);
 
-  // Trigger slot fetch when Ground or Date changes
+  // Trigger both fetches when Ground or Date changes
   useEffect(() => {
     fetchSlots();
-  }, [fetchSlots]);
+    fetchBookings();
+  }, [fetchSlots, fetchBookings]);
 
   return {
     venue,
@@ -126,6 +205,8 @@ export const useSportsHome = (venueId: string) => {
     setSelectedDate,
     slots,
     slotsLoading,
+    bookings,
+    bookingsLoading,
     loading,
   };
 };

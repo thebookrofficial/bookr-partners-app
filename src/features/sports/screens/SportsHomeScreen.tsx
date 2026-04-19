@@ -64,6 +64,8 @@ export const SportsHomeScreen = () => {
     setSelectedDate,
     slots,
     slotsLoading,
+    bookings, // <-- Extract new states
+    bookingsLoading, // <-- Extract new states
     loading,
   } = useSportsHome(serviceId);
 
@@ -163,34 +165,28 @@ export const SportsHomeScreen = () => {
 
         {/* 5. Bookings List */}
         <View style={styles.bookingsContainer}>
-          <BookingCard
-            name="Chirag Patil"
-            phone="+91 89346 93456"
-            date="Mon, 7 Apr 2026"
-            time="7 Pm - 8 Pm"
-            price="₹800"
-            status="Online"
-            onPress={() => navigation.navigate("BookingDetails", { bookingId: "123" })}
-          />
-          <BookingCard
-            name="Yash Jadhav"
-            phone="+91 89346 93456"
-            date="Mon, 7 Apr 2026"
-            time="8 Pm - 9 Pm"
-            price="₹100"
-            status="Online"
-            onPress={() => navigation.navigate("BookingDetails", { bookingId: "124" })}
-          />
-          <BookingCard
-            name="Rohit Sharma"
-            phone="+91 89346 93456"
-            date="Mon, 7 Apr 2026"
-            time="4 Pm - 5 Pm"
-            price="₹800"
-            status="Offline"
-            isOfflineRecord={true}
-            onPress={() => navigation.navigate("BookingDetails", { bookingId: "125" })}
-          />
+          {bookingsLoading ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={styles.loaderStyle} />
+          ) : bookings.length === 0 ? (
+            <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
+              No bookings found for this date.
+            </Text>
+          ) : (
+            bookings.map(booking => (
+              <BookingCard
+                key={booking.id}
+                name={booking.name}
+                phone={booking.phone}
+                date={booking.date}
+                time={booking.time}
+                price={booking.price}
+                status={booking.status}
+                avatarUrl={booking.avatarUrl}
+                isOfflineRecord={booking.isOfflineRecord}
+                onPress={() => navigation.navigate("BookingDetails", { bookingId: booking.id })}
+              />
+            ))
+          )}
         </View>
 
         {/* Bottom Spacer for the Absolute Tab Bar + FAB */}
