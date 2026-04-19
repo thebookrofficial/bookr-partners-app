@@ -7,27 +7,51 @@ import { Text } from "@/components/ui";
 import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
-export type SlotStatus = "available" | "online" | "manual" | "unavailable";
+// Aligning with our Supabase 'slot_status' enum
+export type DbSlotStatus = "available" | "booked" | "blocked" | "maintenance";
 
 export interface TimeSlotData {
   id: string;
   time: string;
-  status: SlotStatus;
+  status: DbSlotStatus | string;
+  raw_start_time?: string; // e.g. "14:00:00" from DB
 }
 
 interface TimeSlotGridProps {
   slots: TimeSlotData[];
+  selectedDate: Date; // Needed to calculate if slots have passed today
   onSlotPress?: (slot: TimeSlotData) => void;
 }
 
-export const TimeSlotGrid = ({ slots, onSlotPress }: TimeSlotGridProps) => {
+export const TimeSlotGrid = ({ slots, selectedDate, onSlotPress }: TimeSlotGridProps) => {
+  // Get current time to disable past slots if viewing 'Today'
+  const now = new Date();
+  const isToday =
+    selectedDate.getDate() === now.getDate() &&
+    selectedDate.getMonth() === now.getMonth() &&
+    selectedDate.getFullYear() === now.getFullYear();
+
+  const currentHour = now.getHours();
+  const currentMinutes = now.getMinutes();
+
   return (
     <View style={styles.grid}>
       {slots.map(slot => {
-        const isAvailable = slot.status === "available";
-        const isOnline = slot.status === "online";
-        const isManual = slot.status === "manual";
-        const isUnavailable = slot.status === "unavailable";
+        // 1. Check if the slot has already passed
+        let isPast = false;
+        if (isToday && slot.raw_start_time) {
+          const [hours, minutes] = slot.raw_start_time.split(":").map(Number);
+          if (hours < currentHour || (hours === currentHour && minutes < currentMinutes)) {
+            isPast = true;
+          }
+        }
+
+        // 2. Map Database status to UI styles
+        // Past slots OR maintenance slots are completely unavailable
+        const isUnavailable = isPast || slot.status === "maintenance";
+        const isAvailable = !isUnavailable && slot.status === "available";
+        const isOnline = !isUnavailable && slot.status === "booked";
+        const isManual = !isUnavailable && slot.status === "blocked";
 
         return (
           <TouchableOpacity
@@ -82,7 +106,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   slotManual: {
-    backgroundColor: COLORS.danger, // #E55959
+    backgroundColor: "#E57C59", // Matched with Legend manual color
   },
   slotUnavailable: {
     backgroundColor: "#E5E5E5",

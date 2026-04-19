@@ -7,7 +7,10 @@ import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { LegendIndicator } from "../components/LegendIndicator";
-import { TimeSlotGrid, TimeSlotData } from "../components/TimeSlotGrid";
+import {
+  TimeSlotGrid,
+  // TimeSlotData
+} from "../components/TimeSlotGrid";
 import { BookingCard } from "../components/BookingCard";
 import { Calendar as CalendarIcon, Plus } from "lucide-react-native";
 import { hs, vs, ms } from "@/utils/responsive.utils";
@@ -20,26 +23,26 @@ import { useSportsHome } from "../hooks/useSportsHome";
 import { Calendar } from "react-native-calendars";
 
 // --- DUMMY DATA MATCHING FIGMA ---
-const DUMMY_SLOTS: TimeSlotData[] = [
-  { id: "1", time: "7 AM", status: "unavailable" },
-  { id: "2", time: "8 AM", status: "unavailable" },
-  { id: "3", time: "9 AM", status: "unavailable" },
-  { id: "4", time: "10 AM", status: "unavailable" },
-  { id: "5", time: "11 AM", status: "unavailable" },
-  { id: "6", time: "12 AM", status: "unavailable" }, // Note: usually 12 PM, keeping Figma text
-  { id: "7", time: "1 Pm", status: "available" },
-  { id: "8", time: "2 Pm", status: "available" },
-  { id: "9", time: "3 Pm", status: "available" },
-  { id: "10", time: "4 Pm", status: "available" },
-  { id: "11", time: "5 Pm", status: "available" },
-  { id: "12", time: "6 Pm", status: "available" },
-  { id: "13", time: "7 Pm", status: "online" },
-  { id: "14", time: "8 PM", status: "manual" },
-  { id: "15", time: "9 Pm", status: "online" },
-  { id: "16", time: "10 Pm", status: "online" },
-  { id: "17", time: "11 PM", status: "manual" },
-  { id: "18", time: "12 Am", status: "manual" },
-];
+// const DUMMY_SLOTS: TimeSlotData[] = [
+//   { id: "1", time: "7 AM", status: "unavailable" },
+//   { id: "2", time: "8 AM", status: "unavailable" },
+//   { id: "3", time: "9 AM", status: "unavailable" },
+//   { id: "4", time: "10 AM", status: "unavailable" },
+//   { id: "5", time: "11 AM", status: "unavailable" },
+//   { id: "6", time: "12 AM", status: "unavailable" }, // Note: usually 12 PM, keeping Figma text
+//   { id: "7", time: "1 Pm", status: "available" },
+//   { id: "8", time: "2 Pm", status: "available" },
+//   { id: "9", time: "3 Pm", status: "available" },
+//   { id: "10", time: "4 Pm", status: "available" },
+//   { id: "11", time: "5 Pm", status: "available" },
+//   { id: "12", time: "6 Pm", status: "available" },
+//   { id: "13", time: "7 Pm", status: "online" },
+//   { id: "14", time: "8 PM", status: "manual" },
+//   { id: "15", time: "9 Pm", status: "online" },
+//   { id: "16", time: "10 Pm", status: "online" },
+//   { id: "17", time: "11 PM", status: "manual" },
+//   { id: "18", time: "12 Am", status: "manual" },
+// ];
 
 export const SportsHomeScreen = () => {
   // const [activeGround, setActiveGround] = useState("Ground 1");
@@ -59,8 +62,11 @@ export const SportsHomeScreen = () => {
     setActiveGroundId,
     selectedDate,
     setSelectedDate,
+    slots,
+    slotsLoading,
     loading,
   } = useSportsHome(serviceId);
+
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
@@ -90,7 +96,7 @@ export const SportsHomeScreen = () => {
   }
 
   // 4. Map active ground name for PillTabs
-  const activeGroundName = grounds.find(g => g.id === activeGroundId)?.name || "";
+  // const activeGroundName = grounds.find(g => g.id === activeGroundId)?.name || "";
 
   return (
     <View style={styles.root}>
@@ -116,25 +122,44 @@ export const SportsHomeScreen = () => {
         </TouchableOpacity>
 
         {/* 3. Ground Selector */}
-        <View style={styles.groundTabs}>
-          <PillTabs
-            tabs={grounds.map(g => g.name)}
-            activeTab={activeGroundName}
-            onTabChange={selectedName => {
-              const selectedGround = grounds.find(g => g.name === selectedName);
-              if (selectedGround) setActiveGroundId(selectedGround.id);
-            }}
-            variant="primary"
-            style={{ marginTop: vs(10), marginBottom: vs(10) }}
-          />
-        </View>
+        {grounds.length > 1 && (
+          <View style={styles.groundTabs}>
+            <PillTabs
+              tabs={grounds.map(g => g.name)}
+              activeTab={grounds.find(g => g.id === activeGroundId)?.name || ""}
+              onTabChange={selectedName => {
+                const selectedGround = grounds.find(g => g.name === selectedName);
+                if (selectedGround) {
+                  setActiveGroundId(selectedGround.id);
+                }
+              }}
+              variant="primary"
+            />
+          </View>
+        )}
 
         {/* 4. Time Slots Section */}
         <Text variant="body1" weight="bold" style={styles.sectionTitle}>
           TIME SLOT
         </Text>
         <LegendIndicator />
-        <TimeSlotGrid slots={DUMMY_SLOTS} />
+
+        {slotsLoading ? (
+          <ActivityIndicator size="small" color={COLORS.primary} style={styles.loaderStyle} />
+        ) : slots.length === 0 ? (
+          <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
+            No slots generated for this date/ground yet.
+          </Text>
+        ) : (
+          <TimeSlotGrid
+            slots={slots as any}
+            selectedDate={selectedDate} // <-- Add this prop!
+            onSlotPress={_slot => {
+              // We will wire up the tap actions in the next step!
+              // TODO: Open bottom sheet or navigate to slot details in Section 5
+            }}
+          />
+        )}
 
         {/* 5. Bookings List */}
         <View style={styles.bookingsContainer}>
@@ -245,6 +270,13 @@ const styles = StyleSheet.create({
   groundTabs: {
     marginTop: -vs(10), // Adjusting PillTabs default margin to match Figma tightness
     marginBottom: vs(10),
+  },
+  emptySlotsText: {
+    textAlign: "center",
+    marginVertical: vs(20),
+  },
+  loaderStyle: {
+    marginVertical: vs(20),
   },
   sectionTitle: {
     textTransform: "uppercase",

@@ -19,7 +19,7 @@ export const LegendIndicator = () => {
       <View style={styles.legendItem}>
         <View style={[styles.dot, styles.manual]} />
         <Text variant="body2" weight="bold">
-          Manuel
+          Manual
         </Text>
       </View>
       <View style={styles.legendItem}>
@@ -42,14 +42,15 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap", // Added to ensure it doesn't break layout on narrow screens
     width: "100%",
-    gap: hs(6),
+    gap: hs(8),
     marginBottom: vs(10),
   },
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: hs(6),
+    gap: hs(4),
   },
   dot: {
     width: ms(10),
@@ -61,7 +62,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#CBDFFE",
   },
-  manual: { backgroundColor: "#E57C59" },
-  online: { backgroundColor: COLORS.primary },
-  unavailable: { backgroundColor: "#E5E5E5" },
+  manual: { backgroundColor: "#E57C59" }, // Coral/Red for Manual
+  online: { backgroundColor: COLORS.primary }, // Blue for Online
+  unavailable: { backgroundColor: "#E5E5E5" }, // Grey for Unavailable
 });
