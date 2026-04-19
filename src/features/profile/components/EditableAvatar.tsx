@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Avatar, AvatarProps } from "@/components/ui/Avatar";
 import { Camera } from "lucide-react-native";
 import { ms } from "@/utils/responsive.utils";
@@ -10,14 +10,24 @@ import { COLORS } from "@/constants/theme";
 
 interface EditableAvatarProps extends AvatarProps {
   onEditPress?: () => void;
+  loading?: boolean;
 }
 
-export const EditableAvatar = ({ onEditPress, ...avatarProps }: EditableAvatarProps) => {
+export const EditableAvatar = ({ onEditPress, loading, ...avatarProps }: EditableAvatarProps) => {
   return (
     <View style={styles.container}>
       <Avatar {...avatarProps} />
-      <TouchableOpacity style={styles.badge} activeOpacity={0.8} onPress={onEditPress}>
-        <Camera size={ms(16)} color={COLORS.text.inverse} />
+      <TouchableOpacity
+        style={styles.badge}
+        activeOpacity={0.8}
+        onPress={onEditPress}
+        disabled={loading} // Disable button while uploading
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color={COLORS.text.inverse} />
+        ) : (
+          <Camera size={ms(16)} color={COLORS.text.inverse} />
+        )}
       </TouchableOpacity>
     </View>
   );

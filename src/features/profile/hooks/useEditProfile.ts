@@ -5,10 +5,12 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store";
 import { Alert } from "react-native";
+import { decode } from "base64-arraybuffer";
 
 export const useEditProfile = () => {
   const { profile, setProfile, clientProfile } = useAuthStore();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const updateProfile = async (newName: string, newPhone: string) => {
     if (!profile || !clientProfile) return;
@@ -47,5 +49,48 @@ export const useEditProfile = () => {
     }
   };
 
-  return { updateProfile, isUpdating };
+  const uploadAvatar = async (imageAsset: any) => {
+    if (!profile) return;
+    setIsUploading(true);
+
+    try {
+      const fileExt = imageAsset.uri.split(".").pop();
+      const fileName = `${profile.id}-${Math.random()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      // Supabase Storage expects ArrayBuffer for native uploads
+      const { error: uploadError } = await supabase.storage
+        .from("profiles") // Ensure this bucket exists in Supabase Dashboard
+        .upload(filePath, decode(imageAsset.base64), {
+          contentType: imageAsset.type,
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get Public URL
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("profiles").getPublicUrl(filePath);
+
+      // Update Table 4.1
+      const { data: updatedProfile, error: pError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl, version: profile.version + 1 })
+        .eq("id", profile.id)
+        .eq("version", profile.version)
+        .select()
+        .single();
+
+      if (pError) throw pError;
+      if (updatedProfile) setProfile(updatedProfile);
+    } catch (error: any) {
+      console.error("Upload Error:", error);
+      Alert.alert("Upload Failed", error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return { updateProfile, uploadAvatar, isUpdating, isUploading };
 };

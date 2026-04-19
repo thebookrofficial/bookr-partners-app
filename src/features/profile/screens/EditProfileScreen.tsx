@@ -14,6 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import { COLORS } from "@/constants/theme";
 import { useAuthStore } from "@/store";
 import { useEditProfile } from "../hooks/useEditProfile";
+import { launchImageLibrary } from "react-native-image-picker";
 
 const GstinLabel = () => (
   <View style={styles.gstinLabelContainer}>
@@ -33,7 +34,7 @@ export const EditProfileScreen = () => {
   const navigation = useNavigation();
   // Destructure 'profile' instead of 'user' for custom DB fields
   const { user, profile, clientProfile } = useAuthStore();
-  const { updateProfile, isUpdating } = useEditProfile();
+  const { updateProfile, isUpdating, uploadAvatar, isUploading } = useEditProfile();
 
   // Correctly map to the Profile interface (Blueprint Table 4.1)
   const [fullName, setFullName] = useState(profile?.full_name || "");
@@ -44,6 +45,25 @@ export const EditProfileScreen = () => {
     if (profile?.full_name) setFullName(profile.full_name);
     if (profile?.phone) setMobile(profile.phone);
   }, [profile]);
+
+  const handlePickImage = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: "photo",
+        includeBase64: true,
+        quality: 0.7,
+        selectionLimit: 1, // Only one photo
+      });
+
+      if (result.didCancel) {
+      } else if (result.errorCode) {
+      } else if (result.assets && result.assets.length > 0) {
+        await uploadAvatar(result.assets[0]);
+      }
+    } catch (error) {
+      console.error("Gallery Error:", error);
+    }
+  };
 
   /**
    * Coordinate the state variables with the hook parameters.
@@ -83,10 +103,10 @@ export const EditProfileScreen = () => {
       <View style={styles.avatarContainer}>
         <EditableAvatar
           size={100}
-          source={
-            user?.user_metadata?.avatar_url ? { uri: user.user_metadata.avatar_url } : undefined
-          }
-          fallbackInitials={fullName.charAt(0) || "Y"}
+          source={profile?.avatar_url ? { uri: profile.avatar_url } : undefined}
+          fallbackInitials={profile?.full_name?.charAt(0) || "P"}
+          onEditPress={handlePickImage} // Wired up!
+          loading={isUploading}
         />
       </View>
 
