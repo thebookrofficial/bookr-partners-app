@@ -146,6 +146,8 @@ export const useSportsHome = (venueId: string) => {
           total_amount,
           platform_fee,
           gateway_fee,
+          guest_name,
+          guest_phone,
           profiles ( full_name, phone, avatar_url ),
           sports_slots!inner ( start_time, end_time, ground_id, slot_date )
         `,
@@ -179,8 +181,8 @@ export const useSportsHome = (venueId: string) => {
 
         return {
           id: b.id,
-          name: b.profiles?.full_name || "Guest User",
-          phone: b.profiles?.phone || "",
+          name: b.profiles?.full_name || b.guest_name || "Guest User",
+          phone: b.profiles?.phone || b.guest_phone || "",
           date: formattedDate,
           time: `${formatHour(b.sports_slots.start_time)} - ${formatHour(b.sports_slots.end_time)}`,
           price: `₹${b.total_amount || 0}`,

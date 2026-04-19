@@ -2,228 +2,175 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import { View, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
-import {
-  ArrowLeft,
-  // Bell,
-  Settings,
-} from "lucide-react-native";
+import { ArrowLeft, Settings, Bell } from "lucide-react-native";
 import { BookingCard } from "../components/BookingCard";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { MainStackParamList } from "@/navigation/navigation.types";
+import { useGuestHistory, HistoryBooking } from "../hooks/useGuestHistory";
 
 export const GuestHistoryScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<MainStackParamList, "GuestHistory">>();
+  const { guestId } = route.params;
+
+  const { history, stats, guestName, loading } = useGuestHistory(guestId);
+
+  // Formatting helpers
+  const formatDisplayDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatTime = (timeStr: string) => {
+    const [h] = timeStr.split(":");
+    const hourInt = parseInt(h, 10);
+    return `${hourInt % 12 || 12} ${hourInt >= 12 ? "Pm" : "Am"}`;
+  };
+
+  const groupedHistory = history.reduce((acc: { [key: string]: HistoryBooking[] }, item) => {
+    const date = new Date(item.slot_date);
+    const monthYear = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+    if (!acc[monthYear]) acc[monthYear] = [];
+    acc[monthYear].push(item);
+    return acc;
+  }, {});
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
-    <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
+    <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(16)}>
       {/* 1. Header */}
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
         </TouchableOpacity>
-
         <Text variant="h3" weight="bold" style={styles.headerTitle}>
           Guest History
         </Text>
-
         <View style={styles.headerActions}>
-          {/* <TouchableOpacity style={styles.iconBtn}>
-            <Bell size={ms(24)} color={COLORS.text.primary} />
-          </TouchableOpacity> */}
-          <TouchableOpacity style={styles.iconBtn}>
-            <Settings size={ms(24)} color={COLORS.text.primary} />
-          </TouchableOpacity>
+          <Bell size={ms(24)} color={COLORS.text.primary} style={{ marginRight: hs(12) }} />
+          <Settings size={ms(24)} color={COLORS.text.primary} />
         </View>
       </View>
 
       {/* 2. Profile Overview */}
       <View style={styles.profileSection}>
-        <Image source={{ uri: "https://placeholder.com/100" }} style={styles.largeAvatar} />
+        {/* <Image
+          source={require("@/assets/images/placeholder-user.png")} // Replace with actual avatar logic
+          style={styles.largeAvatar}
+        /> */}
         <View style={styles.profileInfo}>
-          <Text variant="body1" weight="semiBold">
-            Chirag Patil
+          <Text variant="h2" weight="bold">
+            {guestName}
           </Text>
-          <Text variant="body1" weight="semiBold">
-            +91 98344 8943
+          <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
+            {guestId}
           </Text>
-          <Text variant="body1" weight="medium">
-            13 Total Bookings
+          <Text variant="body2" color={COLORS.text.muted}>
+            {history.length} Total Bookings
           </Text>
         </View>
       </View>
 
       {/* 3. Stats Tabs */}
       <View style={styles.statsTabsContainer}>
-        {/* Past Booking (Active) */}
-        <View style={[styles.statTab, styles.statTabActive]}>
-          <Text variant="body1" weight="semiBold" color={COLORS.text.inverse}>
-            12
+        <TouchableOpacity style={[styles.statTab, styles.statTabActive]}>
+          <Text variant="body1" weight="bold" color={COLORS.text.inverse}>
+            {stats.past}
           </Text>
           <Text variant="caption" weight="semiBold" color={COLORS.text.inverse}>
             Past Booking
           </Text>
-        </View>
-
-        {/* Upcoming (Inactive) */}
-        <View style={styles.statTab}>
-          <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
-            1
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.statTab}>
+          <Text variant="body1" weight="bold">
+            {stats.upcoming}
           </Text>
           <Text variant="caption" weight="semiBold" color={COLORS.text.muted}>
             Upcoming
           </Text>
-        </View>
-
-        {/* Cancelled (Inactive / Danger) */}
-        <View style={styles.statTab}>
-          <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
-            0
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.statTab}>
+          <Text variant="body1" weight="bold">
+            {stats.cancelled}
           </Text>
           <Text variant="caption" weight="semiBold" color={COLORS.danger}>
             Cancelled
           </Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* 4. Bookings List */}
       <View style={styles.listSection}>
-        <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+        <Text variant="body2" weight="bold" style={styles.sectionLabel}>
           PAST BOOKINGS
         </Text>
-
-        {/* Month Group 1 */}
-        <Text variant="body2" weight="semiBold" style={styles.monthHeader}>
-          Apr 2026
-        </Text>
-        <BookingCard
-          name="Chirag Patil"
-          subtitle="Ground 2 (11 v 11)"
-          date="Mon, 28 Apr 2026"
-          time="7 Am - 8 Am"
-          price="₹1600"
-          status="Online"
-          hideCallButton={true}
-        />
-        <BookingCard
-          name="Chirag Patil"
-          subtitle="Ground 2 (11 v 11)"
-          date="Mon, 21 Apr 2026"
-          time="7 Pm - 8 Pm"
-          price="₹100"
-          status="Online"
-          hideCallButton={true}
-        />
-        <BookingCard
-          name="Chirag Patil"
-          subtitle="Ground 1 (9 v 9)"
-          date="Mon, 14 Apr 2026"
-          time="6 Pm - 7 Pm"
-          price="₹800"
-          status="Offline"
-          // REMOVED: isOfflineRecord={true} - Now it renders with a clean background!
-          hideCallButton={true}
-        />
-        <BookingCard
-          name="Chirag Patil"
-          subtitle="Ground 2 (11 v 11)"
-          date="Mon, 7 Apr 2026"
-          time="7 Pm - 8 Pm"
-          price="₹100"
-          status="Online"
-          hideCallButton={true}
-        />
-
-        {/* Month Group 2 */}
-        <Text variant="body2" weight="semiBold" style={styles.monthHeader}>
-          Mar 2026
-        </Text>
-        <BookingCard
-          name="Chirag Patil"
-          subtitle="Ground 2 (11 v 11)"
-          date="Mon, 7 Apr 2026"
-          time="7 Pm - 8 Pm"
-          price="₹100"
-          status="Online"
-          hideCallButton={true}
-        />
+        {Object.keys(groupedHistory).map(month => (
+          <React.Fragment key={month}>
+            <Text variant="body2" weight="bold" style={styles.monthHeader}>
+              {month}
+            </Text>
+            {groupedHistory[month].map(item => (
+              <BookingCard
+                key={item.id}
+                name={guestName}
+                subtitle={guestId}
+                date={formatDisplayDate(item.slot_date)}
+                time={`${formatTime(item.start_time)} - ${formatTime(item.end_time)}`}
+                price={`₹${item.total_amount}`}
+                // CHANGE THIS: Use item.status instead of the ternary logic
+                status={item.status}
+                hideCallButton={true}
+              />
+            ))}
+          </React.Fragment>
+        ))}
       </View>
-
-      {/* Bottom Padding */}
       <View style={{ height: vs(40) }} />
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: vs(10),
-    marginBottom: vs(20),
-  },
-  backBtn: {
-    paddingRight: hs(10),
-  },
-  headerTitle: {
+  centered: {
     flex: 1,
-    fontSize: fs(20),
-  },
-  headerActions: {
-    flexDirection: "row",
-    gap: hs(10),
-  },
-  iconBtn: {
-    padding: hs(4),
-  },
-  profileSection: {
-    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    justifyContent: "center",
-    gap: hs(20),
-    marginBottom: vs(24),
+    backgroundColor: COLORS.background,
   },
-  largeAvatar: {
-    width: ms(100),
-    height: ms(100),
-    borderRadius: ms(50),
-    backgroundColor: COLORS.surface.fallback,
-  },
-  profileInfo: {
-    justifyContent: "center",
-    gap: vs(4),
-  },
-  statsTabsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: hs(14),
-    marginBottom: vs(24),
-  },
+  headerRow: { flexDirection: "row", alignItems: "center", marginVertical: vs(16) },
+  backBtn: { paddingRight: hs(12) },
+  headerTitle: { flex: 1, fontSize: fs(22) },
+  headerActions: { flexDirection: "row", alignItems: "center" },
+  profileSection: { alignItems: "center", marginBottom: vs(30) },
+  largeAvatar: { width: ms(120), height: ms(120), borderRadius: ms(60), marginBottom: vs(12) },
+  profileInfo: { alignItems: "center", gap: vs(2) },
+  statsTabsContainer: { flexDirection: "row", gap: hs(12), marginBottom: vs(24) },
   statTab: {
     flex: 1,
     backgroundColor: COLORS.surface.primary,
-    borderRadius: ms(10),
-    paddingVertical: vs(10),
+    borderRadius: ms(12),
+    paddingVertical: vs(12),
     alignItems: "center",
-    justifyContent: "center",
-    gap: vs(4),
+    gap: vs(2),
   },
-  statTabActive: {
-    backgroundColor: COLORS.primary,
-    borderWidth: 1,
-    borderColor: "#CBDFFE",
-  },
-  listSection: {
-    width: "100%",
-  },
-  sectionTitle: {
-    marginBottom: vs(12),
-  },
-  monthHeader: {
-    marginBottom: vs(10),
-    marginTop: vs(6),
-  },
+  statTabActive: { backgroundColor: COLORS.primary },
+  listSection: { width: "100%" },
+  sectionLabel: { color: COLORS.text.primary, marginBottom: vs(16), letterSpacing: 0.5 },
+  monthHeader: { color: COLORS.text.primary, marginVertical: vs(10) },
 });

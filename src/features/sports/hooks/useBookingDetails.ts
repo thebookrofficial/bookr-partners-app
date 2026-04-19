@@ -9,6 +9,8 @@ export interface BookingDetailData {
   id: string;
   total_amount: number;
   paid_amount: number;
+  guest_name: string | null; // Added
+  guest_phone: string | null; // Added
   profiles: { full_name: string; phone: string; avatar_url: string };
   sports_slots: { start_time: string; end_time: string; slot_date: string };
   venues: { name: string; vertical: string };
@@ -36,7 +38,7 @@ export const useBookingDetails = (bookingId: string) => {
         .from("sports_bookings")
         .select(
           `
-          id, total_amount, paid_amount,
+          id, total_amount, paid_amount, guest_name, guest_phone,
           profiles ( full_name, phone, avatar_url ),
           sports_slots ( start_time, end_time, slot_date ),
           venues ( name, vertical )

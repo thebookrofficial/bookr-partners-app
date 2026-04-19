@@ -85,20 +85,22 @@ export const OfflineBookingSheet = ({
 }: OfflineBookingSheetProps) => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 
-  // Date Picker State
+  // Form States
   const [currentDate, setCurrentDate] = useState<Date>(initialDate);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-
-  // Form States
   const [mobile, setMobile] = useState("");
   const [name, setName] = useState("");
   const [totalPayment, setTotalPayment] = useState("");
   const [advancePaid, setAdvancePaid] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasHistory, setHasHistory] = useState(false);
+
+  const [bookedHours, setBookedHours] = useState<string[]>([]);
+  const [isFetchingSlots, setIsFetchingSlots] = useState(false);
 
   // Hour Selection State
-  const [fromTime, setFromTime] = useState("Start Time");
-  const [toTime, setToTime] = useState("End Time");
+  const [fromTime, setFromTime] = useState("7 AM");
+  const [toTime, setToTime] = useState("8 AM");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
 
   const HOURS = [
@@ -124,58 +126,121 @@ export const OfflineBookingSheet = ({
   ];
 
   useEffect(() => {
+    const fetchUnavailableSlots = async () => {
+      if (!isVisible || !_groundId) return;
+
+      setIsFetchingSlots(true);
+      try {
+        const dateStr = currentDate.toISOString().split("T")[0];
+
+        const { data, error } = await supabase
+          .from("sports_slots")
+          .select("start_time")
+          .eq("ground_id", _groundId)
+          .eq("slot_date", dateStr)
+          .neq("status", "available"); // Fetch anything that isn't available
+
+        if (error) throw error;
+
+        // Convert "07:00:00" to "7 AM" for comparison with our HOURS array
+        const formattedBooked = (data || []).map(slot => {
+          const [h] = slot.start_time.split(":");
+          const hourInt = parseInt(h, 10);
+          const ampm = hourInt >= 12 ? "PM" : "AM";
+          const displayHour = hourInt % 12 || 12;
+          return `${displayHour} ${ampm}`;
+        });
+
+        setBookedHours(formattedBooked);
+      } catch (err) {
+        console.error("Error checking slot availability:", err);
+      } finally {
+        setIsFetchingSlots(false);
+      }
+    };
+
+    fetchUnavailableSlots();
+  }, [currentDate, _groundId, isVisible]);
+
+  useEffect(() => {
     if (isVisible) {
       setCurrentDate(initialDate);
       setMobile("");
       setName("");
       setTotalPayment("");
       setAdvancePaid("");
-      setFromTime("7 AM");
-      setToTime("8 AM");
+      setFromTime("Start Time");
+      setToTime("End Time");
+      setHasHistory(false);
     }
   }, [initialDate, isVisible]);
 
-  // AUTO-FILL & CLEAR LOGIC
+  // UPDATED AUTO-FILL & HISTORY CHECK LOGIC
   useEffect(() => {
-    const lookupGuest = async () => {
+    const lookupGuestAndHistory = async () => {
       const cleanMobile = mobile.replace(/[^\d]/g, "");
 
-      // 1. If the number is incomplete (e.g., user hits backspace), actively clear the name
       if (cleanMobile.length < 10) {
         setName("");
-        return; // Stop execution here so we don't hit the database
+        setHasHistory(false);
+        return;
       }
 
-      // 2. Only run the database check if we have a full 10-digit number
       try {
-        const { data } = await supabase
+        // 1. Try to Resolve Bookr Profile
+        const { data: profile } = await supabase
           .from("profiles")
-          .select("full_name")
-          .eq("phone", mobile) // Using exactly what they typed
-          .single();
+          .select("id, full_name")
+          .eq("phone", cleanMobile)
+          .maybeSingle();
 
-        if (data?.full_name) {
-          setName(data.full_name);
-        } else {
-          // New user (not in DB), keep the name cleared so vendor can type it
-          setName("");
+        let foundName = profile?.full_name || "";
+
+        // 2. If no Bookr Profile, lookup latest Manual Guest Name from bookings
+        if (!foundName) {
+          const { data: lastManualBooking } = await supabase
+            .from("sports_bookings")
+            .select("guest_name")
+            .eq("guest_phone", cleanMobile)
+            .not("guest_name", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (lastManualBooking?.guest_name) {
+            foundName = lastManualBooking.guest_name;
+          }
         }
+
+        setName(foundName);
+
+        // 3. Check for Previous History (Manual Guest OR Bookr Profile)
+        // We check if either user_id matches profile OR guest_phone matches input
+        const { count, error: historyError } = await supabase
+          .from("sports_bookings")
+          .select("id", { count: "exact", head: true })
+          .or(
+            `guest_phone.eq.${cleanMobile},user_id.eq.${
+              profile?.id || "00000000-0000-0000-0000-000000000000"
+            }`,
+          );
+
+        setHasHistory(!historyError && !!count && count > 0);
       } catch (err) {
-        // Error or no match found
+        console.error("Lookup error:", err);
         setName("");
+        setHasHistory(false);
       }
     };
 
-    lookupGuest();
+    lookupGuestAndHistory();
   }, [mobile]);
 
-  // --- FETCH VENUE PRICING ---
+  // FETCH VENUE PRICING
   useEffect(() => {
     const fetchVenuePricing = async () => {
-      if (!venueId) return;
-
+      if (!venueId || !isVisible) return;
       try {
-        // Replace 'sports_venues' with your actual pricing table name if different
         const { data } = await supabase
           .from("venues")
           .select("price_per_hour, min_advance_amount")
@@ -183,7 +248,6 @@ export const OfflineBookingSheet = ({
           .single();
 
         if (data) {
-          // Auto-fill the pricing inputs with defaults from the database
           setTotalPayment(data.price_per_hour?.toString() || "");
           setAdvancePaid(data.min_advance_amount?.toString() || "");
         }
@@ -191,39 +255,8 @@ export const OfflineBookingSheet = ({
         console.error("Failed to fetch pricing:", err);
       }
     };
-
-    if (isVisible) {
-      fetchVenuePricing();
-    }
+    fetchVenuePricing();
   }, [venueId, isVisible]);
-
-  // --- UPDATED MOBILE & NAME LOOKUP ---
-  useEffect(() => {
-    const lookupGuest = async () => {
-      const cleanMobile = mobile.replace(/[^\d]/g, "");
-
-      if (cleanMobile.length < 10) return;
-
-      try {
-        const { data } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("phone", mobile)
-          .single();
-
-        if (data?.full_name) {
-          setName(data.full_name);
-        } else {
-          // If it's a new number, clear the name to allow fresh entry
-          setName("");
-        }
-      } catch (err) {
-        setName("");
-      }
-    };
-
-    lookupGuest();
-  }, [mobile]);
 
   const handleBookNow = async () => {
     const cleanMobile = mobile.replace(/[^\d]/g, "");
@@ -238,31 +271,24 @@ export const OfflineBookingSheet = ({
     });
 
     if (!validationResult.success) {
-      const firstErrorMessage = validationResult.error.issues[0].message;
-      Alert.alert("Required Fields", firstErrorMessage);
+      Alert.alert("Required Fields", validationResult.error.issues[0].message);
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // 1. Resolve User (Same as before)
-      let { data: existingProfile } = await supabase
+      const { data: profile } = await supabase
         .from("profiles")
         .select("id")
-        .eq("phone", mobile)
-        .single();
+        .eq("phone", cleanMobile)
+        .maybeSingle();
 
-      let userId = existingProfile?.id;
-      if (!userId) throw new Error("User profile not found.");
-
-      // 2. Format Dates & Times
+      const userId = profile?.id || null;
       const formattedDate = currentDate.toISOString().split("T")[0];
       const startTime24 = parseTimeTo24Hour(fromTime);
       const endTime24 = parseTimeTo24Hour(toTime);
       const numericTotal = parseFloat(totalPayment);
 
-      // 3. ATTEMPT INSERT FIRST (The "Upsert" Pattern)
-      // This is more reliable than "Select then Insert" because it handles concurrency
       const { data: newSlot, error: insertError } = await supabase
         .from("sports_slots")
         .insert({
@@ -279,7 +305,6 @@ export const OfflineBookingSheet = ({
 
       let slotId = newSlot?.id;
 
-      // 4. IF INSERT FAILED (Because it already exists), FIND IT
       if (insertError || !slotId) {
         const { data: foundSlot } = await supabase
           .from("sports_slots")
@@ -297,13 +322,12 @@ export const OfflineBookingSheet = ({
         slotId = foundSlot?.id;
       }
 
-      if (!slotId) {
-        throw new Error("Could not resolve Slot ID. Check if Ground ID is correct.");
-      }
+      if (!slotId) throw new Error("Could not resolve Slot ID.");
 
-      // 5. Finalize Booking [cite: 159]
       const { error: bookingError } = await supabase.from("sports_bookings").insert({
         user_id: userId,
+        guest_name: userId ? null : name.trim(),
+        guest_phone: userId ? null : cleanMobile,
         venue_id: venueId,
         slot_id: slotId,
         booking_status: "confirmed",
@@ -313,7 +337,8 @@ export const OfflineBookingSheet = ({
         gateway_fee: 0,
         total_amount: numericTotal,
         vendor_payout: numericTotal,
-        notes: `Offline Booking - Guest: ${name}`,
+        notes: `Offline Booking${userId ? " (Bookr User)" : ""}`,
+        paid_amount: parseFloat(advancePaid || "0"),
       });
 
       if (bookingError) throw bookingError;
@@ -322,6 +347,8 @@ export const OfflineBookingSheet = ({
       onSuccess();
     } catch (error: any) {
       Alert.alert("Booking Failed", error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -335,7 +362,6 @@ export const OfflineBookingSheet = ({
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity activeOpacity={1} style={styles.bottomSheetContainer}>
           <View style={styles.handle} />
-
           <View style={styles.sheetHeader}>
             <Text variant="body1" weight="bold" style={styles.headerText}>
               Offline Booking
@@ -345,7 +371,6 @@ export const OfflineBookingSheet = ({
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.sheetContent}>
-            {/* Date Selection Trigger */}
             <TouchableOpacity activeOpacity={0.7} onPress={() => setIsDatePickerOpen(true)}>
               <TextInput
                 variant="filled"
@@ -374,7 +399,6 @@ export const OfflineBookingSheet = ({
               onChangeText={setName}
             />
 
-            {/* Hourly Selectors */}
             <View style={styles.row}>
               <View style={styles.flex1}>
                 <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("from")}>
@@ -430,19 +454,22 @@ export const OfflineBookingSheet = ({
               </View>
             </View>
 
-            <TouchableOpacity
-              style={styles.historyRow}
-              activeOpacity={0.7}
-              onPress={() => {
-                onClose();
-                navigation.navigate("GuestHistory", { guestId: mobile || "unknown" });
-              }}>
-              <FileText size={ms(20)} color={COLORS.text.primary} />
-              <Text variant="body2" weight="semiBold" style={styles.historyText}>
-                Previous History
-              </Text>
-              <ChevronRight size={ms(20)} color={COLORS.text.primary} />
-            </TouchableOpacity>
+            {/* CONDITIONAL HISTORY BUTTON */}
+            {hasHistory && (
+              <TouchableOpacity
+                style={styles.historyRow}
+                activeOpacity={0.7}
+                onPress={() => {
+                  onClose();
+                  navigation.navigate("GuestHistory", { guestId: mobile });
+                }}>
+                <FileText size={ms(20)} color={COLORS.text.primary} />
+                <Text variant="body2" weight="semiBold" style={styles.historyText}>
+                  Previous History
+                </Text>
+                <ChevronRight size={ms(20)} color={COLORS.text.primary} />
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={[styles.saveButton, isSubmitting && styles.saveButtonDisabled]}
@@ -465,7 +492,7 @@ export const OfflineBookingSheet = ({
         </TouchableOpacity>
       </TouchableOpacity>
 
-      {/* Hourly Picker Modal */}
+      {/* Picker Modals (Same as before) */}
       <Modal visible={!!showHourPicker} transparent animationType="fade">
         <TouchableOpacity
           style={styles.modalOverlay}
@@ -475,34 +502,81 @@ export const OfflineBookingSheet = ({
             <Text variant="body1" weight="bold" style={styles.pickerHeader}>
               Select {showHourPicker === "from" ? "Start" : "End"} Time
             </Text>
-            <ScrollView style={styles.hourList} showsVerticalScrollIndicator={false}>
-              {HOURS.map(hour => (
-                <TouchableOpacity
-                  key={hour}
-                  style={styles.hourItem}
-                  onPress={() => {
-                    if (showHourPicker === "from") setFromTime(hour);
-                    else setToTime(hour);
-                    setShowHourPicker(null);
-                  }}>
-                  <Text
-                    variant="body1"
-                    weight={fromTime === hour || toTime === hour ? "bold" : "medium"}>
-                    {hour}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+
+            {isFetchingSlots ? (
+              <ActivityIndicator color={COLORS.primary} style={{ margin: vs(20) }} />
+            ) : (
+              <ScrollView style={styles.hourList} showsVerticalScrollIndicator={false}>
+                {HOURS.map((hour, index) => {
+                  const isBooked = bookedHours.includes(hour);
+                  let isDisabled = false;
+                  let reasonText = "";
+
+                  if (showHourPicker === "from") {
+                    // START TIME: Cannot pick a time that is already booked
+                    isDisabled = isBooked;
+                    if (isBooked) reasonText = "(Booked)";
+                  } else {
+                    // END TIME LOGIC
+                    const fromIndex = HOURS.indexOf(fromTime);
+
+                    // 1. Cannot be earlier than or equal to Start Time
+                    if (index <= fromIndex) {
+                      isDisabled = true;
+                    }
+
+                    // 2. Cannot skip over a booked slot
+                    // If there's a booked slot between fromTime and this hour, disable it
+                    const hasBookingInBetween = HOURS.slice(fromIndex, index).some(h =>
+                      bookedHours.includes(h),
+                    );
+                    if (hasBookingInBetween) {
+                      isDisabled = true;
+                      reasonText = "(Unavailable)";
+                    }
+                  }
+
+                  return (
+                    <TouchableOpacity
+                      key={hour}
+                      style={[
+                        styles.hourItem,
+                        isDisabled && styles.hourItemDisabled,
+                        // Highlight current selection
+                        (fromTime === hour || toTime === hour) && {
+                          backgroundColor: COLORS.surface.primary,
+                        },
+                      ]}
+                      disabled={isDisabled}
+                      onPress={() => {
+                        if (showHourPicker === "from") {
+                          setFromTime(hour);
+                          setToTime("End Time"); // Reset To-time when From-time changes
+                        } else {
+                          setToTime(hour);
+                        }
+                        setShowHourPicker(null);
+                      }}>
+                      <Text
+                        variant="body1"
+                        weight={fromTime === hour || toTime === hour ? "bold" : "bold"}
+                        color={isDisabled ? COLORS.text.secondary : COLORS.text.primary}>
+                        {hour} {reasonText}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>
 
-      {/* Date Picker Modal */}
       <Modal
         visible={isDatePickerOpen}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setIsDatePickerOpen(false)}>
+        statusBarTranslucent={true}>
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
@@ -521,13 +595,6 @@ export const OfflineBookingSheet = ({
                   selectedColor: COLORS.primary,
                 },
               }}
-              theme={{
-                todayTextColor: COLORS.primary,
-                arrowColor: COLORS.primary,
-                textDayFontFamily: "Gilroy-SemiBold",
-                textMonthFontFamily: "Gilroy-ExtraBold",
-                textDayHeaderFontFamily: "Gilroy-SemiBold",
-              }}
             />
           </View>
         </TouchableOpacity>
@@ -537,30 +604,17 @@ export const OfflineBookingSheet = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "flex-end",
-  },
-  saveButtonDisabled: {
-    opacity: 0.7,
-  },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
+  saveButtonDisabled: { opacity: 0.7 },
   bottomSheetContainer: {
     width: "100%",
     backgroundColor: COLORS.background,
     borderTopLeftRadius: ms(20),
     borderTopRightRadius: ms(20),
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border.navBar,
     paddingTop: vs(12),
     paddingHorizontal: hs(12),
     paddingBottom: vs(30),
     maxHeight: "85%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 10,
   },
   handle: {
     width: hs(40),
@@ -570,29 +624,12 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: vs(12),
   },
-  sheetHeader: {
-    marginBottom: vs(16),
-    paddingHorizontal: hs(6),
-  },
-  headerText: {
-    textTransform: "uppercase",
-  },
-  sheetContent: {
-    paddingBottom: vs(20),
-  },
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(6),
-  },
-  row: {
-    flexDirection: "row",
-    gap: hs(20),
-    width: "100%",
-  },
-  flex1: {
-    flex: 1,
-  },
+  sheetHeader: { marginBottom: vs(16), paddingHorizontal: hs(6) },
+  headerText: { textTransform: "uppercase" },
+  sheetContent: { paddingBottom: vs(20) },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6) },
+  row: { flexDirection: "row", gap: hs(20), width: "100%" },
+  flex1: { flex: 1 },
   historyRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -600,13 +637,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border.navBar,
     borderRadius: ms(10),
     paddingHorizontal: hs(10),
-    height: vs(40),
+    height: vs(44),
     marginBottom: vs(16),
   },
-  historyText: {
-    flex: 1,
-    marginLeft: hs(6),
-  },
+  historyText: { flex: 1, marginLeft: hs(6) },
   saveButton: {
     backgroundColor: "#000000",
     borderRadius: ms(10),
@@ -614,10 +648,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  saveText: {
-    fontSize: fs(20),
-    textTransform: "uppercase",
-  },
+  saveText: { fontSize: fs(20), textTransform: "uppercase" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -629,11 +660,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderRadius: ms(12),
     padding: ms(10),
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
   },
   hourPickerContainer: {
     width: "80%",
@@ -642,18 +668,16 @@ const styles = StyleSheet.create({
     padding: ms(20),
     maxHeight: "60%",
   },
-  pickerHeader: {
-    marginBottom: vs(15),
-    textAlign: "center",
-    textTransform: "uppercase",
-  },
-  hourList: {
-    width: "100%",
-  },
+  pickerHeader: { marginBottom: vs(15), textAlign: "center", textTransform: "uppercase" },
+  hourList: { width: "100%" },
   hourItem: {
     paddingVertical: vs(12),
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border.navBar,
     alignItems: "center",
+  },
+  hourItemDisabled: {
+    backgroundColor: COLORS.surface.fallback, // Light grey background
+    opacity: 0.6,
   },
 });

@@ -108,18 +108,23 @@ export const BookingDetailsScreen = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
         </TouchableOpacity>
-
         <Image
-          source={{ uri: booking.profiles.avatar_url || "https://placeholder.com/50" }}
+          source={{
+            uri:
+              booking.profiles?.avatar_url ||
+              `https://ui-avatars.com/api/?name=${
+                booking.profiles?.full_name || booking.guest_name || "Guest"
+              }&background=random`,
+          }}
           style={styles.avatar}
         />
 
         <Text variant="h3" weight="bold" style={styles.headerName}>
-          {booking.profiles.full_name || "Guest User"}
+          {booking.profiles?.full_name || booking.guest_name || "Guest User"}
         </Text>
 
         <Text variant="body2" weight="semiBold" style={styles.categoryText}>
-          {booking.venues.vertical}
+          {booking.venues?.name}
         </Text>
       </View>
 
@@ -133,7 +138,7 @@ export const BookingDetailsScreen = () => {
         </View>
         <View style={styles.inputBoxRow}>
           <Text variant="body2" weight="semiBold" style={styles.inputText}>
-            {booking.profiles.phone || "N/A"}
+            {booking.profiles?.phone || booking.guest_phone || "N/A"}
           </Text>
 
           <View style={styles.actionButtons}>
@@ -326,7 +331,11 @@ export const BookingDetailsScreen = () => {
       <TouchableOpacity
         style={styles.historyRow}
         activeOpacity={0.7}
-        onPress={() => navigation.navigate("GuestHistory", { guestId: booking.profiles.phone })}>
+        onPress={() =>
+          navigation.navigate("GuestHistory", {
+            guestId: booking.profiles?.phone || booking.guest_phone || "unknown",
+          })
+        }>
         <FileText size={ms(20)} color={COLORS.text.primary} />
         <Text variant="body2" weight="semiBold" style={styles.historyText}>
           Previous History
