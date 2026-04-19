@@ -34,16 +34,16 @@ export const BookingCard = ({
   price,
   status,
   avatarUrl,
-  isOfflineRecord = false,
+  // isOfflineRecord = false,
   hideCallButton = false,
   hideDateText = false,
   useClockIcon = false,
   onPress,
   onCallPress,
 }: BookingCardProps) => {
-  const textColor = isOfflineRecord ? COLORS.text.muted : COLORS.text.primary;
-  const iconColor = isOfflineRecord ? COLORS.text.muted : COLORS.text.primary;
-  const cardBg = isOfflineRecord ? "#E0E0E0" : COLORS.surface.primary;
+  const textColor = COLORS.text.primary;
+  const iconColor = COLORS.text.secondary;
+  const cardBg = COLORS.surface.primary;
 
   const handleCall = () => {
     // If a custom onCallPress is provided, use it. Otherwise, trigger deep link.
@@ -72,7 +72,7 @@ export const BookingCard = ({
   };
 
   const getPriceColor = () => {
-    if (isOfflineRecord && status === "Offline") return COLORS.danger;
+    // if (isOfflineRecord && status === "Offline") return COLORS.danger;
     return "#00B562";
   };
 

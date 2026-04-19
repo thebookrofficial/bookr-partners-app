@@ -21,6 +21,7 @@ export interface SlotData {
   time: string;
   status: "available" | "booked" | "blocked" | "maintenance";
   raw_start_time: string;
+  isManualBooking?: boolean;
 }
 
 export interface BookingData {
@@ -91,7 +92,12 @@ export const useSportsHome = (venueId: string) => {
 
       const { data: slotsData, error } = await supabase
         .from("sports_slots")
-        .select("id, start_time, status")
+        .select(
+          `id, 
+          start_time, 
+          status, 
+          sports_bookings ( platform_fee, gateway_fee )`,
+        )
         .eq("venue_id", venueId)
         .eq("ground_id", activeGroundId)
         .eq("slot_date", dateString)
@@ -104,12 +110,15 @@ export const useSportsHome = (venueId: string) => {
         const hourInt = parseInt(hours, 10);
         const ampm = hourInt >= 12 ? "Pm" : "AM";
         const displayHour = hourInt % 12 || 12;
+        const booking = slot.sports_bookings?.[0];
+        const isManual = booking ? booking.platform_fee === 0 && booking.gateway_fee === 0 : false;
 
         return {
           id: slot.id,
           time: `${displayHour} ${ampm}`,
           status: slot.status,
           raw_start_time: slot.start_time,
+          isManualBooking: isManual,
         };
       });
 
@@ -135,13 +144,16 @@ export const useSportsHome = (venueId: string) => {
           `
           id,
           total_amount,
+          platform_fee,
+          gateway_fee,
           profiles ( full_name, phone, avatar_url ),
           sports_slots!inner ( start_time, end_time, ground_id, slot_date )
         `,
         )
         .eq("venue_id", venueId)
         .eq("sports_slots.ground_id", activeGroundId)
-        .eq("sports_slots.slot_date", dateString);
+        .eq("sports_slots.slot_date", dateString)
+        .order("created_at", { ascending: false }); // Show newest first
 
       if (error) throw error;
 
@@ -149,7 +161,7 @@ export const useSportsHome = (venueId: string) => {
         const formatHour = (timeStr: string) => {
           const [h] = timeStr.split(":");
           const hourInt = parseInt(h, 10);
-          const ampm = hourInt >= 12 ? "Pm" : "Am";
+          const ampm = hourInt >= 12 ? "PM" : "AM";
           const displayHour = hourInt % 12 || 12;
           return `${displayHour} ${ampm}`;
         };
@@ -162,8 +174,8 @@ export const useSportsHome = (venueId: string) => {
           year: "numeric",
         });
 
-        // Determine online vs offline (We will assume Online for now until offline logic is solidified)
-        const isOffline = false;
+        // FIX: If platform and gateway fees are 0, it's a manual/offline booking
+        const isOffline = b.platform_fee === 0 && b.gateway_fee === 0;
 
         return {
           id: b.id,
@@ -208,5 +220,9 @@ export const useSportsHome = (venueId: string) => {
     bookings,
     bookingsLoading,
     loading,
+    refresh: () => {
+      fetchSlots();
+      fetchBookings();
+    },
   };
 };

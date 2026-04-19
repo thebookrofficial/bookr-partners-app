@@ -10,6 +10,9 @@ importers:
       "@react-native-async-storage/async-storage":
         specifier: ^3.0.2
         version: 3.0.2(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0))(react@19.1.0)
+      "@react-native-community/datetimepicker":
+        specifier: ^9.1.0
+        version: 9.1.0(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0))(react@19.1.0)
       "@react-native-google-signin/google-signin":
         specifier: ^16.1.2
         version: 16.1.2(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0))(react@19.1.0)
@@ -88,6 +91,9 @@ importers:
       rive-react-native:
         specifier: ^9.8.1
         version: 9.8.1(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0))(react@19.1.0)
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
       zustand:
         specifier: ^5.0.12
         version: 5.0.12(@types/react@19.2.14)(react@19.1.0)(use-sync-external-store@1.6.0(react@19.1.0))
@@ -95,6 +101,9 @@ importers:
       "@babel/core":
         specifier: ^7.25.2
         version: 7.29.0
+      "@babel/plugin-transform-export-namespace-from":
+        specifier: ^7.27.1
+        version: 7.27.1(@babel/core@7.29.0)
       "@babel/preset-env":
         specifier: ^7.25.3
         version: 7.29.2(@babel/core@7.29.0)
@@ -1550,6 +1559,22 @@ packages:
       }
     engines: { node: ">=18" }
     hasBin: true
+
+  "@react-native-community/datetimepicker@9.1.0":
+    resolution:
+      {
+        integrity: sha512-eadbnk+I2vxvW30iTAsm/qlCnMMAadkifIMYNEB2lzhxN/SvlKc7S2V4k5DyrwjdCbqdcMk3t9K6fnUMcAV34w==,
+      }
+    peerDependencies:
+      expo: ">=52.0.0"
+      react: "*"
+      react-native: "*"
+      react-native-windows: "*"
+    peerDependenciesMeta:
+      expo:
+        optional: true
+      react-native-windows:
+        optional: true
 
   "@react-native-google-signin/google-signin@16.1.2":
     resolution:
@@ -7037,6 +7062,12 @@ packages:
       }
     engines: { node: ">=10" }
 
+  zod@4.3.6:
+    resolution:
+      {
+        integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==,
+      }
+
   zustand@5.0.12:
     resolution:
       {
@@ -8288,6 +8319,12 @@ snapshots:
       - supports-color
       - typescript
       - utf-8-validate
+
+  "@react-native-community/datetimepicker@9.1.0(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0))(react@19.1.0)":
+    dependencies:
+      invariant: 2.2.4
+      react: 19.1.0
+      react-native: 0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0)
 
   "@react-native-google-signin/google-signin@16.1.2(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0))(react@19.1.0)":
     dependencies:
@@ -12169,6 +12206,8 @@ snapshots:
       yargs-parser: 21.1.1
 
   yocto-queue@0.1.0: {}
+
+  zod@4.3.6: {}
 
   zustand@5.0.12(@types/react@19.2.14)(react@19.1.0)(use-sync-external-store@1.6.0(react@19.1.0)):
     optionalDependencies:

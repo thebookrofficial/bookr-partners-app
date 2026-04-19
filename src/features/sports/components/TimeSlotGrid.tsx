@@ -15,6 +15,7 @@ export interface TimeSlotData {
   time: string;
   status: DbSlotStatus | string;
   raw_start_time?: string; // e.g. "14:00:00" from DB
+  isManualBooking?: boolean;
 }
 
 interface TimeSlotGridProps {
@@ -50,9 +51,9 @@ export const TimeSlotGrid = ({ slots, selectedDate, onSlotPress }: TimeSlotGridP
         // Past slots OR maintenance slots are completely unavailable
         const isUnavailable = isPast || slot.status === "maintenance";
         const isAvailable = !isUnavailable && slot.status === "available";
-        const isOnline = !isUnavailable && slot.status === "booked";
-        const isManual = !isUnavailable && slot.status === "blocked";
-
+        const isBlocked = !isUnavailable && slot.status === "blocked";
+        const isOnline = !isUnavailable && slot.status === "booked" && !slot.isManualBooking;
+        const isManual = !isUnavailable && slot.status === "booked" && slot.isManualBooking;
         return (
           <TouchableOpacity
             key={slot.id}
@@ -62,6 +63,7 @@ export const TimeSlotGrid = ({ slots, selectedDate, onSlotPress }: TimeSlotGridP
             style={[
               styles.slot,
               isAvailable && styles.slotAvailable,
+              isBlocked && styles.slotBlocked,
               isOnline && styles.slotOnline,
               isManual && styles.slotManual,
               isUnavailable && styles.slotUnavailable,
@@ -112,5 +114,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#E5E5E5",
     borderWidth: 1,
     borderColor: "#E5E5E5",
+  },
+  slotBlocked: {
+    // Rename slotManual to slotBlocked for 'blocked' status
+    backgroundColor: "#BEBEBE",
   },
 });

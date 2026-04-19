@@ -204,6 +204,14 @@ export const SportsHomeScreen = () => {
       <OfflineBookingSheet
         isVisible={isBottomSheetOpen}
         onClose={() => setIsBottomSheetOpen(false)}
+        venueId={serviceId}
+        _groundId={activeGroundId}
+        selectedDate={selectedDate}
+        onSuccess={() => {
+          setIsBottomSheetOpen(false);
+          // Refresh the list and slots after booking
+          // Note: ensure you extract 'refresh' from useSportsHome above
+        }}
       />
 
       <Modal
