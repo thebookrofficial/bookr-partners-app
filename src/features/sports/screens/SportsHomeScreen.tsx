@@ -7,10 +7,7 @@ import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { LegendIndicator } from "../components/LegendIndicator";
-import {
-  TimeSlotGrid,
-  // TimeSlotData
-} from "../components/TimeSlotGrid";
+import { TimeSlotGrid } from "../components/TimeSlotGrid";
 import { BookingCard } from "../components/BookingCard";
 import { Calendar as CalendarIcon, Plus } from "lucide-react-native";
 import { hs, vs, ms } from "@/utils/responsive.utils";
@@ -22,39 +19,11 @@ import { OfflineBookingSheet } from "../components/OfflineBookingSheet";
 import { useSportsHome } from "../hooks/useSportsHome";
 import { Calendar } from "react-native-calendars";
 
-// --- DUMMY DATA MATCHING FIGMA ---
-// const DUMMY_SLOTS: TimeSlotData[] = [
-//   { id: "1", time: "7 AM", status: "unavailable" },
-//   { id: "2", time: "8 AM", status: "unavailable" },
-//   { id: "3", time: "9 AM", status: "unavailable" },
-//   { id: "4", time: "10 AM", status: "unavailable" },
-//   { id: "5", time: "11 AM", status: "unavailable" },
-//   { id: "6", time: "12 AM", status: "unavailable" }, // Note: usually 12 PM, keeping Figma text
-//   { id: "7", time: "1 Pm", status: "available" },
-//   { id: "8", time: "2 Pm", status: "available" },
-//   { id: "9", time: "3 Pm", status: "available" },
-//   { id: "10", time: "4 Pm", status: "available" },
-//   { id: "11", time: "5 Pm", status: "available" },
-//   { id: "12", time: "6 Pm", status: "available" },
-//   { id: "13", time: "7 Pm", status: "online" },
-//   { id: "14", time: "8 PM", status: "manual" },
-//   { id: "15", time: "9 Pm", status: "online" },
-//   { id: "16", time: "10 Pm", status: "online" },
-//   { id: "17", time: "11 PM", status: "manual" },
-//   { id: "18", time: "12 Am", status: "manual" },
-// ];
-
 export const SportsHomeScreen = () => {
-  // const [activeGround, setActiveGround] = useState("Ground 1");
-  // const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
-
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
-
-  // 1. Extract serviceId from route params
   const route = useRoute<RouteProp<SportsTabParamList, "SportsHome">>();
   const { serviceId } = route.params;
 
-  // 2. Fetch dynamic venue and grounds
   const {
     venue,
     grounds,
@@ -64,15 +33,18 @@ export const SportsHomeScreen = () => {
     setSelectedDate,
     slots,
     slotsLoading,
-    bookings, // <-- Extract new states
-    bookingsLoading, // <-- Extract new states
+    bookings,
+    bookingsLoading,
     loading,
   } = useSportsHome(serviceId);
 
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
-  // 3. Format Dynamic Date (e.g., "Today, 19 Apr 2026")
+  // --- ADDED DROPDOWN STATE ---
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("Football");
+
   const getFormattedDate = (date: Date) => {
     const today = new Date();
     const isToday =
@@ -97,25 +69,21 @@ export const SportsHomeScreen = () => {
     );
   }
 
-  // 4. Map active ground name for PillTabs
-  // const activeGroundName = grounds.find(g => g.id === activeGroundId)?.name || "";
-
   return (
     <View style={styles.root}>
       <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-        {/* 1. Header */}
+        {/* 1. Header with Dropdown Action */}
         <ServiceHeader
           title={venue.name}
-          category={venue.vertical}
+          category={selectedCategory}
           imageUri={venue.cover_image_url || undefined}
+          onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
         />
 
         {/* 2. Date Selector */}
         <TouchableOpacity
           style={styles.dateRow}
-          onPress={() => {
-            setIsDatePickerOpen(true);
-          }}
+          onPress={() => setIsDatePickerOpen(true)}
           activeOpacity={0.7}>
           <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
             {getFormattedDate(selectedDate)}
@@ -131,9 +99,7 @@ export const SportsHomeScreen = () => {
               activeTab={grounds.find(g => g.id === activeGroundId)?.name || ""}
               onTabChange={selectedName => {
                 const selectedGround = grounds.find(g => g.name === selectedName);
-                if (selectedGround) {
-                  setActiveGroundId(selectedGround.id);
-                }
+                if (selectedGround) setActiveGroundId(selectedGround.id);
               }}
               variant="primary"
             />
@@ -155,11 +121,8 @@ export const SportsHomeScreen = () => {
         ) : (
           <TimeSlotGrid
             slots={slots as any}
-            selectedDate={selectedDate} // <-- Add this prop!
-            onSlotPress={_slot => {
-              // We will wire up the tap actions in the next step!
-              // TODO: Open bottom sheet or navigate to slot details in Section 5
-            }}
+            selectedDate={selectedDate}
+            onSlotPress={_slot => {}}
           />
         )}
 
@@ -189,7 +152,6 @@ export const SportsHomeScreen = () => {
           )}
         </View>
 
-        {/* Bottom Spacer for the Absolute Tab Bar + FAB */}
         <View style={{ height: vs(120) }} />
       </ScreenContainer>
 
@@ -207,11 +169,7 @@ export const SportsHomeScreen = () => {
         venueId={serviceId}
         _groundId={activeGroundId}
         selectedDate={selectedDate}
-        onSuccess={() => {
-          setIsBottomSheetOpen(false);
-          // Refresh the list and slots after booking
-          // Note: ensure you extract 'refresh' from useSportsHome above
-        }}
+        onSuccess={() => setIsBottomSheetOpen(false)}
       />
 
       <Modal
@@ -219,18 +177,15 @@ export const SportsHomeScreen = () => {
         transparent={true}
         animationType="fade"
         onRequestClose={() => setIsDatePickerOpen(false)}>
-        {/* Clicking the dark overlay closes the modal */}
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setIsDatePickerOpen(false)}>
           <View style={styles.calendarContainer}>
             <Calendar
-              // Format current date to YYYY-MM-DD for the calendar
               current={selectedDate.toISOString().split("T")[0]}
-              minDate={new Date().toISOString().split("T")[0]} // Prevents booking in the past
+              minDate={new Date().toISOString().split("T")[0]}
               onDayPress={(day: any) => {
-                // Convert timestamp back to standard Date object
                 setSelectedDate(new Date(day.timestamp));
                 setIsDatePickerOpen(false);
               }}
@@ -243,7 +198,7 @@ export const SportsHomeScreen = () => {
               theme={{
                 todayTextColor: COLORS.primary,
                 arrowColor: COLORS.primary,
-                textDayFontFamily: "Gilroy-SemiBold", // Matches your brand
+                textDayFontFamily: "Gilroy-SemiBold",
                 textMonthFontFamily: "Gilroy-ExtraBold",
                 textDayHeaderFontFamily: "Gilroy-SemiBold",
               }}
@@ -251,19 +206,40 @@ export const SportsHomeScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* --- ADDED OVERLAY DROPDOWN --- */}
+      {isCategoryOpen && (
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          activeOpacity={1}
+          onPress={() => setIsCategoryOpen(false)}>
+          <View style={styles.dropdownMenu}>
+            {["Football", "Box Cricket", "Pickleball"].map(cat => (
+              <TouchableOpacity
+                key={cat}
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setSelectedCategory(cat);
+                  setIsCategoryOpen(false);
+                }}>
+                <Text variant="body2" weight="semiBold">
+                  {cat}
+                </Text>
+                <View style={styles.radioOuter}>
+                  {selectedCategory === cat && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  root: { flex: 1, backgroundColor: COLORS.background },
+  loadingContainer: { justifyContent: "center", alignItems: "center" },
   dateRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -271,29 +247,15 @@ const styles = StyleSheet.create({
     paddingVertical: vs(6),
     marginBottom: vs(6),
   },
-  groundTabs: {
-    marginTop: -vs(10), // Adjusting PillTabs default margin to match Figma tightness
-    marginBottom: vs(10),
-  },
-  emptySlotsText: {
-    textAlign: "center",
-    marginVertical: vs(20),
-  },
-  loaderStyle: {
-    marginVertical: vs(20),
-  },
-  sectionTitle: {
-    textTransform: "uppercase",
-    marginBottom: vs(6),
-  },
-  bookingsContainer: {
-    marginTop: vs(20),
-    width: "100%",
-  },
+  groundTabs: { marginTop: -vs(10), marginBottom: vs(10) },
+  emptySlotsText: { textAlign: "center", marginVertical: vs(20) },
+  loaderStyle: { marginVertical: vs(20) },
+  sectionTitle: { textTransform: "uppercase", marginBottom: vs(6) },
+  bookingsContainer: { marginTop: vs(20), width: "100%" },
   fab: {
     position: "absolute",
     right: hs(12),
-    bottom: vs(95), // Sits right above the 73px tab bar
+    bottom: vs(95),
     width: ms(58),
     height: ms(58),
     borderRadius: ms(29),
@@ -301,10 +263,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.22,
     shadowRadius: 4,
     elevation: 5,
@@ -326,5 +285,50 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+
+  /* --- NEW OVERLAY DROPDOWN STYLES --- */
+  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
+  dropdownMenu: {
+    position: "absolute",
+    top: vs(55),
+    right: hs(12),
+    backgroundColor: COLORS.background,
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    width: hs(180),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    padding: hs(6),
+    gap: vs(6),
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(8),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    borderRadius: ms(8),
+  },
+  radioOuter: {
+    width: ms(20),
+    height: ms(20),
+    borderRadius: ms(10),
+    borderWidth: 2,
+    borderColor: COLORS.text.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioInner: {
+    width: ms(10),
+    height: ms(10),
+    borderRadius: ms(5),
+    backgroundColor: COLORS.text.primary,
   },
 });

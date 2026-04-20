@@ -16,15 +16,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
 import { supabase } from "@/lib/supabase";
 
-const EssentialActionRow = ({
-  title,
-  icon: Icon,
-  onPress,
-}: {
-  title: string;
-  icon: any;
-  onPress: () => void;
-}) => (
+const EssentialActionRow = ({ title, icon: Icon, onPress }: any) => (
   <TouchableOpacity style={styles.actionRow} onPress={onPress} activeOpacity={0.7}>
     <Icon size={ms(20)} color={COLORS.primary} />
     <Text variant="body2" weight="bold" style={styles.rowTitle}>
@@ -38,23 +30,21 @@ export const SportsEssentialsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, "SportsEssentials">>();
 
-  // --- SMART ID EXTRACTION ---
-  // 1. Try to get it from the local tab params
   let venueId = route.params?.serviceId;
 
-  // 2. If undefined, climb up and grab it from the parent 'SportsServiceTabs' navigator
   if (!venueId) {
     const parentState = navigation.getParent()?.getState();
     const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
     const tabParams = tabRoute?.params as any;
-    // Extract from direct params or nested params object
     venueId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
   }
 
-  // State to hold the groundId
   const [activeGroundId, setActiveGroundId] = useState<string>("");
 
-  // Fetch the first ground associated with this venue
+  // --- ADDED DROPDOWN STATE ---
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("Football");
+
   useEffect(() => {
     const fetchFirstGround = async () => {
       if (!venueId) return;
@@ -69,31 +59,23 @@ export const SportsEssentialsScreen = () => {
           .maybeSingle();
 
         if (error) throw error;
-
-        if (data) {
-          setActiveGroundId(data.id);
-        }
+        if (data) setActiveGroundId(data.id);
       } catch (err) {
         console.error("Error fetching ground:", err);
       }
     };
-
     fetchFirstGround();
   }, [venueId]);
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <View style={styles.headerWrapper}>
+        {/* 1. Header with Dropdown */}
         <ServiceHeader
           title="Elite Strikers Club"
           subtitle="Essentials"
-          rightComponent={
-            <TouchableOpacity style={styles.editButton} activeOpacity={0.7}>
-              <Text variant="body1" weight="semiBold">
-                Edit
-              </Text>
-            </TouchableOpacity>
-          }
+          category={selectedCategory}
+          onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
         />
       </View>
 
@@ -107,53 +89,64 @@ export const SportsEssentialsScreen = () => {
           title="Block / Unblock"
           icon={Ban}
           onPress={() => {
-            // SAFETY CHECK: Ensure we have both IDs before navigating
             if (venueId && activeGroundId) {
-              navigation.navigate("BlockUnblock", {
-                venueId: venueId,
-                groundId: activeGroundId,
-              });
+              navigation.navigate("BlockUnblock", { venueId, groundId: activeGroundId });
             } else if (!venueId) {
               Alert.alert("Error", "Venue ID is missing. Please go back and re-enter this screen.");
             } else {
-              Alert.alert(
-                "No Ground Found",
-                "We couldn't find a sports ground for this venue. Please make sure you have added a ground in Supabase first.",
-              );
+              Alert.alert("No Ground Found", "We couldn't find a sports ground for this venue.");
             }
           }}
         />
         <EssentialActionRow
-          title="Special Days"
+          title="Offers"
           icon={CalendarDays}
-          // eslint-disable-next-line no-console
-          onPress={() => console.log("Special Days Tapped")}
+          onPress={() => {
+            // console.log("Special Days Tapped");
+          }}
         />
         <EssentialActionRow
           title="Update Venue Info"
           icon={RefreshCw}
-          // eslint-disable-next-line no-console
-          onPress={() => console.log("Update Venue Tapped")}
+          onPress={() => {
+            // console.log("Update Venue Tapped");
+          }}
         />
       </View>
+
+      {/* --- ADDED OVERLAY DROPDOWN --- */}
+      {isCategoryOpen && (
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          activeOpacity={1}
+          onPress={() => setIsCategoryOpen(false)}>
+          <View style={styles.dropdownMenu}>
+            {["Football", "Box Cricket", "Pickleball"].map(cat => (
+              <TouchableOpacity
+                key={cat}
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setSelectedCategory(cat);
+                  setIsCategoryOpen(false);
+                }}>
+                <Text variant="body2" weight="semiBold">
+                  {cat}
+                </Text>
+                <View style={styles.radioOuter}>
+                  {selectedCategory === cat && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      )}
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  headerWrapper: {
-    paddingTop: vs(10),
-  },
-  editButton: {
-    backgroundColor: COLORS.surface.primary,
-    paddingHorizontal: hs(16),
-    paddingVertical: vs(4),
-    borderRadius: ms(19),
-  },
-  listSection: {
-    marginTop: vs(10),
-    gap: vs(10),
-  },
+  headerWrapper: { paddingTop: vs(10) },
+  listSection: { marginTop: vs(10), gap: vs(10) },
   actionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -162,9 +155,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: hs(12),
     minHeight: vs(46),
   },
-  rowTitle: {
-    flex: 1,
-    marginLeft: hs(10),
-    fontSize: fs(14),
+  rowTitle: { flex: 1, marginLeft: hs(10), fontSize: fs(14) },
+
+  /* --- NEW OVERLAY DROPDOWN STYLES --- */
+  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
+  dropdownMenu: {
+    position: "absolute",
+    top: vs(55),
+    right: hs(12),
+    backgroundColor: COLORS.background,
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    width: hs(180),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    padding: hs(6),
+    gap: vs(6),
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(8),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    borderRadius: ms(8),
+  },
+  radioOuter: {
+    width: ms(20),
+    height: ms(20),
+    borderRadius: ms(10),
+    borderWidth: 2,
+    borderColor: COLORS.text.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioInner: {
+    width: ms(10),
+    height: ms(10),
+    borderRadius: ms(5),
+    backgroundColor: COLORS.text.primary,
   },
 });

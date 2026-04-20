@@ -32,20 +32,7 @@ const REVENUE_DATA = [
   { date: "18 Apr", value: "+₹11200", fillPct: "80%", isBlue: true },
 ];
 
-/**
- * Custom Tab Component for Filters (Selection & Ground)
- */
-const FilterTab = ({
-  label,
-  isActive,
-  onPress,
-  icon,
-}: {
-  label: string;
-  isActive: boolean;
-  onPress: () => void;
-  icon?: React.ReactNode;
-}) => (
+const FilterTab = ({ label, isActive, onPress, icon }: any) => (
   <TouchableOpacity
     style={[styles.filterTab, isActive ? styles.filterTabActive : styles.filterTabInactive]}
     onPress={onPress}
@@ -55,34 +42,32 @@ const FilterTab = ({
       variant="caption"
       weight="semiBold"
       color={isActive ? COLORS.text.inverse : COLORS.text.muted}
-      style={styles.filterTabText} // Align text properly if multiline
-    >
+      style={styles.filterTabText}>
       {label}
     </Text>
   </TouchableOpacity>
 );
 
 export const SportsDashboardScreen = () => {
-  const [timeFilter, setTimeFilter] = useState("Today"); // Updated default to "Today" based on Figma
+  const [timeFilter, setTimeFilter] = useState("Today");
   const [groundFilter, setGroundFilter] = useState("Overall");
+
+  // --- ADDED DROPDOWN STATE ---
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("Football");
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* 1. Header with Edit Button */}
+        {/* 1. Header with Dropdown */}
         <ServiceHeader
           title="Elite Strikers Club"
           subtitle="Dashboard"
-          rightComponent={
-            <TouchableOpacity style={styles.editButton} activeOpacity={0.7}>
-              <Text variant="body1" weight="semiBold">
-                Edit
-              </Text>
-            </TouchableOpacity>
-          }
+          category={selectedCategory}
+          onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
         />
 
-        {/* 2. Selection Filters - PIXEL PERFECT UPDATE */}
+        {/* 2. Selection Filters */}
         <View style={styles.filterSection}>
           <Text variant="h3" weight="bold" style={styles.filterLabel}>
             Selection
@@ -107,7 +92,6 @@ export const SportsDashboardScreen = () => {
               label="Custom"
               isActive={timeFilter === "Custom"}
               onPress={() => setTimeFilter("Custom")}
-              // Custom uses a 20px icon in Figma
               icon={
                 <Calendar
                   size={ms(16)}
@@ -178,7 +162,7 @@ export const SportsDashboardScreen = () => {
           </View>
         </View>
 
-        {/* 4. Revenue Details Summary (Custom Donut Chart) */}
+        {/* 4. Revenue Details Summary */}
         <Text variant="body1" weight="bold" style={styles.sectionTitle}>
           REVENUE DETAILS
         </Text>
@@ -186,7 +170,6 @@ export const SportsDashboardScreen = () => {
           <View style={styles.revenueDonutWrapper}>
             <View style={[styles.donutRing, styles.donutRingBase]} />
             <View style={[styles.donutRingOver, styles.donutRingDark]} />
-
             <View style={styles.donutInner}>
               <Text variant="body2" weight="semiBold" color="#00B562">
                 +₹9100
@@ -196,7 +179,6 @@ export const SportsDashboardScreen = () => {
               </Text>
             </View>
           </View>
-
           <View style={styles.revenueSplitBlock}>
             <View style={styles.revenueRow}>
               <Text variant="body2" weight="medium">
@@ -229,7 +211,6 @@ export const SportsDashboardScreen = () => {
               </Text>
             ))}
           </View>
-
           <View style={styles.chartArea}>
             {BOOKING_DATA.map((item, index) => {
               const heightPct = (item.value / MAX_BOOKING_Y) * 100;
@@ -278,69 +259,59 @@ export const SportsDashboardScreen = () => {
 
         <View style={{ height: vs(120) }} />
       </ScrollView>
+
+      {/* --- ADDED OVERLAY DROPDOWN --- */}
+      {isCategoryOpen && (
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          activeOpacity={1}
+          onPress={() => setIsCategoryOpen(false)}>
+          <View style={styles.dropdownMenu}>
+            {["Football", "Box Cricket", "Pickleball"].map(cat => (
+              <TouchableOpacity
+                key={cat}
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setSelectedCategory(cat);
+                  setIsCategoryOpen(false);
+                }}>
+                <Text variant="body2" weight="semiBold">
+                  {cat}
+                </Text>
+                <View style={styles.radioOuter}>
+                  {selectedCategory === cat && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      )}
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollContent: {
-    paddingTop: vs(10),
-  },
-  editButton: {
-    backgroundColor: COLORS.surface.primary,
-    paddingHorizontal: hs(16),
-    paddingVertical: vs(4),
-    borderRadius: ms(19),
-  },
-
-  // --- UPDATED SELECTION FILTERS ---
-  filterSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: vs(16),
-  },
-  filterLabel: {
-    width: hs(120), // Exact 120px from Figma
-    fontSize: fs(20), // 20px font size for 'Selection'
-  },
-  filterTabsRow: {
-    flex: 1,
-    flexDirection: "row",
-    gap: hs(10), // 10px gap between tabs
-  },
+  scrollContent: { paddingTop: vs(10) },
+  filterSection: { flexDirection: "row", alignItems: "center", marginBottom: vs(16) },
+  filterLabel: { width: hs(120), fontSize: fs(20) },
+  filterTabsRow: { flex: 1, flexDirection: "row", gap: hs(10) },
   filterTab: {
     flex: 1,
-    height: vs(40), // Exact 40px height from Figma
+    height: vs(40),
     borderRadius: ms(10),
     justifyContent: "center",
     alignItems: "center",
-    flexDirection: "column", // Stack icon and text for "Custom" if needed
+    flexDirection: "column",
   },
-  filterTabText: {
-    textAlign: "center", // Required for "Last week" multiline break
-  },
-  filterTabActive: {
-    backgroundColor: "#282828",
-    borderWidth: 1,
-    borderColor: "#CBDFFE", // Exact light blue border for active tab
-  },
+  filterTabText: { textAlign: "center" },
+  filterTabActive: { backgroundColor: "#282828", borderWidth: 1, borderColor: "#CBDFFE" },
   filterTabInactive: {
-    backgroundColor: COLORS.surface.primary, // #F4F7FC
-    borderWidth: 1, // Add transparent border to prevent UI shift
+    backgroundColor: COLORS.surface.primary,
+    borderWidth: 1,
     borderColor: "transparent",
   },
-
-  dateRangeText: {
-    textAlign: "center",
-    marginVertical: vs(12),
-  },
-  sectionTitle: {
-    textTransform: "uppercase",
-    marginTop: vs(10),
-    marginBottom: vs(12),
-  },
-
-  // --- Summary Cards ---
+  dateRangeText: { textAlign: "center", marginVertical: vs(12) },
+  sectionTitle: { textTransform: "uppercase", marginTop: vs(10), marginBottom: vs(12) },
   summaryCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -349,10 +320,7 @@ const styles = StyleSheet.create({
     padding: hs(12),
     marginBottom: vs(20),
   },
-  revenueSummaryCard: {
-    backgroundColor: "transparent",
-    justifyContent: "center",
-  },
+  revenueSummaryCard: { backgroundColor: "transparent", justifyContent: "center" },
   totalBlock: {
     flex: 1,
     flexDirection: "row",
@@ -360,13 +328,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: hs(6),
   },
-  totalNumber: {
-    fontSize: fs(18),
-  },
-  splitBlock: {
-    flex: 1,
-    gap: vs(6),
-  },
+  totalNumber: { fontSize: fs(18) },
+  splitBlock: { flex: 1, gap: vs(6) },
   splitRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -376,8 +339,6 @@ const styles = StyleSheet.create({
     paddingVertical: vs(6),
     borderRadius: ms(10),
   },
-
-  // --- REVENUE DETAILS DONUT CHART ---
   revenueDonutWrapper: {
     width: ms(100),
     height: ms(100),
@@ -392,9 +353,7 @@ const styles = StyleSheet.create({
     borderRadius: ms(50),
     borderWidth: ms(4),
   },
-  donutRingBase: {
-    borderColor: COLORS.primary,
-  },
+  donutRingBase: { borderColor: COLORS.primary },
   donutRingOver: {
     position: "absolute",
     width: ms(100),
@@ -404,10 +363,7 @@ const styles = StyleSheet.create({
     borderTopColor: "transparent",
     borderLeftColor: "transparent",
   },
-  donutRingDark: {
-    borderColor: "#001C65",
-    transform: [{ rotate: "45deg" }],
-  },
+  donutRingDark: { borderColor: "#001C65", transform: [{ rotate: "45deg" }] },
   donutInner: {
     width: ms(92),
     height: ms(92),
@@ -416,20 +372,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  revenueSplitBlock: {
-    justifyContent: "center",
-    gap: vs(12),
-  },
-  revenueRow: {
-    gap: vs(2),
-  },
-
-  // --- Booking Graph ---
-  graphContainer: {
-    flexDirection: "row",
-    height: vs(250),
-    marginBottom: vs(30),
-  },
+  revenueSplitBlock: { justifyContent: "center", gap: vs(12) },
+  revenueRow: { gap: vs(2) },
+  graphContainer: { flexDirection: "row", height: vs(250), marginBottom: vs(30) },
   yAxis: {
     justifyContent: "space-between",
     paddingRight: hs(10),
@@ -437,51 +382,21 @@ const styles = StyleSheet.create({
     borderRightColor: COLORS.border.navBar,
     height: vs(200),
   },
-  yAxisText: {
-    textAlign: "right",
-    fontSize: fs(12),
-  },
+  yAxisText: { textAlign: "right", fontSize: fs(12) },
   chartArea: {
     flex: 1,
     flexDirection: "row",
     justifyContent: "space-between",
     paddingLeft: hs(14),
   },
-  barColumn: {
-    alignItems: "center",
-    width: hs(28),
-  },
-  barTrack: {
-    width: "100%",
-    height: vs(200),
-    justifyContent: "flex-end",
-  },
-  barFill: {
-    width: "100%",
-    backgroundColor: COLORS.primary,
-    borderRadius: ms(4),
-  },
-  xLabelDate: {
-    marginTop: vs(8),
-    fontSize: fs(10),
-  },
-  xLabelDay: {
-    fontSize: fs(10),
-  },
-
-  // --- Revenue Graph ---
-  revenueGraphContainer: {
-    gap: vs(12),
-    marginBottom: vs(20),
-  },
-  revenueGraphRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  revenueDateLabel: {
-    width: hs(50),
-    fontSize: fs(12),
-  },
+  barColumn: { alignItems: "center", width: hs(28) },
+  barTrack: { width: "100%", height: vs(200), justifyContent: "flex-end" },
+  barFill: { width: "100%", backgroundColor: COLORS.primary, borderRadius: ms(4) },
+  xLabelDate: { marginTop: vs(8), fontSize: fs(10) },
+  xLabelDay: { fontSize: fs(10) },
+  revenueGraphContainer: { gap: vs(12), marginBottom: vs(20) },
+  revenueGraphRow: { flexDirection: "row", alignItems: "center" },
+  revenueDateLabel: { width: hs(50), fontSize: fs(12) },
   revenueBarTrack: {
     height: vs(30),
     backgroundColor: COLORS.surface.primary,
@@ -489,5 +404,50 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "flex-end",
     paddingRight: hs(10),
+  },
+
+  /* --- NEW OVERLAY DROPDOWN STYLES --- */
+  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
+  dropdownMenu: {
+    position: "absolute",
+    top: vs(55),
+    right: hs(12),
+    backgroundColor: COLORS.background,
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    width: hs(180),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    padding: hs(6),
+    gap: vs(6),
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(8),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    borderRadius: ms(8),
+  },
+  radioOuter: {
+    width: ms(20),
+    height: ms(20),
+    borderRadius: ms(10),
+    borderWidth: 2,
+    borderColor: COLORS.text.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioInner: {
+    width: ms(10),
+    height: ms(10),
+    borderRadius: ms(5),
+    backgroundColor: COLORS.text.primary,
   },
 });
