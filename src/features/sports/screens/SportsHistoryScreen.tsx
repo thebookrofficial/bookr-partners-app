@@ -12,6 +12,11 @@ import { COLORS } from "@/constants/theme";
 import { useSportsHistory } from "../hooks/useSportsHistory";
 import { FilterBottomSheet, DateFilterOption } from "../components/FilterBottomSheet";
 
+// Navigation Imports
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
+
 // ==========================================
 // 1. NEW HISTORY CARD
 // ==========================================
@@ -81,6 +86,18 @@ const DateSectionHeader = ({ date, settlement }: { date: string; settlement: num
 // 3. MAIN SCREEN
 // ==========================================
 export const SportsHistoryScreen = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const route = useRoute<RouteProp<SportsTabParamList, any>>();
+
+  // Extract initial serviceId gracefully
+  let serviceId = route.params?.serviceId;
+  if (!serviceId) {
+    const parentState = navigation.getParent()?.getState();
+    const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
+    serviceId =
+      (tabRoute?.params as any)?.serviceId || (tabRoute?.params as any)?.params?.serviceId || "";
+  }
+
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Football");
   const [searchQuery, setSearchQuery] = useState("");
@@ -89,7 +106,14 @@ export const SportsHistoryScreen = () => {
   const [dateFilter, setDateFilter] = useState<DateFilterOption>("all");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>();
 
-  const { historyGroups, loading } = useSportsHistory(searchQuery, dateFilter, customRange);
+  // Pass dynamic IDs and filters to the updated hook
+  const { currentVenueId, historyGroups, loading } = useSportsHistory(
+    serviceId,
+    selectedCategory,
+    searchQuery,
+    dateFilter,
+    customRange,
+  );
 
   return (
     <ScreenContainer backgroundColor={COLORS.background}>
@@ -102,7 +126,6 @@ export const SportsHistoryScreen = () => {
             category={selectedCategory}
             onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
           />
-          {/* Note: Dropdown has been moved outside the ScrollView! */}
         </View>
 
         {/* Sticky Search */}
@@ -125,7 +148,11 @@ export const SportsHistoryScreen = () => {
         {/* List Section */}
         <View style={styles.listSection}>
           {loading ? (
-            <ActivityIndicator size="large" color={COLORS.text.primary} style={styles.loader} />
+            <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+          ) : !currentVenueId ? (
+            <Text style={styles.emptyStateText}>
+              No {selectedCategory} facility setup for this club.
+            </Text>
           ) : historyGroups.length === 0 ? (
             <Text style={styles.emptyStateText}>No history found.</Text>
           ) : (
@@ -164,18 +191,23 @@ export const SportsHistoryScreen = () => {
       {/* ABSOLUTE OVERLAYS (Rendered on top of everything) */}
       {/* ========================================== */}
 
-      {/* 1. Category Dropdown Overlay */}
+      {/* 1. FIXED Category Dropdown Overlay */}
       {isCategoryOpen && (
-        <TouchableOpacity
-          style={styles.dropdownOverlay}
-          activeOpacity={1}
-          onPress={() => setIsCategoryOpen(false)} // Closes if user taps outside!
-        >
+        <View style={styles.dropdownOverlay}>
+          {/* Invisible Backdrop (Closes the menu when tapping outside) */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setIsCategoryOpen(false)}
+          />
+
+          {/* The Menu Itself */}
           <View style={styles.dropdownMenu}>
             {["Football", "Box Cricket", "Pickleball"].map(cat => (
               <TouchableOpacity
                 key={cat}
                 style={styles.dropdownItem}
+                activeOpacity={0.7}
                 onPress={() => {
                   setSelectedCategory(cat);
                   setIsCategoryOpen(false);
@@ -189,7 +221,7 @@ export const SportsHistoryScreen = () => {
               </TouchableOpacity>
             ))}
           </View>
-        </TouchableOpacity>
+        </View>
       )}
 
       {/* 2. Filter Bottom Sheet */}
@@ -210,7 +242,7 @@ export const SportsHistoryScreen = () => {
 const styles = StyleSheet.create({
   headerZIndex: { zIndex: 10, paddingHorizontal: hs(12) },
 
-  /* --- NEW OVERLAY DROPDOWN STYLES --- */
+  /* --- OVERLAY DROPDOWN STYLES --- */
   dropdownOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1000,
@@ -218,7 +250,7 @@ const styles = StyleSheet.create({
   },
   dropdownMenu: {
     position: "absolute",
-    top: vs(55), // Fine-tuned to sit perfectly under the header
+    top: vs(55),
     right: hs(12),
     backgroundColor: COLORS.background,
     borderRadius: ms(10),

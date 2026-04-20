@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -30,8 +30,8 @@ export const SportsEssentialsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, "SportsEssentials">>();
 
+  // Extract initial serviceId
   let venueId = route.params?.serviceId;
-
   if (!venueId) {
     const parentState = navigation.getParent()?.getState();
     const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
@@ -39,33 +39,71 @@ export const SportsEssentialsScreen = () => {
     venueId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
   }
 
-  const [activeGroundId, setActiveGroundId] = useState<string>("");
-
-  // --- ADDED DROPDOWN STATE ---
+  // --- UI STATES ---
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Football");
 
-  useEffect(() => {
-    const fetchFirstGround = async () => {
-      if (!venueId) return;
+  // --- DYNAMIC VENUE STATES ---
+  const [currentVenueId, setCurrentVenueId] = useState<string>("");
+  const [activeGroundId, setActiveGroundId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    const resolveVenueAndGround = async () => {
+      setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from("sports_grounds")
-          .select("id")
-          .eq("venue_id", venueId)
-          .order("display_order", { ascending: true })
+        // Map UI names to exact DB enums
+        const CATEGORY_DB_MAP: Record<string, string> = {
+          Football: "football",
+          "Box Cricket": "box_cricket",
+          Pickleball: "pickleball",
+        };
+        const dbSportType = CATEGORY_DB_MAP[selectedCategory] || selectedCategory;
+
+        // Find Owner
+        const { data: initialVenue } = await supabase
+          .from("venues")
+          .select("owner_id")
+          .eq("id", venueId)
+          .single();
+        if (!initialVenue) return;
+
+        // Find Venue for Owner + Category
+        const { data: matchedVenue } = await supabase
+          .from("venues")
+          .select("id, sports_venues!inner(sports_type)")
+          .eq("owner_id", initialVenue.owner_id)
+          .eq("sports_venues.sports_type", dbSportType)
           .limit(1)
           .maybeSingle();
 
-        if (error) throw error;
-        if (data) setActiveGroundId(data.id);
+        if (matchedVenue) {
+          setCurrentVenueId(matchedVenue.id);
+
+          // Find First Ground for this matched Venue
+          const { data: groundData } = await supabase
+            .from("sports_grounds")
+            .select("id")
+            .eq("venue_id", matchedVenue.id)
+            .order("display_order", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          setActiveGroundId(groundData ? groundData.id : "");
+        } else {
+          // Reset if this owner doesn't have a facility for the selected sport
+          setCurrentVenueId("");
+          setActiveGroundId("");
+        }
       } catch (err) {
-        console.error("Error fetching ground:", err);
+        console.error("Resolution error:", err);
+      } finally {
+        setLoading(false);
       }
     };
-    fetchFirstGround();
-  }, [venueId]);
+
+    if (venueId) resolveVenueAndGround();
+  }, [venueId, selectedCategory]);
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
@@ -79,52 +117,73 @@ export const SportsEssentialsScreen = () => {
         />
       </View>
 
-      <View style={styles.listSection}>
-        <EssentialActionRow
-          title="Bulk Booking"
-          icon={Files}
-          onPress={() => navigation.navigate("BulkBooking")}
-        />
-        <EssentialActionRow
-          title="Block / Unblock"
-          icon={Ban}
-          onPress={() => {
-            if (venueId && activeGroundId) {
-              navigation.navigate("BlockUnblock", { venueId, groundId: activeGroundId });
-            } else if (!venueId) {
-              Alert.alert("Error", "Venue ID is missing. Please go back and re-enter this screen.");
-            } else {
-              Alert.alert("No Ground Found", "We couldn't find a sports ground for this venue.");
-            }
-          }}
-        />
-        <EssentialActionRow
-          title="Offers"
-          icon={CalendarDays}
-          onPress={() => {
-            // console.log("Special Days Tapped");
-          }}
-        />
-        <EssentialActionRow
-          title="Update Venue Info"
-          icon={RefreshCw}
-          onPress={() => {
-            // console.log("Update Venue Tapped");
-          }}
-        />
-      </View>
+      {/* 2. Conditional Rendering for Content */}
+      {loading ? (
+        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+      ) : !currentVenueId ? (
+        <Text style={styles.emptyStateText}>
+          No {selectedCategory} facility setup for this club.
+        </Text>
+      ) : (
+        <View style={styles.listSection}>
+          <EssentialActionRow
+            title="Bulk Booking"
+            icon={Files}
+            onPress={() => navigation.navigate("BulkBooking")}
+          />
+          <EssentialActionRow
+            title="Block / Unblock"
+            icon={Ban}
+            onPress={() => {
+              if (currentVenueId && activeGroundId) {
+                navigation.navigate("BlockUnblock", {
+                  venueId: currentVenueId,
+                  groundId: activeGroundId,
+                });
+              } else if (!currentVenueId) {
+                Alert.alert(
+                  "Error",
+                  "Venue ID is missing. Please go back and re-enter this screen.",
+                );
+              } else {
+                Alert.alert("No Ground Found", "We couldn't find a sports ground for this venue.");
+              }
+            }}
+          />
+          <EssentialActionRow
+            title="Offers"
+            icon={CalendarDays}
+            onPress={() => {
+              // console.log("Special Days Tapped");
+            }}
+          />
+          <EssentialActionRow
+            title="Update Venue Info"
+            icon={RefreshCw}
+            onPress={() => {
+              // console.log("Update Venue Tapped");
+            }}
+          />
+        </View>
+      )}
 
-      {/* --- ADDED OVERLAY DROPDOWN --- */}
+      {/* --- FIXED OVERLAY DROPDOWN --- */}
       {isCategoryOpen && (
-        <TouchableOpacity
-          style={styles.dropdownOverlay}
-          activeOpacity={1}
-          onPress={() => setIsCategoryOpen(false)}>
+        <View style={styles.dropdownOverlay}>
+          {/* Invisible Backdrop */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setIsCategoryOpen(false)}
+          />
+
+          {/* Menu */}
           <View style={styles.dropdownMenu}>
             {["Football", "Box Cricket", "Pickleball"].map(cat => (
               <TouchableOpacity
                 key={cat}
                 style={styles.dropdownItem}
+                activeOpacity={0.7}
                 onPress={() => {
                   setSelectedCategory(cat);
                   setIsCategoryOpen(false);
@@ -138,7 +197,7 @@ export const SportsEssentialsScreen = () => {
               </TouchableOpacity>
             ))}
           </View>
-        </TouchableOpacity>
+        </View>
       )}
     </ScreenContainer>
   );
@@ -157,7 +216,10 @@ const styles = StyleSheet.create({
   },
   rowTitle: { flex: 1, marginLeft: hs(10), fontSize: fs(14) },
 
-  /* --- NEW OVERLAY DROPDOWN STYLES --- */
+  loader: { marginTop: vs(60) },
+  emptyStateText: { textAlign: "center", marginTop: vs(60), color: COLORS.text.muted },
+
+  /* --- FIXED OVERLAY DROPDOWN STYLES --- */
   dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
   dropdownMenu: {
     position: "absolute",

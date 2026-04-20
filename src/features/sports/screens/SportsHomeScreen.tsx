@@ -24,6 +24,9 @@ export const SportsHomeScreen = () => {
   const route = useRoute<RouteProp<SportsTabParamList, "SportsHome">>();
   const { serviceId } = route.params;
 
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("Football");
+
   const {
     venue,
     grounds,
@@ -36,14 +39,10 @@ export const SportsHomeScreen = () => {
     bookings,
     bookingsLoading,
     loading,
-  } = useSportsHome(serviceId);
+  } = useSportsHome(serviceId, selectedCategory);
 
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-
-  // --- ADDED DROPDOWN STATE ---
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("Football");
 
   const getFormattedDate = (date: Date) => {
     const today = new Date();
@@ -61,116 +60,142 @@ export const SportsHomeScreen = () => {
     return isToday ? `Today, ${dateString}` : dateString;
   };
 
-  if (loading || !venue) {
-    return (
-      <View style={[styles.root, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
+  const getLocalISODate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
   return (
     <View style={styles.root}>
       <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-        {/* 1. Header with Dropdown Action */}
+        {/* 1. Header is ALWAYS visible, even if the venue doesn't exist yet */}
         <ServiceHeader
-          title={venue.name}
+          title={venue?.name || "Elite Strikers Club"}
           category={selectedCategory}
-          imageUri={venue.cover_image_url || undefined}
+          imageUri={venue?.cover_image_url || undefined}
           onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
         />
 
-        {/* 2. Date Selector */}
-        <TouchableOpacity
-          style={styles.dateRow}
-          onPress={() => setIsDatePickerOpen(true)}
-          activeOpacity={0.7}>
-          <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
-            {getFormattedDate(selectedDate)}
-          </Text>
-          <CalendarIcon size={ms(16)} color="#00327B" />
-        </TouchableOpacity>
-
-        {/* 3. Ground Selector */}
-        {grounds.length > 1 && (
-          <View style={styles.groundTabs}>
-            <PillTabs
-              tabs={grounds.map(g => g.name)}
-              activeTab={grounds.find(g => g.id === activeGroundId)?.name || ""}
-              onTabChange={selectedName => {
-                const selectedGround = grounds.find(g => g.name === selectedName);
-                if (selectedGround) setActiveGroundId(selectedGround.id);
-              }}
-              variant="primary"
-            />
+        {/* CONDITIONAL RENDERING BASED ON LOADING/DATA STATE */}
+        {loading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
-        )}
-
-        {/* 4. Time Slots Section */}
-        <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-          TIME SLOT
-        </Text>
-        <LegendIndicator />
-
-        {slotsLoading ? (
-          <ActivityIndicator size="small" color={COLORS.primary} style={styles.loaderStyle} />
-        ) : slots.length === 0 ? (
-          <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
-            No slots generated for this date/ground yet.
-          </Text>
-        ) : (
-          <TimeSlotGrid
-            slots={slots as any}
-            selectedDate={selectedDate}
-            onSlotPress={_slot => {}}
-          />
-        )}
-
-        {/* 5. Bookings List */}
-        <View style={styles.bookingsContainer}>
-          {bookingsLoading ? (
-            <ActivityIndicator size="small" color={COLORS.primary} style={styles.loaderStyle} />
-          ) : bookings.length === 0 ? (
-            <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
-              No bookings found for this date.
+        ) : !venue ? (
+          <View style={styles.centerContainer}>
+            <Text
+              variant="body1"
+              weight="semiBold"
+              color={COLORS.text.muted}
+              style={styles.emptyVenueText}>
+              No {selectedCategory} facility has been set up for this club yet.
             </Text>
-          ) : (
-            bookings.map(booking => (
-              <BookingCard
-                key={booking.id}
-                name={booking.name}
-                phone={booking.phone}
-                date={booking.date}
-                time={booking.time}
-                price={booking.price}
-                status={booking.status}
-                avatarUrl={booking.avatarUrl}
-                isOfflineRecord={booking.isOfflineRecord}
-                onPress={() => navigation.navigate("BookingDetails", { bookingId: booking.id })}
-              />
-            ))
-          )}
-        </View>
+          </View>
+        ) : (
+          <>
+            {/* 2. Date Selector */}
+            <TouchableOpacity
+              style={styles.dateRow}
+              onPress={() => setIsDatePickerOpen(true)}
+              activeOpacity={0.7}>
+              <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
+                {getFormattedDate(selectedDate)}
+              </Text>
+              <CalendarIcon size={ms(16)} color="#00327B" />
+            </TouchableOpacity>
 
+            {/* 3. Ground Selector */}
+            {grounds.length > 1 && (
+              <View style={styles.groundTabs}>
+                <PillTabs
+                  tabs={grounds.map(g => g.name)}
+                  activeTab={grounds.find(g => g.id === activeGroundId)?.name || ""}
+                  onTabChange={selectedName => {
+                    const selectedGround = grounds.find(g => g.name === selectedName);
+                    if (selectedGround) setActiveGroundId(selectedGround.id);
+                  }}
+                  variant="primary"
+                />
+              </View>
+            )}
+
+            {/* 4. Time Slots Section */}
+            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+              TIME SLOT
+            </Text>
+            <LegendIndicator />
+
+            {slotsLoading ? (
+              <ActivityIndicator size="small" color={COLORS.primary} style={styles.loaderStyle} />
+            ) : slots.length === 0 ? (
+              <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
+                No slots generated for this date/ground yet.
+              </Text>
+            ) : (
+              <TimeSlotGrid
+                slots={slots as any}
+                selectedDate={selectedDate}
+                isNested={
+                  selectedCategory === "Pickleball" &&
+                  slots.some((s: any) => s.duration_minutes === 30)
+                }
+                onSlotPress={_slot => {}}
+              />
+            )}
+
+            {/* 5. Bookings List */}
+            <View style={styles.bookingsContainer}>
+              {bookingsLoading ? (
+                <ActivityIndicator size="small" color={COLORS.primary} style={styles.loaderStyle} />
+              ) : bookings.length === 0 ? (
+                <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
+                  No bookings found for this date.
+                </Text>
+              ) : (
+                bookings.map(booking => (
+                  <BookingCard
+                    key={booking.id}
+                    name={booking.name}
+                    phone={booking.phone}
+                    date={booking.date}
+                    time={booking.time}
+                    price={booking.price}
+                    status={booking.status}
+                    avatarUrl={booking.avatarUrl}
+                    isOfflineRecord={booking.isOfflineRecord}
+                    onPress={() => navigation.navigate("BookingDetails", { bookingId: booking.id })}
+                  />
+                ))
+              )}
+            </View>
+          </>
+        )}
         <View style={{ height: vs(120) }} />
       </ScreenContainer>
 
-      {/* 6. Floating Action Button (FAB) */}
-      <TouchableOpacity
-        style={styles.fab}
-        activeOpacity={0.8}
-        onPress={() => setIsBottomSheetOpen(true)}>
-        <Plus size={ms(30)} color={COLORS.text.inverse} />
-      </TouchableOpacity>
+      {/* 6. Floating Action Button (Only show if a venue actually exists) */}
+      {!loading && venue && (
+        <TouchableOpacity
+          style={styles.fab}
+          activeOpacity={0.8}
+          onPress={() => setIsBottomSheetOpen(true)}>
+          <Plus size={ms(30)} color={COLORS.text.inverse} />
+        </TouchableOpacity>
+      )}
 
-      <OfflineBookingSheet
-        isVisible={isBottomSheetOpen}
-        onClose={() => setIsBottomSheetOpen(false)}
-        venueId={serviceId}
-        _groundId={activeGroundId}
-        selectedDate={selectedDate}
-        onSuccess={() => setIsBottomSheetOpen(false)}
-      />
+      {/* Modals and Overlays */}
+      {venue && (
+        <OfflineBookingSheet
+          isVisible={isBottomSheetOpen}
+          onClose={() => setIsBottomSheetOpen(false)}
+          venueId={venue.id}
+          _groundId={activeGroundId}
+          selectedDate={selectedDate}
+          onSuccess={() => setIsBottomSheetOpen(false)}
+        />
+      )}
 
       <Modal
         visible={isDatePickerOpen}
@@ -183,14 +208,15 @@ export const SportsHomeScreen = () => {
           onPress={() => setIsDatePickerOpen(false)}>
           <View style={styles.calendarContainer}>
             <Calendar
-              current={selectedDate.toISOString().split("T")[0]}
-              minDate={new Date().toISOString().split("T")[0]}
+              current={getLocalISODate(selectedDate)}
+              minDate={getLocalISODate(new Date())} // Prevents booking in the past, safely!
               onDayPress={(day: any) => {
-                setSelectedDate(new Date(day.timestamp));
+                // Safely reconstruct the exact local date without timezone drift
+                setSelectedDate(new Date(day.year, day.month - 1, day.day));
                 setIsDatePickerOpen(false);
               }}
               markedDates={{
-                [selectedDate.toISOString().split("T")[0]]: {
+                [getLocalISODate(selectedDate)]: {
                   selected: true,
                   selectedColor: COLORS.primary,
                 },
@@ -207,17 +233,20 @@ export const SportsHomeScreen = () => {
         </TouchableOpacity>
       </Modal>
 
-      {/* --- ADDED OVERLAY DROPDOWN --- */}
+      {/* --- FIXED OVERLAY DROPDOWN --- */}
       {isCategoryOpen && (
-        <TouchableOpacity
-          style={styles.dropdownOverlay}
-          activeOpacity={1}
-          onPress={() => setIsCategoryOpen(false)}>
+        <View style={styles.dropdownOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setIsCategoryOpen(false)}
+          />
           <View style={styles.dropdownMenu}>
             {["Football", "Box Cricket", "Pickleball"].map(cat => (
               <TouchableOpacity
                 key={cat}
                 style={styles.dropdownItem}
+                activeOpacity={0.7}
                 onPress={() => {
                   setSelectedCategory(cat);
                   setIsCategoryOpen(false);
@@ -231,7 +260,7 @@ export const SportsHomeScreen = () => {
               </TouchableOpacity>
             ))}
           </View>
-        </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -239,7 +268,13 @@ export const SportsHomeScreen = () => {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
-  loadingContainer: { justifyContent: "center", alignItems: "center" },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: vs(150),
+    paddingHorizontal: hs(20),
+  },
   dateRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -287,7 +322,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 
-  /* --- NEW OVERLAY DROPDOWN STYLES --- */
+  /* --- OVERLAY DROPDOWN STYLES --- */
   dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
   dropdownMenu: {
     position: "absolute",
@@ -330,5 +365,8 @@ const styles = StyleSheet.create({
     height: ms(10),
     borderRadius: ms(5),
     backgroundColor: COLORS.text.primary,
+  },
+  emptyVenueText: {
+    textAlign: "center",
   },
 });

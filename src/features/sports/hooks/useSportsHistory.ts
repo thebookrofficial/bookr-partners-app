@@ -10,14 +10,12 @@ export interface MonthGroup {
   totalSettlement: number;
   days: DailyGroup[];
 }
-
 export interface DailyGroup {
   date: string;
   rawDate: number;
   settlement: number;
   bookings: AggregatedBooking[];
 }
-
 export interface AggregatedBooking {
   id: string;
   name: string;
@@ -28,19 +26,58 @@ export interface AggregatedBooking {
 }
 
 export const useSportsHistory = (
+  initialVenueId: string,
+  category: string,
   searchQuery: string,
   dateFilter: "all" | "3_months" | "6_months" | "9_months" | "custom" = "all",
   customRange?: { start: Date; end: Date },
 ) => {
+  const [currentVenueId, setCurrentVenueId] = useState<string>(initialVenueId);
   const [historyGroups, setHistoryGroups] = useState<MonthGroup[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchHistory = useCallback(async () => {
+  // 1. Resolve Category to actual Venue ID
+  const resolveVenue = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: venue } = await supabase.from("venues").select("id").limit(1).maybeSingle();
-      if (!venue) return;
+      const CATEGORY_DB_MAP: Record<string, string> = {
+        Football: "football",
+        "Box Cricket": "box_cricket",
+        Pickleball: "pickleball",
+      };
+      const dbSportType = CATEGORY_DB_MAP[category] || category;
 
+      const { data: initialVenue } = await supabase
+        .from("venues")
+        .select("owner_id")
+        .eq("id", initialVenueId)
+        .single();
+      if (!initialVenue) throw new Error("Owner not found");
+
+      const { data: matchedVenue } = await supabase
+        .from("venues")
+        .select("id, sports_venues!inner(sports_type)")
+        .eq("owner_id", initialVenue.owner_id)
+        .eq("sports_venues.sports_type", dbSportType)
+        .limit(1)
+        .maybeSingle();
+
+      setCurrentVenueId(matchedVenue ? matchedVenue.id : "");
+    } catch (error) {
+      console.error("Venue resolution error:", error);
+    }
+  }, [initialVenueId, category]);
+
+  // 2. Fetch History using resolved ID
+  const fetchHistory = useCallback(async () => {
+    if (!currentVenueId) {
+      setHistoryGroups([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
       const { data: bookings, error } = await supabase
         .from("sports_bookings")
         .select(
@@ -50,7 +87,7 @@ export const useSportsHistory = (
           sports_slots!inner(slot_date, start_time, end_time)
         `,
         )
-        .eq("venue_id", venue.id)
+        .eq("venue_id", currentVenueId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -60,7 +97,6 @@ export const useSportsHistory = (
       (bookings || []).forEach((b: any) => {
         const slotDate = b.sports_slots.slot_date;
         const dateObj = new Date(slotDate);
-
         const monthStr = dateObj.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
         const rawMonth = new Date(dateObj.getFullYear(), dateObj.getMonth(), 1).getTime();
         const dateStr = dateObj.toLocaleDateString("en-GB", {
@@ -80,7 +116,6 @@ export const useSportsHistory = (
           groupedByMonth[monthStr].days[dateStr] = { rawDate, settlement: 0, users: {} };
 
         const paidAmt = Number(b.paid_amount || 0);
-
         groupedByMonth[monthStr].totalSettlement += paidAmt;
         groupedByMonth[monthStr].days[dateStr].settlement += paidAmt;
 
@@ -103,11 +138,12 @@ export const useSportsHistory = (
       });
 
       const formatTime = (t: string) => {
-        const [h] = t.split(":");
+        const [h, m] = t.split(":");
         const hour = parseInt(h, 10);
         const ampm = hour >= 12 ? "Pm" : "Am";
         const displayHour = hour % 12 || 12;
-        return `${displayHour} ${ampm}`;
+        const displayMins = m === "00" ? "" : `:${m}`;
+        return `${displayHour}${displayMins} ${ampm}`;
       };
 
       let finalGroups: MonthGroup[] = Object.keys(groupedByMonth).map(monthStr => {
@@ -149,7 +185,6 @@ export const useSportsHistory = (
         };
       });
 
-      // --- APPLY DATE FILTERING ---
       if (dateFilter !== "all") {
         const now = new Date().getTime();
         let cutoff = 0;
@@ -162,13 +197,11 @@ export const useSportsHistory = (
             const filteredDays = monthGroup.days.filter(dayGroup => {
               if (dateFilter === "custom" && customRange) {
                 const start = customRange.start.getTime();
-                const end = new Date(customRange.end).setHours(23, 59, 59, 999); // Include entire end day
+                const end = new Date(customRange.end).setHours(23, 59, 59, 999);
                 return dayGroup.rawDate >= start && dayGroup.rawDate <= end;
               }
               return dayGroup.rawDate >= cutoff;
             });
-
-            // Recalculate monthly settlement after date filtering
             const newSettlement = filteredDays.reduce((sum, d) => sum + d.settlement, 0);
             return { ...monthGroup, days: filteredDays, totalSettlement: newSettlement };
           })
@@ -177,7 +210,6 @@ export const useSportsHistory = (
 
       finalGroups.sort((a, b) => b.rawMonth - a.rawMonth);
 
-      // --- APPLY TEXT SEARCH FILTERING ---
       if (searchQuery.trim() !== "") {
         const lowerQuery = searchQuery.toLowerCase();
         finalGroups = finalGroups
@@ -193,7 +225,6 @@ export const useSportsHistory = (
                 return { ...dayGroup, bookings: filteredBookings };
               })
               .filter(dayGroup => dayGroup.bookings.length > 0);
-
             const newSettlement = filteredDays.reduce((sum, d) => sum + d.settlement, 0);
             return { ...monthGroup, days: filteredDays, totalSettlement: newSettlement };
           })
@@ -206,11 +237,14 @@ export const useSportsHistory = (
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, dateFilter, customRange]);
+  }, [currentVenueId, searchQuery, dateFilter, customRange]);
 
+  useEffect(() => {
+    resolveVenue();
+  }, [resolveVenue]);
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
 
-  return { historyGroups, loading, refetch: fetchHistory };
+  return { currentVenueId, historyGroups, loading, refetch: fetchHistory };
 };
