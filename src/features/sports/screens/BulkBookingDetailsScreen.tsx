@@ -22,6 +22,9 @@ import { useBulkBooking } from "../hooks/useBulkBooking";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { supabase } from "@/lib/supabase";
 
+// IMPORT THE NEW VIEW COMPONENT
+import { ViewBulkBooking } from "../components/ViewBulkBooking";
+
 const HOURS = [
   "6 AM",
   "7 AM",
@@ -44,11 +47,11 @@ const HOURS = [
   "12 AM",
 ];
 
-export const BulkBookingDetailsScreen = () => {
-  const route = useRoute<RouteProp<MainStackParamList, "BulkBookingDetails">>();
+// ==========================================
+// CREATE MODE (Internal Component)
+// ==========================================
+const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
   const navigation = useNavigation();
-  const { type } = route.params;
-
   const [bookingType, setBookingType] = useState<"multi" | "single">(type);
   const [mobile, setMobile] = useState("");
   const [name, setName] = useState("");
@@ -59,9 +62,9 @@ export const BulkBookingDetailsScreen = () => {
   const [pricePerHour] = useState(1000);
   const [cashInput, setCashInput] = useState("");
   const [onlineInput, setOnlineInput] = useState("");
-  const [stagedPayments, setStagedPayments] = useState<
-    { mode: "cash" | "online"; amount: number }[]
-  >([]);
+  const [stagedPayments, setStagedPayments] = useState<{ mode: "cash" | "upi"; amount: number }[]>(
+    [],
+  );
   const [showDatePicker, setShowDatePicker] = useState<"from" | "to" | null>(null);
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
@@ -77,25 +80,17 @@ export const BulkBookingDetailsScreen = () => {
   const amountPaid = stagedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remainingAmount = totalPayment - amountPaid;
 
-  // Auto-fill Guest Name based on Mobile Number
   useEffect(() => {
     const lookupGuest = async () => {
       const cleanMobile = mobile.replace(/[^\d]/g, "");
-
-      // Only search when the number looks complete (10+ digits)
       if (cleanMobile.length < 10) return;
-
       try {
-        // 1. Try to find an official Bookr User Profile
         const { data: profile } = await supabase
           .from("profiles")
           .select("full_name")
           .eq("phone", cleanMobile)
           .maybeSingle();
-
         let foundName = profile?.full_name || "";
-
-        // 2. If no Bookr user, check past manual bulk/offline bookings
         if (!foundName) {
           const { data: lastBooking } = await supabase
             .from("sports_bookings")
@@ -105,21 +100,13 @@ export const BulkBookingDetailsScreen = () => {
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
-
-          if (lastBooking?.guest_name) {
-            foundName = lastBooking.guest_name;
-          }
+          if (lastBooking?.guest_name) foundName = lastBooking.guest_name;
         }
-
-        // If we found a name, automatically fill the input field!
-        if (foundName) {
-          setName(foundName);
-        }
+        if (foundName) setName(foundName);
       } catch (err) {
         console.error("Lookup error:", err);
       }
     };
-
     lookupGuest();
   }, [mobile]);
 
@@ -128,7 +115,7 @@ export const BulkBookingDetailsScreen = () => {
     const cash = parseFloat(cashInput || "0");
     const online = parseFloat(onlineInput || "0");
     if (cash > 0) newPayments.push({ mode: "cash", amount: cash });
-    if (online > 0) newPayments.push({ mode: "online", amount: online });
+    if (online > 0) newPayments.push({ mode: "upi", amount: online });
     setStagedPayments(newPayments);
     setCashInput("");
     setOnlineInput("");
@@ -140,7 +127,6 @@ export const BulkBookingDetailsScreen = () => {
       Alert.alert("Missing Info", "Please ensure dates, times, and guest info are valid.");
       return;
     }
-
     const success = await confirmBulkBooking({
       mobile,
       name,
@@ -151,23 +137,18 @@ export const BulkBookingDetailsScreen = () => {
       totalAmountPerSlot: pricePerHour,
       initialPayments: stagedPayments,
     });
-
-    if (success) {
-      navigation.goBack();
-    }
+    if (success) navigation.goBack();
   };
 
   return (
-    <ScreenContainer backgroundColor="#FFFFFF" paddingHorizontal={hs(12)}>
+    <View style={styles.flex1}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Added the Football badge back into the header! */}
         <ServiceHeader
           title="Elite Strikers Club"
           subtitle="Bulk Booking"
           rightComponent={<Text style={[styles.bisonText, styles.headerBadgeText]}>FOOTBALL</Text>}
         />
 
-        {/* Header Tab Bar */}
         <View style={styles.tabBar}>
           <View style={styles.tabContainer}>
             <TouchableOpacity
@@ -205,7 +186,6 @@ export const BulkBookingDetailsScreen = () => {
           {bookingType === "multi" ? "MULTIPLE DAYS BULK BOOKING" : "SINGLE DAY BOOKING"}
         </Text>
 
-        {/* Inputs */}
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
             <Phone size={ms(18)} color="#63A1FD" fill="#63A1FD" />
@@ -235,7 +215,6 @@ export const BulkBookingDetailsScreen = () => {
           />
         </View>
 
-        {/* Dates Selection */}
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
             <Calendar size={ms(18)} color="#63A1FD" />
@@ -275,7 +254,6 @@ export const BulkBookingDetailsScreen = () => {
           </View>
         </View>
 
-        {/* Time Selection */}
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
             <Clock size={ms(18)} color="#63A1FD" />
@@ -303,7 +281,6 @@ export const BulkBookingDetailsScreen = () => {
           </View>
         </View>
 
-        {/* Payment Logic */}
         <View style={styles.fieldGroup}>
           <Text style={styles.labelBold}>Total Payment</Text>
           <View style={styles.inputBoxFill}>
@@ -370,7 +347,6 @@ export const BulkBookingDetailsScreen = () => {
         <View style={{ height: vs(40) }} />
       </ScrollView>
 
-      {/* Standard Pickers */}
       {showDatePicker && (
         <DateTimePicker
           value={showDatePicker === "from" ? fromDate : toDate}
@@ -405,6 +381,24 @@ export const BulkBookingDetailsScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
+    </View>
+  );
+};
+
+// ==========================================
+// MAIN SCREEN EXPORT (The Smart Switch)
+// ==========================================
+export const BulkBookingDetailsScreen = () => {
+  const route = useRoute<RouteProp<MainStackParamList, "BulkBookingDetails">>();
+  const { bookingId, type } = route.params;
+
+  return (
+    <ScreenContainer backgroundColor="#FFFFFF" paddingHorizontal={hs(12)}>
+      {bookingId === "new" ? (
+        <CreateBulkBooking type={type} />
+      ) : (
+        <ViewBulkBooking bookingId={bookingId} type={type} />
+      )}
     </ScreenContainer>
   );
 };
@@ -413,14 +407,13 @@ const styles = StyleSheet.create({
   scrollContent: { paddingTop: vs(10) },
   flex1: { flex: 1 },
 
-  /* --- EXACT CSS FONT MAPPINGS --- */
+  /* --- FONTS --- */
   bisonText: {
     fontFamily: "MDNichromeTest-Bold",
     fontWeight: "700",
     fontSize: fs(20),
     color: "#FFF",
   },
-  tabTitle: { fontFamily: "Gilroy-Bold", fontSize: fs(16), color: "#000" },
   tabText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(12) },
   bookingTypeTitle: {
     fontFamily: "Gilroy-Bold",
@@ -437,7 +430,7 @@ const styles = StyleSheet.create({
   textDanger: { color: "#E55959" },
   textSuccessFlex: { color: "#00B562", flex: 1 },
 
-  /* --- LAYOUT STYLES --- */
+  /* --- CREATE LAYOUT --- */
   tabBar: { flexDirection: "row", alignItems: "center", marginBottom: vs(15), gap: hs(10) },
   tabContainer: {
     flex: 1,
@@ -455,14 +448,11 @@ const styles = StyleSheet.create({
   },
   tabActive: { backgroundColor: "#282828" },
   tabInactive: { backgroundColor: "transparent" },
-
   headerBadgeText: { color: "#000", fontSize: fs(18) },
   tabTextActive: { color: "#FFF" },
   tabTextInactive: { color: "#8C8C8C" },
-
   fieldGroup: { marginBottom: vs(15) },
   labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6), marginBottom: vs(4) },
-
   inputFill: { backgroundColor: "#F4F7FC", borderRadius: ms(10), borderWidth: 0 },
   inputBoxSmall: {
     backgroundColor: "#F4F7FC",
@@ -495,10 +485,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-
   splitRow: { flexDirection: "row", gap: hs(10) },
   addBtn: { flexDirection: "row", alignItems: "center", gap: hs(4) },
-
   paymentDrawer: {
     padding: ms(15),
     borderWidth: 1,
@@ -514,7 +502,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   confirmBtn: {
     backgroundColor: "#000",
     height: vs(44),
@@ -523,7 +510,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: vs(10),
   },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

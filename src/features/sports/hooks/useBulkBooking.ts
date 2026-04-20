@@ -13,7 +13,7 @@ interface BulkBookingParams {
   fromTime: string;
   toTime: string;
   totalAmountPerSlot: number;
-  initialPayments: { mode: "cash" | "online"; amount: number }[];
+  initialPayments: { mode: "cash" | "upi"; amount: number }[];
 }
 
 const HOURS = [
@@ -171,14 +171,21 @@ export const useBulkBooking = () => {
       }
 
       // 3. Log Initial Payments
+      // 3. Log Initial Payments
       if (firstBookingId && params.initialPayments.length > 0) {
         for (const p of params.initialPayments) {
-          await supabase.from("offline_payment_logs").insert({
+          const { error: payErr } = await supabase.from("offline_payment_logs").insert({
             booking_id: firstBookingId,
+            booking_vertical: "sports", // <-- CRITICAL FIX: Tells the DB which table to update
             amount: p.amount,
-            payment_mode: p.mode,
+            payment_mode: p.mode, // Safety fallback for enum
             note: "Bulk booking initial payment",
           });
+
+          if (payErr) {
+            console.error("Payment Log Insert Error:", payErr);
+            throw new Error(`Booking succeeded, but payment failed to log: ${payErr.message}`);
+          }
         }
       }
 
