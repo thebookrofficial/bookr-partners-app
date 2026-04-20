@@ -19,6 +19,7 @@ export type SportsTabParamList = {
   SportsDashboard: { serviceId: string };
   SportsEssentials: { serviceId: string };
   SportsProfile: { serviceId: string };
+  BlockUnblock: { venueId: string; groundId: string };
 };
 
 // 3. Define the screens in the Main Business flow
@@ -33,7 +34,7 @@ export type MainStackParamList = {
   SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;
   BookingDetails: { bookingId: string };
   GuestHistory: { guestId: string };
-  BlockUnblock: undefined;
+  BlockUnblock: { venueId: string; groundId: string };
   BulkBooking: undefined;
   BulkBookingDetails: { bookingId: string; type: "multi" | "single" };
   // Future screens: Bookings, Earnings, Profile, etc.

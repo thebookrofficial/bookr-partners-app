@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -10,10 +10,11 @@ import { ChevronRight, Files, Ban, CalendarDays, RefreshCw } from "lucide-react-
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
-// --- NEW NAVIGATION IMPORTS ---
-import { useNavigation } from "@react-navigation/native";
+// --- NAVIGATION & DATA IMPORTS ---
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { MainStackParamList } from "@/navigation/navigation.types";
+import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
+import { supabase } from "@/lib/supabase";
 
 const EssentialActionRow = ({
   title,
@@ -34,8 +35,51 @@ const EssentialActionRow = ({
 );
 
 export const SportsEssentialsScreen = () => {
-  // Initialize navigation
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const route = useRoute<RouteProp<SportsTabParamList, "SportsEssentials">>();
+
+  // --- SMART ID EXTRACTION ---
+  // 1. Try to get it from the local tab params
+  let venueId = route.params?.serviceId;
+
+  // 2. If undefined, climb up and grab it from the parent 'SportsServiceTabs' navigator
+  if (!venueId) {
+    const parentState = navigation.getParent()?.getState();
+    const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
+    const tabParams = tabRoute?.params as any;
+    // Extract from direct params or nested params object
+    venueId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+  }
+
+  // State to hold the groundId
+  const [activeGroundId, setActiveGroundId] = useState<string>("");
+
+  // Fetch the first ground associated with this venue
+  useEffect(() => {
+    const fetchFirstGround = async () => {
+      if (!venueId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("sports_grounds")
+          .select("id")
+          .eq("venue_id", venueId)
+          .order("display_order", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          setActiveGroundId(data.id);
+        }
+      } catch (err) {
+        console.error("Error fetching ground:", err);
+      }
+    };
+
+    fetchFirstGround();
+  }, [venueId]);
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
@@ -62,7 +106,22 @@ export const SportsEssentialsScreen = () => {
         <EssentialActionRow
           title="Block / Unblock"
           icon={Ban}
-          onPress={() => navigation.navigate("BlockUnblock")} // <-- UPDATED THIS LINE
+          onPress={() => {
+            // SAFETY CHECK: Ensure we have both IDs before navigating
+            if (venueId && activeGroundId) {
+              navigation.navigate("BlockUnblock", {
+                venueId: venueId,
+                groundId: activeGroundId,
+              });
+            } else if (!venueId) {
+              Alert.alert("Error", "Venue ID is missing. Please go back and re-enter this screen.");
+            } else {
+              Alert.alert(
+                "No Ground Found",
+                "We couldn't find a sports ground for this venue. Please make sure you have added a ground in Supabase first.",
+              );
+            }
+          }}
         />
         <EssentialActionRow
           title="Special Days"
