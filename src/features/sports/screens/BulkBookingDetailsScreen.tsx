@@ -1,263 +1,333 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView, Image } from "react-native";
-import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
-import { ServiceHeader } from "../components/ServiceHeader";
-// ADDED 'Minus' to the imports here
+import React, { useEffect, useState } from "react";
 import {
-  Phone,
-  Calendar,
-  Clock,
-  ChevronRight,
-  ChevronDown,
-  FileText,
-  Plus,
-  Minus,
-  Landmark,
-  User as UserIcon,
-} from "lucide-react-native";
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+  Modal,
+} from "react-native";
+import { ScreenContainer } from "@/layouts/ScreenContainer";
+import { Text, TextInput } from "@/components/ui";
+import { ServiceHeader } from "../components/ServiceHeader";
+import { Plus, Minus, ChevronDown, Phone, User, Calendar, Clock } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
-import { COLORS } from "@/constants/theme";
-import { useRoute, RouteProp } from "@react-navigation/native";
+import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
+import { useBulkBooking } from "../hooks/useBulkBooking";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { supabase } from "@/lib/supabase";
 
-interface InfoBoxProps {
-  label: string;
-  value: string;
-  color?: string;
-  icon?: any;
-  showDropdown?: boolean;
-}
-
-const InfoBox = ({
-  label,
-  value,
-  color = COLORS.text.primary,
-  icon: Icon,
-  showDropdown = false,
-}: InfoBoxProps) => (
-  <View style={styles.fieldGroup}>
-    {Icon && (
-      <View style={styles.labelRow}>
-        <Icon size={ms(18)} color={COLORS.primary} />
-        <Text variant="body2" weight="bold" style={styles.label}>
-          {label}
-        </Text>
-      </View>
-    )}
-    {!Icon && (
-      <Text variant="body2" weight="bold" style={styles.labelOnly}>
-        {label}
-      </Text>
-    )}
-
-    <TouchableOpacity style={styles.inputBox} activeOpacity={showDropdown ? 0.7 : 1}>
-      <Text variant="body2" weight="semiBold" color={color} style={styles.flex1}>
-        {value}
-      </Text>
-      {showDropdown && <ChevronDown size={ms(18)} color={COLORS.text.primary} />}
-    </TouchableOpacity>
-  </View>
-);
+const HOURS = [
+  "6 AM",
+  "7 AM",
+  "8 AM",
+  "9 AM",
+  "10 AM",
+  "11 AM",
+  "12 PM",
+  "1 PM",
+  "2 PM",
+  "3 PM",
+  "4 PM",
+  "5 PM",
+  "6 PM",
+  "7 PM",
+  "8 PM",
+  "9 PM",
+  "10 PM",
+  "11 PM",
+  "12 AM",
+];
 
 export const BulkBookingDetailsScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "BulkBookingDetails">>();
-  const { type, bookingId } = route.params;
+  const navigation = useNavigation();
+  const { type } = route.params;
 
   const [bookingType, setBookingType] = useState<"multi" | "single">(type);
-  const [isPaymentHistoryOpen, setIsPaymentHistoryOpen] = useState(false);
+  const [mobile, setMobile] = useState("");
+  const [name, setName] = useState("");
+  const [fromDate, setFromDate] = useState(new Date());
+  const [toDate, setToDate] = useState(new Date());
+  const [fromTime, setFromTime] = useState("7 AM");
+  const [toTime, setToTime] = useState("8 AM");
+  const [pricePerHour] = useState(1000);
+  const [cashInput, setCashInput] = useState("");
+  const [onlineInput, setOnlineInput] = useState("");
+  const [stagedPayments, setStagedPayments] = useState<
+    { mode: "cash" | "online"; amount: number }[]
+  >([]);
+  const [showDatePicker, setShowDatePicker] = useState<"from" | "to" | null>(null);
+  const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
 
-  const isNewBooking = bookingId === "new";
+  const { confirmBulkBooking, isSubmitting } = useBulkBooking();
+
+  const totalSlots =
+    (bookingType === "single"
+      ? 1
+      : Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1) *
+    (HOURS.indexOf(toTime) - HOURS.indexOf(fromTime));
+  const totalPayment = totalSlots * pricePerHour;
+  const amountPaid = stagedPayments.reduce((sum, p) => sum + p.amount, 0);
+  const remainingAmount = totalPayment - amountPaid;
+
+  // Auto-fill Guest Name based on Mobile Number
+  useEffect(() => {
+    const lookupGuest = async () => {
+      const cleanMobile = mobile.replace(/[^\d]/g, "");
+
+      // Only search when the number looks complete (10+ digits)
+      if (cleanMobile.length < 10) return;
+
+      try {
+        // 1. Try to find an official Bookr User Profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("phone", cleanMobile)
+          .maybeSingle();
+
+        let foundName = profile?.full_name || "";
+
+        // 2. If no Bookr user, check past manual bulk/offline bookings
+        if (!foundName) {
+          const { data: lastBooking } = await supabase
+            .from("sports_bookings")
+            .select("guest_name")
+            .eq("guest_phone", cleanMobile)
+            .not("guest_name", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (lastBooking?.guest_name) {
+            foundName = lastBooking.guest_name;
+          }
+        }
+
+        // If we found a name, automatically fill the input field!
+        if (foundName) {
+          setName(foundName);
+        }
+      } catch (err) {
+        console.error("Lookup error:", err);
+      }
+    };
+
+    lookupGuest();
+  }, [mobile]);
+
+  const handleAddPayment = () => {
+    const newPayments = [...stagedPayments];
+    const cash = parseFloat(cashInput || "0");
+    const online = parseFloat(onlineInput || "0");
+    if (cash > 0) newPayments.push({ mode: "cash", amount: cash });
+    if (online > 0) newPayments.push({ mode: "online", amount: online });
+    setStagedPayments(newPayments);
+    setCashInput("");
+    setOnlineInput("");
+    setIsAddingPayment(false);
+  };
+
+  const onConfirm = async () => {
+    if (!mobile || !name || totalSlots <= 0) {
+      Alert.alert("Missing Info", "Please ensure dates, times, and guest info are valid.");
+      return;
+    }
+
+    const success = await confirmBulkBooking({
+      mobile,
+      name,
+      fromDate,
+      toDate: bookingType === "single" ? fromDate : toDate,
+      fromTime,
+      toTime,
+      totalAmountPerSlot: pricePerHour,
+      initialPayments: stagedPayments,
+    });
+
+    if (success) {
+      navigation.goBack();
+    }
+  };
 
   return (
-    <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
+    <ScreenContainer backgroundColor="#FFFFFF" paddingHorizontal={hs(12)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
+        {/* Added the Football badge back into the header! */}
         <ServiceHeader
           title="Elite Strikers Club"
           subtitle="Bulk Booking"
-          rightComponent={
-            <Text variant="body2" weight="bold" style={styles.categoryBadge}>
-              Football
-            </Text>
-          }
+          rightComponent={<Text style={[styles.bisonText, styles.headerBadgeText]}>FOOTBALL</Text>}
         />
 
-        {/* Bulk Booking Type Toggle Bar */}
-        <View style={styles.tabContainer}>
-          <Text variant="body1" weight="bold" style={styles.tabTitle}>
-            Bulk Booking
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.tabPill,
-              bookingType === "multi" ? styles.tabActive : styles.tabInactive,
-            ]}
-            onPress={() => setBookingType("multi")}
-            activeOpacity={0.7}>
-            <Text
-              variant="caption"
-              weight="semiBold"
-              color={bookingType === "multi" ? COLORS.text.inverse : COLORS.text.muted}>
-              Multiple days
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tabPill,
-              bookingType === "single" ? styles.tabActive : styles.tabInactive,
-            ]}
-            onPress={() => setBookingType("single")}
-            activeOpacity={0.7}>
-            <Text
-              variant="caption"
-              weight="semiBold"
-              color={bookingType === "single" ? COLORS.text.inverse : COLORS.text.muted}>
-              Single days
-            </Text>
-          </TouchableOpacity>
+        {/* Header Tab Bar */}
+        <View style={styles.tabBar}>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[
+                styles.tabPill,
+                bookingType === "multi" ? styles.tabActive : styles.tabInactive,
+              ]}
+              onPress={() => setBookingType("multi")}>
+              <Text
+                style={[
+                  styles.tabText,
+                  bookingType === "multi" ? styles.tabTextActive : styles.tabTextInactive,
+                ]}>
+                Multiple days
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tabPill,
+                bookingType === "single" ? styles.tabActive : styles.tabInactive,
+              ]}
+              onPress={() => setBookingType("single")}>
+              <Text
+                style={[
+                  styles.tabText,
+                  bookingType === "single" ? styles.tabTextActive : styles.tabTextInactive,
+                ]}>
+                Single days
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Profile Section */}
-        {!isNewBooking && (
-          <View style={styles.profileRow}>
-            <Image source={{ uri: "https://placeholder.com/50" }} style={styles.avatar} />
-            <View style={styles.flex1}>
-              <Text variant="h3" weight="bold">
-                Chirag Patil
-              </Text>
-            </View>
-          </View>
-        )}
-
-        <Text variant="body1" weight="bold" style={styles.bookingTypeTitle}>
+        <Text style={styles.bookingTypeTitle}>
           {bookingType === "multi" ? "MULTIPLE DAYS BULK BOOKING" : "SINGLE DAY BOOKING"}
         </Text>
 
-        {/* Mobile Input */}
+        {/* Inputs */}
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
-            <Phone size={ms(18)} color={COLORS.primary} fill={COLORS.primary} />
-            <Text variant="body2" weight="medium" style={styles.label}>
-              Mobile No
-            </Text>
+            <Phone size={ms(18)} color="#63A1FD" fill="#63A1FD" />
+            <Text style={styles.label}>Mobile No</Text>
           </View>
-          <View style={styles.inputBox}>
-            <Text variant="body2" weight="semiBold" style={styles.flex1}>
-              {isNewBooking ? "Enter Mobile Number" : "+91 78349 89934"}
-            </Text>
-            {!isNewBooking && (
-              <TouchableOpacity style={styles.callBtn}>
-                <Text variant="caption" weight="bold" color="#FFF">
-                  Call
+          <TextInput
+            variant="filled"
+            value={mobile}
+            onChangeText={setMobile}
+            keyboardType="phone-pad"
+            placeholder="+91 ..."
+            style={styles.inputFill}
+          />
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <View style={styles.labelRow}>
+            <User size={ms(18)} color="#63A1FD" />
+            <Text style={styles.label}>Name</Text>
+          </View>
+          <TextInput
+            variant="filled"
+            value={name}
+            onChangeText={setName}
+            placeholder="Guest Name"
+            style={styles.inputFill}
+          />
+        </View>
+
+        {/* Dates Selection */}
+        <View style={styles.fieldGroup}>
+          <View style={styles.labelRow}>
+            <Calendar size={ms(18)} color="#63A1FD" />
+            <Text style={styles.labelBold}>Select Dates</Text>
+          </View>
+          <View style={styles.splitRow}>
+            <View style={styles.flex1}>
+              <Text style={styles.subLabel}>From</Text>
+              <TouchableOpacity
+                style={styles.inputBoxSmall}
+                onPress={() => setShowDatePicker("from")}>
+                <Text style={styles.inputText}>
+                  {fromDate.toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })}
                 </Text>
               </TouchableOpacity>
+            </View>
+            {bookingType === "multi" && (
+              <View style={styles.flex1}>
+                <Text style={styles.subLabel}>To</Text>
+                <TouchableOpacity
+                  style={styles.inputBoxSmall}
+                  onPress={() => setShowDatePicker("to")}>
+                  <Text style={styles.inputText}>
+                    {toDate.toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
 
-        {/* Name Input */}
+        {/* Time Selection */}
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
-            <UserIcon size={ms(18)} color={COLORS.primary} />
-            <Text variant="body2" weight="medium" style={styles.label}>
-              Name
-            </Text>
-          </View>
-          <View style={styles.inputBox}>
-            <Text variant="body2" weight="semiBold" style={styles.flex1}>
-              {isNewBooking ? "Enter Name" : "Yash Patil"}
-            </Text>
-          </View>
-        </View>
-
-        {/* Date Section */}
-        {bookingType === "multi" ? (
-          <View style={styles.rowGap}>
-            <View style={styles.labelRow}>
-              <Calendar size={ms(18)} color={COLORS.primary} />
-              <Text variant="body2" weight="bold" style={styles.label}>
-                Select Dates
-              </Text>
-            </View>
-            <View style={styles.splitRow}>
-              <View style={styles.flex1}>
-                <InfoBox label="From" value={isNewBooking ? "Select" : "06 May 2026"} />
-              </View>
-              <View style={styles.flex1}>
-                <InfoBox label="To" value={isNewBooking ? "Select" : "12 May 2026"} />
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.rowGap}>
-            <View style={styles.labelRow}>
-              <Calendar size={ms(18)} color={COLORS.primary} />
-              <Text variant="body2" weight="bold" style={styles.label}>
-                Select Date
-              </Text>
-            </View>
-            <InfoBox label="" value={isNewBooking ? "Select Date" : "19/04/2026"} showDropdown />
-          </View>
-        )}
-
-        {/* Time Slots */}
-        <View style={styles.rowGap}>
-          <View style={styles.labelRow}>
-            <Clock size={ms(18)} color={COLORS.primary} />
-            <Text variant="body2" weight="bold" style={styles.label}>
-              Select Time Slots
-            </Text>
+            <Clock size={ms(18)} color="#63A1FD" />
+            <Text style={styles.labelBold}>Select Time Slots</Text>
           </View>
           <View style={styles.splitRow}>
             <View style={styles.flex1}>
-              <InfoBox label="From" value={isNewBooking ? "Start" : "7 Am"} showDropdown />
+              <Text style={styles.subLabel}>From</Text>
+              <TouchableOpacity
+                style={styles.inputBoxSmallRow}
+                onPress={() => setShowHourPicker("from")}>
+                <Text style={styles.inputText}>{fromTime}</Text>
+                <ChevronDown size={ms(16)} color="#000" />
+              </TouchableOpacity>
             </View>
             <View style={styles.flex1}>
-              <InfoBox
-                label="To"
-                value={isNewBooking ? "End" : bookingType === "multi" ? "8 Am" : "12 Pm"}
-                showDropdown
-              />
+              <Text style={styles.subLabel}>To</Text>
+              <TouchableOpacity
+                style={styles.inputBoxSmallRow}
+                onPress={() => setShowHourPicker("to")}>
+                <Text style={styles.inputText}>{toTime}</Text>
+                <ChevronDown size={ms(16)} color="#000" />
+              </TouchableOpacity>
             </View>
           </View>
         </View>
 
-        {/* Payment Summary */}
-        <InfoBox label="Total Payment" value={isNewBooking ? "₹ 0" : "₹ 7000"} />
-        <InfoBox
-          label="Remaining Amount"
-          value={isNewBooking ? "₹ 0" : "₹ 6500"}
-          color={COLORS.danger}
-        />
-
-        {/* Amount Paid with Dynamic Add/Cancel Button */}
+        {/* Payment Logic */}
         <View style={styles.fieldGroup}>
-          <Text variant="body2" weight="bold" style={styles.labelOnly}>
-            Amount Paid
-          </Text>
-          <View style={styles.inputBox}>
-            <Text variant="body2" weight="semiBold" color="#00B562" style={styles.flex1}>
-              {isNewBooking ? "₹ 0" : "₹ 500"}
-            </Text>
+          <Text style={styles.labelBold}>Total Payment</Text>
+          <View style={styles.inputBoxFill}>
+            <Text style={styles.inputText}>₹ {totalPayment}</Text>
+          </View>
+        </View>
 
-            {/* --- UPDATED: Dynamic Add/Cancel Button --- */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.labelBold}>Remaining Amount</Text>
+          <View style={styles.inputBoxFill}>
+            <Text style={[styles.inputText, styles.textDanger]}>₹ {remainingAmount}</Text>
+          </View>
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={styles.labelBold}>Amount Paid</Text>
+          <View style={styles.inputBoxFillRow}>
+            <Text style={[styles.inputText, styles.textSuccessFlex]}>₹ {amountPaid}</Text>
             <TouchableOpacity
               style={styles.addBtn}
-              onPress={() => setIsAddingPayment(!isAddingPayment)}
-              activeOpacity={0.7}>
-              <Text
-                variant="body2"
-                weight="bold"
-                color={isAddingPayment ? COLORS.danger : "#00B562"}>
-                {isAddingPayment ? "Cancel" : "Add"}
-              </Text>
+              onPress={() => setIsAddingPayment(!isAddingPayment)}>
+              <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
               {isAddingPayment ? (
-                <Minus size={ms(18)} color={COLORS.danger} />
+                <Minus size={ms(18)} color="#E55959" />
               ) : (
                 <Plus size={ms(18)} color="#00B562" />
               )}
@@ -265,105 +335,76 @@ export const BulkBookingDetailsScreen = () => {
           </View>
         </View>
 
-        {/* Add Payment Dropdown Box */}
         {isAddingPayment && (
-          <View style={styles.paymentBox}>
-            <View style={styles.paymentFieldGroup}>
-              <Text variant="body2" weight="medium" style={styles.labelOnly}>
-                Cash
-              </Text>
-              <View style={styles.inputBox}>
-                <Text variant="body2" weight="semiBold" style={styles.flex1}>
-                  ₹800
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.paymentFieldGroup}>
-              <Text variant="body2" weight="medium" style={styles.labelOnly}>
-                Online
-              </Text>
-              <View style={styles.inputBox}>
-                <Text variant="body2" weight="semiBold" style={styles.flex1}>
-                  ₹ 100
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.savePaymentBtn}
-              activeOpacity={0.8}
-              onPress={() => setIsAddingPayment(false)}>
-              <Text family="nichrome" variant="h3" color="#FFF">
-                SAVE
-              </Text>
+          <View style={styles.paymentDrawer}>
+            <TextInput
+              variant="filled"
+              label="Cash"
+              value={cashInput}
+              onChangeText={setCashInput}
+              keyboardType="numeric"
+              placeholder="₹"
+            />
+            <TextInput
+              variant="filled"
+              label="Online"
+              value={onlineInput}
+              onChangeText={setOnlineInput}
+              keyboardType="numeric"
+              placeholder="₹"
+            />
+            <TouchableOpacity style={styles.confirmPaymentBtn} onPress={handleAddPayment}>
+              <Text style={styles.bisonText}>SAVE PAYMENT</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Action Button */}
-        {!isAddingPayment && (
-          <TouchableOpacity style={styles.saveBtn} activeOpacity={0.8}>
-            <Text family="nichrome" variant="h3" color="#FFF">
-              CONFIRM BULK BOOKING
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Collapsible Payment History */}
-        {!isNewBooking && (
-          <>
-            <TouchableOpacity
-              style={styles.historyHeader}
-              onPress={() => setIsPaymentHistoryOpen(!isPaymentHistoryOpen)}
-              activeOpacity={0.7}>
-              <Landmark size={ms(20)} color={COLORS.text.primary} />
-              <Text variant="body2" weight="bold" color={COLORS.danger} style={styles.flex1}>
-                Current Booking Payment History
-              </Text>
-              {isPaymentHistoryOpen ? (
-                <ChevronDown size={ms(20)} />
-              ) : (
-                <ChevronRight size={ms(20)} />
-              )}
-            </TouchableOpacity>
-
-            {isPaymentHistoryOpen && (
-              <View style={styles.historyContent}>
-                {[
-                  { date: "10 May 2026", time: "8:05 Am", amount: "+₹2000" },
-                  { date: "8 May 2026", time: "8:02 Am", amount: "+₹1000" },
-                  { date: "5 May 2026", time: "7:43 Pm", amount: "+₹500" },
-                ].map((item, idx) => (
-                  <View key={idx} style={styles.historyItem}>
-                    <View style={styles.flex1}>
-                      <Text variant="body2" weight="semiBold">
-                        {item.date}
-                      </Text>
-                      <Text variant="caption" color={COLORS.text.muted}>
-                        {item.time}
-                      </Text>
-                    </View>
-                    <Text variant="body2" weight="bold" color="#00B562">
-                      {item.amount}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <TouchableOpacity style={styles.historyHeader} activeOpacity={0.7}>
-              <FileText size={ms(20)} color={COLORS.text.primary} />
-              <Text variant="body2" weight="bold" style={styles.flex1}>
-                Previous History
-              </Text>
-              <ChevronRight size={ms(20)} />
-            </TouchableOpacity>
-          </>
-        )}
+        <TouchableOpacity style={styles.confirmBtn} onPress={onConfirm} disabled={isSubmitting}>
+          {isSubmitting ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.bisonText}>CONFIRM BULK BOOKING</Text>
+          )}
+        </TouchableOpacity>
 
         <View style={{ height: vs(40) }} />
       </ScrollView>
+
+      {/* Standard Pickers */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={showDatePicker === "from" ? fromDate : toDate}
+          mode="date"
+          onChange={(e, date) => {
+            setShowDatePicker(null);
+            if (date) {
+              if (showDatePicker === "from") setFromDate(date);
+              else setToDate(date);
+            }
+          }}
+        />
+      )}
+
+      <Modal visible={!!showHourPicker} transparent animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowHourPicker(null)}>
+          <View style={styles.hourPickerContainer}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {HOURS.map(hour => (
+                <TouchableOpacity
+                  key={hour}
+                  style={styles.hourItem}
+                  onPress={() => {
+                    if (showHourPicker === "from") setFromTime(hour);
+                    else setToTime(hour);
+                    setShowHourPicker(null);
+                  }}>
+                  <Text style={styles.inputText}>{hour}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScreenContainer>
   );
 };
@@ -371,105 +412,135 @@ export const BulkBookingDetailsScreen = () => {
 const styles = StyleSheet.create({
   scrollContent: { paddingTop: vs(10) },
   flex1: { flex: 1 },
-  categoryBadge: { textTransform: "capitalize" },
 
-  tabContainer: { flexDirection: "row", alignItems: "center", marginBottom: vs(15), gap: hs(10) },
-  tabTitle: { width: hs(120), fontSize: fs(16) },
+  /* --- EXACT CSS FONT MAPPINGS --- */
+  bisonText: {
+    fontFamily: "MDNichromeTest-Bold",
+    fontWeight: "700",
+    fontSize: fs(20),
+    color: "#FFF",
+  },
+  tabTitle: { fontFamily: "Gilroy-Bold", fontSize: fs(16), color: "#000" },
+  tabText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(12) },
+  bookingTypeTitle: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(16),
+    color: "#000",
+    textTransform: "uppercase",
+    marginBottom: vs(15),
+  },
+  label: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: "#000" },
+  labelBold: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: "#000" },
+  subLabel: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: "#000", marginBottom: vs(4) },
+  inputText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#000" },
+  addText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#00B562" },
+  textDanger: { color: "#E55959" },
+  textSuccessFlex: { color: "#00B562", flex: 1 },
+
+  /* --- LAYOUT STYLES --- */
+  tabBar: { flexDirection: "row", alignItems: "center", marginBottom: vs(15), gap: hs(10) },
+  tabContainer: {
+    flex: 1,
+    flexDirection: "row",
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
+    padding: ms(4),
+  },
   tabPill: {
     flex: 1,
-    height: vs(40),
+    height: vs(32),
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: ms(10),
+    borderRadius: ms(8),
   },
   tabActive: { backgroundColor: "#282828" },
-  tabInactive: { backgroundColor: COLORS.surface.primary },
+  tabInactive: { backgroundColor: "transparent" },
 
-  profileRow: { flexDirection: "row", alignItems: "center", gap: hs(12), marginBottom: vs(15) },
-  avatar: { width: ms(50), height: ms(50), borderRadius: ms(25), backgroundColor: COLORS.primary },
-  bookingTypeTitle: {
-    fontSize: fs(16),
-    marginTop: vs(4),
-    marginBottom: vs(15),
-    textTransform: "uppercase",
-  },
+  headerBadgeText: { color: "#000", fontSize: fs(18) },
+  tabTextActive: { color: "#FFF" },
+  tabTextInactive: { color: "#8C8C8C" },
+
   fieldGroup: { marginBottom: vs(15) },
-  labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6), marginBottom: vs(6) },
-  labelOnly: { marginBottom: vs(6), fontSize: fs(14) },
-  label: { fontSize: fs(14) },
-  inputBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surface.primary,
-    paddingHorizontal: hs(12),
-    paddingVertical: vs(10),
-    borderRadius: ms(10),
-  },
-  callBtn: {
-    backgroundColor: "#000",
-    paddingHorizontal: hs(12),
-    paddingVertical: vs(4),
-    borderRadius: ms(6),
-  },
-  splitRow: { flexDirection: "row", gap: hs(10) },
-  rowGap: { marginBottom: vs(15) },
-  addBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(4),
-    paddingVertical: vs(4),
-    paddingHorizontal: hs(6),
-  }, // Added slight padding for touch target
+  labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6), marginBottom: vs(4) },
 
-  paymentBox: {
-    padding: hs(10),
+  inputFill: { backgroundColor: "#F4F7FC", borderRadius: ms(10), borderWidth: 0 },
+  inputBoxSmall: {
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
+    padding: ms(12),
+    height: vs(40),
+    justifyContent: "center",
+  },
+  inputBoxSmallRow: {
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
+    padding: ms(10),
+    height: vs(40),
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  inputBoxFill: {
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
+    padding: ms(12),
+    height: vs(40),
+    justifyContent: "center",
+  },
+  inputBoxFillRow: {
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
+    paddingHorizontal: ms(12),
+    height: vs(48),
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  splitRow: { flexDirection: "row", gap: hs(10) },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: hs(4) },
+
+  paymentDrawer: {
+    padding: ms(15),
     borderWidth: 1,
     borderColor: "#CBDFFE",
     borderRadius: ms(10),
     marginBottom: vs(15),
-    gap: vs(15),
-  },
-  paymentFieldGroup: { gap: vs(6) },
-  savePaymentBtn: {
-    backgroundColor: "#000",
-    height: vs(44),
-    borderRadius: ms(10),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  historyHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(8),
-    borderWidth: 1,
-    borderColor: "#CBDFFE",
-    borderRadius: ms(10),
-    padding: ms(10),
-    marginTop: vs(10),
-  },
-  historyContent: {
-    padding: ms(10),
-    backgroundColor: COLORS.surface.primary,
-    borderBottomLeftRadius: ms(10),
-    borderBottomRightRadius: ms(10),
     gap: vs(10),
   },
-  historyItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingBottom: vs(8),
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#DDD",
-  },
-  saveBtn: {
+  confirmPaymentBtn: {
     backgroundColor: "#000",
     height: vs(44),
     borderRadius: ms(10),
     justifyContent: "center",
     alignItems: "center",
-    marginTop: vs(20),
-    marginBottom: vs(10),
+  },
+
+  confirmBtn: {
+    backgroundColor: "#000",
+    height: vs(44),
+    borderRadius: ms(10),
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: vs(10),
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  hourPickerContainer: {
+    width: "80%",
+    backgroundColor: "#FFF",
+    borderRadius: ms(10),
+    maxHeight: "50%",
+    padding: ms(10),
+  },
+  hourItem: {
+    padding: ms(15),
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEE",
+    alignItems: "center",
   },
 });

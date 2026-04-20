@@ -1,0 +1,196 @@
+// Copyright (c) 2026 Bookr. All rights reserved.
+// Confidential and Proprietary.
+
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { Alert } from "react-native";
+
+interface BulkBookingParams {
+  mobile: string;
+  name: string;
+  fromDate: Date;
+  toDate: Date;
+  fromTime: string;
+  toTime: string;
+  totalAmountPerSlot: number;
+  initialPayments: { mode: "cash" | "online"; amount: number }[];
+}
+
+const HOURS = [
+  "6 AM",
+  "7 AM",
+  "8 AM",
+  "9 AM",
+  "10 AM",
+  "11 AM",
+  "12 PM",
+  "1 PM",
+  "2 PM",
+  "3 PM",
+  "4 PM",
+  "5 PM",
+  "6 PM",
+  "7 PM",
+  "8 PM",
+  "9 PM",
+  "10 PM",
+  "11 PM",
+  "12 AM",
+];
+
+export const useBulkBooking = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const parseTimeTo24 = (time12h: string) => {
+    if (!time12h || time12h === "12 AM") return "00:00:00";
+    const [time, modifier] = time12h.split(" ");
+    let hours = parseInt(time, 10);
+    if (hours === 12 && modifier === "AM") hours = 0;
+    if (hours < 12 && modifier === "PM") hours += 12;
+    return `${hours.toString().padStart(2, "0")}:00:00`;
+  };
+
+  const confirmBulkBooking = async (params: BulkBookingParams) => {
+    setIsSubmitting(true);
+    try {
+      const { data: venue } = await supabase.from("venues").select("id").limit(1).maybeSingle();
+      const { data: ground } = await supabase
+        .from("sports_grounds")
+        .select("id")
+        .eq("venue_id", venue?.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!venue?.id || !ground?.id) throw new Error("Could not resolve Venue or Ground ID.");
+
+      const cleanMobile = params.mobile.replace(/[^\d]/g, "");
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("phone", cleanMobile)
+        .maybeSingle();
+
+      const dates: string[] = [];
+      let curr = new Date(params.fromDate);
+      while (curr <= params.toDate) {
+        dates.push(curr.toISOString().split("T")[0]);
+        curr.setDate(curr.getDate() + 1);
+      }
+
+      const startIdx = HOURS.indexOf(params.fromTime);
+      const endIdx = HOURS.indexOf(params.toTime);
+      if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx)
+        throw new Error("Invalid time range.");
+      const hourlySlots = HOURS.slice(startIdx, endIdx);
+
+      let bookingsCreated = 0;
+      let firstBookingId: string | null = null;
+
+      for (const d of dates) {
+        for (const hour of hourlySlots) {
+          const startTime24 = parseTimeTo24(hour);
+          const nextHour = HOURS[HOURS.indexOf(hour) + 1] || "12 AM";
+          const endTime24 = parseTimeTo24(nextHour);
+
+          // 1. Explicitly check if slot exists first to avoid ghost-slot errors
+          const { data: existingSlot } = await supabase
+            .from("sports_slots")
+            .select("id, status")
+            .eq("venue_id", venue.id)
+            .eq("ground_id", ground.id)
+            .eq("slot_date", d)
+            .eq("start_time", startTime24)
+            .maybeSingle();
+
+          let slotId = existingSlot?.id;
+
+          if (existingSlot) {
+            if (existingSlot.status !== "available") {
+              // console.log(`Slot ${d} ${hour} is already taken or ghosted.`);
+              continue;
+            }
+            await supabase.from("sports_slots").update({ status: "booked" }).eq("id", slotId);
+          } else {
+            const { data: newSlot, error: insErr } = await supabase
+              .from("sports_slots")
+              .insert({
+                venue_id: venue.id,
+                ground_id: ground.id,
+                slot_date: d,
+                start_time: startTime24,
+                end_time: endTime24,
+                price: params.totalAmountPerSlot,
+                status: "booked",
+              })
+              .select("id")
+              .single();
+
+            if (insErr) {
+              console.error("Slot Insert Error:", insErr);
+              throw new Error(`Database rejected slot creation: ${insErr.message}`);
+            }
+            slotId = newSlot.id;
+          }
+
+          // 2. Create Booking Record with ALL missing financial columns
+          const { data: booking, error: bookingError } = await supabase
+            .from("sports_bookings")
+            .insert({
+              user_id: profile?.id || null,
+              guest_name: profile ? null : params.name,
+              guest_phone: profile ? null : cleanMobile,
+              venue_id: venue.id,
+              slot_id: slotId,
+              booking_status: "confirmed",
+
+              subtotal: params.totalAmountPerSlot,
+              discount_amount: 0,
+              total_amount: params.totalAmountPerSlot,
+              vendor_payout: params.totalAmountPerSlot,
+              platform_fee: 0,
+              gateway_fee: 0,
+              paid_amount: 0,
+
+              notes: "Bulk Booking Record",
+            })
+            .select("id")
+            .single();
+
+          if (bookingError) {
+            console.error("Booking Insert Error:", bookingError);
+            throw new Error(`Database rejected booking record: ${bookingError.message}`);
+          }
+
+          bookingsCreated++;
+          if (!firstBookingId) firstBookingId = booking.id;
+        }
+      }
+
+      if (bookingsCreated === 0) {
+        throw new Error("No slots could be booked. The selected times may already be taken.");
+      }
+
+      // 3. Log Initial Payments
+      if (firstBookingId && params.initialPayments.length > 0) {
+        for (const p of params.initialPayments) {
+          await supabase.from("offline_payment_logs").insert({
+            booking_id: firstBookingId,
+            amount: p.amount,
+            payment_mode: p.mode,
+            note: "Bulk booking initial payment",
+          });
+        }
+      }
+
+      Alert.alert("Success", `Bulk booking successfully created for ${bookingsCreated} slots!`);
+      return true;
+    } catch (e: any) {
+      Alert.alert("Booking Failed", e.message);
+      return false;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return { confirmBulkBooking, isSubmitting };
+};
