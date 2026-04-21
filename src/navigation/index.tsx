@@ -36,6 +36,7 @@ import { BulkBookingScreen } from "@/features/sports/screens/BulkBookingScreen";
 import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingDetailsScreen";
 import { DineHomeScreen } from "@/features/dine/screens/DineHomeScreen";
 import { DineDashboardScreen } from "@/features/dine/screens/DineDashboardScreen";
+import { DineHistoryScreen } from "@/features/dine/screens/DineHistoryScreen";
 import DineDetailsScreen from "@/features/dine/screens/DineDetailsScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
@@ -58,7 +59,6 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
 const SportsProfileScreen = () => <PlaceholderScreen title="Sports Profile" />;
-const DineHistoryScreen = () => <PlaceholderScreen title="Dine History" />;
 const DineEssentialsScreen = () => <PlaceholderScreen title="Dine Essentials" />;
 const DineProfileScreen = () => <PlaceholderScreen title="Dine Profile" />;
 
@@ -91,7 +91,6 @@ const SportsTabNavigator = () => {
           paddingTop: vs(4),
           paddingBottom: vs(25),
           paddingHorizontal: hs(10),
-          boxShadow: "0px -1px 10px rgba(203, 223, 254, 1)",
           gap: vs(10),
         },
         tabBarLabelStyle: {
@@ -148,7 +147,6 @@ const DineTabNavigator = () => {
           paddingTop: vs(4),
           paddingBottom: vs(25),
           paddingHorizontal: hs(10),
-          boxShadow: "0px -1px 10px rgba(203, 223, 254, 1)",
           gap: vs(10),
         },
         tabBarLabelStyle: {

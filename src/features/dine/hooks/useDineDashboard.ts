@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 
-export type DashboardTab = "Today" | "Last week" | "This Month" | "Custom";
+export type DashboardTab = "Today" | "Last week" | "This Month" | "This Year" | "Custom";
 
 export const useDineDashboard = (serviceId: string) => {
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ export const useDineDashboard = (serviceId: string) => {
         "This Month": {
           totalPayout: "+₹147844",
           periodLabel: "Apr 2026",
-          payoutLabel: "Total Payout This week", // As per Figma Frame 6:78778
+          payoutLabel: "Total Payout This week",
           graphTitle: "Revenue Graph This Month",
           weeks: [
             {
@@ -101,6 +101,26 @@ export const useDineDashboard = (serviceId: string) => {
               percentage: 30,
               details: [],
             },
+          ],
+        },
+        "This Year": {
+          totalPayout: "+₹18,50,000",
+          periodLabel: "Year 2026",
+          payoutLabel: "Total Payout This Year",
+          graphTitle: "Revenue Graph This Year",
+          graphData: [
+            { label: "Jan", amount: "+₹1.2L", percentage: 40 },
+            { label: "Feb", amount: "+₹1.5L", percentage: 50 },
+            { label: "Mar", amount: "+₹1.8L", percentage: 60 },
+            { label: "Apr", subLabel: "Today", amount: "+₹1.4L", percentage: 45, active: true },
+            { label: "May", amount: null, percentage: 0 },
+            { label: "Jun", amount: null, percentage: 0 },
+            { label: "Jul", amount: null, percentage: 0 },
+            { label: "Aug", amount: null, percentage: 0 },
+            { label: "Sep", amount: null, percentage: 0 },
+            { label: "Oct", amount: null, percentage: 0 },
+            { label: "Nov", amount: null, percentage: 0 },
+            { label: "Dec", amount: null, percentage: 0 },
           ],
         },
       };

@@ -10,9 +10,10 @@ import { DinePaymentCard } from "./DinePaymentCard";
 
 interface DinePaymentsListProps {
   payments: any[];
+  onPaymentPress: (paymentId: string) => void;
 }
 
-export const DinePaymentsList = ({ payments }: DinePaymentsListProps) => {
+export const DinePaymentsList = ({ payments, onPaymentPress }: DinePaymentsListProps) => {
   return (
     <View style={styles.container}>
       {payments.map((section, sectionIndex) => (
@@ -26,7 +27,11 @@ export const DinePaymentsList = ({ payments }: DinePaymentsListProps) => {
           </Text>
           <View style={styles.listContainer}>
             {section.data.map((payment: any) => (
-              <DinePaymentCard key={payment.id} {...payment} />
+              <DinePaymentCard
+                key={payment.id}
+                {...payment}
+                onPress={() => onPaymentPress(payment.id)}
+              />
             ))}
           </View>
         </View>

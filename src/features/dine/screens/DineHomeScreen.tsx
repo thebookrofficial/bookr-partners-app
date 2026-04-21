@@ -69,8 +69,14 @@ export const DineHomeScreen = () => {
   };
 
   const handleBookingPress = (bookingId: string) => {
-    navigation.navigate("BookingDetails", {
+    navigation.navigate("DineBookingDetails", {
       bookingId,
+    });
+  };
+
+  const handlePaymentPress = (paymentId: string) => {
+    navigation.navigate("DineBookingDetails", {
+      bookingId: paymentId, // Assuming paymentId can be used or mapped to bookingId for details
     });
   };
 
@@ -127,7 +133,7 @@ export const DineHomeScreen = () => {
                 onBookingPress={handleBookingPress}
               />
             ) : (
-              <DinePaymentsList payments={payments} />
+              <DinePaymentsList payments={payments} onPaymentPress={handlePaymentPress} />
             )}
           </>
         )}

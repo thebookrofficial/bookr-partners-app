@@ -19,17 +19,25 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
 export const DineDashboardScreen = () => {
   const route = useRoute<RouteProp<DineTabParamList, "DineDashboard">>();
-  const { serviceId } = route.params;
+  const serviceId = route.params?.serviceId || "default-service";
 
   const { loading, activeTab, setActiveTab, revenueData } = useDineDashboard(serviceId);
 
-  const TABS: DashboardTab[] = ["Today", "Last week", "This Month", "Custom"];
+  const TABS: DashboardTab[] = ["Today", "Last week", "This Month", "This Year", "Custom"];
+
+  if (loading || !revenueData) {
+    return (
+      <View style={[styles.root, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
       <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
         {/* 1. Header */}
-        <ServiceHeader title="Hotel tikka lab" category="Restaurant" imageSource={USER_PROFILE} />
+        <ServiceHeader title="Hotel tikka lab" imageSource={USER_PROFILE} />
 
         {/* 2. Period Tabs */}
         <View style={styles.tabContainer}>
@@ -56,60 +64,54 @@ export const DineDashboardScreen = () => {
           })}
         </View>
 
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
+        <>
+          {/* 3. Period Display */}
+          <Text variant="body1" weight="bold" style={styles.periodLabel}>
+            {revenueData.periodLabel}
+          </Text>
+
+          {/* 4. Total Payout Summary */}
+          <View style={styles.summaryCard}>
+            <Text variant="h1" weight="bold" style={styles.totalAmount}>
+              {revenueData.totalPayout}
+            </Text>
+            <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
+              {revenueData.payoutLabel}
+            </Text>
           </View>
-        ) : (
-          <>
-            {/* 3. Period Display */}
-            <Text variant="body1" weight="bold" style={styles.periodLabel}>
-              {revenueData.periodLabel}
+
+          {/* 5. Revenue Graph Section */}
+          <View style={styles.graphSection}>
+            <Text variant="body1" weight="bold" style={styles.graphTitle}>
+              {revenueData.graphTitle.toUpperCase()}
             </Text>
 
-            {/* 4. Total Payout Summary */}
-            <View style={styles.summaryCard}>
-              <Text variant="h1" weight="bold" style={styles.totalAmount}>
-                {revenueData.totalPayout}
-              </Text>
-              <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
-                {revenueData.payoutLabel}
-              </Text>
+            <View style={styles.graphContainer}>
+              {activeTab === "This Month"
+                ? (revenueData.weeks || []).map((week: any) => (
+                    <WeekExpandableRow
+                      key={week.id}
+                      label={week.label}
+                      dateRange={week.dateRange}
+                      amount={week.amount}
+                      percentage={week.percentage}
+                      isActive={week.active}
+                      details={week.details}
+                    />
+                  ))
+                : (revenueData.graphData || []).map((item: any, index: number) => (
+                    <RevenueBar
+                      key={index}
+                      label={item.label}
+                      subLabel={item.subLabel}
+                      amount={item.amount}
+                      percentage={item.percentage}
+                      isActive={item.active}
+                    />
+                  ))}
             </View>
-
-            {/* 5. Revenue Graph Section */}
-            <View style={styles.graphSection}>
-              <Text variant="body1" weight="bold" style={styles.graphTitle}>
-                {revenueData.graphTitle.toUpperCase()}
-              </Text>
-
-              <View style={styles.graphContainer}>
-                {activeTab === "This Month"
-                  ? revenueData.weeks.map((week: any) => (
-                      <WeekExpandableRow
-                        key={week.id}
-                        label={week.label}
-                        dateRange={week.dateRange}
-                        amount={week.amount}
-                        percentage={week.percentage}
-                        isActive={week.active}
-                        details={week.details}
-                      />
-                    ))
-                  : revenueData.graphData.map((item: any, index: number) => (
-                      <RevenueBar
-                        key={index}
-                        label={item.label}
-                        subLabel={item.subLabel}
-                        amount={item.amount}
-                        percentage={item.percentage}
-                        isActive={item.active}
-                      />
-                    ))}
-              </View>
-            </View>
-          </>
-        )}
+          </View>
+        </>
         <View style={{ height: vs(100) }} />
       </ScreenContainer>
     </View>
@@ -120,7 +122,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   tabContainer: {
     flexDirection: "row",
-    gap: hs(10),
+    gap: hs(6),
     marginVertical: vs(20),
     width: "100%",
     justifyContent: "space-between",
@@ -144,7 +146,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: hs(8),
   },
   tabText: {
-    fontSize: ms(12),
+    fontSize: ms(11),
     color: "#8C8C8C",
     textAlign: "center",
   },
