@@ -13,15 +13,16 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList, DineTabParamList } from "@/navigation/navigation.types";
 import { Calendar } from "react-native-calendars";
 import { ServiceHeader } from "@/features/sports/components/ServiceHeader";
-import { DineBookingCard } from "../components/DineBookingCard";
-import { DineFilterBar } from "../components/DineFilterBar";
+import { DineUpcomingList } from "../components/DineUpcomingList";
+import { DinePaymentsList } from "../components/DinePaymentsList";
+import { DineOfflineBookingSheet } from "../components/DineOfflineBookingSheet";
 import { useDineHome } from "../hooks/useDineHome";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
 /**
  * DineHomeScreen - Modularized for pixel-perfect accuracy.
- * Matches Figma frame 6:75684.
+ * Matches Figma frame 6:77570.
  */
 export const DineHomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -34,6 +35,7 @@ export const DineHomeScreen = () => {
     selectedDate,
     setSelectedDate,
     bookings,
+    payments,
     activeTab,
     setActiveTab,
     filter,
@@ -41,6 +43,7 @@ export const DineHomeScreen = () => {
   } = useDineHome(serviceId);
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);
 
   const getFormattedDate = (date: Date) => {
     const today = new Date(2026, 3, 3);
@@ -65,13 +68,18 @@ export const DineHomeScreen = () => {
     return `${year}-${month}-${day}`;
   };
 
+  const handleBookingPress = (bookingId: string) => {
+    navigation.navigate("BookingDetails", {
+      bookingId,
+    });
+  };
+
   return (
     <View style={styles.root}>
       <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
         {/* 1. Header Section */}
         <ServiceHeader
           title={venue?.name || "Hotel tikka lab"}
-          category="Restaurant"
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
         />
 
@@ -93,7 +101,7 @@ export const DineHomeScreen = () => {
                 style={styles.dateText}>
                 {getFormattedDate(selectedDate)}
               </Text>
-              <CalendarIcon size={ms(18)} color="#00327B" />
+              <CalendarIcon size={ms(16)} color="#00327B" />
             </TouchableOpacity>
 
             {/* 3. Main Category Tabs (Upcoming / Payments) */}
@@ -110,37 +118,42 @@ export const DineHomeScreen = () => {
               />
             </View>
 
-            {/* 4. Filter and List Section */}
-            <DineFilterBar title={activeTab} selectedFilter={filter} onFilterChange={setFilter} />
-
-            <View style={styles.listContainer}>
-              {bookings.length === 0 ? (
-                <Text variant="body2" color={COLORS.text.secondary} style={styles.emptyText}>
-                  No bookings found.
-                </Text>
-              ) : (
-                bookings.map(booking => (
-                  <DineBookingCard
-                    key={booking.id}
-                    {...booking}
-                    onPress={() =>
-                      navigation.navigate("BookingDetails", {
-                        bookingId: booking.id,
-                      })
-                    }
-                  />
-                ))
-              )}
-            </View>
+            {/* 4. List Section (Conditional Rendering) */}
+            {activeTab === "Upcoming" ? (
+              <DineUpcomingList
+                bookings={bookings}
+                filter={filter}
+                onFilterChange={setFilter}
+                onBookingPress={handleBookingPress}
+              />
+            ) : (
+              <DinePaymentsList payments={payments} />
+            )}
           </>
         )}
         <View style={{ height: vs(120) }} />
       </ScreenContainer>
 
       {/* Floating Action Button */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8} onPress={() => {}}>
-        <Plus size={ms(30)} color={COLORS.text.inverse} />
-      </TouchableOpacity>
+      {activeTab === "Upcoming" && (
+        <TouchableOpacity
+          style={styles.fab}
+          activeOpacity={0.8}
+          onPress={() => setIsBookingSheetOpen(true)}>
+          <Plus size={ms(30)} color={COLORS.text.inverse} />
+        </TouchableOpacity>
+      )}
+
+      {/* Offline Booking Sheet */}
+      <DineOfflineBookingSheet
+        isVisible={isBookingSheetOpen}
+        onClose={() => setIsBookingSheetOpen(false)}
+        selectedDate={selectedDate}
+        onSuccess={() => {
+          setIsBookingSheetOpen(false);
+          // Optional: refresh data here if needed
+        }}
+      />
 
       {/* Date Picker Modal */}
       <Modal
@@ -205,28 +218,21 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   tabSectionTitle: {
-    fontSize: ms(18),
-    width: hs(200),
+    fontSize: ms(16),
+    width: hs(205),
     color: COLORS.text.primary,
   },
   pillTabsWrapper: {
     flex: 1,
     marginVertical: 0,
   },
-  listContainer: {
-    width: "100%",
-  },
-  emptyText: {
-    textAlign: "center",
-    marginTop: vs(30),
-  },
   fab: {
     position: "absolute",
     right: hs(12),
     bottom: vs(95),
-    width: ms(58),
-    height: ms(58),
-    borderRadius: ms(29),
+    width: ms(64),
+    height: ms(64),
+    borderRadius: ms(32),
     backgroundColor: COLORS.primary,
     justifyContent: "center",
     alignItems: "center",

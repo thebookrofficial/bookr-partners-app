@@ -68,24 +68,84 @@ const MOCK_BOOKINGS = [
   },
 ];
 
+const MOCK_PAYMENTS = [
+  {
+    date: "Today 03 Apr 2026",
+    data: [
+      {
+        id: "p1",
+        name: "Yash Jadhav",
+        phone: "+91 89346 93456",
+        amount: "₹1000",
+        type: "Pay Bill",
+        typeColor: "#7300FF",
+        amountColor: "#00B562",
+        time: "8:42 Pm",
+        avatarUrl: undefined,
+      },
+      {
+        id: "p2",
+        name: "Chirag Patil",
+        phone: "+91 89346 93456",
+        amount: "₹1600",
+        type: "Table Booking (8 Pm)",
+        typeColor: "#63A1FD",
+        amountColor: "#000000",
+        time: "9:02 Pm",
+        avatarUrl: undefined,
+      },
+    ],
+  },
+  {
+    date: "02 Apr 2026",
+    data: [
+      {
+        id: "p3",
+        name: "Yash Jadhav",
+        phone: "+91 89346 93456",
+        amount: "₹1000",
+        type: "Pay Bill",
+        typeColor: "#7300FF",
+        amountColor: "#00B562",
+        time: "8:42 Pm",
+        avatarUrl: undefined,
+      },
+      {
+        id: "p4",
+        name: "Chirag Patil",
+        phone: "+91 89346 93456",
+        amount: "₹1600",
+        type: "Table Booking (8 Pm)",
+        typeColor: "#63A1FD",
+        amountColor: "#000000",
+        time: "9:02 Pm",
+        avatarUrl: undefined,
+      },
+    ],
+  },
+];
+
 export const useDineHome = (serviceId: string) => {
   const [loading, setLoading] = useState(true);
   const [venue, setVenue] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState(new Date(2026, 3, 3)); // April 3, 2026
   const [bookings, setBookings] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("Upcoming");
   const [filter, setFilter] = useState("Today");
 
   useEffect(() => {
-    // Simulate API fetch
+    setLoading(true);
+    // Simulate API fetch for the specific selectedDate
     const timer = setTimeout(() => {
       setVenue(MOCK_VENUE);
       setBookings(MOCK_BOOKINGS);
+      setPayments(MOCK_PAYMENTS);
       setLoading(false);
-    }, 1000);
+    }, 800);
 
     return () => clearTimeout(timer);
-  }, [serviceId]);
+  }, [serviceId, selectedDate]);
 
   return {
     loading,
@@ -93,6 +153,7 @@ export const useDineHome = (serviceId: string) => {
     selectedDate,
     setSelectedDate,
     bookings,
+    payments,
     activeTab,
     setActiveTab,
     filter,
