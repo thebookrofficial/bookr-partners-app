@@ -10,16 +10,13 @@ This directory contains UI components specific to the Sports service category.
   - Handles various payment statuses and styles offline records with a distinct theme.
 
 - **`LegendIndicator.tsx`**: Provides a visual key for the time slot grid statuses.
-
   - Statuses: Available, Manuel, Online, Blocked.
 
 - **`OfflineBookingSheet.tsx`**: A modal bottom sheet for creating offline bookings.
-
   - Features form inputs for date, mobile, name, time slots, and payments.
   - Includes a quick link to check a guest's previous history.
 
 - **`ViewBulkBooking.tsx`**: A management component for bulk booking batches.
-
   - Lists all bookings in a batch with status and payment tracking.
 
   - Allows adding settlement payments to bulk-created records.
@@ -28,7 +25,6 @@ This directory contains UI components specific to the Sports service category.
 
   - Displays service title, category, and an image/avatar.
   - Includes a sport-category switcher to toggle between different facilities (e.g., Football to Pickleball).
-
 - **`TimeSlotGrid.tsx`**: A grid layout for selecting or viewing hourly time slots.
 
   - Statuses: `available`, `online`, `manual`, `blocked`.
