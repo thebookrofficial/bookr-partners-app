@@ -18,8 +18,9 @@ module.exports = {
         path: ".env",
       },
     ],
+    "@babel/plugin-transform-export-namespace-from",
     // 'react-native-worklets/plugin', // Temporarily commented out until installed
-    "react-native-reanimated/plugin",
+    "react-native-reanimated/plugin", // This must always be the last plugin
   ],
   env: {
     production: {

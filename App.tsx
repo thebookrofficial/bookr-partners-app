@@ -4,6 +4,13 @@ import { StatusBar, useColorScheme } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 // Update this line to use the correct relative path
 import { AppNavigator } from "@/navigation";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
+
+// 1. Global Initializations
+GoogleSignin.configure({
+  scopes: ["https://www.googleapis.com/auth/userinfo.email"],
+  webClientId: "YOUR_NEW_WEB_CLIENT_ID.apps.googleusercontent.com",
+});
 
 function App() {
   const isDarkMode = useColorScheme() === "dark";

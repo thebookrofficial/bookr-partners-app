@@ -43,7 +43,7 @@ export const TextInput = ({
         (typeof label === "string" ? (
           <Text
             variant="body2"
-            weight="medium"
+            weight="bold"
             color={editable === false ? COLORS.text.muted : COLORS.text.primary}
             style={styles.label}>
             {label}

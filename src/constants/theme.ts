@@ -22,5 +22,6 @@ export const COLORS = {
   },
   border: {
     pillActive: "#E2E8F0",
+    navBar: "#CBDFFE",
   },
 };

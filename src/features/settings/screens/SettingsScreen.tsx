@@ -18,9 +18,11 @@ import {
 import { vs, hs, ms } from "@/utils/responsive.utils";
 import { useNavigation } from "@react-navigation/native";
 import { COLORS } from "@/constants/theme";
+import { useAuthLogic } from "@/features/auth/hooks/useAuthLogic";
 
 export const SettingsScreen = () => {
   const navigation = useNavigation();
+  const { logout } = useAuthLogic(); // <-- Hook injected here
 
   return (
     <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
@@ -68,6 +70,7 @@ export const SettingsScreen = () => {
           <SettingsActionRow
             icon={<LogOut size={ms(20)} color={COLORS.primary} />}
             label="Log out"
+            onPress={logout} // <-- Triggering the hook
           />
           <SettingsActionRow
             icon={<Trash2 size={ms(20)} color={COLORS.danger} />}
