@@ -18,16 +18,16 @@ export const Avatar = ({
 }: AvatarProps) => {
   const scaledSize = ms(size);
   const borderRadius = scaledSize / 2;
+  const defaultImage = require("../../assets/icons/ic-user-profile.png");
 
   return (
     <View style={[styles.container, { width: scaledSize, height: scaledSize, borderRadius }]}>
-      {source ? (
-        <Image
-          source={source}
-          style={{ width: scaledSize, height: scaledSize, borderRadius }}
-          resizeMode="cover"
-        />
-      ) : (
+      <Image
+        source={source || defaultImage}
+        style={{ width: scaledSize, height: scaledSize, borderRadius }}
+        resizeMode="cover"
+      />
+      {!source && !defaultImage && (
         <View style={[styles.fallback, { borderRadius }]}>
           <Text
             variant="body1"

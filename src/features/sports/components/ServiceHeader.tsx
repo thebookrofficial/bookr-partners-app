@@ -2,8 +2,8 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import { View, StyleSheet, Image, TouchableOpacity } from "react-native";
-import { Text } from "@/components/ui";
+import { View, StyleSheet, TouchableOpacity, ImageSourcePropType } from "react-native";
+import { Text, Avatar } from "@/components/ui";
 import { ChevronDown, ArrowLeft } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -13,7 +13,7 @@ interface ServiceHeaderProps {
   title: string;
   subtitle?: string;
   category?: string; // Made optional so we can omit it on the dashboard
-  imageUri?: string;
+  imageSource?: ImageSourcePropType;
   onCategoryPress?: () => void;
   rightComponent?: React.ReactNode; // <-- NEW PROP for the Edit button
 }
@@ -22,7 +22,7 @@ export const ServiceHeader = ({
   title,
   subtitle,
   category,
-  imageUri,
+  imageSource,
   onCategoryPress,
   rightComponent,
 }: ServiceHeaderProps) => {
@@ -35,10 +35,10 @@ export const ServiceHeader = ({
       </TouchableOpacity>
 
       <View style={styles.content}>
-        <Image source={{ uri: imageUri || "https://placeholder.com/100" }} style={styles.image} />
+        <Avatar source={imageSource} size={50} />
 
         <View style={styles.textWrapper}>
-          <Text family="nichrome" style={styles.title} numberOfLines={1}>
+          <Text family="nichrome" weight="bold" style={styles.title} numberOfLines={1}>
             {title}
           </Text>
           {subtitle && (

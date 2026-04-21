@@ -22,6 +22,15 @@ export type SportsTabParamList = {
   BlockUnblock: { venueId: string; groundId: string };
 };
 
+// 2.1 Define the Bottom Tab screens for Dine
+export type DineTabParamList = {
+  DineHome: { serviceId: string };
+  DineHistory: { serviceId: string };
+  DineDashboard: { serviceId: string };
+  DineEssentials: { serviceId: string };
+  DineProfile: { serviceId: string };
+};
+
 // 3. Define the screens in the Main Business flow
 export type MainStackParamList = {
   Dashboard: undefined;
@@ -32,6 +41,7 @@ export type MainStackParamList = {
   Settings: undefined;
 
   SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;
+  DineServiceTabs: NavigatorScreenParams<DineTabParamList>;
   BookingDetails: { bookingId: string };
   GuestHistory: { guestId: string };
   BlockUnblock: { venueId: string; groundId: string };
