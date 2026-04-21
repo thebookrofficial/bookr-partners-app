@@ -8,6 +8,8 @@ This is a React Native project built with TypeScript, designed as a business-fac
 - **Main Technologies:**
   - **Framework:** React Native (v0.81.0)
   - **Language:** TypeScript
+  - **Database & Auth:** Supabase (PostgreSQL, Real-time)
+  - **Serverless:** Supabase Edge Functions (Deno/TypeScript)
   - **Navigation:** React Navigation (v7) with Native Stack & Bottom Tabs
   - **UI Components:** Lucide Icons, React Native Skia, Rive
   - **Animation:** React Native Reanimated (v4)

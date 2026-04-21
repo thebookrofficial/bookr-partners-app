@@ -12,10 +12,10 @@ This directory defines the app routing architecture using React Navigation 7.
 - **`AuthStackParamList`**: Unauthenticated routes (`Login`, `Signup`).
 - **`MainStackParamList`**: Authenticated dashboard routes. Includes general profile management (`VendorProfile`, `EditProfile`, `AddStaff`, `Settings`) and service-specific detail screens (`BookingDetails`, `GuestHistory`).
 - **`SportsTabParamList`**: A nested Bottom Tab Navigator used for sports service management. Routes include:
-  - `SportsHome`: The main service dashboard.
-  - `SportsHistory`: Transaction history for the service.
-  - `SportsDashboard`: Analytics and insights.
-  - `SportsEssentials`: Administrative tools and configurations.
+  - `SportsHome`: The main operational dashboard.
+  - `SportsHistory`: Transaction and booking history with monthly grouping.
+  - `SportsDashboard`: Analytics and performance insights.
+  - `SportsEssentials`: Administrative tools (Bulk Booking, Block/Unblock).
   - `SportsProfile`: Service-level profile settings.
 
 ## Rules

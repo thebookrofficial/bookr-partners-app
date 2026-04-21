@@ -8,16 +8,23 @@ The `sports/` module is designed to handle the unique requirements of sports ser
 
 ## Core Screens
 
-- **`SportsHomeScreen`**: The primary operational dashboard for a service. Displays date selection, ground/court switching, a visual `TimeSlotGrid`, and a list of upcoming/current bookings.
-- **`BookingDetailsScreen`**: A deep-dive into a specific booking. Features include payment management (tracking total, paid, and remaining amounts), split-payment entry (Cash/Online), and quick actions (Call/WhatsApp).
-- **`GuestHistoryScreen`**: Provides a comprehensive view of a customer's relationship with the venue, including total booking stats and a categorized list of past, upcoming, and cancelled sessions.
+- **`SportsHomeScreen`**: The primary operational dashboard. Displays date selection, ground switching, a visual `TimeSlotGrid`, and real-time booking lists.
+- **`SportsHistoryScreen`**: Comprehensive transaction and booking history, grouped by month with automated settlement status tracking (Full/Online/Offline).
+- **`SportsDashboardScreen`**: Analytics and insights for the sports venue, providing a high-level overview of performance metrics.
+- **`SportsEssentialsScreen`**: Administrative hub for advanced actions like Bulk Bookings, Slot Blocking, and Venue Updates.
+- **`BookingDetailsScreen`**: Deep-dive into specific bookings with split-payment management (Cash/Online) and quick communication actions.
+- **`BulkBookingScreen` & `BulkBookingDetailsScreen`**: Specialized flow for creating and managing multiple bookings across different dates and times.
+- **`BlockUnblockScreen`**: Dedicated interface for managing venue availability by blocking or unblocking specific time slots/dates.
+- **`GuestHistoryScreen`**: Customer-centric view providing aggregate statistics and a full history of past and upcoming sessions.
 
 ## Key Components
 
-- **`BookingCard`**: A versatile card used across multiple screens to display booking summaries. Supports different statuses (Online, Offline, Advance) and specific styling for offline manual records.
-- **`TimeSlotGrid`**: A responsive grid representing hourly availability. Slots are color-coded based on status: Available (Surface), Online (Primary), Manuel (Danger), and Unavailable (Disabled).
-- **`OfflineBookingSheet`**: A bottom-sheet modal for quick manual entry of bookings, featuring interactive date/time selection and payment tracking.
-- **`ServiceHeader`**: A unified header for all sports-related screens, providing consistent navigation and service-level context.
+- **`BookingCard`**: Versatile card for booking summaries with status-based styling (Online, Offline, Advance).
+- **`TimeSlotGrid`**: Interactive grid for hourly availability, color-coded by status (Available, Online, Manual, Blocked).
+- **`OfflineBookingSheet`**: Bottom-sheet modal for rapid manual entry of single bookings with integrated payment logging.
+- **`ViewBulkBooking`**: Comprehensive view for managing batches of bookings created via the Bulk Booking flow.
+- **`ServiceHeader`**: Unified header providing navigation and service-level context with sport-category switching.
+- **`BlockCalendar` & `ClosedDatesAlert`**: Specialized components for the Block/Unblock management flow.
 
 ## Architectural Rules
 

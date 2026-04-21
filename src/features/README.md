@@ -10,10 +10,11 @@ Encapsulates the Vendor Profile dashboard, staff management, and service listing
 
 ### `sports/`
 
-Dedicated module for sports-related service management (Turfs, Courts, Grounds), including hourly slot booking and real-time availability.
+Dedicated module for sports-related service management (Turfs, Courts, Grounds). Handles hourly slot booking, bulk scheduling, venue availability management, and real-time operational tracking.
 
-- **`components/`**: Feature-private UI blocks (`ServiceCard.tsx`, `StaffCard.tsx`). These are not exported globally because they contain specific layout rules (like the exact 4-column flex row for Staff) that only apply to the profile domain.
-- **`screens/`**: Heavy UI assembly (`VendorProfileScreen.tsx`). Contains the complex layout logic, local state (e.g., active tabs), and Figma-matched padding/margins.
+- **`components/`**: Domain-specific UI blocks like `TimeSlotGrid`, `BookingCard`, and `OfflineBookingSheet`.
+- **`screens/`**: High-level assembly for the multi-tab operational dashboard, including History, Dashboard (Analytics), and Essentials (Admin tools).
+- **`hooks/`**: Specialized Supabase-integrated hooks for real-time slot and booking management.
 
 ## Rules
 
