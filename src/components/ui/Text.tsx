@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Bookr. All rights reserved.
+// Confidential and Proprietary.
+
 import React from "react";
 import { Text as RNText, TextProps as RNTextProps, StyleSheet, TextStyle } from "react-native";
 import { fs } from "@/utils/responsive.utils";
@@ -5,13 +8,17 @@ import { COLORS } from "@/constants/theme";
 
 export interface TextProps extends RNTextProps {
   variant?: "h1" | "h2" | "h3" | "body1" | "body2" | "caption";
-  weight?: "regular" | "medium" | "semiBold" | "bold";
-  family?: "gilroy" | "nichrome";
+  weight?: "regular" | "medium" | "semiBold" | "bold" | "extraBold";
+  family?: "gilroy" | "nichrome" | "bison";
   color?: string;
   align?: TextStyle["textAlign"];
   children: React.ReactNode;
 }
 
+/**
+ * Custom Text component with support for design-system typography.
+ * Maps weights to specific font files linked in src/assets/fonts.
+ */
 export const Text = ({
   variant = "body1",
   weight = "regular",
@@ -23,14 +30,29 @@ export const Text = ({
   ...rest
 }: TextProps) => {
   const getFontFamily = () => {
-    if (family === "nichrome") return "MDNichromeTest-Bold";
+    if (family === "bison") return "Bison-Bold";
+
+    if (family === "nichrome") {
+      switch (weight) {
+        case "bold":
+        case "extraBold":
+          return "MDNichromeTest-Bold";
+        default:
+          return "MDNichromeTest-Bold";
+      }
+    }
+
+    // Default to Gilroy
     switch (weight) {
+      case "extraBold":
+        return "Gilroy-ExtraBold";
       case "bold":
-        return "Gilroy-ExtraBold";
+        return "Gilroy-Bold";
       case "semiBold":
-        return "Gilroy-ExtraBold";
+        return "Gilroy-SemiBold";
       case "medium":
-        return "Gilroy-Light";
+        return "Gilroy-Medium";
+      case "regular":
       default:
         return "Gilroy-Light";
     }

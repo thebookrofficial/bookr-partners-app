@@ -57,9 +57,13 @@
 		<string>MDNichromeTest-Dark.otf</string>
 		<string>MDNichromeTest-DarkOblique.otf</string>
 		<string>AntDesign.ttf</string>
+		<string>Bison-Bold.ttf</string>
 		<string>Entypo.ttf</string>
+		<string>Gilroy-Bold.ttf</string>
 		<string>EvilIcons.ttf</string>
 		<string>Feather.ttf</string>
+		<string>Gilroy-Medium.ttf</string>
+		<string>Gilroy-SemiBold.ttf</string>
 		<string>FontAwesome.ttf</string>
 		<string>FontAwesome5_Brands.ttf</string>
 		<string>FontAwesome5_Regular.ttf</string>
@@ -76,10 +80,9 @@
 		<string>SimpleLineIcons.ttf</string>
 		<string>Zocial.ttf</string>
 	</array>
-
 	<key>NSPhotoLibraryUsageDescription</key>
-  <string>Bookr needs access to your gallery to update your business profile picture.</string>
-  <key>NSCameraUsageDescription</key>
-  <string>Bookr needs access to your camera to take a profile picture.</string>
+	<string>Bookr needs access to your gallery to update your business profile picture.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Bookr needs access to your camera to take a profile picture.</string>
 </dict>
 </plist>
