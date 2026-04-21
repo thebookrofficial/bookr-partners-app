@@ -43,6 +43,7 @@ export type MainStackParamList = {
   SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;
   DineServiceTabs: NavigatorScreenParams<DineTabParamList>;
   BookingDetails: { bookingId: string };
+  DineBookingDetails: { bookingId: string };
   GuestHistory: { guestId: string };
   BlockUnblock: { venueId: string; groundId: string };
   BulkBooking: undefined;

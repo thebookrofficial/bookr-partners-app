@@ -35,6 +35,8 @@ import { BlockUnblockScreen } from "@/features/sports/screens/BlockUnblockScreen
 import { BulkBookingScreen } from "@/features/sports/screens/BulkBookingScreen";
 import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingDetailsScreen";
 import { DineHomeScreen } from "@/features/dine/screens/DineHomeScreen";
+import { DineDashboardScreen } from "@/features/dine/screens/DineDashboardScreen";
+import DineDetailsScreen from "@/features/dine/screens/DineDetailsScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
 import { Text } from "@/components/ui";
@@ -57,7 +59,6 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
 const SportsProfileScreen = () => <PlaceholderScreen title="Sports Profile" />;
 const DineHistoryScreen = () => <PlaceholderScreen title="Dine History" />;
-const DineDashboardScreen = () => <PlaceholderScreen title="Dine Dashboard" />;
 const DineEssentialsScreen = () => <PlaceholderScreen title="Dine Essentials" />;
 const DineProfileScreen = () => <PlaceholderScreen title="Dine Profile" />;
 
@@ -203,6 +204,7 @@ const MainNavigator = () => (
     <MainStack.Screen name="SportsServiceTabs" component={SportsTabNavigator} />
     <MainStack.Screen name="DineServiceTabs" component={DineTabNavigator} />
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
+    <MainStack.Screen name="DineBookingDetails" component={DineDetailsScreen} />
     <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />
     <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
     <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />
