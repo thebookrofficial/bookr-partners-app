@@ -19,6 +19,7 @@ This directory contains the primary screens for the Sports service category.
 - **`SportsDashboardScreen.tsx`**: Analytics hub for venue performance.
 
   - Provides high-level insights into booking trends and revenue (work-in-progress).
+
   - Integrated with real-time Supabase data fetching.
 
 - **`SportsEssentialsScreen.tsx`**: The administrative central hub.

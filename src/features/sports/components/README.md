@@ -21,6 +21,7 @@ This directory contains UI components specific to the Sports service category.
 - **`ViewBulkBooking.tsx`**: A management component for bulk booking batches.
 
   - Lists all bookings in a batch with status and payment tracking.
+
   - Allows adding settlement payments to bulk-created records.
 
 - **`ServiceHeader.tsx`**: The main header component for sports service screens.
