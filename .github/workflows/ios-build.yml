@@ -34,11 +34,11 @@ jobs:
 
       # --- GATE 1: Formatting ---
       - name: Enforce Prettier formatting
-        run: pnpm exec prettier --check .
+        run: pnpm format
 
       # --- GATE 2: Linting ---
       - name: Run ESLint
-        run: pnpm run lint
+        run: pnpm lint
 
       # --- GATE 3: Testing ---
       - name: Run Unit Tests (Jest)
