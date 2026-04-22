@@ -10,6 +10,7 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Text, TextInput } from "@/components/ui";
 import {
@@ -26,13 +27,29 @@ import {
 import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { Calendar } from "react-native-calendars";
+import { supabase } from "@/lib/supabase";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { MainStackParamList } from "@/navigation/navigation.types";
+import { z } from "zod";
 
 interface DineOfflineBookingSheetProps {
   isVisible: boolean;
   onClose: () => void;
+  venueId: string;
   selectedDate: Date;
   onSuccess: () => void;
 }
+
+const offlineBookingSchema = z.object({
+  mobile: z
+    .string()
+    .min(10, "Mobile number must be at least 10 digits.")
+    .regex(/^\d+$/, "Mobile number can only contain digits."),
+  name: z.string().min(2, "Please provide a valid guest name."),
+  guestCount: z.string().min(1, "Guest count is required."),
+  selectedTime: z.string().min(1, "Please select a time slot."),
+});
 
 const CustomLabel = ({ icon: Icon, text }: { icon: any; text: string }) => (
   <View style={styles.labelRow}>
@@ -46,9 +63,12 @@ const CustomLabel = ({ icon: Icon, text }: { icon: any; text: string }) => (
 export const DineOfflineBookingSheet = ({
   isVisible,
   onClose,
+  venueId,
   selectedDate: initialDate,
   onSuccess,
 }: DineOfflineBookingSheetProps) => {
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+
   const [currentDate, setCurrentDate] = useState<Date>(initialDate);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -56,35 +76,250 @@ export const DineOfflineBookingSheet = ({
 
   const [mobile, setMobile] = useState("");
   const [name, setName] = useState("");
-  const [guestCount, setGuestCount] = useState("4");
-  const [occasion, setOccasion] = useState("Birthday");
-  const [selectedTime, setSelectedTime] = useState("8 Pm");
+  const [guestCount, setGuestCount] = useState("Select Guest");
+  const [occasion, setOccasion] = useState("");
+  const [selectedTime, setSelectedTime] = useState("Select Time");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasHistory, setHasHistory] = useState(false);
 
-  const TIME_SLOTS = [
-    { time: "7 Pm", capacity: "0/100", status: "neutral" },
-    { time: "7:30 Pm", capacity: "40/100", status: "available" },
-    { time: "8 Pm", capacity: "51/100", status: "warning" },
-    { time: "9 Pm", capacity: "52/100", status: "warning" },
-    { time: "9:30 Pm", capacity: "73/100", status: "warning" },
-    { time: "8:30 Pm", capacity: "80/100", status: "danger" },
-  ];
+  const [timeSlots, setTimeSlots] = useState<any[]>([]);
+  const [isFetchingSlots, setIsFetchingSlots] = useState(false);
 
   const GUEST_OPTIONS = Array.from({ length: 20 }, (_, i) => (i + 1).toString());
+
+  // Helper to format time for display (e.g., "19:00:00" -> "7 PM")
+  const formatTime12h = (time24h: string) => {
+    const [h, m] = time24h.split(":");
+    const hourInt = parseInt(h, 10);
+    const ampm = hourInt >= 12 ? "PM" : "AM";
+    const displayHour = hourInt % 12 || 12;
+    const displayMins = m === "00" ? "" : `:${m}`;
+    return `${displayHour}${displayMins} ${ampm}`;
+  };
+
+  // Helper to format time for DB (e.g., "7 PM" -> "19:00:00")
+  const parseTimeTo24h = (time12h: string) => {
+    const parts = time12h.split(" ");
+    if (parts.length < 2) return "00:00:00";
+    const [time, period] = parts;
+    const [hours, mins] = time.split(":");
+    let hourInt = parseInt(hours, 10);
+    if (period.toLowerCase() === "pm" && hourInt < 12) hourInt += 12;
+    if (period.toLowerCase() === "am" && hourInt === 12) hourInt = 0;
+    return `${hourInt.toString().padStart(2, "0")}:${(mins || "00").padStart(2, "0")}:00`;
+  };
+
+  useEffect(() => {
+    const fetchSlotsData = async () => {
+      if (!isVisible || !venueId) return;
+
+      setIsFetchingSlots(true);
+      try {
+        const dateStr = currentDate.toISOString().split("T")[0];
+
+        // 1. Fetch Venue Capacity (Sum of all table capacities)
+        const { data: tables, error: tableError } = await supabase
+          .from("dining_tables")
+          .select("capacity")
+          .eq("venue_id", venueId);
+
+        let totalCapacity = 100; // Default fallback
+        if (!tableError && tables && tables.length > 0) {
+          totalCapacity = tables.reduce((acc, t) => acc + (t.capacity || 0), 0);
+        }
+
+        // 2. Fetch all bookings for this date and venue
+        const { data: bookings, error } = await supabase
+          .from("dining_bookings")
+          .select("reservation_time, party_size")
+          .eq("venue_id", venueId)
+          .eq("reservation_date", dateStr)
+          .neq("booking_status", "cancelled");
+
+        if (error) throw error;
+
+        // 3. Define standard slots (Lunch & Dinner)
+        const BASE_SLOTS = [
+          "12:00:00",
+          "12:30:00",
+          "13:00:00",
+          "13:30:00",
+          "19:00:00",
+          "19:30:00",
+          "20:00:00",
+          "20:30:00",
+          "21:00:00",
+          "21:30:00",
+        ];
+
+        // 4. Group party sizes by time
+        const bookedTotals: Record<string, number> = {};
+        (bookings || []).forEach(b => {
+          const t = b.reservation_time;
+          bookedTotals[t] = (bookedTotals[t] || 0) + (b.party_size || 0);
+        });
+
+        // 5. Create final slot objects
+        const formattedSlots = BASE_SLOTS.map(s => {
+          const booked = bookedTotals[s] || 0;
+          const displayTime = formatTime12h(s);
+          const ratio = booked / totalCapacity;
+
+          let status = "available";
+          if (ratio === 0) status = "neutral";
+          else if (ratio > 0.8) status = "danger";
+          else if (ratio > 0.5) status = "warning";
+
+          return {
+            time: displayTime,
+            rawTime: s,
+            capacity: `${booked}/${totalCapacity}`,
+            status,
+          };
+        });
+
+        setTimeSlots(formattedSlots);
+
+        // Ensure selectedTime is valid or set to first available
+        if (selectedTime === "Select Time") {
+          setSelectedTime(formatTime12h(BASE_SLOTS[0]));
+        }
+      } catch (err) {
+        console.error("Error fetching slot data:", err);
+      } finally {
+        setIsFetchingSlots(false);
+      }
+    };
+
+    fetchSlotsData();
+  }, [currentDate, venueId, isVisible, selectedTime]);
 
   useEffect(() => {
     if (isVisible) {
       setCurrentDate(initialDate);
+      setMobile("");
+      setName("");
+      setGuestCount("Select Guest");
+      setOccasion("");
+      setSelectedTime("Select Time");
+      setHasHistory(false);
     }
   }, [initialDate, isVisible]);
 
-  const handleBookNow = () => {
+  // Lookup Guest and History when mobile changes
+  useEffect(() => {
+    const lookupGuestAndHistory = async () => {
+      const cleanMobile = mobile.replace(/[^\d]/g, "");
+
+      if (cleanMobile.length < 10) {
+        setName("");
+        setHasHistory(false);
+        return;
+      }
+
+      try {
+        // 1. Try to Resolve Bookr Profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .eq("phone", cleanMobile)
+          .maybeSingle();
+
+        let foundName = profile?.full_name || "";
+
+        // 2. If no Bookr Profile, lookup latest name from history
+        if (!foundName) {
+          const { data: lastBooking } = await supabase
+            .from("dining_bookings")
+            .select("profiles(full_name)")
+            .eq("profiles.phone", cleanMobile)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (lastBooking?.profiles) {
+            const profileArr = Array.isArray(lastBooking.profiles)
+              ? lastBooking.profiles[0]
+              : lastBooking.profiles;
+            foundName = profileArr?.full_name || "";
+          }
+        }
+
+        if (foundName) setName(foundName);
+
+        // 3. Check for Previous History
+        const { count, error: historyError } = await supabase
+          .from("dining_bookings")
+          .select("id", { count: "exact", head: true })
+          .or(`user_id.eq.${profile?.id || "00000000-0000-0000-0000-000000000000"}`);
+
+        setHasHistory(!historyError && !!count && count > 0);
+      } catch (err) {
+        console.error("Lookup error:", err);
+        setHasHistory(false);
+      }
+    };
+
+    lookupGuestAndHistory();
+  }, [mobile]);
+
+  const handleBookNow = async () => {
+    const cleanMobile = mobile.replace(/[^\d]/g, "");
+
+    const validation = offlineBookingSchema.safeParse({
+      mobile: cleanMobile,
+      name: name.trim(),
+      guestCount,
+      selectedTime,
+    });
+
+    if (!validation.success) {
+      Alert.alert("Required Fields", validation.error.issues[0].message);
+      return;
+    }
+
     setIsSubmitting(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("phone", cleanMobile)
+        .maybeSingle();
+
+      const userId = profile?.id || null;
+
+      // Local-safe date string (YYYY-MM-DD)
+      const year = currentDate.getFullYear();
+      const month = String(currentDate.getMonth() + 1).padStart(2, "0");
+      const day = String(currentDate.getDate()).padStart(2, "0");
+      const formattedDate = `${year}-${month}-${day}`;
+
+      const formattedTime = parseTimeTo24h(selectedTime);
+
+      const { error: insertError } = await supabase.from("dining_bookings").insert({
+        venue_id: venueId,
+        user_id: userId,
+        guest_name: name.trim(),
+        guest_phone: cleanMobile,
+        reservation_date: formattedDate,
+        reservation_time: formattedTime,
+        party_size: parseInt(guestCount, 10),
+        special_requests: occasion,
+        booking_status: "confirmed",
+        paid_amount: 0,
+        bill_amount: 0,
+      });
+
+      if (insertError) throw insertError;
+
+      Alert.alert("Success", "Offline booking created successfully!");
       onSuccess();
-    }, 1500);
+    } catch (error: any) {
+      console.error("Booking error:", error);
+      Alert.alert("Booking Failed", error.message || "An unexpected error occurred.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getStatusColor = (status: string, isSelected: boolean) => {
@@ -134,29 +369,33 @@ export const DineOfflineBookingSheet = ({
               <Text variant="body1" weight="bold" style={styles.sectionTitle}>
                 TIME SLOTS
               </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.slotsScroll}>
-                {TIME_SLOTS.map(slot => {
-                  const isSelected = selectedTime === slot.time;
-                  const statusColor = getStatusColor(slot.status, isSelected);
-                  return (
-                    <TouchableOpacity
-                      key={slot.time}
-                      onPress={() => setSelectedTime(slot.time)}
-                      style={[styles.slotCard, isSelected && styles.selectedSlotCard]}>
-                      <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
-                        {slot.time}
-                      </Text>
-                      <Text variant="body2" weight="semiBold">
-                        <Text style={{ color: statusColor }}>{slot.capacity.split("/")[0]}</Text>
-                        <Text color={COLORS.text.primary}>/{slot.capacity.split("/")[1]}</Text>
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              {isFetchingSlots ? (
+                <ActivityIndicator color={COLORS.primary} style={{ marginVertical: vs(20) }} />
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.slotsScroll}>
+                  {timeSlots.map(slot => {
+                    const isSelected = selectedTime === slot.time;
+                    const statusColor = getStatusColor(slot.status, isSelected);
+                    return (
+                      <TouchableOpacity
+                        key={slot.rawTime}
+                        onPress={() => setSelectedTime(slot.time)}
+                        style={[styles.slotCard, isSelected && styles.selectedSlotCard]}>
+                        <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
+                          {slot.time}
+                        </Text>
+                        <Text variant="body2" weight="semiBold">
+                          <Text style={{ color: statusColor }}>{slot.capacity.split("/")[0]}</Text>
+                          <Text color={COLORS.text.primary}>/{slot.capacity.split("/")[1]}</Text>
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
             </View>
 
             {/* Form Fields */}
@@ -223,15 +462,23 @@ export const DineOfflineBookingSheet = ({
             </View>
 
             {/* History Row */}
-            <TouchableOpacity style={styles.historyRow} activeOpacity={0.7}>
-              <View style={styles.historyLeft}>
-                <FileText size={ms(20)} color={COLORS.text.primary} />
-                <Text variant="body2" weight="semiBold" style={styles.historyText}>
-                  Previous History
-                </Text>
-              </View>
-              <ChevronRight size={ms(20)} color={COLORS.text.primary} />
-            </TouchableOpacity>
+            {hasHistory && (
+              <TouchableOpacity
+                style={styles.historyRow}
+                activeOpacity={0.7}
+                onPress={() => {
+                  onClose();
+                  navigation.navigate("GuestHistory", { guestId: mobile });
+                }}>
+                <View style={styles.historyLeft}>
+                  <FileText size={ms(20)} color={COLORS.text.primary} />
+                  <Text variant="body2" weight="semiBold" style={styles.historyText}>
+                    Previous History
+                  </Text>
+                </View>
+                <ChevronRight size={ms(20)} color={COLORS.text.primary} />
+              </TouchableOpacity>
+            )}
 
             {/* Book Now Button */}
             <TouchableOpacity
@@ -270,7 +517,6 @@ export const DineOfflineBookingSheet = ({
             <Calendar
               current={getLocalISODate(currentDate)}
               onDayPress={(day: any) => {
-                // Use local components to avoid UTC timezone shifts
                 setCurrentDate(new Date(day.year, day.month - 1, day.day));
                 setIsDatePickerOpen(false);
               }}
@@ -302,9 +548,9 @@ export const DineOfflineBookingSheet = ({
               Select Time
             </Text>
             <ScrollView style={styles.selectionList} showsVerticalScrollIndicator={true}>
-              {TIME_SLOTS.map(slot => (
+              {timeSlots.map(slot => (
                 <TouchableOpacity
-                  key={slot.time}
+                  key={slot.rawTime}
                   style={styles.selectionItem}
                   onPress={() => {
                     setSelectedTime(slot.time);
@@ -474,7 +720,7 @@ const styles = StyleSheet.create({
   },
   bookButtonText: {
     fontSize: ms(20),
-    fontFamily: "Bison-Bold", // Matches design
+    fontFamily: "Gilroy-Bold",
   },
   disabledButton: {
     opacity: 0.6,

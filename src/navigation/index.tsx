@@ -40,7 +40,8 @@ import { DineHistoryScreen } from "@/features/dine/screens/DineHistoryScreen";
 import { DineEssentialsScreen } from "@/features/dine/screens/DineEssentialsScreen";
 import { DineCloseDateScreen } from "@/features/dine/screens/DineCloseDateScreen";
 import { DineOffersScreen } from "@/features/dine/screens/DineOffersScreen";
-import DineDetailsScreen from "@/features/dine/screens/DineDetailsScreen";
+import { DineBookingDetailsScreen } from "@/features/dine/screens/DineBookingDetailsScreen";
+import { DinePaymentDetailsScreen } from "@/features/dine/screens/DinePaymentDetailsScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
 import { Text } from "@/components/ui";
@@ -204,7 +205,8 @@ const MainNavigator = () => (
     <MainStack.Screen name="SportsServiceTabs" component={SportsTabNavigator} />
     <MainStack.Screen name="DineServiceTabs" component={DineTabNavigator} />
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
-    <MainStack.Screen name="DineBookingDetails" component={DineDetailsScreen} />
+    <MainStack.Screen name="DineBookingDetails" component={DineBookingDetailsScreen} />
+    <MainStack.Screen name="DinePaymentDetails" component={DinePaymentDetailsScreen} />
     <MainStack.Screen name="DineCloseDate" component={DineCloseDateScreen} />
     <MainStack.Screen name="DineOffers" component={DineOffersScreen} />
     <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />

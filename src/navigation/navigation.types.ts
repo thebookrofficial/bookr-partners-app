@@ -45,7 +45,8 @@ export type MainStackParamList = {
   SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;
   DineServiceTabs: NavigatorScreenParams<DineTabParamList>;
   BookingDetails: { bookingId: string };
-  DineBookingDetails: { bookingId: string };
+  DineBookingDetails: { bookingId: string; isFromPayment?: boolean };
+  DinePaymentDetails: { bookingId: string };
   DineCloseDate: { serviceId: string };
   DineOffers: { serviceId: string };
   GuestHistory: { guestId: string };

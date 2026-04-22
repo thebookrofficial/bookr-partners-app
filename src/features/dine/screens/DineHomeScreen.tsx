@@ -30,7 +30,9 @@ export const DineHomeScreen = () => {
   const { serviceId } = route.params;
 
   const {
-    loading,
+    initialLoading,
+    bookingsLoading,
+    paymentsLoading,
     venue,
     selectedDate,
     setSelectedDate,
@@ -40,13 +42,14 @@ export const DineHomeScreen = () => {
     setActiveTab,
     filter,
     setFilter,
+    refreshBookings,
   } = useDineHome(serviceId);
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);
 
   const getFormattedDate = (date: Date) => {
-    const today = new Date(2026, 3, 3);
+    const today = new Date();
     const isToday =
       date.getDate() === today.getDate() &&
       date.getMonth() === today.getMonth() &&
@@ -71,12 +74,14 @@ export const DineHomeScreen = () => {
   const handleBookingPress = (bookingId: string) => {
     navigation.navigate("DineBookingDetails", {
       bookingId,
+      isFromPayment: false,
     });
   };
 
   const handlePaymentPress = (paymentId: string) => {
     navigation.navigate("DineBookingDetails", {
-      bookingId: paymentId, // Assuming paymentId can be used or mapped to bookingId for details
+      bookingId: paymentId,
+      isFromPayment: true,
     });
   };
 
@@ -89,7 +94,7 @@ export const DineHomeScreen = () => {
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
         />
 
-        {loading ? (
+        {initialLoading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
@@ -124,17 +129,29 @@ export const DineHomeScreen = () => {
               />
             </View>
 
-            {/* 4. List Section (Conditional Rendering) */}
-            {activeTab === "Upcoming" ? (
-              <DineUpcomingList
-                bookings={bookings}
-                filter={filter}
-                onFilterChange={setFilter}
-                onBookingPress={handleBookingPress}
-              />
-            ) : (
-              <DinePaymentsList payments={payments} onPaymentPress={handlePaymentPress} />
-            )}
+            {/* 4. List Section (Conditional Rendering with local loaders) */}
+            <View style={styles.listSection}>
+              {activeTab === "Upcoming" ? (
+                bookingsLoading ? (
+                  <View style={styles.localLoaderContainer}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  </View>
+                ) : (
+                  <DineUpcomingList
+                    bookings={bookings}
+                    filter={filter}
+                    onFilterChange={setFilter}
+                    onBookingPress={handleBookingPress}
+                  />
+                )
+              ) : paymentsLoading ? (
+                <View style={styles.localLoaderContainer}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                </View>
+              ) : (
+                <DinePaymentsList payments={payments} onPaymentPress={handlePaymentPress} />
+              )}
+            </View>
           </>
         )}
         <View style={{ height: vs(120) }} />
@@ -154,10 +171,14 @@ export const DineHomeScreen = () => {
       <DineOfflineBookingSheet
         isVisible={isBookingSheetOpen}
         onClose={() => setIsBookingSheetOpen(false)}
+        venueId={serviceId}
         selectedDate={selectedDate}
         onSuccess={() => {
           setIsBookingSheetOpen(false);
-          // Optional: refresh data here if needed
+          // Small delay to ensure DB consistency before manual refresh
+          setTimeout(() => {
+            refreshBookings();
+          }, 500);
         }}
       />
 
@@ -206,6 +227,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginTop: vs(150),
+  },
+  localLoaderContainer: {
+    paddingVertical: vs(50),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  listSection: {
+    minHeight: vs(300),
   },
   dateRow: {
     flexDirection: "row",

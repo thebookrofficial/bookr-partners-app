@@ -2,23 +2,39 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { ChevronLeft, Phone, CalendarDays, CreditCard } from "lucide-react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Linking,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { ChevronLeft, Phone, CalendarDays, CreditCard, MessageCircle } from "lucide-react-native";
 import { Text } from "@/components/ui/Text";
 import { Avatar } from "@/components/ui/Avatar";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { COLORS } from "@/constants/theme";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
+import { MainStackParamList } from "@/navigation/navigation.types";
+import { useDineDetails } from "../hooks/useDineDetails";
 
 interface InfoFieldProps {
   label: string;
   value: string;
   icon?: any;
   halfWidth?: boolean;
+  rightAction?: React.ReactNode;
 }
 
-const InfoField = ({ label, value, icon: Icon, halfWidth = false }: InfoFieldProps) => (
+const InfoField = ({
+  label,
+  value,
+  icon: Icon,
+  halfWidth = false,
+  rightAction,
+}: InfoFieldProps) => (
   <View style={[styles.infoFieldContainer, halfWidth && styles.halfWidth]}>
     <View style={styles.labelContainer}>
       {Icon && <Icon size={ms(18)} color={COLORS.primary} style={styles.labelIcon} />}
@@ -27,9 +43,10 @@ const InfoField = ({ label, value, icon: Icon, halfWidth = false }: InfoFieldPro
       </Text>
     </View>
     <View style={styles.valueBox}>
-      <Text variant="body1" weight="semiBold">
+      <Text variant="body1" weight="semiBold" style={styles.flex1}>
         {value}
       </Text>
+      {rightAction}
     </View>
   </View>
 );
@@ -73,10 +90,48 @@ const InvoiceRow = ({
 
 const DineDetailsScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<MainStackParamList, "DineBookingDetails">>();
+  const { bookingId } = route.params;
+
+  const { loading, booking } = useDineDetails(bookingId);
 
   const handleBack = () => {
     navigation.goBack();
   };
+
+  const handleWhatsApp = () => {
+    if (booking?.phone) {
+      const cleanPhone = booking.phone.replace(/[^\d]/g, "");
+      const message = `Hello ${booking.name}, this is regarding your table booking for ${booking.guestCount} persons at ${booking.time} on ${booking.date}.`;
+      const url = `whatsapp://send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
+
+      Linking.canOpenURL(url).then(supported => {
+        if (supported) {
+          Linking.openURL(url);
+        } else {
+          // Fallback to web link if app is not installed
+          const webUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+          Linking.openURL(webUrl).catch(() => Alert.alert("Error", "Could not open WhatsApp."));
+        }
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Booking not found.</Text>
+      </View>
+    );
+  }
 
   return (
     <ScreenContainer scrollable paddingHorizontal={hs(12)}>
@@ -85,9 +140,9 @@ const DineDetailsScreen = () => {
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ChevronLeft size={ms(24)} color={COLORS.text.primary} />
         </TouchableOpacity>
-        <Avatar size={50} />
+        <Avatar source={booking.avatarUrl ? { uri: booking.avatarUrl } : undefined} size={50} />
         <Text variant="h3" weight="bold" style={styles.customerName}>
-          Yash Patil
+          {booking.name}
         </Text>
       </View>
 
@@ -98,11 +153,20 @@ const DineDetailsScreen = () => {
 
       {/* Info Fields */}
       <View style={styles.fieldsContainer}>
-        <InfoField label="Mobile No" value="+91 78349 89934" icon={Phone} />
-        <InfoField label="Type" value="Walk in" icon={CalendarDays} />
+        <InfoField
+          label="Mobile No"
+          value={booking.phone}
+          icon={Phone}
+          rightAction={
+            <TouchableOpacity onPress={handleWhatsApp}>
+              <MessageCircle size={ms(20)} color="#25D366" fill="#25D366" />
+            </TouchableOpacity>
+          }
+        />
+        <InfoField label="Type" value={booking.type} icon={CalendarDays} />
         <View style={styles.row}>
-          <InfoField label="Booking time" value="8 Pm" halfWidth />
-          <InfoField label="No of person" value="4" halfWidth />
+          <InfoField label="Booking time" value={booking.time} halfWidth />
+          <InfoField label="No of person" value={booking.guestCount} halfWidth />
         </View>
       </View>
 
@@ -111,15 +175,15 @@ const DineDetailsScreen = () => {
         <Text variant="body1" weight="bold" style={styles.cardTitle}>
           INVOICE AND PAYOUT
         </Text>
-        <InvoiceRow label="Original Bill Amount" value="₹1000" />
-        <InvoiceRow label="Discount" value="-₹50" isNegative />
-        <InvoiceRow label="GST" value="₹12" isDashed />
-        <InvoiceRow label="Platform" value="- ₹20" isNegative isDashed />
-        <InvoiceRow label="Gateway Charges" value="- ₹20" isNegative isDashed />
+        <InvoiceRow label="Original Bill Amount" value={booking.billAmount} />
+        <InvoiceRow label="Discount" value={booking.discount} isNegative />
+        <InvoiceRow label="GST" value={booking.gst} isDashed />
+        <InvoiceRow label="Platform" value={booking.platformFee} isNegative isDashed />
+        <InvoiceRow label="Gateway Charges" value={booking.gatewayCharges} isNegative isDashed />
 
         <View style={styles.separator} />
 
-        <InvoiceRow label="EST. Payout Amount" value="₹800" isTotal />
+        <InvoiceRow label="EST. Payout Amount" value={booking.estPayout} isTotal />
       </View>
 
       {/* Payment Details Card */}
@@ -130,16 +194,25 @@ const DineDetailsScreen = () => {
             PAYMENT DETAILS
           </Text>
         </View>
-        <InvoiceRow label="Method" value="UPI" />
-        <InvoiceRow label="Transaction ID" value="TXN2121904" />
-        <InvoiceRow label="Transaction Date" value="12/12/2026" />
-        <InvoiceRow label="Transaction Time" value="12:40" />
+        <InvoiceRow label="Method" value={booking.paymentMethod} />
+        <InvoiceRow label="Transaction ID" value={booking.transactionId} />
+        <InvoiceRow label="Transaction Date" value={booking.transactionDate} />
+        <InvoiceRow label="Transaction Time" value={booking.transactionTime} />
       </View>
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
+  flex1: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -188,6 +261,8 @@ const styles = StyleSheet.create({
     borderRadius: ms(10),
     paddingHorizontal: hs(hs(10)),
     paddingVertical: vs(12),
+    flexDirection: "row",
+    alignItems: "center",
   },
   invoiceCard: {
     backgroundColor: COLORS.surface.primary,

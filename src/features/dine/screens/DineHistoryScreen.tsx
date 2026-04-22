@@ -34,7 +34,9 @@ export const DineHistoryScreen = () => {
   } = useDineHistory("dummy-service-id");
 
   const handleCardPress = (paymentId: string) => {
-    navigation.navigate("DineBookingDetails", { bookingId: paymentId });
+    navigation.navigate("DinePaymentDetails", {
+      bookingId: paymentId,
+    });
   };
 
   const renderSectionHeader = ({ section }: { section: any }) => (

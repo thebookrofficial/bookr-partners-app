@@ -17,7 +17,7 @@ interface DineUpcomingListProps {
 }
 
 export const DineUpcomingList = ({
-  bookings,
+  bookings = [],
   filter,
   onFilterChange,
   onBookingPress,
@@ -27,7 +27,7 @@ export const DineUpcomingList = ({
       <DineFilterBar title="Upcoming" selectedFilter={filter} onFilterChange={onFilterChange} />
 
       <View style={styles.listContainer}>
-        {bookings.length === 0 ? (
+        {!bookings || bookings.length === 0 ? (
           <Text variant="body2" color={COLORS.text.secondary} style={styles.emptyText}>
             No bookings found.
           </Text>
