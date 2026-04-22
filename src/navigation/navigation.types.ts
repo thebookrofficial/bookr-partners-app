@@ -29,6 +29,8 @@ export type DineTabParamList = {
   DineDashboard: { serviceId: string };
   DineEssentials: { serviceId: string };
   DineProfile: { serviceId: string };
+  DineCloseDate: { serviceId: string };
+  DineOffers: { serviceId: string };
 };
 
 // 3. Define the screens in the Main Business flow
@@ -44,6 +46,8 @@ export type MainStackParamList = {
   DineServiceTabs: NavigatorScreenParams<DineTabParamList>;
   BookingDetails: { bookingId: string };
   DineBookingDetails: { bookingId: string };
+  DineCloseDate: { serviceId: string };
+  DineOffers: { serviceId: string };
   GuestHistory: { guestId: string };
   BlockUnblock: { venueId: string; groundId: string };
   BulkBooking: undefined;

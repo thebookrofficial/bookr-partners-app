@@ -37,6 +37,9 @@ import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingD
 import { DineHomeScreen } from "@/features/dine/screens/DineHomeScreen";
 import { DineDashboardScreen } from "@/features/dine/screens/DineDashboardScreen";
 import { DineHistoryScreen } from "@/features/dine/screens/DineHistoryScreen";
+import { DineEssentialsScreen } from "@/features/dine/screens/DineEssentialsScreen";
+import { DineCloseDateScreen } from "@/features/dine/screens/DineCloseDateScreen";
+import { DineOffersScreen } from "@/features/dine/screens/DineOffersScreen";
 import DineDetailsScreen from "@/features/dine/screens/DineDetailsScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
@@ -59,7 +62,6 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
 const SportsProfileScreen = () => <PlaceholderScreen title="Sports Profile" />;
-const DineEssentialsScreen = () => <PlaceholderScreen title="Dine Essentials" />;
 const DineProfileScreen = () => <PlaceholderScreen title="Dine Profile" />;
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -203,6 +205,8 @@ const MainNavigator = () => (
     <MainStack.Screen name="DineServiceTabs" component={DineTabNavigator} />
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
     <MainStack.Screen name="DineBookingDetails" component={DineDetailsScreen} />
+    <MainStack.Screen name="DineCloseDate" component={DineCloseDateScreen} />
+    <MainStack.Screen name="DineOffers" component={DineOffersScreen} />
     <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />
     <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
     <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />
