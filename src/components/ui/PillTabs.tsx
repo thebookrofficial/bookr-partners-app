@@ -11,7 +11,7 @@ export interface PillTabsProps {
   tabs: string[];
   activeTab: string;
   onTabChange: (tab: string) => void;
-  variant?: "default" | "primary";
+  variant?: "default" | "primary" | "dark";
   style?: StyleProp<ViewStyle>; // Added to allow external style overrides
 }
 
@@ -23,6 +23,7 @@ export const PillTabs = ({
   style,
 }: PillTabsProps) => {
   const isPrimary = variant === "primary";
+  const isDark = variant === "dark";
 
   return (
     // Applied the external style array to the main wrapper
@@ -35,16 +36,32 @@ export const PillTabs = ({
           const isActive = tab === activeTab;
 
           // Determine styles based on variant
-          const activeStyle = isPrimary ? styles.primaryActive : styles.defaultActive;
-          const inactiveStyle = isPrimary ? styles.primaryInactive : styles.defaultInactive;
-          const baseStyle = isPrimary ? styles.primaryPill : styles.defaultPill;
+          let activeStyle, inactiveStyle, baseStyle;
+
+          if (isDark) {
+            activeStyle = styles.darkActive;
+            inactiveStyle = styles.darkInactive;
+            baseStyle = styles.darkPill;
+          } else if (isPrimary) {
+            activeStyle = styles.primaryActive;
+            inactiveStyle = styles.primaryInactive;
+            baseStyle = styles.primaryPill;
+          } else {
+            activeStyle = styles.defaultActive;
+            inactiveStyle = styles.defaultInactive;
+            baseStyle = styles.defaultPill;
+          }
 
           // Determine exact text color
           let textColor;
           if (isActive) {
-            textColor = isPrimary ? COLORS.text.inverse : COLORS.text.primary;
+            if (isDark) textColor = COLORS.text.inverse;
+            else if (isPrimary) textColor = COLORS.text.inverse;
+            else textColor = COLORS.text.primary;
           } else {
-            textColor = isPrimary ? COLORS.text.primary : COLORS.text.muted;
+            if (isDark) textColor = COLORS.text.muted;
+            else if (isPrimary) textColor = COLORS.text.primary;
+            else textColor = COLORS.text.muted;
           }
 
           return (
@@ -105,5 +122,21 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     borderWidth: 1,
     borderColor: "#CBDFFE",
+  },
+
+  // --- DARK VARIANT (DineHomeScreen Bookings/Payments) ---
+  darkPill: {
+    paddingHorizontal: hs(18),
+    height: vs(40),
+    borderRadius: ms(10),
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: hs(100),
+  },
+  darkActive: {
+    backgroundColor: "#282828",
+  },
+  darkInactive: {
+    backgroundColor: "#F4F7FC",
   },
 });

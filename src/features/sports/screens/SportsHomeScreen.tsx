@@ -74,7 +74,7 @@ export const SportsHomeScreen = () => {
         <ServiceHeader
           title={venue?.name || "Elite Strikers Club"}
           category={selectedCategory}
-          imageUri={venue?.cover_image_url || undefined}
+          imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
           onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
         />
 

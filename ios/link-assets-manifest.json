@@ -78,12 +78,28 @@
       "sha1": "6a48a962b06cc3acbdfd61df0d9a34744eea5e8d"
     },
     {
+      "path": "src/assets/fonts/Bison/Bison-Bold.ttf",
+      "sha1": "e97efddb23610cc9bab798192c4ecc00f8f73b41"
+    },
+    {
+      "path": "src/assets/fonts/Gilroy/Gilroy-Bold.ttf",
+      "sha1": "7fe4d8cf5325dd47363d0f80fefb40ac7df5d5a6"
+    },
+    {
       "path": "src/assets/fonts/Gilroy/Gilroy-ExtraBold.otf",
       "sha1": "ebd136c81542a067830d5852b785d069403c4a15"
     },
     {
       "path": "src/assets/fonts/Gilroy/Gilroy-Light.otf",
       "sha1": "78410fd9e800f48e3ffa140497ba2d65ac169d22"
+    },
+    {
+      "path": "src/assets/fonts/Gilroy/Gilroy-Medium.ttf",
+      "sha1": "d7f893124bd4fff78805e69df31385ae113368be"
+    },
+    {
+      "path": "src/assets/fonts/Gilroy/Gilroy-SemiBold.ttf",
+      "sha1": "8663a356eb9bc23b77696208f74376daf59687ea"
     },
     {
       "path": "src/assets/fonts/MD-Nichrome/MDNichromeTest-BlackOblique.otf",

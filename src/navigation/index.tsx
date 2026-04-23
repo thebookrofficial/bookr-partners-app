@@ -10,6 +10,7 @@ import {
   AuthStackParamList,
   MainStackParamList,
   SportsTabParamList,
+  DineTabParamList,
 } from "./navigation.types";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import {
@@ -33,6 +34,14 @@ import { SportsEssentialsScreen } from "@/features/sports/screens/SportsEssentia
 import { BlockUnblockScreen } from "@/features/sports/screens/BlockUnblockScreen";
 import { BulkBookingScreen } from "@/features/sports/screens/BulkBookingScreen";
 import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingDetailsScreen";
+import { DineHomeScreen } from "@/features/dine/screens/DineHomeScreen";
+import { DineDashboardScreen } from "@/features/dine/screens/DineDashboardScreen";
+import { DineHistoryScreen } from "@/features/dine/screens/DineHistoryScreen";
+import { DineEssentialsScreen } from "@/features/dine/screens/DineEssentialsScreen";
+import { DineCloseDateScreen } from "@/features/dine/screens/DineCloseDateScreen";
+import { DineOffersScreen } from "@/features/dine/screens/DineOffersScreen";
+import { DineBookingDetailsScreen } from "@/features/dine/screens/DineBookingDetailsScreen";
+import { DinePaymentDetailsScreen } from "@/features/dine/screens/DinePaymentDetailsScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
 import { Text } from "@/components/ui";
@@ -54,11 +63,13 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
 const SportsProfileScreen = () => <PlaceholderScreen title="Sports Profile" />;
+const DineProfileScreen = () => <PlaceholderScreen title="Dine Profile" />;
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainStack = createNativeStackNavigator<MainStackParamList>();
 const SportsTab = createBottomTabNavigator<SportsTabParamList>();
+const DineTab = createBottomTabNavigator<DineTabParamList>();
 
 const TabIcon =
   (IconComponent: any) =>
@@ -83,7 +94,6 @@ const SportsTabNavigator = () => {
           paddingTop: vs(4),
           paddingBottom: vs(25),
           paddingHorizontal: hs(10),
-          boxShadow: "0px -1px 10px rgba(203, 223, 254, 1)",
           gap: vs(10),
         },
         tabBarLabelStyle: {
@@ -122,6 +132,62 @@ const SportsTabNavigator = () => {
   );
 };
 
+const DineTabNavigator = () => {
+  return (
+    <DineTab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.text.muted,
+        tabBarStyle: {
+          position: "absolute",
+          backgroundColor: COLORS.surface.primary,
+          borderTopWidth: 1,
+          borderTopColor: COLORS.border.navBar,
+          borderTopLeftRadius: ms(20),
+          borderTopRightRadius: ms(20),
+          height: vs(80),
+          paddingTop: vs(4),
+          paddingBottom: vs(25),
+          paddingHorizontal: hs(10),
+          gap: vs(10),
+        },
+        tabBarLabelStyle: {
+          fontFamily: "Gilroy-Bold",
+          fontSize: fs(12),
+          lineHeight: fs(12),
+          marginTop: vs(2),
+        },
+      }}>
+      <DineTab.Screen
+        name="DineHome"
+        component={DineHomeScreen}
+        options={{ title: "Home", tabBarIcon: TabIcon(Calendar) }}
+      />
+      <DineTab.Screen
+        name="DineHistory"
+        component={DineHistoryScreen}
+        options={{ title: "History", tabBarIcon: TabIcon(HistoryIcon) }}
+      />
+      <DineTab.Screen
+        name="DineDashboard"
+        component={DineDashboardScreen}
+        options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
+      />
+      <DineTab.Screen
+        name="DineEssentials"
+        component={DineEssentialsScreen}
+        options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
+      />
+      <DineTab.Screen
+        name="DineProfile"
+        component={DineProfileScreen}
+        options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
+      />
+    </DineTab.Navigator>
+  );
+};
+
 const AuthNavigator = () => (
   <AuthStack.Navigator screenOptions={{ headerShown: false }}>
     <AuthStack.Screen name="Login" component={LoginScreen} />
@@ -137,7 +203,12 @@ const MainNavigator = () => (
     <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
     <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
     <MainStack.Screen name="SportsServiceTabs" component={SportsTabNavigator} />
+    <MainStack.Screen name="DineServiceTabs" component={DineTabNavigator} />
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
+    <MainStack.Screen name="DineBookingDetails" component={DineBookingDetailsScreen} />
+    <MainStack.Screen name="DinePaymentDetails" component={DinePaymentDetailsScreen} />
+    <MainStack.Screen name="DineCloseDate" component={DineCloseDateScreen} />
+    <MainStack.Screen name="DineOffers" component={DineOffersScreen} />
     <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />
     <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
     <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />

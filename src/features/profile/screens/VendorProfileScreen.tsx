@@ -20,7 +20,7 @@ import { useVendorData } from "../hooks/useVendorData";
 export const VendorProfileScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { user, clientProfile } = useAuthStore();
-  const { loading, venues } = useVendorData();
+  const { loading, venues, refresh } = useVendorData();
 
   // Set initial tab based on Blueprint standardized naming [cite: 237]
   const [activeTab, setActiveTab] = useState(STRINGS.profile.tabs[0]);
@@ -43,7 +43,12 @@ export const VendorProfileScreen = () => {
   }, [activeTab, venues]);
 
   return (
-    <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
+    <ScreenContainer
+      scrollable
+      backgroundColor={COLORS.background}
+      paddingHorizontal={hs(12)}
+      refreshing={loading}
+      onRefresh={refresh}>
       {/* 1. App Bar - Branding & Global Actions */}
       <View style={styles.appBar}>
         <View style={styles.appBarLeft}>
@@ -118,6 +123,11 @@ export const VendorProfileScreen = () => {
                 if (venue.vertical === "sports") {
                   navigation.navigate("SportsServiceTabs", {
                     screen: "SportsHome",
+                    params: { serviceId: venue.id },
+                  });
+                } else if (venue.vertical === "dining") {
+                  navigation.navigate("DineServiceTabs", {
+                    screen: "DineHome",
                     params: { serviceId: venue.id },
                   });
                 }

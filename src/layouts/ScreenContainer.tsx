@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ViewStyle,
+  RefreshControl,
 } from "react-native";
 import { hs } from "@/utils/responsive.utils";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,6 +21,8 @@ export interface ScreenContainerProps {
   style?: ViewStyle;
   paddingHorizontal?: number;
   backgroundColor?: string;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }
 
 export const ScreenContainer = ({
@@ -28,6 +31,8 @@ export const ScreenContainer = ({
   style,
   paddingHorizontal = hs(24),
   backgroundColor = COLORS.background,
+  refreshing = false,
+  onRefresh,
 }: ScreenContainerProps) => {
   const Container = scrollable ? ScrollView : View;
 
@@ -35,6 +40,14 @@ export const ScreenContainer = ({
     ? {
         showsVerticalScrollIndicator: false,
         contentContainerStyle: [styles.innerContent, { paddingHorizontal }],
+        refreshControl: onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        ) : undefined,
       }
     : { style: [styles.innerContent, { paddingHorizontal }] };
 
