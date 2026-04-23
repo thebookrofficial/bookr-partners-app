@@ -2,7 +2,15 @@
 // Confidential and Proprietary.
 
 import React, { useState, useCallback } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView, Modal } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Modal,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs, TextInput } from "@/components/ui";
 import { ServiceHeader } from "@/features/sports/components/ServiceHeader";
@@ -17,25 +25,16 @@ import {
   Dot,
   ChevronLeft,
   ChevronRight,
+  Info,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useRoute, RouteProp } from "@react-navigation/native";
 import { DineTabParamList } from "@/navigation/navigation.types";
 import { useDineHome } from "../hooks/useDineHome";
+import { useDineOffers } from "../hooks/useDineOffers";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
-
-interface OfferRecord {
-  id: string;
-  type: "coupon" | "discount";
-  code?: string;
-  description: string;
-  expiry?: string;
-  startDate: string;
-  endDate?: string;
-  isPast?: boolean;
-}
 
 /**
  * DineOffersScreen - Manage coupons and discounts for a dine venue.
@@ -46,26 +45,17 @@ export const DineOffersScreen = () => {
   const { serviceId } = route.params;
   const { venue } = useDineHome(serviceId);
 
+  // Hook for Database Interactions
+  const {
+    onGoingOffers,
+    pastOffers,
+    loading: dbLoading,
+    createOffer,
+    deleteOffer,
+  } = useDineOffers(serviceId);
+
   // Tabs State
   const [activeTab, setActiveTab] = useState<string>("Coupons");
-
-  // Offers List State
-  const [onGoingOffers, setOnGoingOffers] = useState<OfferRecord[]>([
-    {
-      id: "1",
-      type: "coupon",
-      code: "bookr12",
-      description: "For 5% off above ₹1000 Bill",
-      startDate: "19/04/2026",
-    },
-    {
-      id: "2",
-      type: "discount",
-      description: "15% off on above ₹800 Bill",
-      expiry: "7 Days Left",
-      startDate: "19/04/2026",
-    },
-  ]);
 
   // Form State
   const [couponCode, setCouponCode] = useState("");
@@ -76,6 +66,7 @@ export const DineOffersScreen = () => {
   const [uptoAmount, setUptoAmount] = useState("150");
   const [usageLimit, setUsageLimit] = useState("Everyone");
   const [totalUsage, setTotalUsage] = useState("1");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Dropdown Selection State
   const [activeDropdown, setActiveDropdown] = useState<{
@@ -98,26 +89,76 @@ export const DineOffersScreen = () => {
     });
   };
 
-  const handleConfirmOffer = () => {
+  const handleConfirmOffer = async () => {
     const isCoupon = activeTab === "Coupons";
-    const newOffer: OfferRecord = {
-      id: Math.random().toString(36).substr(2, 9),
+
+    if (isCoupon && !couponCode.trim()) {
+      Alert.alert("Error", "Please enter a coupon code.");
+      return;
+    }
+
+    if (selectionMode === "range" && (!dateRange.start || !dateRange.end)) {
+      Alert.alert("Error", "Please select a date range.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const val =
+      offerValueType === "flat"
+        ? parseInt(flatAmount, 10)
+        : parseInt(percentage.replace("%", ""), 10);
+    const minOrder = parseInt(minOrderValue.replace("₹", ""), 10);
+    const upto = parseInt(uptoAmount, 10);
+
+    const description = `${
+      offerValueType === "flat" ? `₹${flatAmount} off` : `${percentage} off`
+    } on above ₹${minOrder} Bill`;
+
+    const start =
+      selectionMode === "single"
+        ? selectedDate.toISOString()
+        : new Date(dateRange.start!).toISOString();
+    const end =
+      selectionMode === "single"
+        ? new Date(selectedDate.getTime() + 86400000).toISOString()
+        : new Date(dateRange.end!).toISOString();
+
+    const success = await createOffer({
       type: isCoupon ? "coupon" : "discount",
-      code: isCoupon ? couponCode : undefined,
-      description: `${
-        offerValueType === "flat" ? `₹${flatAmount} off` : `${percentage} off`
-      } on above ${minOrderValue} Bill`,
-      startDate:
-        selectionMode === "single"
-          ? selectedDate.toLocaleDateString("en-GB")
-          : dateRange.start || "",
-      endDate: selectionMode === "range" ? dateRange.end : undefined,
-    };
-    setOnGoingOffers(prev => [newOffer, ...prev]);
-    // Reset basic form fields
-    setCouponCode("");
-    setSelectionMode("single");
-    setDateRange({});
+      code: isCoupon ? couponCode.toUpperCase() : undefined,
+      description,
+      discountType: offerValueType,
+      discountValue: val,
+      minOrderValue: minOrder,
+      maxDiscount: offerValueType === "percentage" ? upto : undefined,
+      usageLimit,
+      totalUsagePerUser: parseInt(totalUsage, 10),
+      validFrom: start,
+      validUntil: end,
+    });
+
+    setIsSubmitting(false);
+
+    if (success) {
+      setCouponCode("");
+      setSelectionMode("single");
+      setDateRange({});
+      Alert.alert("Submitted", "Offer submitted for Admin Review!");
+    }
+  };
+
+  const handleDeleteOffer = (id: string) => {
+    Alert.alert("Confirm Remove", "Are you sure you want to remove this offer?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: async () => {
+          await deleteOffer(id);
+        },
+      },
+    ]);
   };
 
   const selectOption = (option: string) => {
@@ -137,10 +178,6 @@ export const DineOffersScreen = () => {
         break;
     }
     setActiveDropdown(null);
-  };
-
-  const deleteOffer = (id: string) => {
-    setOnGoingOffers(prev => prev.filter(o => o.id !== id));
   };
 
   const onDayPress = useCallback(
@@ -241,23 +278,42 @@ export const DineOffersScreen = () => {
           <Text variant="body2" weight="bold" style={styles.sectionTitle}>
             ON GOING {activeTab.toUpperCase()}
           </Text>
-          {filteredOngoing.map(offer => (
-            <View key={offer.id} style={styles.offerRow}>
-              <View style={styles.greenDot} />
-              <Text variant="body2" weight="semiBold" style={styles.offerText}>
-                {offer.code ? `${offer.code} ` : ""}
-                {offer.description}
-              </Text>
-              {offer.expiry && (
-                <Text variant="caption" weight="semiBold" color={COLORS.text.muted}>
-                  {offer.expiry}
-                </Text>
-              )}
-              <TouchableOpacity onPress={() => deleteOffer(offer.id)}>
-                <Trash2 size={ms(18)} color={COLORS.danger} />
-              </TouchableOpacity>
-            </View>
-          ))}
+          {dbLoading ? (
+            <ActivityIndicator
+              size="small"
+              color={COLORS.primary}
+              style={{ marginVertical: vs(10) }}
+            />
+          ) : filteredOngoing.length === 0 ? (
+            <Text variant="caption" color={COLORS.text.muted} style={{ paddingLeft: hs(4) }}>
+              No ongoing {activeTab.toLowerCase()}
+            </Text>
+          ) : (
+            filteredOngoing.map(offer => (
+              <View key={offer.id} style={styles.offerRow}>
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: offer.status === "pending" ? "#FFB800" : "#00B562" },
+                  ]}
+                />
+                <View style={styles.offerTextContainer}>
+                  <Text variant="body2" weight="semiBold" style={styles.offerText}>
+                    {offer.code ? `${offer.code} ` : ""}
+                    {offer.description}
+                  </Text>
+                  {offer.status === "pending" && (
+                    <Text variant="caption" weight="medium" color={COLORS.text.muted}>
+                      Pending Review
+                    </Text>
+                  )}
+                </View>
+                <TouchableOpacity onPress={() => handleDeleteOffer(offer.id)}>
+                  <Trash2 size={ms(18)} color={COLORS.danger} />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
         </View>
 
         {/* CREATE OFFER FORM */}
@@ -277,6 +333,7 @@ export const DineOffersScreen = () => {
                 value={couponCode}
                 onChangeText={setCouponCode}
                 style={styles.filledInput}
+                autoCapitalize="characters"
               />
             </View>
           )}
@@ -288,12 +345,14 @@ export const DineOffersScreen = () => {
             {selectionMode === "single" ? (
               <TouchableOpacity
                 style={styles.inputContainer}
-                onPress={() => setSelectionMode("range")}>
+                onPress={() => setShowDatePicker(true)}>
                 <CalendarIcon size={ms(20)} color={COLORS.primary} />
                 <Text variant="body2" weight="semiBold" style={styles.inputText}>
                   {selectedDate.toLocaleDateString("en-GB")}
                 </Text>
-                <Plus size={ms(24)} color={COLORS.text.primary} />
+                <TouchableOpacity onPress={() => setSelectionMode("range")}>
+                  <Plus size={ms(24)} color={COLORS.text.primary} />
+                </TouchableOpacity>
               </TouchableOpacity>
             ) : (
               <>
@@ -537,11 +596,25 @@ export const DineOffersScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.primaryBtn} onPress={handleConfirmOffer}>
-            <Text family="bison" weight="bold" style={styles.btnText}>
-              {activeTab === "Coupons" ? "CONFIRM NEW COUPON" : "CONFIRM DISCOUNT OFFER"}
-            </Text>
+          <TouchableOpacity
+            style={[styles.primaryBtn, (isSubmitting || dbLoading) && styles.disabledBg]}
+            onPress={handleConfirmOffer}
+            disabled={isSubmitting || dbLoading}>
+            {isSubmitting ? (
+              <ActivityIndicator color={COLORS.text.inverse} />
+            ) : (
+              <Text family="bison" weight="bold" style={styles.btnText}>
+                {activeTab === "Coupons" ? "CONFIRM NEW COUPON" : "CONFIRM DISCOUNT OFFER"}
+              </Text>
+            )}
           </TouchableOpacity>
+
+          <View style={styles.reviewNotice}>
+            <Info size={ms(16)} color={COLORS.text.muted} />
+            <Text variant="caption" color={COLORS.text.muted}>
+              Note: New offers require admin review before they go live for users.
+            </Text>
+          </View>
         </View>
 
         {/* PAST OFFERS SECTION */}
@@ -549,24 +622,31 @@ export const DineOffersScreen = () => {
           <Text variant="body2" weight="bold" style={styles.sectionTitle}>
             PAST {activeTab.toUpperCase()} OFFERS
           </Text>
-          <View style={styles.pastOfferRow}>
-            <CalendarIcon size={ms(20)} color={COLORS.text.muted} />
-            <Text variant="body2" weight="semiBold" style={styles.pastOfferText}>
-              12 Mar 2026
+          {pastOffers.filter(o =>
+            activeTab === "Coupons" ? o.type === "coupon" : o.type === "discount",
+          ).length === 0 ? (
+            <Text variant="caption" color={COLORS.text.muted} style={{ paddingLeft: hs(4) }}>
+              No past records
             </Text>
-            <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
-              5% OFF
-            </Text>
-          </View>
-          <View style={styles.pastOfferRow}>
-            <CalendarIcon size={ms(20)} color={COLORS.text.muted} />
-            <Text variant="body2" weight="semiBold" style={styles.pastOfferText}>
-              30 Dec 2026 - 1 Jan 2026
-            </Text>
-            <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
-              7% OFF
-            </Text>
-          </View>
+          ) : (
+            pastOffers
+              .filter(o => (activeTab === "Coupons" ? o.type === "coupon" : o.type === "discount"))
+              .map(offer => (
+                <View key={offer.id} style={styles.pastOfferRow}>
+                  <CalendarIcon size={ms(20)} color={COLORS.text.muted} />
+                  <Text variant="body2" weight="semiBold" style={styles.pastOfferText}>
+                    {formatDisplayDate(offer.validFrom)}
+                    {offer.validUntil && offer.validUntil !== offer.validFrom
+                      ? ` - ${formatDisplayDate(offer.validUntil)}`
+                      : ""}
+                  </Text>
+                  <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
+                    {offer.discountValue}
+                    {offer.discountType === "percentage" ? "%" : ""} OFF
+                  </Text>
+                </View>
+              ))
+          )}
         </View>
 
         <DatePicker
@@ -623,13 +703,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: vs(10),
-    gap: hs(160),
+    justifyContent: "space-between",
   },
   typesLabel: {
     fontSize: fs(18),
   },
   pillTabs: {
-    flex: 1,
+    flex: 0.6,
     marginVertical: 0,
   },
   section: {
@@ -649,14 +729,16 @@ const styles = StyleSheet.create({
     paddingVertical: vs(12),
     gap: hs(10),
   },
-  greenDot: {
+  statusDot: {
     width: ms(10),
     height: ms(10),
     borderRadius: ms(5),
-    backgroundColor: "#00B562",
+  },
+  offerTextContainer: {
+    flex: 1,
   },
   offerText: {
-    flex: 1,
+    color: COLORS.text.primary,
   },
   formGroup: {
     gap: vs(4),
@@ -688,7 +770,7 @@ const styles = StyleSheet.create({
   },
   inputText: {
     flex: 1,
-    color: COLORS.text.muted,
+    color: COLORS.text.primary,
   },
   rangeInputs: {
     flexDirection: "row",
@@ -716,6 +798,9 @@ const styles = StyleSheet.create({
   },
   calendar: {
     marginTop: vs(10),
+    backgroundColor: COLORS.surface.primary,
+    borderRadius: ms(12),
+    padding: ms(10),
   },
   row: {
     flexDirection: "row",
@@ -756,14 +841,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.surface.primary,
   },
-  filledInputContainer: {
-    backgroundColor: COLORS.surface.primary,
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(12),
-    height: vs(44),
-    justifyContent: "center",
-  },
   dropdownInput: {
     flexDirection: "row",
     alignItems: "center",
@@ -798,5 +875,12 @@ const styles = StyleSheet.create({
   pastOfferText: {
     flex: 1,
     color: COLORS.text.muted,
+  },
+  reviewNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+    marginTop: vs(6),
+    paddingHorizontal: hs(4),
   },
 });
