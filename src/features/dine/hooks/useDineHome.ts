@@ -47,24 +47,6 @@ export const useDineHome = (serviceId: string) => {
   const filterRef = useRef(filter);
   const dateRef = useRef(selectedDate);
 
-  useEffect(() => {
-    filterRef.current = filter;
-    dateRef.current = selectedDate;
-  }, [filter, selectedDate]);
-
-  // Handle Filter Change
-  useEffect(() => {
-    const today = new Date();
-    if (filter === "Today") {
-      setSelectedDate(today);
-    } else if (filter === "Tommorow") {
-      const tomorrow = new Date();
-      tomorrow.setDate(today.getDate() + 1);
-      setSelectedDate(tomorrow);
-    }
-    // "All" filter doesn't change selectedDate visually, but fetchBookings handles it
-  }, [filter]);
-
   const fetchVenueDetails = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -99,6 +81,7 @@ export const useDineHome = (serviceId: string) => {
         .select(
           `
           id,
+          user_id,
           reservation_date,
           reservation_time,
           party_size,
@@ -106,6 +89,7 @@ export const useDineHome = (serviceId: string) => {
           paid_amount,
           guest_name,
           guest_phone,
+          booking_status,
           profiles (
             full_name,
             phone,
@@ -113,7 +97,8 @@ export const useDineHome = (serviceId: string) => {
           )
         `,
         )
-        .eq("venue_id", serviceId);
+        .eq("venue_id", serviceId)
+        .neq("booking_status", "cancelled");
 
       if (filterRef.current === "All") {
         query = query.gte("reservation_date", todayString);
@@ -129,6 +114,7 @@ export const useDineHome = (serviceId: string) => {
 
       const formattedBookings: DineBookingData[] = (data || []).map((b: any) => {
         const formatTime = (timeStr: string) => {
+          if (!timeStr) return "N/A";
           const [h, m] = timeStr.split(":");
           const hourInt = parseInt(h, 10);
           const ampm = hourInt >= 12 ? "Pm" : "Am";
@@ -146,12 +132,15 @@ export const useDineHome = (serviceId: string) => {
         });
 
         const profiles = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
-        const isOffline = !!b.guest_name || !!b.guest_phone;
+
+        // Robust logic: If guest_name is present, it's a vendor-made (Offline) booking.
+        // Online bookings (from app) will have guest_name as null and rely on user_id/profiles.
+        const isOffline = Boolean(b.guest_name && b.guest_name.trim() !== "");
 
         return {
           id: b.id,
-          name: b.guest_name || profiles?.full_name || "Guest User",
-          phone: b.guest_phone || profiles?.phone || "",
+          name: isOffline ? b.guest_name : profiles?.full_name || "Guest User",
+          phone: isOffline ? b.guest_phone : profiles?.phone || "",
           date: formattedDate,
           time: formatTime(b.reservation_time),
           guestCount: `${b.party_size} Guest`,
@@ -172,13 +161,25 @@ export const useDineHome = (serviceId: string) => {
   const fetchPayments = useCallback(async () => {
     setPaymentsLoading(true);
     try {
-      const { data, error } = await supabase
+      const targetDate = dateRef.current;
+      const localDateString = `${targetDate.getFullYear()}-${String(
+        targetDate.getMonth() + 1,
+      ).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`;
+
+      const today = new Date();
+      const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
+        2,
+        "0",
+      )}-${String(today.getDate()).padStart(2, "0")}`;
+
+      let query = supabase
         .from("dining_bookings")
         .select(
           `
           id,
           paid_amount,
           reservation_time,
+          reservation_date,
           created_at,
           guest_name,
           guest_phone,
@@ -190,8 +191,15 @@ export const useDineHome = (serviceId: string) => {
         `,
         )
         .eq("venue_id", serviceId)
-        .gt("paid_amount", 0)
-        .order("created_at", { ascending: false });
+        .gt("paid_amount", 0);
+
+      if (filterRef.current === "All") {
+        query = query.gte("reservation_date", todayString);
+      } else {
+        query = query.eq("reservation_date", localDateString);
+      }
+
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (error) throw error;
 
@@ -216,11 +224,12 @@ export const useDineHome = (serviceId: string) => {
         if (!grouped[dateStr]) grouped[dateStr] = [];
 
         const profiles = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
+        const isOffline = Boolean(b.guest_name && b.guest_name.trim() !== "");
 
         grouped[dateStr].push({
           id: b.id,
-          name: profiles?.full_name || b.guest_name || "Guest User",
-          phone: profiles?.phone || b.guest_phone || "",
+          name: isOffline ? b.guest_name : profiles?.full_name || "Guest User",
+          phone: isOffline ? b.guest_phone : profiles?.phone || "",
           amount: `₹${b.paid_amount}`,
           type: "Table Booking",
           typeColor: "#63A1FD",
@@ -243,6 +252,26 @@ export const useDineHome = (serviceId: string) => {
     }
   }, [serviceId]);
 
+  // Handle Filter -> Date mapping
+  useEffect(() => {
+    const today = new Date();
+    if (filter === "Today") {
+      setSelectedDate(today);
+    } else if (filter === "Tomorrow") {
+      const tomorrow = new Date();
+      tomorrow.setDate(today.getDate() + 1);
+      setSelectedDate(tomorrow);
+    }
+  }, [filter]);
+
+  // Sync refs and trigger fetch when filters or date change
+  useEffect(() => {
+    filterRef.current = filter;
+    dateRef.current = selectedDate;
+    fetchBookings();
+    fetchPayments();
+  }, [filter, selectedDate, fetchBookings, fetchPayments]);
+
   // Initial Load (Venue only)
   useEffect(() => {
     const loadInitial = async () => {
@@ -253,11 +282,8 @@ export const useDineHome = (serviceId: string) => {
     loadInitial();
   }, [fetchVenueDetails]);
 
-  // Dependent Load (Bookings & Payments)
+  // Dependent Load (Realtime Subscription only)
   useEffect(() => {
-    fetchBookings();
-    fetchPayments();
-
     // Set up Realtime Subscription
     const channel = supabase
       .channel(`dine_home_${serviceId}`)

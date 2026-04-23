@@ -3,9 +3,9 @@
 
 import React, { useState } from "react";
 import { View, StyleSheet, ActivityIndicator, SectionList, TouchableOpacity } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { MainStackParamList } from "@/navigation/navigation.types";
+import { MainStackParamList, DineTabParamList } from "@/navigation/navigation.types";
 import { Search, ChevronRight, SlidersHorizontal } from "lucide-react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, TextInput } from "@/components/ui";
@@ -20,7 +20,17 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
 export const DineHistoryScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const route = useRoute<RouteProp<DineTabParamList, "DineHistory">>();
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  // Safely resolve serviceId from params or parent navigator
+  let serviceId = route.params?.serviceId;
+  if (!serviceId) {
+    const parentState = (navigation as any).getParent()?.getState();
+    const tabRoute = parentState?.routes.find((r: any) => r.name === "DineServiceTabs");
+    const tabParams = tabRoute?.params as any;
+    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+  }
 
   const {
     loading,
@@ -31,7 +41,7 @@ export const DineHistoryScreen = () => {
     customRange,
     setCustomRange,
     historyGroups,
-  } = useDineHistory("dummy-service-id");
+  } = useDineHistory(serviceId);
 
   const handleCardPress = (paymentId: string) => {
     navigation.navigate("DinePaymentDetails", {

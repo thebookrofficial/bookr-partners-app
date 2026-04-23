@@ -76,7 +76,9 @@ export const useDineDetails = (bookingId: string) => {
 
       const profiles = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
       const table = Array.isArray(data.dining_tables) ? data.dining_tables[0] : data.dining_tables;
-      const isOffline = !!data.guest_name || !!data.guest_phone;
+
+      // Robust logic: If guest_name is present, it's a vendor-made (Offline) booking.
+      const isOffline = Boolean(data.guest_name && data.guest_name.trim() !== "");
 
       // Fetch payment info if available
       const { data: paymentData } = await supabase
@@ -91,14 +93,13 @@ export const useDineDetails = (bookingId: string) => {
       const convenienceFee = Number(data.convenience_fee || 0);
 
       // Calculate derived values for the invoice view
-      // Note: These formulas might need adjustment based on business logic
-      const gst = billAmount * 0.05; // Example 5% GST
+      const gst = billAmount * 0.05;
       const platformFee = convenienceFee;
 
       const formattedBooking: DineBookingDetail = {
         id: data.id,
-        name: data.guest_name || profiles?.full_name || "Guest User",
-        phone: data.guest_phone || profiles?.phone || "",
+        name: isOffline ? data.guest_name : profiles?.full_name || "Guest User",
+        phone: isOffline ? data.guest_phone : profiles?.phone || "",
         date: data.reservation_date,
         time: formatTime(data.reservation_time),
         guestCount: data.party_size.toString(),

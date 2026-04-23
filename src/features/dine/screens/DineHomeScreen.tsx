@@ -27,7 +27,15 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 export const DineHomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<DineTabParamList, "DineHome">>();
-  const { serviceId } = route.params;
+
+  // Safely resolve serviceId from params or parent navigator
+  let serviceId = route.params?.serviceId;
+  if (!serviceId) {
+    const parentState = (navigation as any).getParent()?.getState();
+    const tabRoute = parentState?.routes.find((r: any) => r.name === "DineServiceTabs");
+    const tabParams = tabRoute?.params as any;
+    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+  }
 
   const {
     initialLoading,

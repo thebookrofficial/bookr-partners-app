@@ -14,7 +14,7 @@ interface DineFilterBarProps {
 }
 
 export const DineFilterBar = ({ title, selectedFilter, onFilterChange }: DineFilterBarProps) => {
-  const filters = ["Today", "Tommorow", "All"];
+  const filters = ["Today", "Tomorrow", "All"];
 
   return (
     <View style={styles.container}>

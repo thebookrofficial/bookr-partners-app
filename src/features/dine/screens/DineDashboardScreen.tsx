@@ -8,7 +8,7 @@ import { Text } from "@/components/ui";
 import { Calendar as CalendarIcon } from "lucide-react-native";
 import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { useRoute, RouteProp } from "@react-navigation/native";
+import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { DineTabParamList } from "@/navigation/navigation.types";
 import { ServiceHeader } from "@/features/sports/components/ServiceHeader";
 import { RevenueBar } from "../components/RevenueBar";
@@ -18,8 +18,17 @@ import { useDineDashboard, DashboardTab } from "../hooks/useDineDashboard";
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
 export const DineDashboardScreen = () => {
+  const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<DineTabParamList, "DineDashboard">>();
-  const serviceId = route.params?.serviceId || "default-service";
+
+  // Safely resolve serviceId from params or parent navigator
+  let serviceId = route.params?.serviceId;
+  if (!serviceId) {
+    const parentState = navigation.getParent()?.getState();
+    const tabRoute = parentState?.routes.find((r: any) => r.name === "DineServiceTabs");
+    const tabParams = tabRoute?.params as any;
+    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+  }
 
   const { loading, activeTab, setActiveTab, revenueData } = useDineDashboard(serviceId);
 
