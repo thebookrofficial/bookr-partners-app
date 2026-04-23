@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -14,6 +14,7 @@ import { ServiceHeader } from "@/features/sports/components/ServiceHeader";
 import { RevenueBar } from "../components/RevenueBar";
 import { WeekExpandableRow } from "../components/WeekExpandableRow";
 import { useDineDashboard, DashboardTab } from "../hooks/useDineDashboard";
+import { DineFilterBottomSheet } from "../components/DineFilterBottomSheet";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -30,13 +31,31 @@ export const DineDashboardScreen = () => {
     serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
   }
 
-  const { loading, activeTab, setActiveTab, revenueData } = useDineDashboard(serviceId);
+  const { loading, activeTab, setActiveTab, revenueData, venue, setCustomRange, refresh } =
+    useDineDashboard(serviceId);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refresh();
+    setIsRefreshing(false);
+  };
+
+  const handleTabPress = (tab: DashboardTab) => {
+    if (tab === "Custom") {
+      setIsFilterSheetOpen(true);
+    }
+    setActiveTab(tab);
+  };
 
   const TABS: DashboardTab[] = ["Today", "Last week", "This Month", "This Year", "Custom"];
 
-  if (loading || !revenueData) {
+  // Early return only for absolute initial load
+  if (loading && !revenueData) {
     return (
-      <View style={[styles.root, styles.loadingContainer]}>
+      <View style={[styles.root, styles.loadingFull]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
@@ -44,9 +63,17 @@ export const DineDashboardScreen = () => {
 
   return (
     <View style={styles.root}>
-      <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
+      <ScreenContainer
+        scrollable
+        backgroundColor={COLORS.background}
+        paddingHorizontal={hs(12)}
+        refreshing={isRefreshing}
+        onRefresh={handleRefresh}>
         {/* 1. Header */}
-        <ServiceHeader title="Hotel tikka lab" imageSource={USER_PROFILE} />
+        <ServiceHeader
+          title={venue?.name || "Hotel tikka lab"}
+          imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
+        />
 
         {/* 2. Period Tabs */}
         <View style={styles.tabContainer}>
@@ -57,7 +84,7 @@ export const DineDashboardScreen = () => {
               <TouchableOpacity
                 key={tab}
                 activeOpacity={0.8}
-                onPress={() => setActiveTab(tab)}
+                onPress={() => handleTabPress(tab)}
                 style={[styles.tab, isActive && styles.activeTab, isCustom && styles.customTab]}>
                 {isCustom && (
                   <CalendarIcon size={ms(16)} color={isActive ? "#FFFFFF" : "#8C8C8C"} />
@@ -73,62 +100,92 @@ export const DineDashboardScreen = () => {
           })}
         </View>
 
-        <>
-          {/* 3. Period Display */}
-          <Text variant="body1" weight="bold" style={styles.periodLabel}>
-            {revenueData.periodLabel}
-          </Text>
-
-          {/* 4. Total Payout Summary */}
-          <View style={styles.summaryCard}>
-            <Text variant="h1" weight="bold" style={styles.totalAmount}>
-              {revenueData.totalPayout}
-            </Text>
-            <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
-              {revenueData.payoutLabel}
-            </Text>
-          </View>
-
-          {/* 5. Revenue Graph Section */}
-          <View style={styles.graphSection}>
-            <Text variant="body1" weight="bold" style={styles.graphTitle}>
-              {revenueData.graphTitle.toUpperCase()}
+        {revenueData ? (
+          <>
+            {/* 3. Period Display */}
+            <Text variant="body1" weight="bold" style={styles.periodLabel}>
+              {revenueData.periodLabel || "Select Period"}
             </Text>
 
-            <View style={styles.graphContainer}>
-              {activeTab === "This Month"
-                ? (revenueData.weeks || []).map((week: any) => (
-                    <WeekExpandableRow
-                      key={week.id}
-                      label={week.label}
-                      dateRange={week.dateRange}
-                      amount={week.amount}
-                      percentage={week.percentage}
-                      isActive={week.active}
-                      details={week.details}
-                    />
-                  ))
-                : (revenueData.graphData || []).map((item: any, index: number) => (
-                    <RevenueBar
-                      key={index}
-                      label={item.label}
-                      subLabel={item.subLabel}
-                      amount={item.amount}
-                      percentage={item.percentage}
-                      isActive={item.active}
-                    />
-                  ))}
+            {/* 4. Total Payout Summary */}
+            <View style={styles.summaryCard}>
+              <Text variant="h1" weight="bold" style={styles.totalAmount}>
+                {revenueData.totalPayout || "+₹0"}
+              </Text>
+              <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
+                {revenueData.payoutLabel || "Total Payout"}
+              </Text>
             </View>
+
+            {/* 5. Revenue Graph Section */}
+            <View style={styles.graphSection}>
+              <Text variant="body1" weight="bold" style={styles.graphTitle}>
+                {revenueData.graphTitle ? revenueData.graphTitle.toUpperCase() : "REVENUE"}
+              </Text>
+
+              <View style={styles.graphContainer}>
+                {activeTab === "This Month"
+                  ? (revenueData.weeks || []).map((week: any) => (
+                      <WeekExpandableRow
+                        key={week.id}
+                        label={week.label}
+                        dateRange={week.dateRange}
+                        amount={week.amount}
+                        percentage={week.percentage}
+                        isActive={week.active}
+                        details={week.details}
+                      />
+                    ))
+                  : (revenueData.graphData || []).map((item: any, index: number) => (
+                      <RevenueBar
+                        key={index}
+                        label={item.label}
+                        subLabel={item.subLabel}
+                        amount={item.amount}
+                        percentage={item.percentage}
+                        isActive={item.active}
+                      />
+                    ))}
+              </View>
+            </View>
+          </>
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Text variant="body2" color={COLORS.text.muted}>
+              No revenue data available for this period.
+            </Text>
           </View>
-        </>
-        <View style={{ height: vs(100) }} />
+        )}
+        <View style={{ height: vs(120) }} />
       </ScreenContainer>
+
+      <DineFilterBottomSheet
+        visible={isFilterSheetOpen}
+        onClose={() => setIsFilterSheetOpen(false)}
+        currentFilter={activeTab === "Custom" ? "custom" : "all"}
+        onApply={(_f, range) => {
+          if (range) {
+            setCustomRange(range);
+            setActiveTab("Custom");
+          }
+        }}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
+  loadingFull: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+  },
+  emptyContainer: {
+    paddingVertical: vs(50),
+    alignItems: "center",
+  },
   tabContainer: {
     flexDirection: "row",
     gap: hs(6),
