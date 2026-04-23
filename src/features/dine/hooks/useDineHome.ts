@@ -40,12 +40,45 @@ export const useDineHome = (serviceId: string) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [bookings, setBookings] = useState<DineBookingData[]>([]);
   const [payments, setPayments] = useState<DinePaymentData[]>([]);
+  const [closedDates, setClosedDates] = useState<any[]>([]);
+  const [isClosedToday, setIsClosedToday] = useState(false);
   const [activeTab, setActiveTab] = useState("Upcoming");
   const [filter, setFilter] = useState("Today");
 
   // Use refs to avoid stale closures in Realtime callback
   const filterRef = useRef(filter);
   const dateRef = useRef(selectedDate);
+
+  const fetchClosedDates = useCallback(async () => {
+    if (!serviceId) return;
+    try {
+      const { data, error } = await supabase
+        .from("venue_closed_dates")
+        .select("*")
+        .eq("venue_id", serviceId);
+
+      if (error) throw error;
+      setClosedDates(data || []);
+    } catch (error) {
+      console.error("Error fetching closed dates:", error);
+    }
+  }, [serviceId]);
+
+  // Immediate closure check whenever date or database records change
+  useEffect(() => {
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(selectedDate.getDate()).padStart(2, "0");
+    const targetDateStr = `${year}-${month}-${day}`;
+
+    const isClosed = closedDates.some(record => {
+      const start = record.start_date;
+      const end = record.end_date || record.start_date;
+      return targetDateStr >= start && targetDateStr <= end && record.is_full_day;
+    });
+
+    setIsClosedToday(isClosed);
+  }, [selectedDate, closedDates]);
 
   const fetchVenueDetails = useCallback(async () => {
     try {
@@ -311,21 +344,26 @@ export const useDineHome = (serviceId: string) => {
     fetchPayments();
   }, [filter, selectedDate, fetchBookings, fetchPayments]);
 
-  // Initial Load (Venue only)
+  // Initial Load (Venue and Closed Dates)
   useEffect(() => {
     const loadInitial = async () => {
       setInitialLoading(true);
-      await fetchVenueDetails();
+      await Promise.all([fetchVenueDetails(), fetchClosedDates()]);
       setInitialLoading(false);
     };
     loadInitial();
-  }, [fetchVenueDetails]);
+  }, [fetchVenueDetails, fetchClosedDates]);
 
   // Dependent Load (Realtime Subscription only)
   useEffect(() => {
-    // Set up Realtime Subscription
-    const channel = supabase
-      .channel(`dine_home_${serviceId}`)
+    if (!serviceId) return;
+
+    // Use unique channel names per mount to avoid collisions
+    const randomSuffix = Math.random().toString(36).substring(7);
+    const bookingsChannel = supabase.channel(`dine_home_bookings_${serviceId}_${randomSuffix}`);
+    const closedDatesChannel = supabase.channel(`dine_home_closed_${serviceId}_${randomSuffix}`);
+
+    bookingsChannel
       .on(
         "postgres_changes",
         {
@@ -334,18 +372,33 @@ export const useDineHome = (serviceId: string) => {
           table: "dining_bookings",
           filter: `venue_id=eq.${serviceId}`,
         },
-        _payload => {
-          // Refresh both lists when any change occurs
+        () => {
           fetchBookings();
           fetchPayments();
         },
       )
       .subscribe();
 
+    closedDatesChannel
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "venue_closed_dates",
+          filter: `venue_id=eq.${serviceId}`,
+        },
+        () => {
+          fetchClosedDates();
+        },
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(bookingsChannel);
+      supabase.removeChannel(closedDatesChannel);
     };
-  }, [fetchBookings, fetchPayments, serviceId]);
+  }, [fetchBookings, fetchPayments, fetchClosedDates, serviceId]);
 
   return {
     initialLoading,
@@ -356,6 +409,7 @@ export const useDineHome = (serviceId: string) => {
     setSelectedDate,
     bookings,
     payments,
+    isClosedToday,
     activeTab,
     setActiveTab,
     filter,
@@ -365,6 +419,7 @@ export const useDineHome = (serviceId: string) => {
     refresh: () => {
       fetchBookings();
       fetchPayments();
+      fetchClosedDates();
     },
   };
 };

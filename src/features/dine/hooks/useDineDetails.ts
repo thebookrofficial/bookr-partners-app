@@ -162,11 +162,15 @@ export const useDineDetails = (bookingId: string) => {
   }, [bookingId]);
 
   useEffect(() => {
+    if (!bookingId) return;
+
     fetchBookingDetails();
 
     // Set up Realtime Subscription for this specific record
+    // Use a unique channel name per mount to avoid collisions
+    const channelName = `booking_detail_${bookingId}_${Math.random().toString(36).substring(7)}`;
     const channel = supabase
-      .channel(`booking_detail_${bookingId}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         {

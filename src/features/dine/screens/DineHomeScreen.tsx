@@ -6,7 +6,7 @@ import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Modal } from "re
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
 import { Calendar as CalendarIcon, Plus } from "lucide-react-native";
-import { hs, vs, ms } from "@/utils/responsive.utils";
+import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -46,6 +46,7 @@ export const DineHomeScreen = () => {
     setSelectedDate,
     bookings,
     payments,
+    isClosedToday,
     activeTab,
     setActiveTab,
     filter,
@@ -126,13 +127,22 @@ export const DineHomeScreen = () => {
               style={styles.dateRow}
               onPress={() => setIsDatePickerOpen(true)}
               activeOpacity={0.7}>
-              <Text
-                variant="body2"
-                weight="medium"
-                color={COLORS.text.primary}
-                style={styles.dateText}>
-                {getFormattedDate(selectedDate)}
-              </Text>
+              <View style={styles.dateInfoContainer}>
+                <Text
+                  variant="body2"
+                  weight="medium"
+                  color={COLORS.text.primary}
+                  style={styles.dateText}>
+                  {getFormattedDate(selectedDate)}
+                </Text>
+                {isClosedToday && (
+                  <View style={styles.closedBadge}>
+                    <Text variant="caption" weight="bold" style={styles.closedText}>
+                      VENUE IS CLOSED
+                    </Text>
+                  </View>
+                )}
+              </View>
               <CalendarIcon size={ms(16)} color="#00327B" />
             </TouchableOpacity>
 
@@ -311,5 +321,22 @@ const styles = StyleSheet.create({
     borderRadius: ms(12),
     padding: ms(10),
     elevation: 5,
+  },
+  dateInfoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(8),
+  },
+  closedBadge: {
+    backgroundColor: "#FFEBEB",
+    paddingHorizontal: hs(8),
+    paddingVertical: vs(2),
+    borderRadius: ms(4),
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+  },
+  closedText: {
+    color: COLORS.danger,
+    fontSize: fs(10),
   },
 });

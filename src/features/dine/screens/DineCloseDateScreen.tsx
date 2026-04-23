@@ -14,17 +14,10 @@ import { COLORS } from "@/constants/theme";
 import { useRoute, RouteProp } from "@react-navigation/native";
 import { DineTabParamList } from "@/navigation/navigation.types";
 import { useDineHome } from "../hooks/useDineHome";
+import { useDineCloseDate, ClosedDateRecord } from "../hooks/useDineCloseDate";
+import { ActivityIndicator, Alert } from "react-native";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
-
-interface ClosedDateRecord {
-  id: string;
-  startDate: string;
-  endDate?: string;
-  startTime?: string;
-  endTime?: string;
-  isFullDay: boolean;
-}
 
 /**
  * DineCloseDateScreen - Manage closed dates for a dine venue.
@@ -35,8 +28,16 @@ export const DineCloseDateScreen = () => {
   const { serviceId } = route.params;
   const { venue } = useDineHome(serviceId);
 
-  // States
-  const [upcomingClosedDates, setUpcomingClosedDates] = useState<ClosedDateRecord[]>([]);
+  // Hook for Database Interactions
+  const {
+    upcomingClosedDates,
+    pastClosedDates,
+    loading: dbLoading,
+    setClosedDate,
+    removeClosedDate,
+  } = useDineCloseDate(serviceId);
+
+  // Selection States
   const [selectionMode, setSelectionMode] = useState<"single" | "range">("single");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [dateRange, setDateRange] = useState<{ start?: string; end?: string }>({});
@@ -47,21 +48,22 @@ export const DineCloseDateScreen = () => {
   const [toTime, setToTime] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState<"from" | "to" | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Mock past dates based on Figma
-  const pastClosedDates = [
-    { id: "p1", date: "12 Mar 2026", status: "Closed" },
-    { id: "p2", date: "30 Dec 2026 - 1 Jan 2026", status: "Closed" },
-  ];
-
-  const formatTime = (date: Date) => {
+  const formatTimeDisplay = (date: Date) => {
     return date.toLocaleTimeString("en-US", {
       hour: "numeric",
       hour12: true,
     });
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatTimeDB = (date: Date) => {
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}:00`;
+  };
+
+  const formatDateDisplay = (dateStr: string) => {
     const d = new Date(dateStr);
     return d.toLocaleDateString("en-GB", {
       day: "2-digit",
@@ -70,26 +72,40 @@ export const DineCloseDateScreen = () => {
     });
   };
 
-  const handleSetAsClosed = () => {
+  const handleSetAsClosed = async () => {
     if (selectionMode === "single" || (dateRange.start && dateRange.end)) {
-      const newRecord: ClosedDateRecord = {
-        id: Math.random().toString(36).substr(2, 9),
+      setIsSubmitting(true);
+      const newRecord: Omit<ClosedDateRecord, "id"> = {
         startDate:
           selectionMode === "single" ? selectedDate.toISOString().split("T")[0] : dateRange.start!,
         endDate: selectionMode === "range" ? dateRange.end : undefined,
-        startTime: slotType === "custom" ? formatTime(fromTime) : undefined,
-        endTime: slotType === "custom" ? formatTime(toTime) : undefined,
+        startTime: slotType === "custom" ? formatTimeDB(fromTime) : undefined,
+        endTime: slotType === "custom" ? formatTimeDB(toTime) : undefined,
         isFullDay: slotType === "all",
       };
-      setUpcomingClosedDates(prev => [...prev, newRecord]);
-      // Reset after set
-      setDateRange({});
-      setSelectionMode("single");
+
+      const success = await setClosedDate(newRecord);
+      setIsSubmitting(false);
+
+      if (success) {
+        // Reset after set
+        setDateRange({});
+        setSelectionMode("single");
+      }
     }
   };
 
-  const removeClosedDate = (id: string) => {
-    setUpcomingClosedDates(prev => prev.filter(item => item.id !== id));
+  const handleRemoveClosedDate = async (id: string) => {
+    Alert.alert("Confirm Delete", "Are you sure you want to remove this closed date?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          await removeClosedDate(id);
+        },
+      },
+    ]);
   };
 
   const onDayPress = useCallback(
@@ -174,7 +190,13 @@ export const DineCloseDateScreen = () => {
           <Text variant="body2" weight="bold" style={styles.sectionTitle}>
             CLOSED DATES
           </Text>
-          {upcomingClosedDates.length === 0 ? (
+          {dbLoading ? (
+            <ActivityIndicator
+              size="small"
+              color={COLORS.primary}
+              style={{ marginVertical: vs(10) }}
+            />
+          ) : upcomingClosedDates.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.greenDot} />
               <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
@@ -186,8 +208,8 @@ export const DineCloseDateScreen = () => {
               <View key={item.id} style={styles.recordRow}>
                 <View style={styles.recordTextContainer}>
                   <Text variant="body2" weight="semiBold" style={styles.recordText}>
-                    {formatDate(item.startDate)}{" "}
-                    {item.endDate ? `- ${formatDate(item.endDate)}` : ""}
+                    {formatDateDisplay(item.startDate)}{" "}
+                    {item.endDate ? `- ${formatDateDisplay(item.endDate)}` : ""}
                   </Text>
                   {!item.isFullDay && (
                     <Text variant="caption" weight="medium" color={COLORS.text.muted}>
@@ -197,7 +219,7 @@ export const DineCloseDateScreen = () => {
                 </View>
                 <TouchableOpacity
                   style={styles.deleteBtn}
-                  onPress={() => removeClosedDate(item.id)}>
+                  onPress={() => handleRemoveClosedDate(item.id)}>
                   <X size={ms(18)} color={COLORS.danger} />
                 </TouchableOpacity>
               </View>
@@ -219,12 +241,14 @@ export const DineCloseDateScreen = () => {
             {selectionMode === "single" ? (
               <TouchableOpacity
                 style={styles.inputContainer}
-                onPress={() => setSelectionMode("range")}>
+                onPress={() => setShowDatePicker(true)}>
                 <CalendarIcon size={ms(20)} color={COLORS.primary} />
                 <Text variant="body2" weight="semiBold" style={styles.inputText}>
                   {selectedDate.toLocaleDateString("en-GB")}
                 </Text>
-                <Plus size={ms(24)} color={COLORS.text.primary} />
+                <TouchableOpacity onPress={() => setSelectionMode("range")}>
+                  <Plus size={ms(24)} color={COLORS.text.primary} />
+                </TouchableOpacity>
               </TouchableOpacity>
             ) : (
               <>
@@ -235,7 +259,7 @@ export const DineCloseDateScreen = () => {
                     </Text>
                     <View style={styles.rangeInput}>
                       <Text variant="body2" weight="semiBold">
-                        {dateRange.start ? formatDate(dateRange.start) : "Select Date"}
+                        {dateRange.start ? formatDateDisplay(dateRange.start) : "Select Date"}
                       </Text>
                     </View>
                   </View>
@@ -245,7 +269,7 @@ export const DineCloseDateScreen = () => {
                     </Text>
                     <View style={styles.rangeInput}>
                       <Text variant="body2" weight="semiBold">
-                        {dateRange.end ? formatDate(dateRange.end) : "Select Date"}
+                        {dateRange.end ? formatDateDisplay(dateRange.end) : "Select Date"}
                       </Text>
                     </View>
                   </View>
@@ -334,7 +358,7 @@ export const DineCloseDateScreen = () => {
                     style={styles.rangeInput}
                     onPress={() => setShowTimePicker("from")}>
                     <Text variant="body2" weight="semiBold">
-                      {formatTime(fromTime)}
+                      {formatTimeDisplay(fromTime)}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -346,7 +370,7 @@ export const DineCloseDateScreen = () => {
                     style={styles.rangeInput}
                     onPress={() => setShowTimePicker("to")}>
                     <Text variant="body2" weight="semiBold">
-                      {formatTime(toTime)}
+                      {formatTimeDisplay(toTime)}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -357,15 +381,21 @@ export const DineCloseDateScreen = () => {
           <TouchableOpacity
             style={[
               styles.primaryBtn,
-              selectionMode === "range" &&
-                (!dateRange.start || !dateRange.end) &&
+              ((selectionMode === "range" && (!dateRange.start || !dateRange.end)) ||
+                isSubmitting) &&
                 styles.disabledBtn,
             ]}
-            disabled={selectionMode === "range" && (!dateRange.start || !dateRange.end)}
+            disabled={
+              (selectionMode === "range" && (!dateRange.start || !dateRange.end)) || isSubmitting
+            }
             onPress={handleSetAsClosed}>
-            <Text family="bison" weight="bold" style={styles.btnText}>
-              SET AS CLOSED
-            </Text>
+            {isSubmitting ? (
+              <ActivityIndicator color={COLORS.text.inverse} />
+            ) : (
+              <Text family="bison" weight="bold" style={styles.btnText}>
+                SET AS CLOSED
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -374,17 +404,24 @@ export const DineCloseDateScreen = () => {
           <Text variant="body2" weight="bold" style={styles.sectionTitle}>
             PAST CLOSED DATES
           </Text>
-          {pastClosedDates.map(item => (
-            <View key={item.id} style={styles.pastRecordRow}>
-              <CalendarIcon size={ms(20)} color={COLORS.text.muted} />
-              <Text variant="body2" weight="semiBold" style={styles.pastRecordText}>
-                {item.date}
-              </Text>
-              <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
-                {item.status}
-              </Text>
-            </View>
-          ))}
+          {pastClosedDates.length === 0 ? (
+            <Text variant="caption" color={COLORS.text.muted} style={{ paddingLeft: hs(4) }}>
+              No past records
+            </Text>
+          ) : (
+            pastClosedDates.map(item => (
+              <View key={item.id} style={styles.pastRecordRow}>
+                <CalendarIcon size={ms(20)} color={COLORS.text.muted} />
+                <Text variant="body2" weight="semiBold" style={styles.pastRecordText}>
+                  {formatDateDisplay(item.startDate)}{" "}
+                  {item.endDate ? `- ${formatDateDisplay(item.endDate)}` : ""}
+                </Text>
+                <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
+                  Closed
+                </Text>
+              </View>
+            ))
+          )}
         </View>
 
         {/* Single Date Picker */}
