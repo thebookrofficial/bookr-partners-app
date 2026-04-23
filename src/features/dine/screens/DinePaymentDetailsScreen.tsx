@@ -205,8 +205,12 @@ export const DinePaymentDetailsScreen = () => {
           <InfoField label="Type" value={booking.type} icon={CalendarDays} />
 
           <View style={styles.row}>
-            <InfoField label="Booking time" value={booking.time} halfWidth />
-            <InfoField label="No of person" value={booking.guestCount} halfWidth />
+            {booking.isTableBooking && (
+              <InfoField label="Booking time" value={booking.time} halfWidth />
+            )}
+            {booking.isTableBooking && (
+              <InfoField label="No of person" value={booking.guestCount} halfWidth />
+            )}
           </View>
         </View>
 
@@ -224,24 +228,6 @@ export const DinePaymentDetailsScreen = () => {
             </Text>
           </View>
           <View style={styles.invoiceRow}>
-            <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
-              Discount
-            </Text>
-            <Text variant="body2" weight="medium" color={COLORS.danger}>
-              {booking.discount}
-            </Text>
-          </View>
-          <View style={styles.invoiceRow}>
-            <View style={styles.dashedLabelContainer}>
-              <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
-                GST
-              </Text>
-            </View>
-            <Text variant="body2" weight="medium" color={COLORS.text.primary}>
-              {booking.gst}
-            </Text>
-          </View>
-          <View style={styles.invoiceRow}>
             <View style={styles.dashedLabelContainer}>
               <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
                 Platform
@@ -249,6 +235,14 @@ export const DinePaymentDetailsScreen = () => {
             </View>
             <Text variant="body2" weight="medium" color={COLORS.danger}>
               {booking.platformFee}
+            </Text>
+          </View>
+          <View style={styles.invoiceRow}>
+            <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
+              Discount
+            </Text>
+            <Text variant="body2" weight="medium" color={COLORS.danger}>
+              {booking.discount}
             </Text>
           </View>
           <View style={styles.invoiceRow}>

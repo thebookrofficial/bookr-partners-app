@@ -117,7 +117,7 @@ export const useDineHome = (serviceId: string) => {
           if (!timeStr) return "N/A";
           const [h, m] = timeStr.split(":");
           const hourInt = parseInt(h, 10);
-          const ampm = hourInt >= 12 ? "Pm" : "Am";
+          const ampm = hourInt >= 12 ? "PM" : "AM";
           const displayHour = hourInt % 12 || 12;
           const displayMins = m === "00" ? "" : `:${m}`;
           return `${displayHour}${displayMins} ${ampm}`;
@@ -162,7 +162,7 @@ export const useDineHome = (serviceId: string) => {
     setPaymentsLoading(true);
     try {
       const targetDate = dateRef.current;
-      const localDateString = `${targetDate.getFullYear()}-${String(
+      const targetDateString = `${targetDate.getFullYear()}-${String(
         targetDate.getMonth() + 1,
       ).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`;
 
@@ -183,6 +183,9 @@ export const useDineHome = (serviceId: string) => {
           created_at,
           guest_name,
           guest_phone,
+          table_id,
+          booking_status,
+          bill_amount,
           profiles (
             full_name,
             phone,
@@ -191,13 +194,7 @@ export const useDineHome = (serviceId: string) => {
         `,
         )
         .eq("venue_id", serviceId)
-        .gt("paid_amount", 0);
-
-      if (filterRef.current === "All") {
-        query = query.gte("reservation_date", todayString);
-      } else {
-        query = query.eq("reservation_date", localDateString);
-      }
+        .gt("bill_amount", 0);
 
       const { data, error } = await query.order("created_at", { ascending: false });
 
@@ -205,7 +202,31 @@ export const useDineHome = (serviceId: string) => {
 
       const grouped: Record<string, any[]> = {};
       (data || []).forEach((b: any) => {
+        // Helper to safely get ISO date string (YYYY-MM-DD)
+        const getSafeDateString = (dateVal: any) => {
+          if (!dateVal) return null;
+          const d = new Date(dateVal);
+          return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
+        };
+
+        // Date Logic: If "All", show everything from today onwards.
+        // If specific date, show if reservation_date OR created_at matches.
+        const resDate = b.reservation_date;
+        const createdDate = getSafeDateString(b.created_at);
+
+        let shouldInclude = false;
+        if (filterRef.current === "All") {
+          shouldInclude =
+            (resDate && resDate >= todayString) || (createdDate && createdDate >= todayString);
+        } else {
+          shouldInclude = resDate === targetDateString || createdDate === targetDateString;
+        }
+
+        if (!shouldInclude) return;
+
         const dateObj = new Date(b.created_at);
+        if (isNaN(dateObj.getTime())) return; // Skip invalid created_at records
+
         const dateStr = dateObj.toLocaleDateString("en-GB", {
           day: "2-digit",
           month: "short",
@@ -218,21 +239,39 @@ export const useDineHome = (serviceId: string) => {
             minute: "2-digit",
             hour12: true,
           })
-          .replace("am", "Am")
-          .replace("pm", "Pm");
+          .replace("am", "AM")
+          .replace("pm", "PM");
 
         if (!grouped[dateStr]) grouped[dateStr] = [];
 
         const profiles = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
         const isOffline = Boolean(b.guest_name && b.guest_name.trim() !== "");
 
+        // Robust Multi-Signal Logic for Type Differentiation:
+        const createdDateOnly = b.created_at
+          ? new Date(b.created_at).toISOString().split("T")[0]
+          : null;
+        const name = isOffline ? b.guest_name : profiles?.full_name || "Guest User";
+
+        const isTableBooking =
+          // 1. Any active (not completed) record is a Table Booking
+          b.booking_status !== "completed" ||
+          // 2. Any record with a specific table assigned is a Table Booking
+          Boolean(b.table_id) ||
+          // 3. If it was booked for a date after it was created, it's a reservation
+          (b.reservation_date && createdDateOnly && b.reservation_date > createdDateOnly) ||
+          // 4. Offline records are bookings, unless labeled as direct pay
+          (isOffline &&
+            !name.toLowerCase().includes("direct pay") &&
+            !name.toLowerCase().includes("pay bill"));
+
         grouped[dateStr].push({
           id: b.id,
-          name: isOffline ? b.guest_name : profiles?.full_name || "Guest User",
+          name,
           phone: isOffline ? b.guest_phone : profiles?.phone || "",
           amount: `₹${b.paid_amount}`,
-          type: "Table Booking",
-          typeColor: "#63A1FD",
+          type: isTableBooking ? "Table Booking" : "Pay Bill",
+          typeColor: isTableBooking ? "#63A1FD" : "#7300FF",
           amountColor: "#00B562",
           time: timeStr,
           avatarUrl: profiles?.avatar_url,

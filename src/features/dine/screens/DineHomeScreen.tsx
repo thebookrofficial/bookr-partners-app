@@ -51,10 +51,18 @@ export const DineHomeScreen = () => {
     filter,
     setFilter,
     refreshBookings,
+    refresh,
   } = useDineHome(serviceId);
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refresh();
+    setIsRefreshing(false);
+  };
 
   const getFormattedDate = (date: Date) => {
     const today = new Date();
@@ -95,7 +103,12 @@ export const DineHomeScreen = () => {
 
   return (
     <View style={styles.root}>
-      <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
+      <ScreenContainer
+        scrollable
+        backgroundColor={COLORS.background}
+        paddingHorizontal={hs(12)}
+        refreshing={isRefreshing}
+        onRefresh={handleRefresh}>
         {/* 1. Header Section */}
         <ServiceHeader
           title={venue?.name || "Hotel tikka lab"}

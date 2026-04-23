@@ -14,7 +14,7 @@ export interface DineBookingDetail {
   occasion: string;
   status: "Online" | "Offline";
   avatarUrl?: string;
-  type: string;
+  type: "Reserved" | "Walkin";
   billAmount: string;
   discount: string;
   gst: string;
@@ -26,6 +26,7 @@ export interface DineBookingDetail {
   transactionDate: string;
   transactionTime: string;
   tableNumber?: string;
+  isTableBooking: boolean;
 }
 
 export const useDineDetails = (bookingId: string) => {
@@ -50,6 +51,8 @@ export const useDineDetails = (bookingId: string) => {
           booking_status,
           guest_name,
           guest_phone,
+          created_at,
+          table_id,
           profiles (
             full_name,
             phone,
@@ -66,6 +69,7 @@ export const useDineDetails = (bookingId: string) => {
       if (error) throw error;
 
       const formatTime = (timeStr: string) => {
+        if (!timeStr || timeStr === "00:00:00" || timeStr === "00:00") return "";
         const [h, m] = timeStr.split(":");
         const hourInt = parseInt(h, 10);
         const ampm = hourInt >= 12 ? "Pm" : "Am";
@@ -77,8 +81,20 @@ export const useDineDetails = (bookingId: string) => {
       const profiles = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
       const table = Array.isArray(data.dining_tables) ? data.dining_tables[0] : data.dining_tables;
 
-      // Robust logic: If guest_name is present, it's a vendor-made (Offline) booking.
+      // Robust logic for Type Differentiation (Matches Home/History hooks)
+      const createdDateOnly = data.created_at
+        ? new Date(data.created_at).toISOString().split("T")[0]
+        : null;
       const isOffline = Boolean(data.guest_name && data.guest_name.trim() !== "");
+      const name = isOffline ? data.guest_name : profiles?.full_name || "Guest User";
+
+      const isTableBooking =
+        data.booking_status !== "completed" ||
+        Boolean(data.table_id) ||
+        (data.reservation_date && createdDateOnly && data.reservation_date > createdDateOnly) ||
+        (isOffline &&
+          !name.toLowerCase().includes("direct pay") &&
+          !name.toLowerCase().includes("pay bill"));
 
       // Fetch payment info if available
       const { data: paymentData } = await supabase
@@ -89,31 +105,39 @@ export const useDineDetails = (bookingId: string) => {
         .maybeSingle();
 
       const billAmount = Number(data.bill_amount || 0);
-      const paidAmount = Number(data.paid_amount || 0);
-      const convenienceFee = Number(data.convenience_fee || 0);
 
-      // Calculate derived values for the invoice view
-      const gst = billAmount * 0.05;
-      const platformFee = convenienceFee;
+      // --- LOGIC UPDATES ---
+      // For now, assume partnered = true. This would ideally be fetched from the venue's partnership status.
+      const isPartnered = true;
+
+      const platformFee = billAmount * 0.05;
+      const gatewayCharges = billAmount * 0.02;
+      const gst = 0;
+      // Discount is 5% if partnered, otherwise 0
+      const discount = isPartnered ? billAmount * 0.05 : 0;
+
+      // Calculate EST Payout: (Total Bill - Vendor Discount) - Bookr Commission (7%)
+      const estPayout = billAmount - discount - (platformFee + gatewayCharges);
 
       const formattedBooking: DineBookingDetail = {
         id: data.id,
-        name: isOffline ? data.guest_name : profiles?.full_name || "Guest User",
+        name,
         phone: isOffline ? data.guest_phone : profiles?.phone || "",
         date: data.reservation_date,
-        time: formatTime(data.reservation_time),
+        time: isTableBooking ? formatTime(data.reservation_time) : "",
         guestCount: data.party_size.toString(),
         occasion: data.special_requests || "-",
         status: isOffline ? "Offline" : "Online",
         avatarUrl: profiles?.avatar_url,
-        type: table?.table_number ? `Table ${table.table_number}` : "Walk in",
-        billAmount: `₹${billAmount}`,
-        discount: "-₹0",
+        type: isTableBooking ? "Reserved" : "Walkin",
+        billAmount: `₹${billAmount.toFixed(2)}`,
+        discount: `-₹${discount.toFixed(2)}`,
         gst: `₹${gst.toFixed(2)}`,
         platformFee: `-₹${platformFee.toFixed(2)}`,
-        gatewayCharges: "-₹0",
-        estPayout: `₹${paidAmount}`,
-        paymentMethod: paymentData?.payment_method || (paidAmount > 0 ? "Online" : "Cash"),
+        gatewayCharges: `-₹${gatewayCharges.toFixed(2)}`,
+        estPayout: `₹${estPayout.toFixed(2)}`,
+        paymentMethod:
+          paymentData?.payment_method || (Number(data.paid_amount) > 0 ? "Online" : "Cash"),
         transactionId: paymentData?.razorpay_payment_id || "N/A",
         transactionDate: paymentData?.created_at
           ? new Date(paymentData.created_at).toLocaleDateString("en-GB")
@@ -126,6 +150,7 @@ export const useDineDetails = (bookingId: string) => {
             })
           : formatTime(data.reservation_time),
         tableNumber: table?.table_number,
+        isTableBooking,
       };
 
       setBooking(formattedBooking);

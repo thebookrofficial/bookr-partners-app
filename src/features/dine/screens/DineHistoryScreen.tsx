@@ -2,7 +2,14 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, ActivityIndicator, SectionList, TouchableOpacity } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ActivityIndicator,
+  SectionList,
+  TouchableOpacity,
+  RefreshControl,
+} from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList, DineTabParamList } from "@/navigation/navigation.types";
@@ -41,7 +48,16 @@ export const DineHistoryScreen = () => {
     customRange,
     setCustomRange,
     historyGroups,
+    refresh,
   } = useDineHistory(serviceId);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refresh();
+    setIsRefreshing(false);
+  };
 
   const handleCardPress = (paymentId: string) => {
     navigation.navigate("DinePaymentDetails", {
@@ -104,6 +120,14 @@ export const DineHistoryScreen = () => {
             <DinePaymentCard {...item} onPress={() => handleCardPress(item.id)} />
           )}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
+            />
+          }
           ListEmptyComponent={
             <Text variant="body1" color={COLORS.text.secondary} style={styles.emptyText}>
               No history found.
@@ -142,14 +166,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   filterBtn: {
-    width: ms(48),
-    height: ms(48),
+    width: vs(38),
+    height: vs(38),
     backgroundColor: COLORS.surface.primary,
     borderRadius: ms(10),
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
+    marginBottom: vs(16), // Match TextInput's bottom margin
   },
   sectionHeader: {
     flexDirection: "row",
