@@ -11,6 +11,7 @@ import {
   MainStackParamList,
   SportsTabParamList,
   DineTabParamList,
+  StaycationTabParamList,
 } from "./navigation.types";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import {
@@ -42,6 +43,9 @@ import { DineCloseDateScreen } from "@/features/dine/screens/DineCloseDateScreen
 import { DineOffersScreen } from "@/features/dine/screens/DineOffersScreen";
 import { DineBookingDetailsScreen } from "@/features/dine/screens/DineBookingDetailsScreen";
 import { DinePaymentDetailsScreen } from "@/features/dine/screens/DinePaymentDetailsScreen";
+import { StaycationHomeScreen } from "@/features/staycation/screens/StaycationHomeScreen";
+import { StaycationHistoryScreen } from "@/features/staycation/screens/StaycationHistoryScreen";
+import { StaycationDashboardScreen } from "@/features/staycation/screens/StaycationDashboardScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
 import { Text } from "@/components/ui";
@@ -64,12 +68,15 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
 const SportsProfileScreen = () => <PlaceholderScreen title="Sports Profile" />;
 const DineProfileScreen = () => <PlaceholderScreen title="Dine Profile" />;
+const StaycationEssentialsScreen = () => <PlaceholderScreen title="Staycation Essentials" />;
+const StaycationProfileScreen = () => <PlaceholderScreen title="Staycation Profile" />;
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainStack = createNativeStackNavigator<MainStackParamList>();
 const SportsTab = createBottomTabNavigator<SportsTabParamList>();
 const DineTab = createBottomTabNavigator<DineTabParamList>();
+const StaycationTab = createBottomTabNavigator<StaycationTabParamList>();
 
 const TabIcon =
   (IconComponent: any) =>
@@ -188,6 +195,62 @@ const DineTabNavigator = () => {
   );
 };
 
+const StaycationTabNavigator = () => {
+  return (
+    <StaycationTab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.text.muted,
+        tabBarStyle: {
+          position: "absolute",
+          backgroundColor: COLORS.surface.primary,
+          borderTopWidth: 1,
+          borderTopColor: COLORS.border.navBar,
+          borderTopLeftRadius: ms(20),
+          borderTopRightRadius: ms(20),
+          height: vs(80),
+          paddingTop: vs(4),
+          paddingBottom: vs(25),
+          paddingHorizontal: hs(10),
+          gap: vs(10),
+        },
+        tabBarLabelStyle: {
+          fontFamily: "Gilroy-Bold",
+          fontSize: fs(12),
+          lineHeight: fs(12),
+          marginTop: vs(2),
+        },
+      }}>
+      <StaycationTab.Screen
+        name="StaycationHome"
+        component={StaycationHomeScreen}
+        options={{ title: "Home", tabBarIcon: TabIcon(Calendar) }}
+      />
+      <StaycationTab.Screen
+        name="StaycationHistory"
+        component={StaycationHistoryScreen}
+        options={{ title: "History", tabBarIcon: TabIcon(HistoryIcon) }}
+      />
+      <StaycationTab.Screen
+        name="StaycationDashboard"
+        component={StaycationDashboardScreen}
+        options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
+      />
+      <StaycationTab.Screen
+        name="StaycationEssentials"
+        component={StaycationEssentialsScreen}
+        options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
+      />
+      <StaycationTab.Screen
+        name="StaycationProfile"
+        component={StaycationProfileScreen}
+        options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
+      />
+    </StaycationTab.Navigator>
+  );
+};
+
 const AuthNavigator = () => (
   <AuthStack.Navigator screenOptions={{ headerShown: false }}>
     <AuthStack.Screen name="Login" component={LoginScreen} />
@@ -204,6 +267,7 @@ const MainNavigator = () => (
     <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
     <MainStack.Screen name="SportsServiceTabs" component={SportsTabNavigator} />
     <MainStack.Screen name="DineServiceTabs" component={DineTabNavigator} />
+    <MainStack.Screen name="StaycationServiceTabs" component={StaycationTabNavigator} />
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
     <MainStack.Screen name="DineBookingDetails" component={DineBookingDetailsScreen} />
     <MainStack.Screen name="DinePaymentDetails" component={DinePaymentDetailsScreen} />

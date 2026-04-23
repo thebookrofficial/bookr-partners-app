@@ -33,6 +33,15 @@ export type DineTabParamList = {
   DineOffers: { serviceId: string };
 };
 
+// 2.2 Define the Bottom Tab screens for Staycation
+export type StaycationTabParamList = {
+  StaycationHome: { serviceId: string };
+  StaycationHistory: { serviceId: string };
+  StaycationDashboard: { serviceId: string };
+  StaycationEssentials: { serviceId: string };
+  StaycationProfile: { serviceId: string };
+};
+
 // 3. Define the screens in the Main Business flow
 export type MainStackParamList = {
   Dashboard: undefined;
@@ -44,6 +53,7 @@ export type MainStackParamList = {
 
   SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;
   DineServiceTabs: NavigatorScreenParams<DineTabParamList>;
+  StaycationServiceTabs: NavigatorScreenParams<StaycationTabParamList>;
   BookingDetails: { bookingId: string };
   DineBookingDetails: { bookingId: string; isFromPayment?: boolean };
   DinePaymentDetails: { bookingId: string };
