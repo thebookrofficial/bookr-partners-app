@@ -468,7 +468,7 @@ export const DineOfflineBookingSheet = ({
                 activeOpacity={0.7}
                 onPress={() => {
                   onClose();
-                  navigation.navigate("GuestHistory", { guestId: mobile });
+                  navigation.navigate("GuestHistory", { guestId: mobile, bookingId: "" });
                 }}>
                 <View style={styles.historyLeft}>
                   <FileText size={ms(20)} color={COLORS.text.primary} />

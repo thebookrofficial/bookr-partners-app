@@ -57,6 +57,22 @@ jest.mock("react-native-worklets", () => ({
   },
 }));
 
+// Mock Vision Camera
+jest.mock("react-native-vision-camera", () => ({
+  Camera: "Camera",
+  useCameraDevice: jest.fn(() => ({})),
+  useObjectOutput: jest.fn(() => ({})),
+  useCameraPermission: jest.fn(() => ({
+    hasPermission: true,
+    requestPermission: jest.fn(() => Promise.resolve(true)),
+  })),
+}));
+
+// Mock Nitro Modules
+jest.mock("react-native-nitro-modules", () => ({
+  NitroModules: {},
+}));
+
 // Mock Reanimated
 jest.mock("react-native-reanimated", () => {
   return {
