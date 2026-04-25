@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -10,93 +10,338 @@ import {
   TouchableOpacity,
   Alert,
   Linking,
-  SafeAreaView,
+  Modal,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { EventHeader } from "../components/EventHeader";
-import { Calendar, ChevronRight, Phone, X, Camera as CameraIcon } from "lucide-react-native";
-import { useIsFocused, useNavigation } from "@react-navigation/native";
+import {
+  Calendar,
+  ChevronRight,
+  Phone,
+  X,
+  Camera as CameraIcon,
+  Ticket,
+  Clock,
+  User,
+} from "lucide-react-native";
+import { useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
+import { Attendee, useAdminEventStore } from "../store/useAdminEventStore";
 
 import {
   Camera,
   useCameraDevice,
-  // useObjectOutput, // Temporarily disabled to prevent native crash
   useCameraPermission,
-  // type ScannedCode,
+  // useObjectOutput is currently disabled for Android in this Nitro build due to native crash
+  useObjectOutput,
 } from "react-native-vision-camera";
+import { Platform } from "react-native";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
-// Mock Data
-const MOCK_SCANS = [
-  { id: "1", name: "Chirag Patil", phone: "+91 89346 93456", time: "8:32 Pm", type: "VIP x 3" },
-  { id: "2", name: "Yash Jadhav", phone: "+91 34345 96856", time: "8:32 Pm", type: "Regular x 2" },
-  { id: "3", name: "Yash Patil", phone: "+91 89346 93456", time: "8:31 Pm", type: "Regular x 2" },
-  { id: "4", name: "Tejas Sutar", phone: "+91 89346 93456", time: "8:30 Pm", type: "Premium x 6" },
-  { id: "5", name: "Tejas Sutar", phone: "+91 89346 93456", time: "8:30 Pm", type: "Premium x 6" },
-  { id: "6", name: "Tejas Sutar", phone: "+91 89346 93456", time: "8:30 Pm", type: "Premium x 6" },
-];
-
-const TABS = [
-  { label: "All", count: 80 },
-  { label: "Regular", count: 65 },
-  { label: "Premium", count: 10 },
-  { label: "VIP", count: 4 },
-  { label: "Guest", count: 1 },
-];
-
 /**
- * Full Screen Camera Component
- * Simplified to ONLY show the camera feed to debug the white screen
+ * iOS Specific Camera with Scanning
  */
-const FullScreenCamera = ({ onClose }: { onClose: () => void }) => {
-  const isFocused = useIsFocused();
+const FullScreenCameraIOS = ({
+  onClose,
+  onCodeScanned,
+  isActive,
+}: {
+  onClose: () => void;
+  onCodeScanned: (value: string) => void;
+  isActive: boolean;
+}) => {
   const device = useCameraDevice("back");
+  const isScanning = useRef(true);
 
-  if (!device) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text color="#FFF">Hardware: Loading Camera Device...</Text>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <X size={ms(24)} color="#FFF" />
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // useObjectOutput is safe here as this component only renders on iOS
+  const objectOutput = useObjectOutput({
+    // @ts-ignore
+    types: ["qr"],
+    onObjectsScanned: (objects: any[]) => {
+      if (objects.length > 0 && objects[0].value && isScanning.current) {
+        isScanning.current = false;
+        onCodeScanned(objects[0].value);
+        setTimeout(() => {
+          isScanning.current = true;
+        }, 2000);
+      }
+    },
+  });
+
+  if (!device) return <View style={styles.loadingContainer} />;
 
   return (
     <View style={styles.cameraRoot}>
       <Camera
         style={StyleSheet.absoluteFill}
         device={device}
-        isActive={isFocused}
+        isActive={isActive}
+        outputs={[objectOutput]}
         onError={error => {
           Alert.alert("Camera Error", error.message);
+          onClose();
         }}
       />
-      <SafeAreaView style={styles.cameraOverlay}>
+      <View style={styles.cameraOverlay} pointerEvents="box-none">
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
           <X size={ms(24)} color="#FFF" />
         </TouchableOpacity>
         <View style={styles.scanFrame} />
         <Text weight="semiBold" style={styles.cameraHint}>
-          Camera Feed Active (Scanner Disabled for Debug)
+          Align QR code within the frame
         </Text>
-      </SafeAreaView>
+      </View>
     </View>
   );
 };
 
+/**
+ * Android Specific Camera (Nitro version restricted)
+ */
+const FullScreenCameraAndroid = ({
+  onClose,
+  onCodeScanned,
+  isActive,
+}: {
+  onClose: () => void;
+  onCodeScanned: (value: string) => void;
+  isActive: boolean;
+}) => {
+  const device = useCameraDevice("back");
+
+  if (!device) return <View style={styles.loadingContainer} />;
+
+  return (
+    <View style={styles.cameraRoot}>
+      <Camera
+        style={StyleSheet.absoluteFill}
+        device={device}
+        isActive={isActive}
+        onError={error => {
+          Alert.alert("Camera Error", error.message);
+          onClose();
+        }}
+      />
+      <View style={styles.cameraOverlay} pointerEvents="box-none">
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <X size={ms(24)} color="#FFF" />
+        </TouchableOpacity>
+        <View style={styles.scanFrame} />
+        <Text weight="semiBold" style={styles.cameraHint}>
+          Scanner restricted on Android Nitro version
+        </Text>
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.simulateButton}
+            onPress={() => onCodeScanned("TEST_ID_1")}>
+            <Text color="#FFF" weight="bold">
+              Simulate Scan
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+};
+
+/**
+ * Main Camera Entry Point
+ */
+const FullScreenCamera = (props: any) => {
+  if (Platform.OS === "ios") {
+    return <FullScreenCameraIOS {...props} />;
+  }
+  return <FullScreenCameraAndroid {...props} />;
+};
+
+interface ScanResultModalProps {
+  modalMode: "confirmation" | "warning" | null;
+  activeAttendee: Attendee | null;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+const ScanResultModal = ({
+  modalMode,
+  activeAttendee,
+  onClose,
+  onConfirm,
+}: ScanResultModalProps) => (
+  <Modal visible={modalMode !== null} transparent animationType="slide" statusBarTranslucent={true}>
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalContent}>
+        <View style={styles.modalHeader}>
+          <Text
+            weight="bold"
+            style={[styles.modalTitle, modalMode === "warning" && styles.warningTitle]}>
+            {modalMode === "confirmation" ? "ENTRY CONFIRMATION" : "ALREADY SCANNED"}
+          </Text>
+        </View>
+
+        <View style={styles.modalBody}>
+          {/* Pass Type */}
+          <View style={styles.modalRow}>
+            <View style={styles.rowLabelContainer}>
+              <Ticket size={ms(18)} color={COLORS.text.primary} />
+              <Text weight="bold" style={styles.rowLabel}>
+                Pass Type
+              </Text>
+            </View>
+            <View style={styles.rowValueContainer}>
+              <Text weight="bold" style={styles.passTypeText}>
+                {activeAttendee?.ticketType}
+              </Text>
+            </View>
+          </View>
+
+          {/* Date and Time */}
+          <View style={styles.dualRow}>
+            <View style={styles.flex1}>
+              <View style={styles.modalRow}>
+                <View style={styles.rowLabelContainer}>
+                  <Calendar size={ms(18)} color={COLORS.text.primary} />
+                  <Text weight="medium" style={styles.rowLabel}>
+                    Date
+                  </Text>
+                </View>
+                <View style={styles.rowValueContainer}>
+                  <Text weight="semiBold" style={styles.rowValueText}>
+                    20/04/26
+                  </Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.dualRowRight}>
+              <View style={styles.modalRow}>
+                <View style={styles.rowLabelContainer}>
+                  <Clock size={ms(18)} color={COLORS.text.primary} />
+                  <Text weight="medium" style={styles.rowLabel}>
+                    Time / Slot Time
+                  </Text>
+                </View>
+                <View style={styles.rowValueContainer}>
+                  <Text weight="semiBold" style={styles.rowValueText}>
+                    {activeAttendee?.time}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Name */}
+          <View style={styles.modalRow}>
+            <View style={styles.rowLabelContainer}>
+              <User size={ms(18)} color={COLORS.text.primary} />
+              <Text weight="medium" style={styles.rowLabel}>
+                Name
+              </Text>
+            </View>
+            <View style={styles.rowValueContainer}>
+              <Text weight="semiBold" style={styles.rowValueText}>
+                {activeAttendee?.name}
+              </Text>
+            </View>
+          </View>
+
+          {/* Mobile No */}
+          <View style={styles.modalRow}>
+            <View style={styles.rowLabelContainer}>
+              <Phone size={ms(18)} color={COLORS.text.primary} />
+              <Text weight="medium" style={styles.rowLabel}>
+                Mobile No
+              </Text>
+            </View>
+            <View style={styles.rowValueContainer}>
+              <Text weight="semiBold" style={styles.rowValueText}>
+                {activeAttendee?.phone}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.modalFooter}>
+          {modalMode === "confirmation" ? (
+            <>
+              <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                <Text weight="bold" style={styles.cancelButtonText}>
+                  CANCEL
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmButton} onPress={onConfirm}>
+                <Text weight="bold" style={styles.confirmButtonText}>
+                  CONFIRM ENTRY
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity style={styles.closeBtnLarge} onPress={onClose}>
+              <Text weight="bold" style={styles.confirmButtonText}>
+                CLOSE
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </View>
+  </Modal>
+);
+
 export const EventScanScreen = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const isFocused = useIsFocused();
+
+  // Safely resolve serviceId from params or parent navigator
+  let serviceId = route.params?.serviceId;
+  if (!serviceId) {
+    const parentState = navigation.getParent()?.getState();
+    const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
+    const tabParams = tabRoute?.params as any;
+    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+  }
+
+  const { ticketCategories, attendees, fetchTicketCategories, fetchTodayAttendees } =
+    useAdminEventStore();
+
   const [selectedTab, setSelectedTab] = useState("All");
   const [isScanningMode, setIsScanningMode] = useState(false);
+  const [alreadyScannedCodes, setAlreadyScannedCodes] = useState<string[]>([]);
+  const [modalMode, setModalMode] = useState<"confirmation" | "warning" | null>(null);
+  const [activeAttendee, setActiveAttendee] = useState<Attendee | null>(null);
 
   const { hasPermission, requestPermission } = useCameraPermission();
+
+  useEffect(() => {
+    if (serviceId) {
+      fetchTicketCategories(serviceId);
+      fetchTodayAttendees(serviceId);
+    }
+  }, [serviceId, fetchTicketCategories, fetchTodayAttendees]);
+
+  // Compute dynamic tabs based on current attendees and categories
+  const TABS = [
+    { label: "All", count: attendees.length },
+    {
+      label: "Guest",
+      count: attendees.filter(a => a.categoryName.toLowerCase() === "guest").length,
+    },
+    ...ticketCategories.map(cat => ({
+      label: cat,
+      count: attendees.filter(a => a.categoryName === cat).length,
+    })),
+  ];
+
+  const filteredScans =
+    selectedTab === "All"
+      ? attendees
+      : attendees.filter(
+          a =>
+            a.categoryName === selectedTab ||
+            (selectedTab === "Guest" && a.categoryName.toLowerCase() === "guest"),
+        );
 
   const handleOpenScanner = useCallback(async () => {
     if (!hasPermission) {
@@ -111,6 +356,55 @@ export const EventScanScreen = () => {
     }
     setIsScanningMode(true);
   }, [hasPermission, requestPermission]);
+
+  const handleCodeScanned = useCallback(
+    (code: string) => {
+      // Find attendee by ID
+      let attendee = attendees.find(a => a.id === code);
+
+      // Add mock handling for testing Simulation on Android
+      if (!attendee && code === "TEST_ID_1") {
+        attendee = {
+          id: "TEST_ID_1",
+          name: "Yash Jadhav",
+          phone: "+91 78349 89934",
+          time: "8 PM",
+          ticketType: "Regular x 2",
+          categoryName: "Regular",
+        };
+      }
+
+      if (!attendee) {
+        Alert.alert("Invalid Ticket", "This QR code does not match any booking.");
+        return;
+      }
+
+      setActiveAttendee(attendee);
+
+      if (alreadyScannedCodes.includes(code)) {
+        setModalMode("warning");
+      } else {
+        setModalMode("confirmation");
+      }
+    },
+    [attendees, alreadyScannedCodes],
+  );
+
+  const handleConfirmEntry = () => {
+    if (activeAttendee) {
+      setAlreadyScannedCodes(prev => [...prev, activeAttendee.id]);
+      // Close modal first
+      setModalMode(null);
+      setActiveAttendee(null);
+      // Then exit scanning mode
+      setIsScanningMode(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setModalMode(null);
+    setActiveAttendee(null);
+  };
 
   // Handle Tab Press: 2nd click opens camera
   useEffect(() => {
@@ -143,7 +437,7 @@ export const EventScanScreen = () => {
     );
   };
 
-  const renderScanItem = ({ item }: { item: (typeof MOCK_SCANS)[0] }) => (
+  const renderScanItem = ({ item }: { item: any }) => (
     <View style={styles.scanItem}>
       <View style={styles.avatarContainer}>
         <Image source={USER_PROFILE} style={styles.avatar} />
@@ -164,7 +458,7 @@ export const EventScanScreen = () => {
               {item.time}
             </Text>
             <Text weight="semiBold" style={styles.scanType}>
-              {item.type}
+              {item.ticketType}
             </Text>
           </View>
         </View>
@@ -172,11 +466,7 @@ export const EventScanScreen = () => {
     </View>
   );
 
-  if (isScanningMode) {
-    return <FullScreenCamera onClose={() => setIsScanningMode(false)} />;
-  }
-
-  return (
+  const mainContent = (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <EventHeader title="Neon Shadow World Tour 2026" subtitle="Scan" imageSource={USER_PROFILE} />
 
@@ -199,7 +489,6 @@ export const EventScanScreen = () => {
         <Text weight="bold" style={styles.historyTitle}>
           HISTORY
         </Text>
-        {/* Debug Button in case Tab Click is finicky */}
         <TouchableOpacity onPress={handleOpenScanner} style={styles.debugBtn}>
           <CameraIcon size={16} color={COLORS.primary} />
           <Text color={COLORS.primary} variant="caption">
@@ -220,13 +509,35 @@ export const EventScanScreen = () => {
       </View>
 
       <FlatList
-        data={MOCK_SCANS}
+        data={filteredScans}
         renderItem={renderScanItem}
         keyExtractor={item => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContainer}
       />
     </ScreenContainer>
+  );
+
+  return (
+    <View style={styles.flex1}>
+      {isScanningMode ? (
+        <FullScreenCamera
+          onClose={() => setIsScanningMode(false)}
+          onCodeScanned={handleCodeScanned}
+          isActive={isFocused}
+        />
+      ) : (
+        mainContent
+      )}
+
+      {/* Shared Modal to prevent duplicate instances or stale state */}
+      <ScanResultModal
+        modalMode={modalMode}
+        activeAttendee={activeAttendee}
+        onClose={handleCloseModal}
+        onConfirm={handleConfirmEntry}
+      />
+    </View>
   );
 };
 
@@ -360,12 +671,10 @@ const styles = StyleSheet.create({
   cameraRoot: {
     flex: 1,
     backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#111",
+    backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -400,5 +709,129 @@ const styles = StyleSheet.create({
     paddingVertical: vs(8),
     borderRadius: ms(8),
     overflow: "hidden",
+    textAlign: "center",
+  },
+  simulateButton: {
+    marginTop: vs(20),
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: hs(20),
+    paddingVertical: vs(12),
+    borderRadius: ms(10),
+  },
+  flex1: {
+    flex: 1,
+  },
+  blackBg: {
+    backgroundColor: "#000",
+  },
+  dualRowRight: {
+    flex: 1,
+    marginLeft: hs(10),
+  },
+  warningTitle: {
+    color: COLORS.danger,
+  },
+  closeBtnLarge: {
+    flex: 1,
+    height: vs(45),
+    backgroundColor: "#000",
+    borderRadius: ms(10),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: hs(20),
+  },
+  modalContent: {
+    width: "100%",
+    backgroundColor: COLORS.background,
+    borderRadius: ms(20),
+    paddingVertical: vs(20),
+    paddingHorizontal: hs(12),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalHeader: {
+    marginBottom: vs(10),
+    paddingHorizontal: hs(6),
+  },
+  modalTitle: {
+    fontSize: fs(16),
+    color: COLORS.text.primary,
+    textTransform: "uppercase",
+  },
+  modalBody: {
+    gap: vs(10),
+    padding: ms(6),
+  },
+  modalRow: {
+    gap: vs(4),
+  },
+  dualRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  rowLabelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+  },
+  rowLabel: {
+    fontSize: fs(14),
+    color: COLORS.text.primary,
+  },
+  rowValueContainer: {
+    backgroundColor: COLORS.surface.primary,
+    borderRadius: ms(10),
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(12),
+  },
+  passTypeText: {
+    fontSize: fs(14),
+    color: COLORS.primary,
+  },
+  rowValueText: {
+    fontSize: fs(14),
+    color: COLORS.text.primary,
+  },
+  modalFooter: {
+    flexDirection: "row",
+    gap: hs(10),
+    marginTop: vs(20),
+  },
+  cancelButton: {
+    flex: 1,
+    height: vs(45),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    borderRadius: ms(10),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    fontSize: fs(20),
+    color: COLORS.text.primary,
+    fontFamily: "Bison-Bold",
+  },
+  confirmButton: {
+    flex: 1,
+    height: vs(45),
+    backgroundColor: "#000",
+    borderRadius: ms(10),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  confirmButtonText: {
+    fontSize: fs(20),
+    color: COLORS.text.inverse,
+    fontFamily: "Bison-Bold",
   },
 });
