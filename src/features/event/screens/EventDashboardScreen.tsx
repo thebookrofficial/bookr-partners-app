@@ -1,41 +1,81 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
-import { View, StyleSheet, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
 import { COLORS } from "@/constants/theme";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { EventHeader } from "../components/EventHeader";
+import { useEventDashboard, DayData } from "../hooks/useEventDashboard";
+import { useNavigation, useRoute } from "@react-navigation/native";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
-const TABS = ["Overall", "Day 1", "Day 2", "Day 3"];
-
-// Mock Data
-const DASHBOARD_DATA = {
-  Overall: {
-    entries: { total: 337, regular: 225, premium: 92, vip: 20 },
-    revenue: { total: "+₹254,163", regular: "+₹112,275", premium: "+₹91,908", vip: "+₹49,980" },
-  },
-  "Day 1": {
-    entries: { total: 104, regular: 70, premium: 28, vip: 6 },
-    revenue: { total: "+₹77,896", regular: "+₹34,930", premium: "+₹27,972", vip: "+₹14,994" },
-  },
-  "Day 2": {
-    entries: { total: 120, regular: 80, premium: 30, vip: 10 },
-    revenue: { total: "+₹85,000", regular: "+₹40,000", premium: "+₹30,000", vip: "+₹15,000" },
-  },
-  "Day 3": {
-    entries: { total: 113, regular: 75, premium: 34, vip: 4 },
-    revenue: { total: "+₹91,267", regular: "+₹37,345", premium: "+₹33,936", vip: "+₹19,986" },
-  },
-};
-
 export const EventDashboardScreen = () => {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+
+  // Safely resolve serviceId from params or parent navigator
+  let serviceId = route.params?.serviceId;
+  if (!serviceId) {
+    const parentState = navigation.getParent()?.getState();
+    const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
+    const tabParams = tabRoute?.params as any;
+    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+  }
+
+  const { loading, refreshing, eventTitle, dashboardData, error, refresh } =
+    useEventDashboard(serviceId);
+
   const [activeTab, setActiveTab] = useState("Overall");
-  const data = DASHBOARD_DATA[activeTab as keyof typeof DASHBOARD_DATA];
+
+  // Dynamically set tabs based on available dashboard data
+  const TABS = dashboardData ? Object.keys(dashboardData) : ["Overall"];
+
+  // Ensure active tab resets if it somehow becomes invalid
+  useEffect(() => {
+    if (dashboardData && !dashboardData[activeTab]) {
+      setActiveTab("Overall");
+    }
+  }, [dashboardData, activeTab]);
+
+  const data: DayData | null = dashboardData ? dashboardData[activeTab] : null;
+
+  if (loading) {
+    return (
+      <View style={styles.loadingWrapper}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  if (error || !dashboardData || !data) {
+    return (
+      <View style={styles.root}>
+        <ScreenContainer
+          scrollable
+          backgroundColor={COLORS.background}
+          paddingHorizontal={hs(12)}
+          refreshing={refreshing}
+          onRefresh={refresh}>
+          <EventHeader title="Dashboard" subtitle="No Event Found" imageSource={USER_PROFILE} />
+          <View style={styles.emptyContainer}>
+            <Text variant="body1" color={COLORS.text.muted}>
+              {error ? `Error: ${error}` : "No active events found for this venue."}
+            </Text>
+            <Text variant="caption" color={COLORS.text.muted} style={styles.debugText}>
+              Searching Venue ID: {serviceId || "Missing"}
+            </Text>
+            <TouchableOpacity onPress={() => refresh()} style={styles.retryBtn}>
+              <Text weight="bold">TAP TO RETRY</Text>
+            </TouchableOpacity>
+          </View>
+        </ScreenContainer>
+      </View>
+    );
+  }
 
   const renderSectionHeader = (title: string) => (
     <Text weight="bold" style={styles.sectionHeader}>
@@ -82,159 +122,215 @@ export const EventDashboardScreen = () => {
     );
   };
 
-  const renderOverallGraphs = () => (
-    <>
-      <View style={styles.graphContainer}>
-        {renderSectionHeader("Booking graph")}
-        <View style={styles.barGraphWrapper}>
-          <View style={styles.yAxis}>
-            {["140", "120", "100", "80", "60", "40", "20", "0"].map(val => (
-              <Text key={val} style={styles.yAxisText}>
-                {val}
-              </Text>
+  const renderOverallGraphs = () => {
+    // Calculate max entries across all days to scale bars
+    const daysDataList = Object.values(dashboardData).filter(d => d.date !== "Overall");
+    const maxEntries = Math.max(...daysDataList.map(d => d.totalEntries), 140);
+
+    return (
+      <>
+        <View style={styles.graphContainer}>
+          {renderSectionHeader("Booking graph")}
+          <View style={styles.barGraphWrapper}>
+            <View style={styles.yAxis}>
+              {["140", "120", "100", "80", "60", "40", "20", "0"].map(val => (
+                <Text key={val} style={styles.yAxisText}>
+                  {val}
+                </Text>
+              ))}
+            </View>
+            <View style={styles.barsArea}>
+              {daysDataList.map((dayItem, index) => {
+                const barHeight =
+                  dayItem.totalEntries > 0
+                    ? vs(Math.max((dayItem.totalEntries / maxEntries) * 150, 4))
+                    : 0;
+
+                return (
+                  <View key={index} style={styles.barGroup}>
+                    <Text style={styles.barTopLabel}>{dayItem.totalEntries}</Text>
+                    <View style={[styles.bar, styles.barBlue, { height: barHeight }]} />
+                    <Text style={styles.xAxisDate}>{dayItem.date}</Text>
+                    <Text style={styles.xAxisDay}>{dayItem.dayName}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.graphContainer}>
+          {renderSectionHeader("pass Categories graph")}
+          <View style={styles.legendRow}>
+            {dashboardData.Overall.categories.map((cat, idx) => (
+              <View key={idx} style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: cat.color }]} />
+                <Text weight="bold" style={styles.legendText}>
+                  {cat.label}
+                </Text>
+              </View>
             ))}
           </View>
-          <View style={styles.barsArea}>
-            <View style={styles.barGroup}>
-              <Text style={styles.barTopLabel}>104</Text>
-              <View style={[styles.bar, styles.barRed, { height: vs(147) }]} />
-              <Text style={styles.xAxisDate}>20 Apr</Text>
-              <Text style={styles.xAxisDay}>Mon</Text>
+
+          <View style={styles.barGraphWrapper}>
+            <View style={styles.yAxis}>
+              {["105", "90", "75", "60", "45", "30", "15", "0"].map(val => (
+                <Text key={val} style={styles.yAxisText}>
+                  {val}
+                </Text>
+              ))}
             </View>
-            <View style={styles.barGroup}>
-              <View style={[styles.bar, styles.barBlue, { height: vs(189) }]} />
-              <Text style={styles.xAxisDate}>21 Apr</Text>
-              <Text style={styles.xAxisDay}>Tue</Text>
-            </View>
-            <View style={styles.barGroup}>
-              <View style={[styles.bar, styles.barBlue, { height: vs(140) }]} />
-              <Text style={styles.xAxisDate}>22 Apr</Text>
-              <Text style={styles.xAxisDay}>Wed</Text>
+            <View style={styles.barsArea}>
+              <View style={styles.dotOverlayContainer}>
+                {daysDataList.map((dayItem, index) => (
+                  <View key={index} style={styles.overlayCol}>
+                    {dayItem.categories.map((cat, catIdx) => {
+                      // Pseudo-scale height based on max entries (max chart height is vs(150))
+                      const dotBottom =
+                        dayItem.totalEntries > 0
+                          ? vs(Math.max((cat.entries / 140) * 150, 10))
+                          : vs(10);
+
+                      return (
+                        <View
+                          key={catIdx}
+                          style={[
+                            styles.lineDot,
+                            { backgroundColor: cat.color, bottom: dotBottom },
+                          ]}
+                        />
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
+              <View style={styles.xAxisRow}>
+                {daysDataList.map((dayItem, index) => (
+                  <View key={index} style={styles.barGroup}>
+                    <Text style={styles.xAxisDate}>{dayItem.date}</Text>
+                    <Text style={styles.xAxisDay}>{dayItem.dayName}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
         </View>
-      </View>
+      </>
+    );
+  };
 
+  const renderDayGraphs = () => {
+    // Generate horizontal bars dynamically based on today's revenue breakdown
+    const hBars = [
+      { label: "Overall Today", value: `+₹${data.totalRevenue}`, width: hs(294) },
+      ...data.categories.map(c => ({
+        label: c.label,
+        value: `+₹${c.revenue}`,
+        width: hs(Math.max((c.revenue / data.totalRevenue) * 294, 50)), // Scale based on total
+      })),
+    ];
+
+    return (
       <View style={styles.graphContainer}>
-        {renderSectionHeader("pass Categories graph")}
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, styles.dotBlue]} />
-            <Text weight="bold" style={styles.legendText}>
-              Regular
-            </Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, styles.dotYellow]} />
-            <Text weight="bold" style={styles.legendText}>
-              Premium
-            </Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, styles.dotRed]} />
-            <Text weight="bold" style={styles.legendText}>
-              VIP
-            </Text>
-          </View>
-        </View>
-        <View style={styles.barGraphWrapper}>
-          <View style={styles.yAxis}>
-            {["105", "90", "75", "60", "40", "30", "15", "0"].map(val => (
-              <Text key={val} style={styles.yAxisText}>
-                {val}
-              </Text>
-            ))}
-          </View>
-          <View style={styles.barsArea}>
-            <View style={styles.linePlaceholderArea}>
-              <View style={[styles.lineDot, styles.dotBlue, { left: hs(50), top: vs(120) }]} />
-              <View style={[styles.lineDot, styles.dotBlue, { left: hs(130), top: vs(80) }]} />
-              <View style={[styles.lineDot, styles.dotBlue, { left: hs(210), top: vs(140) }]} />
-              <Text style={styles.lineValueLabel}>+38</Text>
-            </View>
-            <View style={styles.xAxisRow}>
-              <View style={styles.barGroup}>
-                <Text style={styles.xAxisDate}>20 Apr</Text>
-                <Text style={styles.xAxisDay}>Mon</Text>
+        {renderSectionHeader("Revenue graph")}
+        <View style={styles.horizontalGraphArea}>
+          {hBars.map((item, index) => (
+            <View key={index} style={styles.hBarRow}>
+              <View style={styles.hBarLabelBox}>
+                <Text weight="semiBold" style={styles.hBarLabel}>
+                  {item.label}
+                </Text>
               </View>
-              <View style={styles.barGroup}>
-                <Text style={styles.xAxisDate}>21 Apr</Text>
-                <Text style={styles.xAxisDay}>Tue</Text>
-              </View>
-              <View style={styles.barGroup}>
-                <Text style={styles.xAxisDate}>22 Apr</Text>
-                <Text style={styles.xAxisDay}>Wed</Text>
+              <View style={[styles.hBar, { width: item.width }]}>
+                <Text weight="semiBold" style={styles.hBarValue}>
+                  {item.value}
+                </Text>
               </View>
             </View>
-          </View>
+          ))}
         </View>
       </View>
-    </>
-  );
-
-  const renderDayGraphs = () => (
-    <View style={styles.graphContainer}>
-      {renderSectionHeader("Revenue graph")}
-      <View style={styles.horizontalGraphArea}>
-        {[
-          { label: "Overall Today", value: data.revenue.total, width: hs(294) },
-          { label: "Regular Pass", value: data.revenue.regular, width: hs(154) },
-          { label: "Premium Pass", value: data.revenue.premium, width: hs(135) },
-          { label: "VIP", value: data.revenue.vip, width: hs(89) },
-        ].map((item, index) => (
-          <View key={index} style={styles.hBarRow}>
-            <View style={styles.hBarLabelBox}>
-              <Text weight="semiBold" style={styles.hBarLabel}>
-                {item.label}
-              </Text>
-            </View>
-            <View style={[styles.hBar, { width: item.width }]}>
-              <Text weight="semiBold" style={styles.hBarValue}>
-                {item.value}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
-    <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-      <EventHeader
-        title="Neon Shadow World Tour 2026"
-        subtitle="Dashboard"
-        imageSource={USER_PROFILE}
-      />
+    <View style={styles.root}>
+      <ScreenContainer
+        scrollable
+        backgroundColor={COLORS.background}
+        paddingHorizontal={hs(12)}
+        refreshing={refreshing}
+        onRefresh={refresh}>
+        <EventHeader
+          title={eventTitle || "Neon Shadow World Tour 2026"}
+          subtitle="Dashboard"
+          imageSource={USER_PROFILE}
+        />
 
-      <PillTabs
-        tabs={TABS}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        variant="dark"
-        style={styles.tabs}
-      />
+        <PillTabs
+          tabs={TABS}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          variant="dark"
+          style={styles.tabs}
+        />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {renderDetailCard("Entries Details", data.entries.total, "Total Entries", [
-          { label: "Regular Pass", value: data.entries.regular },
-          { label: "Premium Pass", value: data.entries.premium },
-          { label: "VIP", value: data.entries.vip },
-        ])}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}>
+          {renderDetailCard(
+            "Entries Details",
+            data.totalEntries,
+            "Total Entries",
+            data.categories.map(c => ({ label: c.label, value: c.entries })),
+          )}
 
-        {renderDetailCard("Revenue Details", data.revenue.total, "Total Revenue", [
-          { label: "Regular Pass", value: data.revenue.regular, color: "#00B562" },
-          { label: "Premium Pass", value: data.revenue.premium, color: "#00B562" },
-          { label: "VIP", value: data.revenue.vip, color: "#00B562" },
-        ])}
+          {renderDetailCard(
+            "Revenue Details",
+            `+₹${data.totalRevenue}`,
+            "Total Revenue",
+            data.categories.map(c => ({
+              label: c.label,
+              value: `+₹${c.revenue}`,
+              color: "#00B562",
+            })),
+          )}
 
-        {activeTab === "Overall" ? renderOverallGraphs() : renderDayGraphs()}
-      </ScrollView>
-    </ScreenContainer>
+          {activeTab === "Overall" ? renderOverallGraphs() : renderDayGraphs()}
+        </ScrollView>
+      </ScreenContainer>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  loadingWrapper: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: vs(100),
+    gap: vs(10),
+  },
+  debugText: {
+    fontSize: fs(10),
+    opacity: 0.5,
+  },
+  retryBtn: {
+    marginTop: vs(20),
+    padding: ms(10),
+    backgroundColor: COLORS.surface.primary,
+    borderRadius: ms(8),
+  },
   tabs: {
     marginVertical: vs(15),
   },
@@ -408,6 +504,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     width: "100%",
+  },
+  dotOverlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingRight: hs(20),
+    bottom: vs(40), // Offset for x-axis labels
+  },
+  overlayCol: {
+    width: hs(50),
+    alignItems: "center",
+    height: "100%",
   },
   horizontalGraphArea: {
     gap: vs(10),
