@@ -40,6 +40,8 @@ export type StaycationTabParamList = {
   StaycationDashboard: { serviceId: string };
   StaycationEssentials: { serviceId: string };
   StaycationProfile: { serviceId: string };
+  StaycationCloseDate: { serviceId: string };
+  StaycationOffers: { serviceId: string };
 };
 
 // 2.3 Define the Bottom Tab screens for Events
@@ -67,6 +69,9 @@ export type MainStackParamList = {
   StaycationServiceTabs: NavigatorScreenParams<StaycationTabParamList>;
   EventServiceTabs: NavigatorScreenParams<EventTabParamList>;
   BookingDetails: { bookingId: string };
+  StaycationBookingDetails: { booking: any };
+  StaycationCloseDate: { serviceId: string };
+  StaycationOffers: { serviceId: string };
   DineBookingDetails: { bookingId: string; isFromPayment?: boolean };
   DinePaymentDetails: { bookingId: string };
   DineCloseDate: { serviceId: string };

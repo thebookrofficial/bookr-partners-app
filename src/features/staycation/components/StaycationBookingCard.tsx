@@ -8,12 +8,14 @@ import { Phone, Calendar } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { StaycationBooking } from "../types/staycation.types";
+import { useNavigation } from "@react-navigation/native";
 
 interface StaycationBookingCardProps extends StaycationBooking {
   onPress?: () => void;
 }
 
 export const StaycationBookingCard = ({
+  id,
   name,
   phone,
   avatarUrl,
@@ -24,6 +26,8 @@ export const StaycationBookingCard = ({
   guestCount,
   onPress,
 }: StaycationBookingCardProps) => {
+  const navigation = useNavigation<any>();
+
   const handleCall = () => {
     if (phone) {
       const cleanPhone = phone.replace(/[^\d+]/g, "");
@@ -32,11 +36,20 @@ export const StaycationBookingCard = ({
     }
   };
 
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    } else {
+      navigation.navigate("StaycationBookingDetails", { bookingId: id });
+    }
+  };
+
   const getStatusColor = () => {
     switch (status) {
-      case "Advance":
+      case "Online":
       case "Full":
       case "Complete":
+      case "Advance":
         return "#63A1FD";
       case "Offline":
       case "Remaining":
@@ -47,61 +60,56 @@ export const StaycationBookingCard = ({
   };
 
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={styles.cardContainer}>
+    <TouchableOpacity activeOpacity={0.8} onPress={handlePress} style={styles.cardContainer}>
       <View style={styles.avatarWrapper}>
         <Avatar source={avatarUrl ? { uri: avatarUrl } : undefined} size={50} />
       </View>
 
       <View style={styles.mainContent}>
-        {/* Top Header Section */}
+        {/* Top Section: Name, Phone, Amount, Status */}
         <View style={styles.topHeader}>
           <View style={styles.namePhoneContainer}>
-            <Text variant="body1" weight="bold" color={COLORS.text.primary} style={styles.nameText}>
+            <Text weight="bold" style={styles.nameText}>
               {name}
             </Text>
-            <TouchableOpacity onPress={handleCall} style={styles.phoneRow}>
-              <Phone size={ms(18)} color={COLORS.text.primary} fill={COLORS.text.primary} />
-              <Text
-                variant="body2"
-                weight="medium"
-                color={COLORS.text.primary}
-                style={styles.phoneText}>
+            <View style={styles.phoneRow}>
+              <Phone size={ms(20)} color={COLORS.text.primary} fill={COLORS.text.primary} />
+              <Text weight="medium" style={styles.phoneText}>
                 {phone}
               </Text>
-            </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.amountStatusWrapper}>
-            <Text variant="body1" weight="semiBold" style={styles.amountText}>
+            <Text weight="semiBold" style={styles.amountText}>
               ₹{amount}
             </Text>
-            <Text
-              variant="body2"
-              weight="semiBold"
-              style={[styles.statusLabel, { color: getStatusColor() }]}>
+            <Text weight="semiBold" style={[styles.statusLabel, { color: getStatusColor() }]}>
               {status}
             </Text>
           </View>
         </View>
 
-        {/* Details Row */}
+        {/* Bottom Section: Date, Guests, Call */}
         <View style={styles.detailsRow}>
-          <View style={styles.iconLabelPair}>
+          <View style={styles.dateContainer}>
             <Calendar size={ms(20)} color={COLORS.text.primary} />
-            <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
+            <Text weight="semiBold" style={styles.dateText}>
               {checkIn} - {checkOut}
             </Text>
           </View>
-          <View style={styles.guestAndCallRow}>
-            <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
+
+          <View style={styles.guestWrapper}>
+            <Text weight="semiBold" style={styles.guestText}>
               {guestCount} Guest
             </Text>
-            <TouchableOpacity style={styles.callButton} activeOpacity={0.7} onPress={handleCall}>
-              <Text variant="body2" weight="bold" color={COLORS.text.inverse}>
-                Call
-              </Text>
-            </TouchableOpacity>
           </View>
+
+          <TouchableOpacity style={styles.callButton} activeOpacity={0.7} onPress={handleCall}>
+            <Text weight="bold" style={styles.callButtonText}>
+              Call
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>
@@ -117,10 +125,11 @@ const styles = StyleSheet.create({
     paddingVertical: vs(10),
     marginBottom: vs(10),
     width: "100%",
+    alignItems: "center",
+    gap: hs(10),
   },
   avatarWrapper: {
-    marginRight: hs(10),
-    alignSelf: "flex-start",
+    // No specific margin needed due to parent gap
   },
   mainContent: {
     flex: 1,
@@ -129,7 +138,7 @@ const styles = StyleSheet.create({
   topHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   namePhoneContainer: {
     flex: 1,
@@ -137,11 +146,13 @@ const styles = StyleSheet.create({
     borderBottomColor: "#CBDFFE",
     paddingBottom: vs(4),
     marginRight: hs(10),
+    gap: vs(6),
   },
   nameText: {
     fontSize: fs(16),
-    lineHeight: fs(16),
-    marginBottom: vs(6),
+    fontFamily: "Gilroy-Bold",
+    color: COLORS.text.primary,
+    lineHeight: fs(16 * 0.93),
   },
   phoneRow: {
     flexDirection: "row",
@@ -150,6 +161,8 @@ const styles = StyleSheet.create({
   },
   phoneText: {
     fontSize: fs(14),
+    fontFamily: "Gilroy-Medium",
+    color: COLORS.text.primary,
   },
   amountStatusWrapper: {
     alignItems: "center",
@@ -157,35 +170,51 @@ const styles = StyleSheet.create({
   },
   amountText: {
     fontSize: fs(14),
+    fontFamily: "Gilroy-SemiBold",
     color: "#00B562",
     lineHeight: fs(14),
   },
   statusLabel: {
     fontSize: fs(10),
+    fontFamily: "Gilroy-SemiBold",
     lineHeight: fs(10),
-    marginTop: vs(2),
   },
   detailsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  iconLabelPair: {
     flexDirection: "row",
     alignItems: "center",
     gap: hs(8),
   },
-  guestAndCallRow: {
+  dateContainer: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: hs(10),
+    gap: hs(8),
+  },
+  dateText: {
+    fontSize: fs(14),
+    fontFamily: "Gilroy-SemiBold",
+    color: COLORS.text.primary,
+  },
+  guestWrapper: {
+    justifyContent: "flex-end",
+  },
+  guestText: {
+    fontSize: fs(14),
+    fontFamily: "Gilroy-SemiBold",
+    color: COLORS.text.primary,
   },
   callButton: {
-    backgroundColor: COLORS.text.primary,
+    backgroundColor: "black",
     paddingHorizontal: hs(14),
     paddingVertical: vs(4),
     borderRadius: ms(6),
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.25)",
+  },
+  callButtonText: {
+    fontSize: fs(14),
+    fontFamily: "Gilroy-Bold",
+    color: "white",
+    textAlign: "center",
   },
 });

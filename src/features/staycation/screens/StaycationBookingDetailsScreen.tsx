@@ -176,7 +176,7 @@ export const StaycationBookingDetailsScreen = () => {
           <TouchableOpacity style={styles.historyBtn}>
             <View style={styles.historyContent}>
               <Clock size={ms(20)} color="#e55959" />
-              <Text style={[styles.historyText, { color: "#e55959" }]}>
+              <Text style={[styles.historyText, styles.currentHistoryText]}>
                 Current Booking Payment History
               </Text>
             </View>
@@ -351,6 +351,9 @@ const styles = StyleSheet.create({
     color: "#00b562",
   },
   remainingAmountText: {
+    color: "#e55959",
+  },
+  currentHistoryText: {
     color: "#e55959",
   },
   whatsappBtn: {

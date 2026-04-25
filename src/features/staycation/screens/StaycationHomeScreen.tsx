@@ -1,45 +1,50 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
+import React from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, PillTabs } from "@/components/ui";
+import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import { StaycationBookingCard } from "../components/StaycationBookingCard";
-import { Calendar as CalendarIcon, Plus } from "lucide-react-native";
-import { hs, vs, ms } from "@/utils/responsive.utils";
+import { Plus } from "lucide-react-native";
+import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
+import { useRoute, RouteProp } from "@react-navigation/native";
+import { StaycationTabParamList } from "@/navigation/navigation.types";
+import { useStaycationHome } from "../hooks/useStaycationHome";
 import { Calendar } from "react-native-calendars";
+
+const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
 const MOCK_BOOKINGS = [
   {
     id: "1",
     name: "Chirag Patil",
     phone: "+91 89346 93456",
-    checkIn: "16 Apr",
-    checkOut: "17 Apr",
-    guestCount: 3,
+    checkIn: "6 Apr",
+    checkOut: "9 Apr",
+    guestCount: 10,
     amount: "500",
-    status: "Advance" as const,
+    status: "Complete" as const,
   },
   {
     id: "2",
     name: "Yash Jadhav",
     phone: "+91 89346 93456",
-    checkIn: "20 Apr",
-    checkOut: "22 Apr",
-    guestCount: 2,
+    checkIn: "10 Apr",
+    checkOut: "11 Apr",
+    guestCount: 10,
     amount: "10000",
-    status: "Full" as const,
+    status: "Complete" as const,
   },
   {
     id: "3",
     name: "Om Powar",
     phone: "+91 89346 93456",
-    checkIn: "23 Apr",
-    checkOut: "24 Apr",
-    guestCount: 3,
+    checkIn: "14 Apr",
+    checkOut: "15 Apr",
+    guestCount: 7,
     amount: "800",
     status: "Offline" as const,
   },
@@ -47,111 +52,208 @@ const MOCK_BOOKINGS = [
     id: "4",
     name: "Yash Jadhav",
     phone: "+91 89346 93456",
-    checkIn: "30 Apr",
-    checkOut: "02 May",
-    guestCount: 2,
+    checkIn: "17 Apr",
+    checkOut: "18 Apr",
+    guestCount: 10,
     amount: "1000",
+    status: "Advance" as const,
+  },
+  {
+    id: "5",
+    name: "Rohit Sharma",
+    phone: "+91 89346 93456",
+    checkIn: "13 Apr",
+    checkOut: "14 Apr",
+    guestCount: 8,
+    amount: "500",
     status: "Advance" as const,
   },
 ];
 
 export const StaycationHomeScreen = () => {
-  const [selectedCategory, setSelectedCategory] = useState("Private Rooms");
-  const [selectedDate, setSelectedDate] = useState(new Date(2026, 3, 16)); // Apr 16, 2026
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const route = useRoute<RouteProp<StaycationTabParamList, "StaycationHome">>();
+  const { serviceId } = route.params;
+  const { venue } = useStaycationHome(serviceId);
 
-  const categories = ["Private Rooms", "Delux Rooms", "Cottages"];
-
-  const getFormattedDate = (date: Date) => {
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const getLocalISODate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+  // Custom markings for the calendar based on status in Figma
+  const markedDates: any = {
+    "2026-05-01": {
+      customStyles: {
+        container: {
+          borderWidth: 1,
+          borderColor: "#8c8c8c",
+          borderRadius: 4,
+          justifyContent: "center",
+          alignItems: "center",
+        },
+        text: { color: "black" },
+      },
+    },
+    // manuel (Red) - using color from Figma #e55959
+    "2026-05-10": {
+      customStyles: {
+        container: {
+          backgroundColor: "#e55959",
+          borderRadius: 4,
+          justifyContent: "center",
+          alignItems: "center",
+        },
+        text: { color: "white" },
+      },
+    },
+    "2026-05-14": {
+      customStyles: {
+        container: {
+          backgroundColor: "#e55959",
+          borderRadius: 4,
+          justifyContent: "center",
+          alignItems: "center",
+        },
+        text: { color: "white" },
+      },
+    },
+    "2026-05-19": {
+      customStyles: {
+        container: {
+          backgroundColor: "#e55959",
+          borderRadius: 4,
+          justifyContent: "center",
+          alignItems: "center",
+        },
+        text: { color: "white" },
+      },
+    },
+    // Online (Blue) - using color from Figma #63a1fd
+    "2026-05-06": {
+      customStyles: {
+        container: {
+          backgroundColor: "#63a1fd",
+          borderRadius: 4,
+          justifyContent: "center",
+          alignItems: "center",
+        },
+        text: { color: "white" },
+      },
+    },
+    "2026-05-08": {
+      customStyles: {
+        container: {
+          backgroundColor: "#63a1fd",
+          borderRadius: 4,
+          justifyContent: "center",
+          alignItems: "center",
+        },
+        text: { color: "white" },
+      },
+    },
+    "2026-05-17": {
+      customStyles: {
+        container: {
+          backgroundColor: "#63a1fd",
+          borderRadius: 4,
+          justifyContent: "center",
+          alignItems: "center",
+        },
+        text: { color: "white" },
+      },
+    },
   };
 
   return (
     <View style={styles.root}>
       <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-        <StaycationHeader title="Hilltop Mountain Resort" />
+        <StaycationHeader
+          title={venue?.name || "Vally view farmhouse"}
+          subtitle="Bookings"
+          imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
+        />
 
-        <View style={styles.sectionHeader}>
-          <Text variant="body1" weight="bold" color={COLORS.text.primary}>
-            Bookings
-          </Text>
-          <View style={styles.tabWrapper}>
-            <PillTabs
-              tabs={categories}
-              activeTab={selectedCategory}
-              onTabChange={setSelectedCategory}
-              variant="primary"
-            />
+        {/* Status Legend */}
+        <View style={styles.legendRow}>
+          <View style={styles.legendItem}>
+            <View style={styles.availableDot} />
+            <Text style={styles.legendText}>Available</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, styles.manuelDot]} />
+            <Text style={styles.legendText}>manuel</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, styles.onlineDot]} />
+            <Text style={styles.legendText}>Online</Text>
           </View>
         </View>
 
-        <Text variant="body1" weight="bold" style={styles.categoryTitle}>
-          {selectedCategory}
-        </Text>
-
-        <TouchableOpacity
-          style={styles.dateSelector}
-          activeOpacity={0.7}
-          onPress={() => setIsDatePickerOpen(!isDatePickerOpen)}>
-          <Text variant="body2" weight="semiBold" color="#00327B">
-            {getFormattedDate(selectedDate)}
-          </Text>
-          <CalendarIcon size={ms(16)} color="#00327B" />
-        </TouchableOpacity>
-
-        {isDatePickerOpen && (
-          <View style={styles.calendarWrapper}>
-            <Calendar
-              current={getLocalISODate(selectedDate)}
-              onDayPress={day => {
-                setSelectedDate(new Date(day.timestamp));
-                setIsDatePickerOpen(false);
-              }}
-              markedDates={{
-                [getLocalISODate(selectedDate)]: {
-                  selected: true,
-                  selectedColor: COLORS.primary,
+        {/* Inline Calendar */}
+        <View style={styles.calendarContainer}>
+          <Calendar
+            current={"2026-05-01"}
+            markingType={"custom"}
+            markedDates={markedDates}
+            renderArrow={direction => (
+              <Text style={styles.calendarArrow}>{direction === "left" ? "<" : ">"}</Text>
+            )}
+            enableSwipeMonths={true}
+            theme={
+              {
+                backgroundColor: "#ffffff",
+                calendarBackground: "#ffffff",
+                textSectionTitleColor: "#b3b3b3",
+                selectedDayBackgroundColor: "#63a1fd",
+                selectedDayTextColor: "#ffffff",
+                todayTextColor: "black",
+                dayTextColor: "#000000",
+                textDisabledColor: "transparent",
+                monthTextColor: "black",
+                textDayFontFamily: "Gilroy-Bold",
+                textMonthFontFamily: "Gilroy-Bold",
+                textDayHeaderFontFamily: "Gilroy-Bold",
+                textDayFontSize: fs(11),
+                textMonthFontSize: fs(14),
+                textDayHeaderFontSize: fs(14),
+                "stylesheet.calendar.header": {
+                  dayHeader: {
+                    marginTop: 2,
+                    marginBottom: 7,
+                    width: 32,
+                    textAlign: "center",
+                    fontSize: fs(14),
+                    fontFamily: "Gilroy-Bold",
+                    color: "#b3b3b3",
+                  },
+                  dayTextAtIndex5: { color: "#009bff" },
+                  dayTextAtIndex6: { color: "#009bff" },
+                  header: {
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    paddingLeft: 10,
+                    paddingRight: 10,
+                    marginTop: 10,
+                    alignItems: "center",
+                    gap: hs(40),
+                  },
                 },
-              }}
-              theme={{
-                todayTextColor: COLORS.primary,
-                arrowColor: COLORS.primary,
-              }}
-            />
-          </View>
-        )}
+              } as any
+            }
+          />
+        </View>
+
+        {/* Bookings Section */}
+        <View style={styles.bookingsHeader}>
+          <Text style={styles.bookingsTitle}>Booking For April</Text>
+        </View>
 
         <View style={styles.bookingsList}>
           {MOCK_BOOKINGS.map(booking => (
-            <StaycationBookingCard
-              key={booking.id}
-              id={booking.id}
-              name={booking.name}
-              phone={booking.phone}
-              checkIn={booking.checkIn}
-              checkOut={booking.checkOut}
-              guestCount={booking.guestCount}
-              amount={booking.amount}
-              status={booking.status}
-            />
+            <StaycationBookingCard key={booking.id} {...booking} />
           ))}
         </View>
+
         <View style={{ height: vs(120) }} />
       </ScreenContainer>
 
       <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
-        <Plus size={ms(24)} color={COLORS.text.inverse} strokeWidth={3} />
+        <Plus size={ms(30)} color={COLORS.text.inverse} strokeWidth={2} />
       </TouchableOpacity>
     </View>
   );
@@ -162,51 +264,77 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  sectionHeader: {
-    marginTop: vs(20),
-  },
-  tabWrapper: {
-    marginTop: vs(12),
-  },
-  categoryTitle: {
-    marginTop: vs(20),
-    textTransform: "uppercase",
-  },
-  dateSelector: {
+  legendRow: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "#E6EFFF",
-    paddingHorizontal: hs(12),
-    paddingVertical: vs(6),
-    borderRadius: ms(6),
-    gap: hs(8),
-    marginTop: vs(16),
-  },
-  calendarWrapper: {
+    gap: hs(12),
     marginTop: vs(10),
-    borderRadius: ms(10),
-    overflow: "hidden",
+    marginBottom: vs(10),
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+  },
+  dot: {
+    width: ms(10),
+    height: ms(10),
+    borderRadius: ms(5),
+  },
+  availableDot: {
+    width: ms(10),
+    height: ms(10),
+    borderRadius: ms(5),
+    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: COLORS.border.navBar,
+    borderColor: "#CBDFFE",
+  },
+  manuelDot: {
+    backgroundColor: "#e55959",
+  },
+  onlineDot: {
+    backgroundColor: "#63a1fd",
+  },
+  legendText: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(14),
+    color: COLORS.text.primary,
+    textTransform: "lowercase",
+  },
+  calendarContainer: {
+    backgroundColor: "#FFFFFF",
+    marginBottom: vs(20),
+  },
+  calendarArrow: {
+    fontSize: fs(16),
+    fontFamily: "Gilroy-Bold",
+    color: "black",
+  },
+  bookingsHeader: {
+    marginBottom: vs(10),
+  },
+  bookingsTitle: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(20),
+    color: COLORS.text.primary,
   },
   bookingsList: {
-    marginTop: vs(20),
+    gap: vs(2),
   },
   fab: {
     position: "absolute",
-    right: hs(20),
+    right: hs(18),
     bottom: vs(100),
-    width: ms(56),
-    height: ms(56),
-    borderRadius: ms(28),
-    backgroundColor: COLORS.primary,
+    width: ms(60),
+    height: ms(60),
+    borderRadius: ms(30),
+    backgroundColor: "#63a1fd",
     justifyContent: "center",
     alignItems: "center",
-    elevation: 5,
+    elevation: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
   },
 });

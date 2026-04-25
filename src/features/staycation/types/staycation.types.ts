@@ -7,7 +7,7 @@ export interface StaycationBooking {
   phone: string;
   avatarUrl?: string;
   amount: string;
-  status: "Advance" | "Full" | "Offline" | "Complete" | "Remaining";
+  status: "Advance" | "Full" | "Offline" | "Complete" | "Remaining" | "Online";
   checkIn: string;
   checkOut: string;
   guestCount: number;
