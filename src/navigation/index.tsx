@@ -70,8 +70,6 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 );
 
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
-const SportsProfileScreen = () => <PlaceholderScreen title="Sports Profile" />;
-const DineProfileScreen = () => <PlaceholderScreen title="Dine Profile" />;
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -134,7 +132,7 @@ const SportsTabNavigator = () => {
       />
       <SportsTab.Screen
         name="SportsProfile"
-        component={SportsProfileScreen}
+        component={VendorProfileScreen}
         options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
       />
     </SportsTab.Navigator>
@@ -190,7 +188,7 @@ const DineTabNavigator = () => {
       />
       <DineTab.Screen
         name="DineProfile"
-        component={DineProfileScreen}
+        component={VendorProfileScreen}
         options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
       />
     </DineTab.Navigator>

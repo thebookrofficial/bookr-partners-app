@@ -18,7 +18,7 @@ export type SportsTabParamList = {
   SportsHistory: { serviceId: string };
   SportsDashboard: { serviceId: string };
   SportsEssentials: { serviceId: string };
-  SportsProfile: { serviceId: string };
+  SportsProfile: undefined;
   BlockUnblock: { venueId: string; groundId: string };
 };
 
@@ -28,7 +28,7 @@ export type DineTabParamList = {
   DineHistory: { serviceId: string };
   DineDashboard: { serviceId: string };
   DineEssentials: { serviceId: string };
-  DineProfile: { serviceId: string };
+  DineProfile: undefined;
   DineCloseDate: { serviceId: string };
   DineOffers: { serviceId: string };
 };
