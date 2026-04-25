@@ -7,15 +7,6 @@ import { Text } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
-const DAYS = [
-  { date: "14 Apr", day: "Mon", bookings: 100 },
-  { date: "15 Apr", day: "Tue", bookings: 120 },
-  { date: "16 Apr", day: "Wed", bookings: 85 },
-  { date: "17 Apr", day: "Thu", bookings: 40 },
-  { date: "18 Apr", day: "Fri", bookings: 0 },
-  { date: "19 Apr", day: "Sat", bookings: 0 },
-];
-
 const Y_AXIS = ["140", "120", "100", "80", "60", "40", "20", "0"];
 
 export interface EventChartCategory {
@@ -23,11 +14,21 @@ export interface EventChartCategory {
   color: string;
 }
 
-export interface EventChartsProps {
-  categories: EventChartCategory[];
+export interface EventChartData {
+  date: string;
+  day: string;
+  bookings: number;
 }
 
-export const EventCharts = ({ categories }: EventChartsProps) => {
+export interface EventChartsProps {
+  categories: EventChartCategory[];
+  chartData: EventChartData[];
+}
+
+export const EventCharts = ({ categories, chartData }: EventChartsProps) => {
+  // Find the maximum value in the chartData to scale the bars properly
+  const maxBookings = Math.max(...chartData.map(d => d.bookings), 140);
+
   return (
     <View style={styles.container}>
       {/* 1. Booking Graph - Bar Chart */}
@@ -45,25 +46,27 @@ export const EventCharts = ({ categories }: EventChartsProps) => {
           </View>
           <View style={styles.chartArea}>
             <View style={styles.barsRow}>
-              {DAYS.map((item, index) => (
-                <View key={index} style={styles.barCol}>
-                  <View style={styles.barContainer}>
-                    {item.bookings > 0 && (
-                      <View
-                        style={[
-                          styles.bar,
-                          { height: vs(item.bookings * 1.1) }, // Scaled height
-                        ]}
-                      />
-                    )}
-                    {item.bookings === 0 && <View style={styles.emptyBar} />}
+              {chartData.map((item, index) => {
+                // Calculate height percentage based on max value (150 is the container height)
+                const barHeight =
+                  item.bookings > 0 ? vs(Math.max((item.bookings / maxBookings) * 150, 4)) : 0;
+
+                return (
+                  <View key={index} style={styles.barCol}>
+                    <View style={styles.barContainer}>
+                      {item.bookings > 0 ? (
+                        <View style={[styles.bar, { height: barHeight }]} />
+                      ) : (
+                        <View style={styles.emptyBar} />
+                      )}
+                    </View>
+                    <View style={styles.labelWrapper}>
+                      <Text style={styles.dateLabel}>{item.date}</Text>
+                      <Text style={styles.dayLabel}>{item.day}</Text>
+                    </View>
                   </View>
-                  <View style={styles.labelWrapper}>
-                    <Text style={styles.dateLabel}>{item.date}</Text>
-                    <Text style={styles.dayLabel}>{item.day}</Text>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           </View>
         </View>
@@ -99,7 +102,7 @@ export const EventCharts = ({ categories }: EventChartsProps) => {
               <View style={styles.simpleLine} />
             </View>
             <View style={styles.barsRow}>
-              {DAYS.map((item, index) => (
+              {chartData.map((item, index) => (
                 <View key={index} style={styles.barCol}>
                   <View style={styles.labelWrapper}>
                     <Text style={styles.dateLabel}>{item.date}</Text>
@@ -227,5 +230,22 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: COLORS.primary,
     opacity: 0.3,
+  },
+  dotOverlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: "row",
+    gap: hs(15),
+    paddingHorizontal: hs(10),
+  },
+  overlayCol: {
+    flex: 1,
+    alignItems: "center",
+    height: "100%",
+  },
+  chartDot: {
+    position: "absolute",
+    width: ms(6),
+    height: ms(6),
+    borderRadius: ms(3),
   },
 });
