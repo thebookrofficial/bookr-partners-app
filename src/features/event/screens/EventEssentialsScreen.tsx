@@ -8,7 +8,11 @@ import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { EventHeader } from "../components/EventHeader";
 import { EventActionRow } from "../components/EventActionRow";
-import { Calendar, Star, RotateCcw } from "lucide-react-native";
+import {
+  Calendar,
+  Star,
+  //  RotateCcw
+} from "lucide-react-native";
 import { useNavigation, RouteProp, useRoute } from "@react-navigation/native";
 import { EventTabParamList } from "@/navigation/navigation.types";
 
@@ -50,11 +54,11 @@ export const EventEssentialsScreen = () => {
             label="Guest Invite"
             onPress={() => navigation.navigate("EventGuestInvite", { serviceId })}
           />
-          <EventActionRow
+          {/* <EventActionRow
             icon={<RotateCcw size={ms(20)} color={COLORS.primary} />}
             label="Update Venue Info"
             onPress={() => {}}
-          />
+          /> */}
         </View>
         <View style={{ height: vs(100) }} />
       </ScreenContainer>
