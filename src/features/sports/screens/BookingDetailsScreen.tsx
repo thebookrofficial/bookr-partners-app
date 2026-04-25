@@ -333,7 +333,8 @@ export const BookingDetailsScreen = () => {
         activeOpacity={0.7}
         onPress={() =>
           navigation.navigate("GuestHistory", {
-            guestId: booking.profiles?.phone || booking.guest_phone || "unknown",
+            guestId: booking.profiles.phone || booking.guest_phone || "unknown",
+            bookingId: booking.id,
           })
         }>
         <FileText size={ms(20)} color={COLORS.text.primary} />

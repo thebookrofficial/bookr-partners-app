@@ -135,6 +135,11 @@ export const VendorProfileScreen = () => {
                     screen: "StaycationHome",
                     params: { serviceId: venue.id },
                   });
+                } else if (venue.vertical === "events") {
+                  navigation.navigate("EventServiceTabs", {
+                    screen: "EventHome",
+                    params: { serviceId: venue.id },
+                  });
                 }
               }}
             />

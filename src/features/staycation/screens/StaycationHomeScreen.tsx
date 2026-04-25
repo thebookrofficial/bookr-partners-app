@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Modal } from "react-native";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
@@ -17,40 +17,40 @@ const MOCK_BOOKINGS = [
     id: "1",
     name: "Chirag Patil",
     phone: "+91 89346 93456",
-    checkInDate: "16 Apr",
-    checkOutDate: "17 Apr",
-    guests: 3,
-    price: "₹500",
+    checkIn: "16 Apr",
+    checkOut: "17 Apr",
+    guestCount: 3,
+    amount: "500",
     status: "Advance" as const,
   },
   {
     id: "2",
     name: "Yash Jadhav",
     phone: "+91 89346 93456",
-    checkInDate: "20 Apr",
-    checkOutDate: "22 Apr",
-    guests: 2,
-    price: "₹10000",
+    checkIn: "20 Apr",
+    checkOut: "22 Apr",
+    guestCount: 2,
+    amount: "10000",
     status: "Full" as const,
   },
   {
     id: "3",
     name: "Om Powar",
     phone: "+91 89346 93456",
-    checkInDate: "23 Apr",
-    checkOutDate: "24 Apr",
-    guests: 3,
-    price: "₹800",
+    checkIn: "23 Apr",
+    checkOut: "24 Apr",
+    guestCount: 3,
+    amount: "800",
     status: "Offline" as const,
   },
   {
     id: "4",
     name: "Yash Jadhav",
     phone: "+91 89346 93456",
-    checkInDate: "30 Apr",
-    checkOutDate: "02 May",
-    guests: 2,
-    price: "₹1000",
+    checkIn: "30 Apr",
+    checkOut: "02 May",
+    guestCount: 2,
+    amount: "1000",
     status: "Advance" as const,
   },
 ];
@@ -101,51 +101,21 @@ export const StaycationHomeScreen = () => {
         </Text>
 
         <TouchableOpacity
-          style={styles.dateRow}
-          onPress={() => setIsDatePickerOpen(true)}
-          activeOpacity={0.7}>
-          <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
+          style={styles.dateSelector}
+          activeOpacity={0.7}
+          onPress={() => setIsDatePickerOpen(!isDatePickerOpen)}>
+          <Text variant="body2" weight="semiBold" color="#00327B">
             {getFormattedDate(selectedDate)}
           </Text>
           <CalendarIcon size={ms(16)} color="#00327B" />
         </TouchableOpacity>
 
-        <View style={styles.bookingsList}>
-          {MOCK_BOOKINGS.map(booking => (
-            <StaycationBookingCard
-              key={booking.id}
-              id={booking.id}
-              name={booking.name}
-              phone={booking.phone}
-              checkInDate={booking.checkInDate}
-              checkOutDate={booking.checkOutDate}
-              guests={booking.guests}
-              price={booking.price}
-              status={booking.status}
-            />
-          ))}
-        </View>
-        <View style={{ height: vs(120) }} />
-      </ScreenContainer>
-
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8} onPress={() => {}}>
-        <Plus size={ms(30)} color={COLORS.text.inverse} />
-      </TouchableOpacity>
-
-      <Modal
-        visible={isDatePickerOpen}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsDatePickerOpen(false)}>
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsDatePickerOpen(false)}>
-          <View style={styles.calendarContainer}>
+        {isDatePickerOpen && (
+          <View style={styles.calendarWrapper}>
             <Calendar
               current={getLocalISODate(selectedDate)}
-              onDayPress={(day: any) => {
-                setSelectedDate(new Date(day.year, day.month - 1, day.day));
+              onDayPress={day => {
+                setSelectedDate(new Date(day.timestamp));
                 setIsDatePickerOpen(false);
               }}
               markedDates={{
@@ -157,76 +127,86 @@ export const StaycationHomeScreen = () => {
               theme={{
                 todayTextColor: COLORS.primary,
                 arrowColor: COLORS.primary,
-                textDayFontFamily: "Gilroy-SemiBold",
-                textMonthFontFamily: "Gilroy-ExtraBold",
-                textDayHeaderFontFamily: "Gilroy-SemiBold",
               }}
             />
           </View>
-        </TouchableOpacity>
-      </Modal>
+        )}
+
+        <View style={styles.bookingsList}>
+          {MOCK_BOOKINGS.map(booking => (
+            <StaycationBookingCard
+              key={booking.id}
+              id={booking.id}
+              name={booking.name}
+              phone={booking.phone}
+              checkIn={booking.checkIn}
+              checkOut={booking.checkOut}
+              guestCount={booking.guestCount}
+              amount={booking.amount}
+              status={booking.status}
+            />
+          ))}
+        </View>
+        <View style={{ height: vs(120) }} />
+      </ScreenContainer>
+
+      <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
+        <Plus size={ms(24)} color={COLORS.text.inverse} strokeWidth={3} />
+      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
+  root: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: vs(10),
-    marginBottom: vs(15),
+    marginTop: vs(20),
   },
   tabWrapper: {
-    flex: 1,
-    marginLeft: hs(10),
+    marginTop: vs(12),
   },
   categoryTitle: {
-    marginBottom: vs(10),
+    marginTop: vs(20),
+    textTransform: "uppercase",
   },
-  dateRow: {
+  dateSelector: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#E6EFFF",
+    paddingHorizontal: hs(12),
     paddingVertical: vs(6),
-    marginBottom: vs(10),
+    borderRadius: ms(6),
+    gap: hs(8),
+    marginTop: vs(16),
+  },
+  calendarWrapper: {
+    marginTop: vs(10),
+    borderRadius: ms(10),
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
   },
   bookingsList: {
-    width: "100%",
+    marginTop: vs(20),
   },
   fab: {
     position: "absolute",
-    right: hs(12),
-    bottom: vs(95),
-    width: ms(58),
-    height: ms(58),
-    borderRadius: ms(29),
+    right: hs(20),
+    bottom: vs(100),
+    width: ms(56),
+    height: ms(56),
+    borderRadius: ms(28),
     backgroundColor: COLORS.primary,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 4,
     elevation: 5,
-    zIndex: 10,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  calendarContainer: {
-    width: "90%",
-    backgroundColor: COLORS.background,
-    borderRadius: ms(12),
-    padding: ms(10),
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
   },
 });
