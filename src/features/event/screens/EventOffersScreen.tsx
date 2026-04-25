@@ -1,23 +1,57 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView, Modal } from "react-native";
+import React, { useState, useCallback } from "react";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Modal,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs, TextInput } from "@/components/ui";
 import { EventHeader } from "../components/EventHeader";
-import { Calendar as CalendarWidget } from "react-native-calendars";
-import { Calendar as CalendarIcon, Plus, ChevronDown, Circle, Dot } from "lucide-react-native";
+import { Calendar, DateData } from "react-native-calendars";
+import DatePicker from "react-native-date-picker";
+import {
+  Calendar as CalendarIcon,
+  Plus,
+  Trash2,
+  ChevronDown,
+  Circle,
+  Dot,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+} from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useRoute, RouteProp } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
+import { useEventOffers } from "../hooks/useEventOffers";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
+/**
+ * EventOffersScreen - Manage coupons and discounts for an event.
+ * Replicates DineOffersScreen logic for consistent UX.
+ */
 export const EventOffersScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "EventOffers">>();
-  const _serviceId = route.params?.serviceId || "";
+  const serviceId = route.params?.serviceId || "";
+
+  // Hook for Database Interactions
+  const {
+    onGoingOffers,
+    pastOffers,
+    loading: dbLoading,
+    eventData,
+    createOffer,
+    deleteOffer,
+  } = useEventOffers(serviceId);
 
   // Tabs State
   const [activeTab, setActiveTab] = useState<string>("Coupons");
@@ -30,8 +64,9 @@ export const EventOffersScreen = () => {
   const [percentage, setPercentage] = useState("5%");
   const [minOrderValue, setMinOrderValue] = useState("₹1000");
   const [uptoAmount, setUptoAmount] = useState("150");
-  const [usageLimit, setUsageLimit] = useState("Only via coupon");
+  const [usageLimit, setUsageLimit] = useState("Everyone");
   const [totalUsage, setTotalUsage] = useState("1");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Dropdown Selection State
   const [activeDropdown, setActiveDropdown] = useState<{
@@ -40,10 +75,122 @@ export const EventOffersScreen = () => {
   } | null>(null);
 
   // Date Logic
-  const [dateRange] = useState<{ start?: string; end?: string }>({
-    start: "2026-05-06",
-    end: "2026-05-12",
-  });
+  const [selectionMode, setSelectionMode] = useState<"single" | "range">("single");
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateRange, setDateRange] = useState<{ start?: string; end?: string }>({});
+
+  const formatDisplayDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const handleConfirmOffer = async () => {
+    const isCoupon = activeTab === "Coupons";
+
+    if (isCoupon && !couponCode.trim()) {
+      Alert.alert("Error", "Please enter a coupon code.");
+      return;
+    }
+
+    if (selectionMode === "range" && (!dateRange.start || !dateRange.end)) {
+      Alert.alert("Error", "Please select a date range.");
+      return;
+    }
+
+    // Validation for numeric inputs
+    const val =
+      offerValueType === "flat"
+        ? parseInt(flatAmount, 10)
+        : parseInt(percentage.replace("%", ""), 10);
+
+    const minOrder = parseInt(minOrderValue.replace("₹", ""), 10);
+    const upto = parseInt(uptoAmount, 10);
+
+    if (isNaN(val) || val <= 0) {
+      Alert.alert("Error", "Please enter a valid discount value.");
+      return;
+    }
+    if (isNaN(minOrder)) {
+      Alert.alert("Error", "Please enter a valid minimum order value.");
+      return;
+    }
+    if (offerValueType === "percentage" && isNaN(upto)) {
+      Alert.alert("Error", "Please enter a valid maximum discount amount (Upto).");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const description = `${
+      offerValueType === "flat" ? `₹${flatAmount} off` : `${percentage} off`
+    } on above ₹${minOrder} Bill`;
+
+    const start =
+      selectionMode === "single"
+        ? selectedDate.toISOString()
+        : new Date(dateRange.start!).toISOString();
+
+    // For single day, we set end to end of that day
+    const end =
+      selectionMode === "single"
+        ? new Date(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+            23,
+            59,
+            59,
+          ).toISOString()
+        : new Date(
+            new Date(dateRange.end!).getFullYear(),
+            new Date(dateRange.end!).getMonth(),
+            new Date(dateRange.end!).getDate(),
+            23,
+            59,
+            59,
+          ).toISOString();
+
+    const success = await createOffer({
+      type: isCoupon ? "coupon" : "discount",
+      code: isCoupon ? couponCode.toUpperCase() : undefined,
+      description,
+      discountType: offerValueType,
+      discountValue: val,
+      minOrderValue: minOrder,
+      maxDiscount: offerValueType === "percentage" ? upto : undefined,
+      usageLimit,
+      totalUsagePerUser: parseInt(totalUsage, 10),
+      validFrom: start,
+      validUntil: end,
+    });
+
+    setIsSubmitting(false);
+
+    if (success) {
+      setCouponCode("");
+      setSelectionMode("single");
+      setDateRange({});
+      Alert.alert("Submitted", "Offer submitted for Admin Review!");
+    }
+  };
+
+  const handleDeleteOffer = (id: string) => {
+    Alert.alert("Confirm Remove", "Are you sure you want to remove this offer?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: async () => {
+          await deleteOffer(id);
+        },
+      },
+    ]);
+  };
 
   const selectOption = (option: string) => {
     if (!activeDropdown) return;
@@ -64,41 +211,85 @@ export const EventOffersScreen = () => {
     setActiveDropdown(null);
   };
 
+  const onDayPress = useCallback(
+    (day: DateData) => {
+      if (selectionMode === "range") {
+        if (!dateRange.start || (dateRange.start && dateRange.end)) {
+          setDateRange({ start: day.dateString });
+        } else {
+          // Ensure end date is after start date
+          if (new Date(day.dateString) >= new Date(dateRange.start)) {
+            setDateRange(prev => ({ ...prev, end: day.dateString }));
+          } else {
+            setDateRange({ start: day.dateString });
+          }
+        }
+      } else {
+        setSelectedDate(new Date(day.timestamp));
+      }
+    },
+    [selectionMode, dateRange],
+  );
+
   const getMarkedDates = () => {
     const marked: any = {};
-    if (dateRange.start) {
-      marked[dateRange.start] = {
-        startingDay: true,
-        color: COLORS.primary,
-        textColor: COLORS.text.inverse,
-      };
-    }
-    if (dateRange.end) {
-      marked[dateRange.end] = {
-        endingDay: true,
-        color: COLORS.primary,
-        textColor: COLORS.text.inverse,
-      };
-      let start = new Date(dateRange.start!);
-      let end = new Date(dateRange.end!);
-      for (let d = new Date(start.getTime() + 86400000); d < end; d.setDate(d.getDate() + 1)) {
-        marked[d.toISOString().split("T")[0]] = {
-          color: COLORS.border.navBar,
-          textColor: COLORS.text.primary,
+    if (selectionMode === "range") {
+      if (dateRange.start) {
+        marked[dateRange.start] = {
+          startingDay: true,
+          color: COLORS.primary,
+          textColor: COLORS.text.inverse,
         };
       }
+      if (dateRange.end) {
+        marked[dateRange.end] = {
+          endingDay: true,
+          color: COLORS.primary,
+          textColor: COLORS.text.inverse,
+        };
+        let start = new Date(dateRange.start!);
+        let end = new Date(dateRange.end!);
+        for (let d = new Date(start.getTime() + 86400000); d < end; d.setDate(d.getDate() + 1)) {
+          marked[d.toISOString().split("T")[0]] = {
+            color: COLORS.border.navBar,
+            textColor: COLORS.text.primary,
+          };
+        }
+      }
+    } else {
+      const dateString = selectedDate.toISOString().split("T")[0];
+      marked[dateString] = {
+        selected: true,
+        color: COLORS.primary,
+        textColor: COLORS.text.inverse,
+      };
     }
     return marked;
   };
+
+  const calculateDays = () => {
+    if (!dateRange.start || !dateRange.end) return 0;
+    const start = new Date(dateRange.start);
+    const end = new Date(dateRange.end);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays;
+  };
+
+  const filteredOngoing = onGoingOffers.filter(o =>
+    activeTab === "Coupons" ? o.type === "coupon" : o.type === "discount",
+  );
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.headerWrapper}>
           <EventHeader
-            title="Neon Shadow World Tour 2026"
+            title={eventData?.title || "Event Name"}
             subtitle="Offers"
-            imageSource={USER_PROFILE}
+            imageSource={
+              eventData?.cover_image_url ? { uri: eventData.cover_image_url } : USER_PROFILE
+            }
           />
         </View>
 
@@ -120,12 +311,38 @@ export const EventOffersScreen = () => {
           <Text weight="bold" style={styles.sectionTitle}>
             ON GOING {activeTab.toUpperCase()}
           </Text>
-          <View style={styles.offerRow}>
-            <View style={styles.statusDotActive} />
-            <Text weight="semiBold" style={styles.offerText}>
-              bookr12 For 5% off above ₹1000 Bill
+          {dbLoading ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={styles.loader} />
+          ) : filteredOngoing.length === 0 ? (
+            <Text variant="caption" color={COLORS.text.muted} style={styles.emptyText}>
+              No ongoing {activeTab.toLowerCase()}
             </Text>
-          </View>
+          ) : (
+            filteredOngoing.map(offer => (
+              <View key={offer.id} style={styles.offerRow}>
+                <View
+                  style={[
+                    styles.statusDot,
+                    offer.status === "pending" ? styles.statusPending : styles.statusActive,
+                  ]}
+                />
+                <View style={styles.offerTextContainer}>
+                  <Text weight="semiBold" style={styles.offerText}>
+                    {offer.code ? `${offer.code} ` : ""}
+                    {offer.description}
+                  </Text>
+                  {offer.status === "pending" && (
+                    <Text variant="caption" weight="medium" color={COLORS.text.muted}>
+                      Pending Review
+                    </Text>
+                  )}
+                </View>
+                <TouchableOpacity onPress={() => handleDeleteOffer(offer.id)}>
+                  <Trash2 size={ms(18)} color={COLORS.danger} />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
         </View>
 
         {/* INVITE TO */}
@@ -150,62 +367,111 @@ export const EventOffersScreen = () => {
         {/* CREATE OFFER FORM */}
         <View style={styles.section}>
           <Text weight="bold" style={styles.sectionTitle}>
-            CREATE COUPON
+            {activeTab === "Coupons" ? "CREATE COUPON" : "SET DISCOUNT OFFER"}
           </Text>
+
+          {activeTab === "Coupons" && (
+            <View style={styles.formGroup}>
+              <Text variant="body2" weight="medium" style={styles.label}>
+                Type Coupon Code
+              </Text>
+              <TextInput
+                placeholder="Ex: BOOKR5"
+                variant="filled"
+                value={couponCode}
+                onChangeText={setCouponCode}
+                autoCapitalize="characters"
+              />
+            </View>
+          )}
 
           <View style={styles.formGroup}>
             <Text variant="body2" weight="medium" style={styles.label}>
-              Type Coupon Code
+              Select Upcoming Special Day/Days
             </Text>
-            <TextInput
-              placeholder="Ex: BOOKR5"
-              variant="filled"
-              value={couponCode}
-              onChangeText={setCouponCode}
-              autoCapitalize="characters"
+            {selectionMode === "single" ? (
+              <TouchableOpacity
+                style={styles.datePickerInput}
+                onPress={() => setShowDatePicker(true)}>
+                <CalendarIcon size={ms(20)} color={COLORS.primary} />
+                <Text weight="semiBold" style={styles.inputText}>
+                  {selectedDate.toLocaleDateString("en-GB")}
+                </Text>
+                <TouchableOpacity onPress={() => setSelectionMode("range")}>
+                  <Plus size={ms(24)} color={COLORS.text.primary} />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <View style={styles.rangeInputs}>
+                  <View style={styles.rangeColumn}>
+                    <Text variant="body2" weight="medium" style={styles.subLabel}>
+                      From
+                    </Text>
+                    <View style={styles.rangeInput}>
+                      <Text weight="semiBold">
+                        {dateRange.start ? formatDisplayDate(dateRange.start) : "Select Date"}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.rangeColumn}>
+                    <Text variant="body2" weight="medium" style={styles.subLabel}>
+                      To
+                    </Text>
+                    <View style={styles.rangeInput}>
+                      <Text weight="semiBold">
+                        {dateRange.end ? formatDisplayDate(dateRange.end) : "Select Date"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.rangeStatus}>
+                  <CalendarIcon size={ms(20)} color={COLORS.primary} />
+                  <Text variant="body2" weight="medium" style={styles.rangeStatusText}>
+                    {dateRange.start && dateRange.end
+                      ? `${calculateDays()} Days will be selected`
+                      : "Select range on calendar"}
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+
+          {selectionMode === "range" && (
+            <Calendar
+              onDayPress={onDayPress}
+              markedDates={getMarkedDates()}
+              current={dateRange.start || new Date().toISOString().split("T")[0]}
+              enableSwipeMonths={true}
+              hideArrows={false}
+              renderArrow={direction => (
+                <View style={styles.calendarArrow}>
+                  {direction === "left" ? (
+                    <ChevronLeft size={ms(20)} color={COLORS.primary} />
+                  ) : (
+                    <ChevronRight size={ms(20)} color={COLORS.primary} />
+                  )}
+                </View>
+              )}
+              theme={{
+                calendarBackground: "transparent",
+                selectedDayBackgroundColor: COLORS.primary,
+                selectedDayTextColor: COLORS.text.inverse,
+                todayTextColor: COLORS.primary,
+                dayTextColor: COLORS.text.primary,
+                textDisabledColor: "#B3B3B3",
+                monthTextColor: COLORS.text.primary,
+                arrowColor: COLORS.primary,
+                textMonthFontFamily: "Inter-SemiBold",
+                textDayHeaderFontFamily: "Inter-Medium",
+                textDayFontSize: fs(11),
+                textMonthFontSize: fs(12),
+                textDayHeaderFontSize: fs(11),
+              }}
+              markingType={"period"}
+              style={styles.calendar}
             />
-          </View>
-
-          <View style={styles.row}>
-            <View style={styles.flex1}>
-              <Text variant="body2" weight="medium" style={styles.label}>
-                From
-              </Text>
-              <View style={styles.dateDisplay}>
-                <Text weight="semiBold">06 May 2026</Text>
-              </View>
-            </View>
-            <View style={styles.flex1}>
-              <Text variant="body2" weight="medium" style={styles.label}>
-                To
-              </Text>
-              <View style={styles.dateDisplay}>
-                <Text weight="semiBold">06 May 2026</Text>
-              </View>
-            </View>
-          </View>
-
-          <CalendarWidget
-            markedDates={getMarkedDates()}
-            current={"2026-05-01"}
-            markingType={"period"}
-            theme={{
-              calendarBackground: "transparent",
-              selectedDayBackgroundColor: COLORS.primary,
-              selectedDayTextColor: COLORS.text.inverse,
-              todayTextColor: COLORS.primary,
-              dayTextColor: COLORS.text.primary,
-              textDisabledColor: "#B3B3B3",
-              monthTextColor: COLORS.text.primary,
-              arrowColor: COLORS.primary,
-              textMonthFontFamily: "Inter-SemiBold",
-              textDayHeaderFontFamily: "Inter-Medium",
-              textDayFontSize: fs(11),
-              textMonthFontSize: fs(12),
-              textDayHeaderFontSize: fs(11),
-            }}
-            style={styles.calendar}
-          />
+          )}
 
           {/* Flat / Min Order Value Row */}
           <View style={styles.row}>
@@ -362,40 +628,75 @@ export const EventOffersScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.primaryBtn}>
-            <Text family="bison" weight="bold" style={styles.btnText}>
-              CONFIRM NEW COUPON
-            </Text>
+          <TouchableOpacity
+            style={[styles.primaryBtn, (isSubmitting || dbLoading) && styles.disabledBg]}
+            onPress={handleConfirmOffer}
+            disabled={isSubmitting || dbLoading}>
+            {isSubmitting ? (
+              <ActivityIndicator color={COLORS.text.inverse} />
+            ) : (
+              <Text family="bison" weight="bold" style={styles.btnText}>
+                {activeTab === "Coupons" ? "CONFIRM NEW COUPON" : "CONFIRM DISCOUNT OFFER"}
+              </Text>
+            )}
           </TouchableOpacity>
+
+          <View style={styles.reviewNotice}>
+            <Info size={ms(16)} color={COLORS.text.muted} />
+            <Text variant="caption" color={COLORS.text.muted}>
+              Note: New offers require admin review before they go live for users.
+            </Text>
+          </View>
         </View>
 
         {/* PAST OFFERS SECTION */}
         <View style={styles.section}>
           <Text weight="bold" style={styles.sectionTitle}>
-            PAST DISCOUNT OFFERS
+            PAST {activeTab.toUpperCase()} OFFERS
           </Text>
-          <View style={styles.pastOfferRow}>
-            <CalendarIcon size={ms(20)} color={COLORS.text.muted} />
-            <Text weight="semiBold" style={styles.pastOfferText}>
-              12 Mar 2026
+          {pastOffers.filter(o =>
+            activeTab === "Coupons" ? o.type === "coupon" : o.type === "discount",
+          ).length === 0 ? (
+            <Text variant="caption" color={COLORS.text.muted} style={styles.emptyText}>
+              No past records
             </Text>
-            <Text weight="semiBold" color={COLORS.text.muted}>
-              5% OFF
-            </Text>
-          </View>
-          <View style={styles.pastOfferRow}>
-            <CalendarIcon size={ms(20)} color={COLORS.text.muted} />
-            <Text weight="semiBold" style={styles.pastOfferText}>
-              30 Dec 2026 - 1 Jan 2026
-            </Text>
-            <Text weight="semiBold" color={COLORS.text.muted}>
-              7% OFF
-            </Text>
-          </View>
+          ) : (
+            pastOffers
+              .filter(o => (activeTab === "Coupons" ? o.type === "coupon" : o.type === "discount"))
+              .map(offer => (
+                <View key={offer.id} style={styles.pastOfferRow}>
+                  <CalendarIcon size={ms(20)} color={COLORS.text.muted} />
+                  <Text weight="semiBold" style={styles.pastOfferText}>
+                    {formatDisplayDate(offer.validFrom)}
+                    {offer.validUntil && offer.validUntil !== offer.validFrom
+                      ? ` - ${formatDisplayDate(offer.validUntil)}`
+                      : ""}
+                  </Text>
+                  <Text weight="semiBold" color={COLORS.text.muted}>
+                    {offer.discountValue}
+                    {offer.discountType === "percentage" ? "%" : ""} OFF
+                  </Text>
+                </View>
+              ))
+          )}
         </View>
 
         <View style={{ height: vs(120) }} />
       </ScrollView>
+
+      <DatePicker
+        modal
+        open={showDatePicker}
+        date={selectedDate}
+        mode="date"
+        onConfirm={date => {
+          setShowDatePicker(false);
+          setSelectedDate(date);
+        }}
+        onCancel={() => {
+          setShowDatePicker(false);
+        }}
+      />
 
       {/* OPTIONS MODAL */}
       <Modal
@@ -468,11 +769,8 @@ const styles = StyleSheet.create({
     height: ms(10),
     borderRadius: ms(5),
   },
-  statusDotActive: {
-    width: ms(10),
-    height: ms(10),
-    borderRadius: ms(5),
-    backgroundColor: "#00B562",
+  offerTextContainer: {
+    flex: 1,
   },
   offerText: {
     color: COLORS.text.primary,
@@ -507,13 +805,49 @@ const styles = StyleSheet.create({
     gap: hs(15),
     marginTop: vs(15),
   },
-  dateDisplay: {
+  datePickerInput: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.surface.primary,
     borderRadius: ms(10),
     paddingHorizontal: hs(10),
     paddingVertical: vs(12),
+    gap: hs(10),
     height: vs(44),
+  },
+  inputText: {
+    flex: 1,
+    color: COLORS.text.primary,
+  },
+  rangeInputs: {
+    flexDirection: "row",
+    gap: hs(10),
+  },
+  rangeColumn: {
+    flex: 1,
+  },
+  rangeInput: {
+    backgroundColor: COLORS.surface.primary,
+    borderRadius: ms(10),
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(12),
     justifyContent: "center",
+    height: vs(44),
+  },
+  rangeStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(4),
+    marginTop: vs(6),
+  },
+  rangeStatusText: {
+    textTransform: "capitalize",
+    color: COLORS.text.primary,
+  },
+  subLabel: {
+    textTransform: "capitalize",
+    fontSize: fs(12),
+    marginBottom: vs(2),
   },
   calendar: {
     marginTop: vs(15),
@@ -584,5 +918,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: hs(15),
     borderBottomWidth: 1,
     borderBottomColor: COLORS.surface.primary,
+  },
+  reviewNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+    marginTop: vs(6),
+    paddingHorizontal: hs(4),
+  },
+  loader: {
+    marginVertical: vs(10),
+  },
+  emptyText: {
+    paddingLeft: hs(4),
+  },
+  statusPending: {
+    backgroundColor: "#FFB800",
+  },
+  statusActive: {
+    backgroundColor: "#00B562",
+  },
+  calendarArrow: {
+    padding: ms(4),
+    borderRadius: ms(20),
+    backgroundColor: COLORS.surface.primary,
   },
 });
