@@ -18,7 +18,7 @@ export type SportsTabParamList = {
   SportsHistory: { serviceId: string };
   SportsDashboard: { serviceId: string };
   SportsEssentials: { serviceId: string };
-  SportsProfile: { serviceId: string };
+  SportsProfile: undefined;
   BlockUnblock: { venueId: string; groundId: string };
 };
 
@@ -28,9 +28,19 @@ export type DineTabParamList = {
   DineHistory: { serviceId: string };
   DineDashboard: { serviceId: string };
   DineEssentials: { serviceId: string };
-  DineProfile: { serviceId: string };
+  DineProfile: undefined;
   DineCloseDate: { serviceId: string };
   DineOffers: { serviceId: string };
+};
+
+// 2.2 Define the Bottom Tab screens for Events
+export type EventTabParamList = {
+  EventHome: { serviceId: string };
+  EventHistory: { serviceId: string };
+  EventDashboard: { serviceId: string };
+  EventScan: { serviceId: string };
+  EventEssentials: { serviceId: string };
+  EventProfile: undefined;
 };
 
 // 3. Define the screens in the Main Business flow
@@ -44,12 +54,15 @@ export type MainStackParamList = {
 
   SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;
   DineServiceTabs: NavigatorScreenParams<DineTabParamList>;
+  EventServiceTabs: NavigatorScreenParams<EventTabParamList>;
   BookingDetails: { bookingId: string };
   DineBookingDetails: { bookingId: string; isFromPayment?: boolean };
   DinePaymentDetails: { bookingId: string };
   DineCloseDate: { serviceId: string };
   DineOffers: { serviceId: string };
-  GuestHistory: { guestId: string };
+  EventOffers: { serviceId: string };
+  EventGuestInvite: { serviceId: string };
+  GuestHistory: { bookingId: string; guestId?: string };
   BlockUnblock: { venueId: string; groundId: string };
   BulkBooking: undefined;
   BulkBookingDetails: { bookingId: string; type: "multi" | "single" };

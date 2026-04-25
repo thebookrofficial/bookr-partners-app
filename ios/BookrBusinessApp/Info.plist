@@ -83,6 +83,5 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Bookr needs access to your gallery to update your business profile picture.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Bookr needs access to your camera to take a profile picture.</string>
-</dict>
+	<string>Bookr needs access to your camera to scan tickets and take profile pictures.</string></dict>
 </plist>

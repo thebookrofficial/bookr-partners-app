@@ -11,10 +11,12 @@ import {
   MainStackParamList,
   SportsTabParamList,
   DineTabParamList,
+  EventTabParamList,
 } from "./navigation.types";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import {
   Calendar,
+  FileText,
   History as HistoryIcon,
   LayoutDashboard,
   MoreHorizontal,
@@ -42,6 +44,12 @@ import { DineCloseDateScreen } from "@/features/dine/screens/DineCloseDateScreen
 import { DineOffersScreen } from "@/features/dine/screens/DineOffersScreen";
 import { DineBookingDetailsScreen } from "@/features/dine/screens/DineBookingDetailsScreen";
 import { DinePaymentDetailsScreen } from "@/features/dine/screens/DinePaymentDetailsScreen";
+import { EventHomeScreen } from "@/features/event/screens/EventHomeScreen";
+import { EventEssentialsScreen } from "@/features/event/screens/EventEssentialsScreen";
+import { EventOffersScreen } from "@/features/event/screens/EventOffersScreen";
+import { EventGuestInviteScreen } from "@/features/event/screens/EventGuestInviteScreen";
+import { EventDashboardScreen } from "@/features/event/screens/EventDashboardScreen";
+import { EventScanScreen } from "@/features/event/screens/EventScanScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
 import { Text } from "@/components/ui";
@@ -62,14 +70,13 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 );
 
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
-const SportsProfileScreen = () => <PlaceholderScreen title="Sports Profile" />;
-const DineProfileScreen = () => <PlaceholderScreen title="Dine Profile" />;
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainStack = createNativeStackNavigator<MainStackParamList>();
 const SportsTab = createBottomTabNavigator<SportsTabParamList>();
 const DineTab = createBottomTabNavigator<DineTabParamList>();
+const EventTab = createBottomTabNavigator<EventTabParamList>();
 
 const TabIcon =
   (IconComponent: any) =>
@@ -125,7 +132,7 @@ const SportsTabNavigator = () => {
       />
       <SportsTab.Screen
         name="SportsProfile"
-        component={SportsProfileScreen}
+        component={VendorProfileScreen}
         options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
       />
     </SportsTab.Navigator>
@@ -181,10 +188,84 @@ const DineTabNavigator = () => {
       />
       <DineTab.Screen
         name="DineProfile"
-        component={DineProfileScreen}
+        component={VendorProfileScreen}
         options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
       />
     </DineTab.Navigator>
+  );
+};
+
+const ScanTabIcon = () => (
+  <View style={styles.scanButton}>
+    <View style={styles.scanInner}>
+      <View style={styles.scanLine} />
+    </View>
+  </View>
+);
+
+const EventTabNavigator = () => {
+  return (
+    <EventTab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.text.muted,
+        tabBarStyle: {
+          position: "absolute",
+          backgroundColor: COLORS.surface.primary,
+          borderTopWidth: 1,
+          borderTopColor: COLORS.border.navBar,
+          borderTopLeftRadius: ms(20),
+          borderTopRightRadius: ms(20),
+          height: vs(80),
+          paddingTop: vs(4),
+          paddingBottom: vs(25),
+          paddingHorizontal: hs(10),
+        },
+        tabBarLabelStyle: {
+          fontFamily: "Gilroy-Bold",
+          fontSize: fs(12),
+          lineHeight: fs(12),
+          marginTop: vs(2),
+        },
+      }}>
+      <EventTab.Screen
+        name="EventHome"
+        component={EventHomeScreen}
+        options={{
+          title: "Bookings",
+          tabBarIcon: TabIcon(FileText), // Better match for Figma list icon
+        }}
+      />
+      <EventTab.Screen
+        name="EventDashboard"
+        component={EventDashboardScreen}
+        options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
+      />
+      <EventTab.Screen
+        name="EventScan"
+        component={EventScanScreen}
+        options={{
+          title: "Scan",
+          tabBarIcon: ScanTabIcon,
+          tabBarLabelStyle: {
+            color: COLORS.text.primary,
+            fontSize: fs(12),
+            fontFamily: "Gilroy-Bold",
+          },
+        }}
+      />
+      <EventTab.Screen
+        name="EventEssentials"
+        component={EventEssentialsScreen}
+        options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
+      />
+      <EventTab.Screen
+        name="EventProfile"
+        component={VendorProfileScreen}
+        options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
+      />
+    </EventTab.Navigator>
   );
 };
 
@@ -204,11 +285,14 @@ const MainNavigator = () => (
     <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
     <MainStack.Screen name="SportsServiceTabs" component={SportsTabNavigator} />
     <MainStack.Screen name="DineServiceTabs" component={DineTabNavigator} />
+    <MainStack.Screen name="EventServiceTabs" component={EventTabNavigator} />
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
     <MainStack.Screen name="DineBookingDetails" component={DineBookingDetailsScreen} />
     <MainStack.Screen name="DinePaymentDetails" component={DinePaymentDetailsScreen} />
     <MainStack.Screen name="DineCloseDate" component={DineCloseDateScreen} />
     <MainStack.Screen name="DineOffers" component={DineOffersScreen} />
+    <MainStack.Screen name="EventOffers" component={EventOffersScreen} />
+    <MainStack.Screen name="EventGuestInvite" component={EventGuestInviteScreen} />
     <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />
     <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
     <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />
@@ -261,5 +345,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.background,
+  },
+  scanButton: {
+    width: ms(56),
+    height: ms(56),
+    borderRadius: ms(28),
+    backgroundColor: COLORS.text.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: vs(-30),
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  scanInner: {
+    width: ms(24),
+    height: ms(24),
+    borderWidth: 2,
+    borderColor: COLORS.text.inverse,
+    borderRadius: 4,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scanLine: {
+    width: "80%",
+    height: 2,
+    backgroundColor: COLORS.text.inverse,
   },
 });

@@ -16,7 +16,9 @@ import { useGuestHistory, HistoryBooking } from "../hooks/useGuestHistory";
 export const GuestHistoryScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<MainStackParamList, "GuestHistory">>();
-  const { guestId } = route.params;
+  const { guestId: guestIdParam, bookingId } = route.params;
+
+  const guestId = guestIdParam || bookingId;
 
   const { history, stats, guestName, loading } = useGuestHistory(guestId);
 

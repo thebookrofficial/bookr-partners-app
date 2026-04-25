@@ -8,7 +8,7 @@ import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
 export interface PillTabsProps {
-  tabs: string[];
+  tabs: (string | { label: string; count?: string | number })[];
   activeTab: string;
   onTabChange: (tab: string) => void;
   variant?: "default" | "primary" | "dark";
@@ -32,8 +32,10 @@ export const PillTabs = ({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContainer}>
-        {tabs.map(tab => {
-          const isActive = tab === activeTab;
+        {tabs.map((tabItem, index) => {
+          const tabLabel = typeof tabItem === "string" ? tabItem : tabItem.label;
+          const tabCount = typeof tabItem === "string" ? undefined : tabItem.count;
+          const isActive = tabLabel === activeTab;
 
           // Determine styles based on variant
           let activeStyle, inactiveStyle, baseStyle;
@@ -66,13 +68,24 @@ export const PillTabs = ({
 
           return (
             <TouchableOpacity
-              key={tab}
+              key={`${tabLabel}-${index}`}
               activeOpacity={0.7}
-              onPress={() => onTabChange(tab)}
+              onPress={() => onTabChange(tabLabel)}
               style={[baseStyle, isActive ? activeStyle : inactiveStyle]}>
-              <Text variant="body2" weight="semiBold" color={textColor} style={styles.tabText}>
-                {tab}
-              </Text>
+              <View style={styles.tabContent}>
+                <Text variant="body2" weight="semiBold" color={textColor} style={styles.tabText}>
+                  {tabLabel}
+                </Text>
+                {tabCount !== undefined && (
+                  <Text
+                    variant="caption"
+                    weight="semiBold"
+                    color={textColor}
+                    style={styles.tabCountText}>
+                    ({tabCount})
+                  </Text>
+                )}
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -84,7 +97,9 @@ export const PillTabs = ({
 const styles = StyleSheet.create({
   wrapper: { marginVertical: vs(10) },
   scrollContainer: { gap: hs(10) },
-  tabText: { textTransform: "capitalize" },
+  tabContent: { alignItems: "center", justifyContent: "center" },
+  tabText: { textTransform: "capitalize", textAlign: "center" },
+  tabCountText: { textAlign: "center" },
 
   // --- DEFAULT VARIANT (VendorProfileScreen) ---
   defaultPill: {
