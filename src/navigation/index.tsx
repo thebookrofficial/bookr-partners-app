@@ -72,7 +72,6 @@ const PlaceholderScreen = ({ title }: { title: string }) => (
 const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
 const SportsProfileScreen = () => <PlaceholderScreen title="Sports Profile" />;
 const DineProfileScreen = () => <PlaceholderScreen title="Dine Profile" />;
-const EventProfileScreen = () => <PlaceholderScreen title="Event Profile" />;
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -265,7 +264,7 @@ const EventTabNavigator = () => {
       />
       <EventTab.Screen
         name="EventProfile"
-        component={EventProfileScreen}
+        component={VendorProfileScreen}
         options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
       />
     </EventTab.Navigator>

@@ -40,7 +40,7 @@ export type EventTabParamList = {
   EventDashboard: { serviceId: string };
   EventScan: { serviceId: string };
   EventEssentials: { serviceId: string };
-  EventProfile: { serviceId: string };
+  EventProfile: undefined;
 };
 
 // 3. Define the screens in the Main Business flow
