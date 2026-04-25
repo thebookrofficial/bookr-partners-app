@@ -17,11 +17,14 @@ import {
 } from "lucide-react-native";
 import { vs, hs, ms } from "@/utils/responsive.utils";
 import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { MainStackParamList } from "@/navigation/navigation.types";
 import { COLORS } from "@/constants/theme";
 import { useAuthLogic } from "@/features/auth/hooks/useAuthLogic";
+import { LEGAL_TEXT } from "@/constants/legal";
 
 export const SettingsScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { logout } = useAuthLogic(); // <-- Hook injected here
 
   return (
@@ -45,10 +48,22 @@ export const SettingsScreen = () => {
           <SettingsActionRow
             icon={<Ticket size={ms(20)} color={COLORS.primary} />}
             label="Privacy Policy"
+            onPress={() =>
+              navigation.navigate("LegalView", {
+                title: LEGAL_TEXT.privacy.title,
+                content: LEGAL_TEXT.privacy.content,
+              })
+            }
           />
           <SettingsActionRow
             icon={<FileText size={ms(20)} color={COLORS.primary} />}
             label="Terms and condition"
+            onPress={() =>
+              navigation.navigate("LegalView", {
+                title: LEGAL_TEXT.terms.title,
+                content: LEGAL_TEXT.terms.content,
+              })
+            }
           />
           <SettingsActionRow
             icon={<HelpCircle size={ms(20)} color={COLORS.primary} />}

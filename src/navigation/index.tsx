@@ -54,6 +54,7 @@ import { EventOffersScreen } from "@/features/event/screens/EventOffersScreen";
 import { EventGuestInviteScreen } from "@/features/event/screens/EventGuestInviteScreen";
 import { EventDashboardScreen } from "@/features/event/screens/EventDashboardScreen";
 import { EventScanScreen } from "@/features/event/screens/EventScanScreen";
+import { LegalViewScreen } from "@/features/settings/screens/LegalViewScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
 import { Text } from "@/components/ui";
@@ -346,6 +347,7 @@ const MainNavigator = () => (
     <MainStack.Screen name="Settings" component={SettingsScreen} />
     <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
     <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
+    <MainStack.Screen name="LegalView" component={LegalViewScreen} />
     <MainStack.Screen name="SportsServiceTabs" component={SportsTabNavigator} />
     <MainStack.Screen name="DineServiceTabs" component={DineTabNavigator} />
     <MainStack.Screen name="StaycationServiceTabs" component={StaycationTabNavigator} />
