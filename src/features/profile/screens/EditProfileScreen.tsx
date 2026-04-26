@@ -16,19 +16,19 @@ import { useAuthStore } from "@/store";
 import { useEditProfile } from "../hooks/useEditProfile";
 import { launchImageLibrary } from "react-native-image-picker";
 
-const GstinLabel = () => (
-  <View style={styles.gstinLabelContainer}>
-    <Text variant="body2" weight="medium" color={COLORS.text.muted}>
-      GSTIN No
-    </Text>
-    <TouchableOpacity style={styles.checkboxWrapper} activeOpacity={0.7}>
-      <Text variant="body2" weight="medium" color={COLORS.text.muted}>
-        Dont have
-      </Text>
-      <View style={styles.checkboxOutline} />
-    </TouchableOpacity>
-  </View>
-);
+// const GstinLabel = () => (
+//   <View style={styles.gstinLabelContainer}>
+//     <Text variant="body2" weight="medium" color={COLORS.text.muted}>
+//       GSTIN No
+//     </Text>
+//     <TouchableOpacity style={styles.checkboxWrapper} activeOpacity={0.7}>
+//       <Text variant="body2" weight="medium" color={COLORS.text.muted}>
+//         Dont have
+//       </Text>
+//       <View style={styles.checkboxOutline} />
+//     </TouchableOpacity>
+//   </View>
+// );
 
 export const EditProfileScreen = () => {
   const navigation = useNavigation();
@@ -131,7 +131,7 @@ export const EditProfileScreen = () => {
       </View>
 
       {/* 4. Read-Only Financial Info (Blueprint Tables 4.2 & 4.3) */}
-      <View style={styles.formSection}>
+      {/* <View style={styles.formSection}>
         <View style={styles.row}>
           <View style={styles.halfWidth}>
             <TextInput
@@ -176,7 +176,7 @@ export const EditProfileScreen = () => {
           editable={false}
           style={styles.disabledInput}
         />
-      </View>
+      </View> */}
 
       {/* 5. Help & Support Section */}
       <View style={styles.helpSection}>
