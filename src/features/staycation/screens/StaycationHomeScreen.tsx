@@ -1,8 +1,15 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useMemo } from "react";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
@@ -10,160 +17,60 @@ import { StaycationBookingCard } from "../components/StaycationBookingCard";
 import { Plus } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { useRoute, RouteProp } from "@react-navigation/native";
-import { StaycationTabParamList } from "@/navigation/navigation.types";
 import { useStaycationHome } from "../hooks/useStaycationHome";
 import { Calendar } from "react-native-calendars";
+import { StaycationBooking } from "../types/staycation.types";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
-const MOCK_BOOKINGS = [
-  {
-    id: "1",
-    name: "Chirag Patil",
-    phone: "+91 89346 93456",
-    checkIn: "6 Apr",
-    checkOut: "9 Apr",
-    guestCount: 10,
-    amount: "500",
-    status: "Complete" as const,
-  },
-  {
-    id: "2",
-    name: "Yash Jadhav",
-    phone: "+91 89346 93456",
-    checkIn: "10 Apr",
-    checkOut: "11 Apr",
-    guestCount: 10,
-    amount: "10000",
-    status: "Complete" as const,
-  },
-  {
-    id: "3",
-    name: "Om Powar",
-    phone: "+91 89346 93456",
-    checkIn: "14 Apr",
-    checkOut: "15 Apr",
-    guestCount: 7,
-    amount: "800",
-    status: "Offline" as const,
-  },
-  {
-    id: "4",
-    name: "Yash Jadhav",
-    phone: "+91 89346 93456",
-    checkIn: "17 Apr",
-    checkOut: "18 Apr",
-    guestCount: 10,
-    amount: "1000",
-    status: "Advance" as const,
-  },
-  {
-    id: "5",
-    name: "Rohit Sharma",
-    phone: "+91 89346 93456",
-    checkIn: "13 Apr",
-    checkOut: "14 Apr",
-    guestCount: 8,
-    amount: "500",
-    status: "Advance" as const,
-  },
-];
+// Current Date for logic: 2026-04-26
+const CURRENT_DATE = "2026-04-26";
+
+type ListEntry = { type: "header"; title: string } | { type: "booking"; data: StaycationBooking };
+
+// Helper to format date for card display (e.g., "2026-04-26" -> "26 Apr")
+const formatDisplayDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const day = date.getDate();
+  const month = date.toLocaleString("en-US", { month: "short" });
+  return `${day} ${month}`;
+};
 
 export const StaycationHomeScreen = () => {
-  const route = useRoute<RouteProp<StaycationTabParamList, "StaycationHome">>();
-  const { serviceId } = route.params;
-  const { venue } = useStaycationHome(serviceId);
+  const { isLoading, markedDates, groupedBookings, refetch, venue } = useStaycationHome();
 
-  // Custom markings for the calendar based on status in Figma
-  const markedDates: any = {
-    "2026-05-01": {
-      customStyles: {
-        container: {
-          borderWidth: 1,
-          borderColor: "#8c8c8c",
-          borderRadius: 4,
-          justifyContent: "center",
-          alignItems: "center",
-        },
-        text: { color: "black" },
-      },
-    },
-    // manuel (Red) - using color from Figma #e55959
-    "2026-05-10": {
-      customStyles: {
-        container: {
-          backgroundColor: "#e55959",
-          borderRadius: 4,
-          justifyContent: "center",
-          alignItems: "center",
-        },
-        text: { color: "white" },
-      },
-    },
-    "2026-05-14": {
-      customStyles: {
-        container: {
-          backgroundColor: "#e55959",
-          borderRadius: 4,
-          justifyContent: "center",
-          alignItems: "center",
-        },
-        text: { color: "white" },
-      },
-    },
-    "2026-05-19": {
-      customStyles: {
-        container: {
-          backgroundColor: "#e55959",
-          borderRadius: 4,
-          justifyContent: "center",
-          alignItems: "center",
-        },
-        text: { color: "white" },
-      },
-    },
-    // Online (Blue) - using color from Figma #63a1fd
-    "2026-05-06": {
-      customStyles: {
-        container: {
-          backgroundColor: "#63a1fd",
-          borderRadius: 4,
-          justifyContent: "center",
-          alignItems: "center",
-        },
-        text: { color: "white" },
-      },
-    },
-    "2026-05-08": {
-      customStyles: {
-        container: {
-          backgroundColor: "#63a1fd",
-          borderRadius: 4,
-          justifyContent: "center",
-          alignItems: "center",
-        },
-        text: { color: "white" },
-      },
-    },
-    "2026-05-17": {
-      customStyles: {
-        container: {
-          backgroundColor: "#63a1fd",
-          borderRadius: 4,
-          justifyContent: "center",
-          alignItems: "center",
-        },
-        text: { color: "white" },
-      },
-    },
+  // Flatten categorized bookings for the list
+  const flatListData = useMemo(() => {
+    const data: ListEntry[] = [];
+    groupedBookings.forEach((section: { title: string; data: StaycationBooking[] }) => {
+      data.push({ type: "header", title: section.title });
+      section.data.forEach(b => data.push({ type: "booking", data: b }));
+    });
+    return data;
+  }, [groupedBookings]);
+
+  const renderItem = ({ item }: { item: ListEntry }) => {
+    if (item.type === "header") {
+      return (
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>{item.title}</Text>
+        </View>
+      );
+    }
+    return (
+      <StaycationBookingCard
+        {...item.data}
+        checkIn={formatDisplayDate(item.data.checkIn)}
+        checkOut={formatDisplayDate(item.data.checkOut)}
+      />
+    );
   };
 
-  return (
-    <View style={styles.root}>
-      <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
+  const listHeader = useMemo(
+    () => (
+      <View style={styles.headerContainer}>
         <StaycationHeader
-          title={venue?.name || "Vally view farmhouse"}
+          title={venue?.name || "Staycation Venue"}
           subtitle="Bookings"
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
         />
@@ -187,24 +94,26 @@ export const StaycationHomeScreen = () => {
         {/* Inline Calendar */}
         <View style={styles.calendarContainer}>
           <Calendar
-            current={"2026-05-01"}
-            markingType={"custom"}
+            current={CURRENT_DATE}
+            markingType={"period"}
             markedDates={markedDates}
             renderArrow={direction => (
               <Text style={styles.calendarArrow}>{direction === "left" ? "<" : ">"}</Text>
             )}
             enableSwipeMonths={true}
+            disableAllTouchEventsForDisabledDays={true}
+            onDayPress={() => {}} // Disabled for read-only behavior
             theme={
               {
-                backgroundColor: "#ffffff",
-                calendarBackground: "#ffffff",
+                backgroundColor: COLORS.background,
+                calendarBackground: COLORS.background,
                 textSectionTitleColor: "#b3b3b3",
-                selectedDayBackgroundColor: "#63a1fd",
-                selectedDayTextColor: "#ffffff",
-                todayTextColor: "black",
-                dayTextColor: "#000000",
+                selectedDayBackgroundColor: COLORS.primary,
+                selectedDayTextColor: COLORS.text.inverse,
+                todayTextColor: COLORS.text.primary,
+                dayTextColor: COLORS.text.primary,
                 textDisabledColor: "transparent",
-                monthTextColor: "black",
+                monthTextColor: COLORS.text.primary,
                 textDayFontFamily: "Gilroy-Bold",
                 textMonthFontFamily: "Gilroy-Bold",
                 textDayHeaderFontFamily: "Gilroy-Bold",
@@ -221,8 +130,8 @@ export const StaycationHomeScreen = () => {
                     fontFamily: "Gilroy-Bold",
                     color: "#b3b3b3",
                   },
-                  dayTextAtIndex5: { color: "#009bff" },
-                  dayTextAtIndex6: { color: "#009bff" },
+                  dayTextAtIndex5: { color: COLORS.primary },
+                  dayTextAtIndex6: { color: COLORS.primary },
                   header: {
                     flexDirection: "row",
                     justifyContent: "center",
@@ -238,18 +147,49 @@ export const StaycationHomeScreen = () => {
           />
         </View>
 
-        {/* Bookings Section */}
         <View style={styles.bookingsHeader}>
-          <Text style={styles.bookingsTitle}>Booking For April</Text>
+          <Text style={styles.bookingsTitle}>Recent Bookings</Text>
         </View>
+      </View>
+    ),
+    [venue, markedDates],
+  );
 
-        <View style={styles.bookingsList}>
-          {MOCK_BOOKINGS.map(booking => (
-            <StaycationBookingCard key={booking.id} {...booking} />
-          ))}
-        </View>
-
-        <View style={{ height: vs(120) }} />
+  return (
+    <View style={styles.root}>
+      <ScreenContainer
+        scrollable={false}
+        backgroundColor={COLORS.background}
+        paddingHorizontal={hs(12)}>
+        {isLoading && flatListData.length === 0 ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        ) : (
+          <FlatList
+            data={flatListData}
+            keyExtractor={(item, index) =>
+              item.type === "header" ? item.title + index : item.data.id
+            }
+            renderItem={renderItem}
+            ListHeaderComponent={listHeader}
+            ListFooterComponent={<View style={{ height: vs(120) }} />}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={isLoading}
+                onRefresh={refetch}
+                tintColor={COLORS.primary}
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No upcoming bookings found.</Text>
+              </View>
+            }
+          />
+        )}
       </ScreenContainer>
 
       <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
@@ -263,6 +203,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  headerContainer: {
+    paddingTop: vs(10),
   },
   legendRow: {
     flexDirection: "row",
@@ -287,13 +230,13 @@ const styles = StyleSheet.create({
     borderRadius: ms(5),
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "#CBDFFE",
+    borderColor: COLORS.border.navBar,
   },
   manuelDot: {
-    backgroundColor: "#e55959",
+    backgroundColor: COLORS.danger,
   },
   onlineDot: {
-    backgroundColor: "#63a1fd",
+    backgroundColor: COLORS.primary,
   },
   legendText: {
     fontFamily: "Gilroy-Bold",
@@ -302,13 +245,13 @@ const styles = StyleSheet.create({
     textTransform: "lowercase",
   },
   calendarContainer: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.background,
     marginBottom: vs(20),
   },
   calendarArrow: {
     fontSize: fs(16),
     fontFamily: "Gilroy-Bold",
-    color: "black",
+    color: COLORS.text.primary,
   },
   bookingsHeader: {
     marginBottom: vs(10),
@@ -318,8 +261,32 @@ const styles = StyleSheet.create({
     fontSize: fs(20),
     color: COLORS.text.primary,
   },
-  bookingsList: {
-    gap: vs(2),
+  sectionHeader: {
+    marginTop: vs(10),
+    marginBottom: vs(5),
+  },
+  sectionTitle: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(16),
+    color: COLORS.text.muted,
+  },
+  listContent: {
+    paddingBottom: vs(20),
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: vs(100),
+  },
+  emptyContainer: {
+    padding: ms(32),
+    alignItems: "center",
+    marginTop: vs(20),
+  },
+  emptyText: {
+    color: COLORS.text.muted,
+    fontFamily: "Gilroy-Medium",
   },
   fab: {
     position: "absolute",
@@ -328,7 +295,7 @@ const styles = StyleSheet.create({
     width: ms(60),
     height: ms(60),
     borderRadius: ms(30),
-    backgroundColor: "#63a1fd",
+    backgroundColor: COLORS.primary,
     justifyContent: "center",
     alignItems: "center",
     elevation: 8,

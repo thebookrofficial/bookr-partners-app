@@ -2,60 +2,180 @@
 // Confidential and Proprietary.
 
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "../../../lib/supabase";
+import { useAuthStore } from "../../../store";
+import { StaycationBooking } from "../types/staycation.types";
+import { COLORS } from "@/constants/theme";
 
-export const useStaycationHome = (serviceId: string) => {
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [venue, setVenue] = useState<any>(null);
-  const [closedDates, setClosedDates] = useState<any[]>([]);
+// Helper to format Date to YYYY-MM-DD
+const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
-  const fetchVenueDetails = useCallback(async () => {
-    if (!serviceId) return;
+export const useStaycationHome = (serviceId?: string) => {
+  const { clientProfile } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(true);
+  const [markedDates, setMarkedDates] = useState<any>({});
+
+  // Grouped bookings for the FlatList/SectionList
+  const [groupedBookings, setGroupedBookings] = useState<
+    { title: string; data: StaycationBooking[] }[]
+  >([]);
+
+  const [venue, setVenue] = useState<{ name: string; cover_image_url: string | null } | null>(null);
+
+  const fetchDashboardData = useCallback(async () => {
+    if (!clientProfile?.id) return;
+
     try {
-      const { data, error } = await supabase
+      setIsLoading(true);
+
+      // 1. Get the Staycation Venue ID for this owner
+      let venueQuery = supabase
         .from("venues")
         .select("id, name, cover_image_url")
-        .eq("id", serviceId)
-        .single();
+        .eq("owner_id", clientProfile.id)
+        .eq("vertical", "staycation");
 
-      if (error) throw error;
-      setVenue(data);
+      // If a specific serviceId is passed, use it!
+      if (serviceId) {
+        venueQuery = venueQuery.eq("id", serviceId);
+      }
+
+      const { data: venueData, error: venueError } = await venueQuery.limit(1).maybeSingle();
+
+      if (venueError) {
+        console.error("Supabase error fetching venue:", venueError);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!venueData) {
+        // console.log("No staycation venue found for this specific logged-in user.");
+        setIsLoading(false);
+        return;
+      }
+
+      setVenue({
+        name: venueData.name,
+        cover_image_url: venueData.cover_image_url,
+      });
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const todayStr = formatDate(today);
+      const tomorrowStr = formatDate(tomorrow);
+
+      // 2. Fetch future/current bookings
+      const { data: bookingsData, error: bookingsError } = await supabase
+        .from("staycation_bookings")
+        .select(
+          `
+          id,
+          booking_type,
+          check_in_date,
+          check_out_date,
+          guest_count,
+          total_amount,
+          paid_amount,
+          profiles:user_id ( full_name, phone, avatar_url )
+        `,
+        )
+        .eq("venue_id", venueData.id)
+        .gte("check_out_date", todayStr)
+        .order("check_in_date", { ascending: true });
+
+      if (bookingsError) throw bookingsError;
+
+      const todayList: StaycationBooking[] = [];
+      const tomorrowList: StaycationBooking[] = [];
+      const upcomingList: StaycationBooking[] = [];
+      const newMarkedDates: any = {};
+
+      bookingsData?.forEach((booking: any) => {
+        const checkInStr = booking.check_in_date;
+        const checkOutStr = booking.check_out_date;
+        const profile = booking.profiles;
+
+        // Determine Color based on online vs manual
+        // Defaulting green for online, orange for manual
+        const isOnline = booking.booking_type === "online";
+        const rangeColor = isOnline ? COLORS.primary : COLORS.danger; // Tailwind Emerald-500 & Amber-500
+
+        // Map marked dates for Calendar (Period Marking)
+        let currentDate = new Date(checkInStr);
+        const endDate = new Date(checkOutStr);
+
+        while (currentDate <= endDate) {
+          const dateString = formatDate(currentDate);
+
+          if (!newMarkedDates[dateString]) {
+            newMarkedDates[dateString] = {
+              startingDay: dateString === checkInStr,
+              endingDay: dateString === checkOutStr,
+              color: rangeColor,
+              textColor: "#ffffff",
+            };
+          }
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        // Determine Status logic for UI
+        let statusTag: StaycationBooking["status"] = isOnline ? "Online" : "Offline";
+        if (booking.paid_amount >= booking.total_amount) statusTag = "Full";
+        else if (booking.paid_amount > 0) statusTag = "Advance";
+
+        // Format for UI
+        const formattedBooking: StaycationBooking = {
+          id: booking.id,
+          name: profile?.full_name || "Guest",
+          phone: profile?.phone || "N/A",
+          avatarUrl: profile?.avatar_url,
+          amount: booking.total_amount.toString(),
+          status: statusTag,
+          checkIn: checkInStr,
+          checkOut: checkOutStr,
+          guestCount: booking.guest_count,
+        };
+
+        // Grouping logic
+        if (checkInStr === todayStr) {
+          todayList.push(formattedBooking);
+        } else if (checkInStr === tomorrowStr) {
+          tomorrowList.push(formattedBooking);
+        } else {
+          upcomingList.push(formattedBooking);
+        }
+      });
+
+      setMarkedDates(newMarkedDates);
+
+      const sections = [];
+      if (todayList.length > 0) sections.push({ title: "Today's Check-ins", data: todayList });
+      if (tomorrowList.length > 0)
+        sections.push({ title: "Tomorrow's Check-ins", data: tomorrowList });
+      if (upcomingList.length > 0)
+        sections.push({ title: "Upcoming Bookings", data: upcomingList });
+
+      setGroupedBookings(sections);
     } catch (error) {
-      console.error("Error fetching staycation venue details:", error);
+      console.error("Error fetching staycation data:", error);
+    } finally {
+      setIsLoading(false);
     }
-  }, [serviceId]);
-
-  const fetchClosedDates = useCallback(async () => {
-    if (!serviceId) return;
-    try {
-      const { data, error } = await supabase
-        .from("venue_closed_dates")
-        .select("*")
-        .eq("venue_id", serviceId);
-
-      if (error) throw error;
-      setClosedDates(data || []);
-    } catch (error) {
-      console.error("Error fetching staycation closed dates:", error);
-    }
-  }, [serviceId]);
+  }, [clientProfile, serviceId]);
 
   useEffect(() => {
-    const loadInitial = async () => {
-      setInitialLoading(true);
-      await Promise.all([fetchVenueDetails(), fetchClosedDates()]);
-      setInitialLoading(false);
-    };
-    loadInitial();
-  }, [fetchVenueDetails, fetchClosedDates]);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   return {
-    initialLoading,
+    isLoading,
+    markedDates,
+    groupedBookings,
+    refetch: fetchDashboardData,
     venue,
-    closedDates,
-    refresh: () => {
-      fetchVenueDetails();
-      fetchClosedDates();
-    },
   };
 };
