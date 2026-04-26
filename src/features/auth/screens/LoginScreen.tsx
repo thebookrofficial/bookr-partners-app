@@ -16,9 +16,20 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
   const [email, setEmail] = useState("");
   const { isLoading, loginWithEmail, loginWithGoogle } = useAuthLogic();
 
+  // const handleEmailContinue = () => {
+  //   loginWithEmail(email, () => {
+  //     navigation.navigate("Otp", { email: email.trim() });
+  //   });
+  // };
+
   const handleEmailContinue = () => {
-    loginWithEmail(email, () => {
-      navigation.navigate("Otp", { email: email.trim() });
+    loginWithEmail(email, isBypass => {
+      // If we did NOT bypass with a password, go to the OTP screen.
+      // If we DID bypass, do nothing here—the AppNavigator will automatically
+      // detect the new session and switch to the Main App Dashboard!
+      if (!isBypass) {
+        navigation.navigate("Otp", { email: email.trim() });
+      }
     });
   };
 

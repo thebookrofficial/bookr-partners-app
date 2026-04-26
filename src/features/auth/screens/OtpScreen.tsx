@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput } from "react-native";
 import { Text } from "@/components/ui";
 import { AuthScreenProps } from "@/navigation/navigation.types";
@@ -24,6 +24,8 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
   const [isFocused, setIsFocused] = useState(false);
   const [timer, setTimer] = useState(TIMER_SECONDS);
 
+  const hasSubmitted = useRef(false);
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (timer > 0) {
@@ -34,8 +36,12 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
 
   // Trigger API call the exact millisecond the 6th digit is typed
   useEffect(() => {
-    if (code.length === OTP_LENGTH) {
+    if (code.length === OTP_LENGTH && !hasSubmitted.current) {
+      hasSubmitted.current = true; // Lock the gate!
       verifyOtpCode(email, code);
+    } else if (code.length < OTP_LENGTH) {
+      // If the user deletes a number to fix a typo, unlock the gate so they can submit again
+      hasSubmitted.current = false;
     }
   }, [code, email, verifyOtpCode]);
 
