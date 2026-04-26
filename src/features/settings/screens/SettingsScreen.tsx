@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { SettingsActionRow } from "../components/SettingsActionRow";
@@ -22,10 +22,22 @@ import { MainStackParamList } from "@/navigation/navigation.types";
 import { COLORS } from "@/constants/theme";
 import { useAuthLogic } from "@/features/auth/hooks/useAuthLogic";
 import { LEGAL_TEXT } from "@/constants/legal";
+import { SUPPORT_TEXT } from "@/constants/support";
 
 export const SettingsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
-  const { logout } = useAuthLogic(); // <-- Hook injected here
+  const { logout } = useAuthLogic();
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "To delete your account and permanently remove all associated venue data from the platform, please contact us at support@thebookr.in.\n\nOur team will process your account termination request within 30 days.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Understood", style: "default" },
+      ],
+    );
+  };
 
   return (
     <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
@@ -68,10 +80,22 @@ export const SettingsScreen = () => {
           <SettingsActionRow
             icon={<HelpCircle size={ms(20)} color={COLORS.primary} />}
             label="Support and Help"
+            onPress={() =>
+              navigation.navigate("LegalView", {
+                title: SUPPORT_TEXT.help.title,
+                content: SUPPORT_TEXT.help.content,
+              })
+            }
           />
           <SettingsActionRow
             icon={<AlertTriangle size={ms(20)} color={COLORS.primary} />}
             label="Report a Grievance"
+            onPress={() =>
+              navigation.navigate("LegalView", {
+                title: SUPPORT_TEXT.grievance.title,
+                content: SUPPORT_TEXT.grievance.content,
+              })
+            }
           />
         </View>
       </View>
@@ -85,12 +109,13 @@ export const SettingsScreen = () => {
           <SettingsActionRow
             icon={<LogOut size={ms(20)} color={COLORS.primary} />}
             label="Log out"
-            onPress={logout} // <-- Triggering the hook
+            onPress={logout}
           />
           <SettingsActionRow
             icon={<Trash2 size={ms(20)} color={COLORS.danger} />}
             label="Delete account"
             danger
+            onPress={handleDeleteAccount}
           />
         </View>
       </View>
