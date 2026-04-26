@@ -6,6 +6,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppNavigator } from "@/navigation";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 
+import { withStallion } from "react-native-stallion";
+
 // 1. Global Initializations
 GoogleSignin.configure({
   scopes: ["https://www.googleapis.com/auth/userinfo.email"],
@@ -27,4 +29,4 @@ function App() {
   );
 }
 
-export default App;
+export default withStallion(App);

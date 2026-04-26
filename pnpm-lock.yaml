@@ -82,6 +82,9 @@ importers:
       react-native-screens:
         specifier: ^4.24.0
         version: 4.24.0(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0))(react@19.1.0)
+      react-native-stallion:
+        specifier: ^2.3.2
+        version: 2.3.2(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0))(react@19.1.0)
       react-native-svg:
         specifier: ^15.15.4
         version: 15.15.4(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0))(react@19.1.0)
@@ -5809,6 +5812,15 @@ packages:
         integrity: sha512-b+4vILXHPu++t8H41PHLBVsTab2LPqwXNdzgdScyl4+Cu8Ta34aUQW3T469cB0ogAMPdu//KV00w4YVpDZoRUQ==,
       }
 
+  react-native-stallion@2.3.2:
+    resolution:
+      {
+        integrity: sha512-DSs9wAPqPuQkLWsoh38923m0wDhaugdX1nqTp9OpTeibtSb9sKgAkgZk/NSq4ogIInfjdMMvAsyKzJKMgmmbeg==,
+      }
+    peerDependencies:
+      react: "*"
+      react-native: "*"
+
   react-native-svg@15.15.4:
     resolution:
       {
@@ -11427,6 +11439,11 @@ snapshots:
   react-native-skia-apple-macos@147.1.0: {}
 
   react-native-skia-apple-tvos@147.1.0: {}
+
+  react-native-stallion@2.3.2(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0))(react@19.1.0):
+    dependencies:
+      react: 19.1.0
+      react-native: 0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0)
 
   react-native-svg@15.15.4(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.1.0))(react@19.1.0):
     dependencies:
