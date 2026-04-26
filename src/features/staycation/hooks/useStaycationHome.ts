@@ -82,8 +82,6 @@ export const useStaycationHome = (serviceId?: string) => {
           guest_count,
           total_amount,
           paid_amount,
-          guest_name,
-          guest_phone,
           profiles:user_id ( full_name, phone, avatar_url )
         `,
         )
@@ -101,10 +99,11 @@ export const useStaycationHome = (serviceId?: string) => {
       bookingsData?.forEach((booking: any) => {
         const checkInStr = booking.check_in_date;
         const checkOutStr = booking.check_out_date;
-        const profile = booking.profiles;
+        const profile = Array.isArray(booking.profiles) ? booking.profiles[0] : booking.profiles;
 
         // Differentiate Manual vs Online (consistent with Details screen)
-        const isOnline = (parseFloat(booking.platform_fee) || 0) > 0 && !booking.guest_name;
+        const isOnline =
+          booking.booking_type === "online" || (parseFloat(booking.platform_fee) || 0) > 0;
         const rangeColor = isOnline ? COLORS.primary : COLORS.danger;
 
         // Map marked dates for Calendar (Period Marking)
@@ -144,8 +143,8 @@ export const useStaycationHome = (serviceId?: string) => {
         // Format for UI
         const formattedBooking: StaycationBooking = {
           id: booking.id,
-          name: booking.guest_name || profile?.full_name || "Guest",
-          phone: booking.guest_phone || profile?.phone || "N/A",
+          name: profile?.full_name || "Guest",
+          phone: profile?.phone || "N/A",
           avatarUrl: profile?.avatar_url,
           amount: booking.total_amount.toString(),
           status: statusTag,

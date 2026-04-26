@@ -33,8 +33,6 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
           guest_count,
           total_amount,
           paid_amount,
-          guest_name,
-          guest_phone,
           profiles:user_id ( full_name, phone, avatar_url )
         `,
         )
@@ -44,11 +42,14 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
       if (error) throw error;
 
       if (bookingData) {
-        const profile = bookingData.profiles as any;
+        const profile = Array.isArray(bookingData.profiles)
+          ? bookingData.profiles[0]
+          : (bookingData.profiles as any);
 
         // Consistent logic with Details screen: platform_fee > 0 means Online
-        // OR if guest_name/guest_phone is present, it's Manual (as per user instruction)
-        const isOnline = (parseFloat(bookingData.platform_fee) || 0) > 0 && !bookingData.guest_name;
+        // OR booking_type is online
+        const isOnline =
+          bookingData.booking_type === "online" || (parseFloat(bookingData.platform_fee) || 0) > 0;
 
         // Determine Status logic for UI
         let statusTag: StaycationBooking["status"] = isOnline ? "Online" : "Offline";
@@ -72,8 +73,8 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
 
         const formattedBooking: StaycationBooking = {
           id: bookingData.id,
-          name: bookingData.guest_name || profile?.full_name || "Guest",
-          phone: bookingData.guest_phone || profile?.phone || "N/A",
+          name: profile?.full_name || "Guest",
+          phone: profile?.phone || "N/A",
           avatarUrl: profile?.avatar_url,
           amount: totalAmount.toString(),
           status: statusTag,

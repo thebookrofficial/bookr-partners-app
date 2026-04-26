@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
-import { View, StyleSheet, SectionList, TouchableOpacity } from "react-native";
+import React, { useState, useMemo } from "react";
+import { View, StyleSheet, SectionList, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
@@ -12,62 +12,11 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
-import { useStaycationHome } from "../hooks/useStaycationHome";
+import { useStaycationHistory } from "../hooks/useStaycationHistory";
+import { DateFilterOption } from "../hooks/useStaycationHistory";
+import { FilterBottomSheet } from "../../sports/components/FilterBottomSheet";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
-
-const MOCK_DATA = [
-  {
-    date: "22 Apr 2026",
-    data: [
-      {
-        id: "1",
-        name: "Chirag Patil",
-        phone: "+91 89346 93456",
-        amount: "2000",
-        status: "Complete" as const,
-        checkIn: "22 Apr",
-        checkOut: "23 Apr",
-        guestCount: 2,
-      },
-      {
-        id: "2",
-        name: "Yash Jadhav",
-        phone: "+91 89346 93456",
-        amount: "2500",
-        status: "Complete" as const,
-        checkIn: "21 Apr",
-        checkOut: "24 Apr",
-        guestCount: 2,
-      },
-    ],
-  },
-  {
-    date: "21 Apr 2026",
-    data: [
-      {
-        id: "3",
-        name: "Ritesh Patil",
-        phone: "+91 89346 93456",
-        amount: "2000",
-        status: "Complete" as const,
-        checkIn: "21 Apr",
-        checkOut: "22 Apr",
-        guestCount: 2,
-      },
-      {
-        id: "4",
-        name: "Shivtej Patil",
-        phone: "+91 89346 93456",
-        amount: "2000",
-        status: "Complete" as const,
-        checkIn: "21 Apr",
-        checkOut: "22 Apr",
-        guestCount: 2,
-      },
-    ],
-  },
-];
 
 export const StaycationHistoryScreen = () => {
   const navigation = useNavigation<any>();
@@ -82,8 +31,24 @@ export const StaycationHistoryScreen = () => {
     serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
   }
 
-  const { venue } = useStaycationHome(serviceId);
-  const [activeTab, setActiveTab] = useState("Private Rooms");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilterOption>("all");
+  const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>();
+
+  const { isLoading, rooms, venue, getGroupedBookings } = useStaycationHistory(
+    serviceId,
+    dateFilter,
+    customRange,
+  );
+  const [activeTab, setActiveTab] = useState("All Rooms");
+
+  const tabNames = useMemo(() => {
+    return rooms.length > 0 ? rooms.map(r => r.name) : ["All Rooms"];
+  }, [rooms]);
+
+  const listData = useMemo(() => {
+    return getGroupedBookings(activeTab);
+  }, [activeTab, getGroupedBookings]);
 
   return (
     <ScreenContainer scrollable={false} paddingHorizontal={hs(12)}>
@@ -98,7 +63,7 @@ export const StaycationHistoryScreen = () => {
           Bookings
         </Text>
         <PillTabs
-          tabs={["Private Rooms", "Delux Rooms", "Cottages"]}
+          tabs={tabNames}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           variant="dark"
@@ -108,40 +73,77 @@ export const StaycationHistoryScreen = () => {
 
       <View style={styles.filterRow}>
         <Text variant="body2" weight="semiBold" style={styles.monthText}>
-          Apr 2026
+          {dateFilter === "all"
+            ? "All Time"
+            : dateFilter === "3_months"
+            ? "Last 3 Months"
+            : dateFilter === "6_months"
+            ? "Last 6 Months"
+            : dateFilter === "9_months"
+            ? "Last 9 Months"
+            : customRange
+            ? `${customRange.start.toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })} - ${customRange.end.toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}`
+            : "Custom Range"}
         </Text>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => setIsFilterOpen(true)}>
           <Calendar size={ms(16)} color={COLORS.text.primary} />
         </TouchableOpacity>
       </View>
 
-      <SectionList
-        sections={MOCK_DATA}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <StaycationBookingCard
-            {...item}
-            onPress={() =>
-              (navigation as any).navigate("StaycationBookingDetails", {
-                booking: item,
-                isFromHistory: true,
-              })
-            }
-          />
-        )}
-        renderSectionHeader={({ section: { date, data } }) => (
-          <View style={styles.sectionHeader}>
-            <Text variant="body2" weight="semiBold" style={styles.sectionDate}>
-              {date}
-            </Text>
-            <Text variant="body2" weight="semiBold" style={styles.sectionCount}>
-              {data.length}/5
-            </Text>
-          </View>
-        )}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {isLoading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#63A1FD" />
+        </View>
+      ) : (
+        <SectionList
+          sections={listData}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <StaycationBookingCard
+              bookingId={item.id}
+              {...item}
+              onPress={() =>
+                (navigation as any).navigate("StaycationBookingDetails", {
+                  booking: item,
+                  isFromHistory: true,
+                })
+              }
+            />
+          )}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <View style={styles.dateLeft}>
+                <Text variant="body2" weight="bold" style={styles.sectionDate}>
+                  {section.date}
+                </Text>
+                <Text variant="body2" weight="semiBold" style={styles.sectionCount}>
+                  {section.data.length} Bookings
+                </Text>
+              </View>
+
+              <View style={styles.settlementRight}>
+                <Text style={styles.datePriceText}>₹{(section as any).settlement}</Text>
+                <Text style={styles.dateSettlementLabel}>Total Payout</Text>
+              </View>
+            </View>
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No past bookings found.</Text>
+            </View>
+          }
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       {/* Floating Action Button */}
       <View style={styles.fabContainer}>
@@ -149,6 +151,18 @@ export const StaycationHistoryScreen = () => {
           <Plus size={ms(30)} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      {/* Date Filter Bottom Sheet */}
+      <FilterBottomSheet
+        visible={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        currentFilter={dateFilter as any}
+        currentCustomRange={customRange}
+        onApply={(filter: any, range) => {
+          setDateFilter(filter);
+          setCustomRange(range);
+        }}
+      />
     </ScreenContainer>
   );
 };
@@ -183,19 +197,52 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: vs(6),
+    alignItems: "center",
+    paddingVertical: vs(8),
     paddingHorizontal: hs(6),
+    marginBottom: vs(4),
+  },
+  dateLeft: {
+    flexDirection: "column",
   },
   sectionDate: {
     fontSize: fs(14),
     color: "#000",
   },
   sectionCount: {
+    fontSize: fs(12),
+    color: COLORS.text.muted,
+    marginTop: vs(2),
+  },
+  settlementRight: {
+    alignItems: "flex-end",
+  },
+  datePriceText: {
+    fontFamily: "Gilroy-Bold",
     fontSize: fs(14),
-    color: "#000",
+    color: "#00B562",
+  },
+  dateSettlementLabel: {
+    fontFamily: "Gilroy-SemiBold",
+    fontSize: fs(10),
+    color: COLORS.text.muted,
+    marginTop: vs(2),
   },
   listContent: {
     paddingBottom: vs(120),
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyContainer: {
+    paddingTop: vs(40),
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: fs(14),
+    color: COLORS.text.muted,
   },
   fabContainer: {
     position: "absolute",
