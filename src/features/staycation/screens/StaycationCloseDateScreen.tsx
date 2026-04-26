@@ -83,23 +83,79 @@ export const StaycationCloseDateScreen = () => {
 
   const onDayPress = useCallback(
     (day: DateData) => {
+      const isDayClosed = (dateStr: string) => {
+        return [...upcomingClosedDates, ...pastClosedDates].some(record => {
+          if (record.endDate) {
+            return dateStr >= record.startDate && dateStr <= record.endDate;
+          }
+          return dateStr === record.startDate;
+        });
+      };
+
+      if (isDayClosed(day.dateString)) {
+        return;
+      }
+
       if (!dateRange.start || (dateRange.start && dateRange.end)) {
         setDateRange({ start: day.dateString });
       } else {
-        if (new Date(day.dateString) >= new Date(dateRange.start)) {
-          setDateRange(prev => ({ ...prev, end: day.dateString }));
+        if (day.dateString >= dateRange.start) {
+          let start = new Date(dateRange.start);
+          let end = new Date(day.dateString);
+          let hasDisabledDateInRange = false;
+
+          for (let d = new Date(start.getTime() + 86400000); d <= end; d.setDate(d.getDate() + 1)) {
+            const dStr = d.toISOString().split("T")[0];
+            if (isDayClosed(dStr)) {
+              hasDisabledDateInRange = true;
+              break;
+            }
+          }
+
+          if (hasDisabledDateInRange) {
+            Alert.alert("Invalid Range", "Your selection includes dates that are already closed.");
+            setDateRange({ start: day.dateString });
+          } else {
+            setDateRange(prev => ({ ...prev, end: day.dateString }));
+          }
         } else {
           setDateRange({ start: day.dateString });
         }
       }
     },
-    [dateRange],
+    [dateRange, upcomingClosedDates, pastClosedDates],
   );
 
   const getMarkedDates = () => {
     const marked: any = {};
+
+    // Add existing closed dates to marked dates
+    const allClosedDates = [...upcomingClosedDates, ...pastClosedDates];
+    allClosedDates.forEach(record => {
+      if (record.endDate) {
+        let start = new Date(record.startDate);
+        let end = new Date(record.endDate);
+        for (let d = new Date(start.getTime()); d <= end; d.setDate(d.getDate() + 1)) {
+          marked[d.toISOString().split("T")[0]] = {
+            disabled: true,
+            disableTouchEvent: true,
+            color: COLORS.border.navBar,
+            textColor: COLORS.text.muted,
+          };
+        }
+      } else {
+        marked[record.startDate] = {
+          disabled: true,
+          disableTouchEvent: true,
+          color: COLORS.border.navBar,
+          textColor: COLORS.text.muted,
+        };
+      }
+    });
+
     if (dateRange.start) {
       marked[dateRange.start] = {
+        ...marked[dateRange.start],
         startingDay: true,
         color: COLORS.primary,
         textColor: COLORS.text.inverse,
@@ -107,6 +163,7 @@ export const StaycationCloseDateScreen = () => {
     }
     if (dateRange.end) {
       marked[dateRange.end] = {
+        ...marked[dateRange.end],
         endingDay: true,
         color: COLORS.primary,
         textColor: COLORS.text.inverse,
@@ -114,7 +171,9 @@ export const StaycationCloseDateScreen = () => {
       let start = new Date(dateRange.start!);
       let end = new Date(dateRange.end!);
       for (let d = new Date(start.getTime() + 86400000); d < end; d.setDate(d.getDate() + 1)) {
-        marked[d.toISOString().split("T")[0]] = {
+        const dStr = d.toISOString().split("T")[0];
+        marked[dStr] = {
+          ...marked[dStr],
           color: COLORS.border.navBar,
           textColor: COLORS.text.primary,
         };

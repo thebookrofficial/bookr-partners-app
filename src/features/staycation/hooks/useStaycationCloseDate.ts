@@ -14,6 +14,17 @@ export interface ClosedDateRecord {
   isFullDay: boolean;
 }
 
+const getDatesBetween = (startDate: string, endDate: string) => {
+  const dates = [];
+  let currentDate = new Date(startDate);
+  const end = new Date(endDate);
+  while (currentDate <= end) {
+    dates.push(currentDate.toISOString().split("T")[0]);
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  return dates;
+};
+
 export const useStaycationCloseDate = (venueId: string) => {
   const [upcomingClosedDates, setUpcomingClosedDates] = useState<ClosedDateRecord[]>([]);
   const [pastClosedDates, setPastClosedDates] = useState<ClosedDateRecord[]>([]);
@@ -84,6 +95,54 @@ export const useStaycationCloseDate = (venueId: string) => {
 
       if (error) throw error;
 
+      const targetDates = record.endDate
+        ? getDatesBetween(record.startDate, record.endDate)
+        : [record.startDate];
+
+      const { data: rooms } = await supabase
+        .from("staycation_rooms")
+        .select("id")
+        .eq("venue_id", venueId);
+
+      if (rooms && rooms.length > 0) {
+        const roomIds = rooms.map(r => r.id);
+
+        const { data: existingAvail } = await supabase
+          .from("staycation_availability")
+          .select("id, room_id, date")
+          .in("room_id", roomIds)
+          .in("date", targetDates);
+
+        const existingMap = new Set(existingAvail?.map(ea => `${ea.room_id}_${ea.date}`) || []);
+
+        const toInsert = [];
+        for (const roomId of roomIds) {
+          for (const date of targetDates) {
+            if (!existingMap.has(`${roomId}_${date}`)) {
+              toInsert.push({
+                venue_id: venueId,
+                room_id: roomId,
+                date: date,
+                is_available: false,
+                is_blocked: true,
+              });
+            }
+          }
+        }
+
+        if (toInsert.length > 0) {
+          await supabase.from("staycation_availability").insert(toInsert);
+        }
+
+        if (existingAvail && existingAvail.length > 0) {
+          const existingIds = existingAvail.map(ea => ea.id);
+          await supabase
+            .from("staycation_availability")
+            .update({ is_blocked: true, is_available: false })
+            .in("id", existingIds);
+        }
+      }
+
       await fetchClosedDates(false);
       return true;
     } catch (err: any) {
@@ -94,9 +153,43 @@ export const useStaycationCloseDate = (venueId: string) => {
 
   const removeClosedDate = async (id: string) => {
     try {
+      const { data: recordData } = await supabase
+        .from("venue_closed_dates")
+        .select("start_date, end_date")
+        .eq("id", id)
+        .single();
+
       const { error } = await supabase.from("venue_closed_dates").delete().eq("id", id);
 
       if (error) throw error;
+
+      if (recordData) {
+        const targetDates = recordData.end_date
+          ? getDatesBetween(recordData.start_date, recordData.end_date)
+          : [recordData.start_date];
+
+        const { data: rooms } = await supabase
+          .from("staycation_rooms")
+          .select("id")
+          .eq("venue_id", venueId);
+
+        if (rooms && rooms.length > 0) {
+          const roomIds = rooms.map(r => r.id);
+          const { data: existingAvail } = await supabase
+            .from("staycation_availability")
+            .select("id")
+            .in("room_id", roomIds)
+            .in("date", targetDates);
+
+          if (existingAvail && existingAvail.length > 0) {
+            const existingIds = existingAvail.map(ea => ea.id);
+            await supabase
+              .from("staycation_availability")
+              .update({ is_blocked: false, is_available: true })
+              .in("id", existingIds);
+          }
+        }
+      }
 
       await fetchClosedDates(false);
       return true;
