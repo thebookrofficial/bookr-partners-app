@@ -2,7 +2,14 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Linking, Alert } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Linking,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Avatar, TextInput } from "@/components/ui";
 import {
@@ -22,13 +29,14 @@ import {
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { useStaycationBookingDetails } from "../hooks/useStaycationBookingDetails";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
 const InfoBlock = ({ label, value, icon: Icon, isSelection, valueColor }: any) => (
   <View style={styles.infoBlock}>
     <View style={styles.labelRow}>
-      <Icon size={ms(18)} color={COLORS.text.primary} />
+      <Icon size={ms(18)} color={COLORS.text?.primary || "black"} />
       <Text style={styles.labelText}>{label}</Text>
     </View>
     <View style={styles.valueBox}>
@@ -38,30 +46,97 @@ const InfoBlock = ({ label, value, icon: Icon, isSelection, valueColor }: any) =
   </View>
 );
 
+// Helper to format Date for UI
+const formatDate = (dateStr: string | undefined) => {
+  if (!dateStr) return "N/A";
+  const date = new Date(dateStr);
+  return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}/${date.getFullYear()}`;
+};
+
 export const StaycationBookingDetailsScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { booking, isFromHistory } = route.params || {};
+  // We grab the booking ID from the route params to fetch fresh data
+  const { booking: initialBooking, isFromHistory } = route.params || {};
+
+  // Initialize the custom hook
+  const { isLoading, isUpdating, bookingDetails, updatePayment, cancelBooking } =
+    useStaycationBookingDetails(initialBooking?.id);
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
   const [onlineAmount, setOnlineAmount] = useState("");
 
-  const bookingData = {
-    name: booking?.name || "Chirag Patil",
-    phone: booking?.phone || "+91 78349 89934",
-    checkIn: booking?.checkIn || "03/04/2026",
-    checkOut: booking?.checkOut || "04/04/2026",
-    guestCount: booking?.guestCount || 10,
-    bookingType: booking?.status || "Online",
-    totalPayment: booking?.amount || "5000",
-    remainingAmount: "0",
-    amountPaid: booking?.amount || "5000",
+  const handleCall = () => {
+    const phone = bookingDetails?.profiles?.phone || initialBooking?.phone;
+    if (!phone) {
+      Alert.alert("No Phone Number", "This user hasn't provided a phone number.");
+      return;
+    }
+    const url = `tel:${phone}`;
+    Linking.openURL(url).catch(() => Alert.alert("Error", "Could not open dialer."));
   };
 
-  const handleCall = () => {
-    const url = `tel:${bookingData.phone}`;
-    Linking.openURL(url).catch(() => Alert.alert("Error", "Could not open dialer."));
+  const handleSavePayment = async () => {
+    const success = await updatePayment(cashAmount, onlineAmount);
+    if (success) {
+      setIsAddingPayment(false);
+      setCashAmount("");
+      setOnlineAmount("");
+    }
+  };
+
+  const handleCancel = () => {
+    Alert.alert("Cancel Booking", "Are you sure you want to cancel this booking?", [
+      { text: "No", style: "cancel" },
+      {
+        text: "Yes, Cancel",
+        style: "destructive",
+        onPress: async () => {
+          const success = await cancelBooking();
+          if (success) {
+            Alert.alert("Success", "Booking cancelled successfully.");
+          }
+        },
+      },
+    ]);
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#63a1fd" />
+      </View>
+    );
+  }
+
+  // Map fresh Supabase data to the UI variables
+  const totalPayment =
+    parseFloat(bookingDetails?.total_amount) || parseFloat(initialBooking?.amount) || 0;
+  const amountPaid = parseFloat(bookingDetails?.paid_amount) || 0;
+  const remainingAmount = Math.max(0, totalPayment - amountPaid);
+
+  // Differentiate Manual vs Online:
+  // Use booking_type or platform_fee as indicator.
+  const isOnline =
+    bookingDetails?.booking_type === "online" ||
+    (parseFloat(bookingDetails?.platform_fee) || 0) > 0;
+  const isCancelled = bookingDetails?.booking_status === "cancelled";
+  const bookingType = isOnline ? "Online" : "Manual";
+
+  const bookingData = {
+    name: bookingDetails?.profiles?.full_name || initialBooking?.name || "Guest",
+    phone: bookingDetails?.profiles?.phone || initialBooking?.phone || "N/A",
+    avatarUrl: bookingDetails?.profiles?.avatar_url || initialBooking?.avatarUrl,
+    checkIn: formatDate(bookingDetails?.check_in_date || initialBooking?.checkIn),
+    checkOut: formatDate(bookingDetails?.check_out_date || initialBooking?.checkOut),
+    guestCount: bookingDetails?.guest_count || initialBooking?.guestCount || 0,
+    bookingType: isCancelled ? "Cancelled" : bookingType,
+    totalPayment: totalPayment.toString(),
+    remainingAmount: remainingAmount.toString(),
+    amountPaid: amountPaid.toString(),
   };
 
   return (
@@ -73,7 +148,10 @@ export const StaycationBookingDetailsScreen = () => {
             <ArrowLeft size={ms(24)} color="black" />
           </TouchableOpacity>
           <View style={styles.profileRow}>
-            <Avatar source={USER_PROFILE} size={50} />
+            <Avatar
+              source={bookingData.avatarUrl ? { uri: bookingData.avatarUrl } : USER_PROFILE}
+              size={50}
+            />
             <Text style={styles.profileName}>{bookingData.name}</Text>
           </View>
         </View>
@@ -81,7 +159,7 @@ export const StaycationBookingDetailsScreen = () => {
         {/* Mobile No Section */}
         <View style={styles.section}>
           <View style={styles.labelRow}>
-            <Phone size={ms(18)} color={COLORS.text.primary} />
+            <Phone size={ms(18)} color={COLORS.text?.primary || "black"} />
             <Text style={styles.labelText}>Mobile No</Text>
           </View>
           <View style={styles.phoneBox}>
@@ -101,13 +179,13 @@ export const StaycationBookingDetailsScreen = () => {
 
         {/* Guest / Booking Type Section */}
         <View style={styles.row}>
-          <InfoBlock label="No Of Guest" value={bookingData.guestCount} icon={User} isSelection />
+          <InfoBlock label="No Of Guest" value={bookingData.guestCount} icon={User} />
           <View style={{ width: hs(20) }} />
           <InfoBlock
             label="Booking Type"
             value={bookingData.bookingType}
             icon={ClipboardList}
-            valueColor="#63a1fd"
+            valueColor={isCancelled ? COLORS.text.muted : "#63a1fd"}
           />
         </View>
 
@@ -135,38 +213,54 @@ export const StaycationBookingDetailsScreen = () => {
               <Text style={[styles.paymentValue, styles.amountPaidText]}>
                 ₹ {bookingData.amountPaid}
               </Text>
-              <TouchableOpacity
-                style={styles.addBtnRow}
-                onPress={() => setIsAddingPayment(!isAddingPayment)}>
-                <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
-                {isAddingPayment ? (
-                  <Minus size={ms(20)} color="#e55959" />
-                ) : (
-                  <Plus size={ms(20)} color="#00b562" />
-                )}
-              </TouchableOpacity>
+
+              {remainingAmount > 0 && !isCancelled && (
+                <TouchableOpacity
+                  style={styles.addBtnRow}
+                  onPress={() => setIsAddingPayment(!isAddingPayment)}>
+                  <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
+                  {isAddingPayment ? (
+                    <Minus size={ms(20)} color="#e55959" />
+                  ) : (
+                    <Plus size={ms(20)} color="#00b562" />
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
+
           {isAddingPayment && (
-            <View style={styles.splitBox}>
-              <View style={styles.splitInput}>
-                <Text style={styles.paymentLabel}>Cash</Text>
-                <TextInput
-                  placeholder="₹ 0"
-                  keyboardType="numeric"
-                  value={cashAmount}
-                  onChangeText={setCashAmount}
-                />
+            <View>
+              <View style={styles.splitBox}>
+                <View style={styles.splitInput}>
+                  <Text style={styles.paymentLabel}>Cash</Text>
+                  <TextInput
+                    placeholder="₹ 0"
+                    keyboardType="numeric"
+                    value={cashAmount}
+                    onChangeText={setCashAmount}
+                  />
+                </View>
+                <View style={styles.splitInput}>
+                  <Text style={styles.paymentLabel}>Online</Text>
+                  <TextInput
+                    placeholder="₹ 0"
+                    keyboardType="numeric"
+                    value={onlineAmount}
+                    onChangeText={setOnlineAmount}
+                  />
+                </View>
               </View>
-              <View style={styles.splitInput}>
-                <Text style={styles.paymentLabel}>Online</Text>
-                <TextInput
-                  placeholder="₹ 0"
-                  keyboardType="numeric"
-                  value={onlineAmount}
-                  onChangeText={setOnlineAmount}
-                />
-              </View>
+              <TouchableOpacity
+                style={styles.savePaymentBtn}
+                onPress={handleSavePayment}
+                disabled={isUpdating}>
+                {isUpdating ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={styles.savePaymentText}>Save Payment</Text>
+                )}
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -201,10 +295,14 @@ export const StaycationBookingDetailsScreen = () => {
           <ChevronRight size={ms(18)} color="black" />
         </TouchableOpacity>
 
-        {!isFromHistory && (
-          <TouchableOpacity style={styles.cancelBtn}>
+        {!isFromHistory && !isOnline && !isCancelled && (
+          <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} disabled={isUpdating}>
             <View style={styles.cancelContent}>
-              <Text style={styles.cancelText}>Cancel Booking</Text>
+              {isUpdating ? (
+                <ActivityIndicator size="small" color="black" />
+              ) : (
+                <Text style={styles.cancelText}>Cancel Booking</Text>
+              )}
             </View>
             <Trash2 size={ms(20)} color="black" />
           </TouchableOpacity>
@@ -219,6 +317,12 @@ export const StaycationBookingDetailsScreen = () => {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: COLORS.background,
   },
   header: {
@@ -355,6 +459,18 @@ const styles = StyleSheet.create({
   },
   currentHistoryText: {
     color: "#e55959",
+  },
+  savePaymentBtn: {
+    backgroundColor: "#63a1fd",
+    paddingVertical: vs(12),
+    borderRadius: ms(8),
+    alignItems: "center",
+    marginTop: vs(12),
+  },
+  savePaymentText: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(16),
+    color: "white",
   },
   whatsappBtn: {
     backgroundColor: "#25d366",

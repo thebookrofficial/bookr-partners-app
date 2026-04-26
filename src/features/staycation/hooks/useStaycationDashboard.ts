@@ -1,10 +1,9 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../../lib/supabase";
-import { COLORS } from "@/constants/theme";
 import { useAuthStore } from "../../../store";
 
 // Helper to format Date to YYYY-MM-DD in local time
@@ -77,9 +76,9 @@ export const useStaycationDashboard = (
         .maybeSingle();
       if (venueData) actualVenueId = venueData.id;
     }
-    
+
     if (!actualVenueId) return;
-    
+
     try {
       const { data, error } = await supabase
         .from("staycation_rooms")
@@ -118,10 +117,10 @@ export const useStaycationDashboard = (
         }
 
         const { data: venueData } = await venueQuery.limit(1).maybeSingle();
-          
+
         if (venueData) actualVenueId = venueData.id;
       }
-      
+
       if (!actualVenueId) {
         setIsLoading(false);
         return;
@@ -137,7 +136,7 @@ export const useStaycationDashboard = (
           id,
           total_amount,
           platform_fee,
-          guest_name,
+          booking_type,
           check_in_date,
           check_out_date,
           room_id,
@@ -178,7 +177,7 @@ export const useStaycationDashboard = (
       // If we want to match 'Current Activity', we should probably stick to non-cancelled.
       const activeBookings = bookings.filter(b => b.booking_status !== "cancelled");
 
-      // Match Home Screen: Total bookings should include all bookings in the period, even cancelled ones, 
+      // Match Home Screen: Total bookings should include all bookings in the period, even cancelled ones,
       // so the top-level number matches expectations when comparing lists.
       let totalBookings = bookings.length;
       let onlineBookings = 0;
@@ -191,17 +190,17 @@ export const useStaycationDashboard = (
       const revenueByDate: Record<string, number> = {};
 
       // Initialize all dates in range with 0
-      let d = new Date(startDate);
-      while (d <= endDate) {
-        revenueByDate[formatDate(d)] = 0;
-        d.setDate(d.getDate() + 1);
+      let loopDate = new Date(startDate);
+      while (loopDate <= endDate) {
+        revenueByDate[formatDate(loopDate)] = 0;
+        loopDate.setDate(loopDate.getDate() + 1);
       }
 
       // For Revenue and Online/Offline counts, we only count ACTIVE (non-cancelled) bookings.
       activeBookings.forEach(b => {
         const amount = parseFloat(b.total_amount) || 0;
         const platformFee = parseFloat(b.platform_fee) || 0;
-        const isOnline = platformFee > 0 && !b.guest_name;
+        const isOnline = b.booking_type === "online" || platformFee > 0;
 
         totalRevenue += amount;
         if (isOnline) {
@@ -273,7 +272,10 @@ export const useStaycationDashboard = (
           w.isPrimary = true;
         }
 
-        const maxDailyAmount = Math.max(...(w.dailyBreakdown?.map(d => parseFloat(d.amount)) || [0]), 0);
+        const maxDailyAmount = Math.max(
+          ...(w.dailyBreakdown?.map(d => parseFloat(d.amount)) || [0]),
+          0,
+        );
         w.dailyBreakdown?.forEach(day => {
           const dayAmount = parseFloat(day.amount);
           day.percentage = maxDailyAmount > 0 ? (dayAmount / maxDailyAmount) * 100 : 0;
@@ -303,7 +305,7 @@ export const useStaycationDashboard = (
   useFocusEffect(
     useCallback(() => {
       fetchDashboardData();
-    }, [fetchDashboardData])
+    }, [fetchDashboardData]),
   );
 
   return {

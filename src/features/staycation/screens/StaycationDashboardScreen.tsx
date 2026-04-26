@@ -2,7 +2,13 @@
 // Confidential and Proprietary.
 
 import React, { useState, useMemo } from "react";
-import { View, StyleSheet, TouchableOpacity, LayoutAnimation, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  LayoutAnimation,
+  ActivityIndicator,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
@@ -21,7 +27,7 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 const DonutChart = ({ size = ms(100), strokeWidth = 6, onlineRevenue, totalRevenue }: any) => {
   const onlineRevNum = parseFloat(onlineRevenue) || 0;
   const totalRevNum = parseFloat(totalRevenue) || 0;
-  
+
   const onlineAngle = totalRevNum > 0 ? (onlineRevNum / totalRevNum) * 360 : 0;
 
   const createArc = (startAngle: number, sweepAngle: number) => {
@@ -93,12 +99,12 @@ export const StaycationDashboardScreen = () => {
   }
 
   const { venue } = useStaycationHome(serviceId);
-  
+
   const [selection, setSelection] = useState("This Month");
   const [activeTab, setActiveTab] = useState("All Rooms");
   const [expandedWeek, setExpandedWeek] = useState<string | null>(null);
   const [isCustomSheetVisible, setIsCustomSheetVisible] = useState(false);
-  
+
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(() => {
     const now = new Date();
     return {
@@ -129,7 +135,7 @@ export const StaycationDashboardScreen = () => {
     serviceId || "",
     dateRange.start,
     dateRange.end,
-    activeTab
+    activeTab,
   );
 
   const roomTabs = useMemo(() => ["All Rooms", ...rooms.map(r => r.name)], [rooms]);
@@ -267,10 +273,7 @@ export const StaycationDashboardScreen = () => {
               REVENUE DETAILS
             </Text>
             <View style={styles.revenueCard}>
-              <DonutChart 
-                onlineRevenue={stats.onlineRevenue} 
-                totalRevenue={stats.totalRevenue} 
-              />
+              <DonutChart onlineRevenue={stats.onlineRevenue} totalRevenue={stats.totalRevenue} />
 
               <View style={styles.revenueCol}>
                 <View style={styles.revenueItem}>
@@ -309,7 +312,11 @@ export const StaycationDashboardScreen = () => {
                         onPress={() => item.dailyBreakdown && toggleWeek(item.id)}
                         style={styles.graphRow}>
                         <View style={styles.weekLabelBox}>
-                          <Text variant="body2" weight="semiBold" color="#8C8C8C" style={styles.weekText}>
+                          <Text
+                            variant="body2"
+                            weight="semiBold"
+                            color="#8C8C8C"
+                            style={styles.weekText}>
                             {item.week}
                           </Text>
                           <Text variant="body2" style={styles.dateRangeText}>
@@ -359,7 +366,11 @@ export const StaycationDashboardScreen = () => {
                                 </Text>
                               </View>
                               <View style={styles.barWrapper}>
-                                <View style={[styles.bar, { width: hs(Math.max(day.percentage * 2, 20)) }]}>
+                                <View
+                                  style={[
+                                    styles.bar,
+                                    { width: hs(Math.max(day.percentage * 2, 20)) },
+                                  ]}>
                                   <Text
                                     variant="body2"
                                     weight="semiBold"
@@ -379,7 +390,9 @@ export const StaycationDashboardScreen = () => {
                 })
               ) : (
                 <View style={styles.emptyContainer}>
-                  <Text variant="body2" color="#8C8C8C">No revenue data for this period</Text>
+                  <Text variant="body2" color="#8C8C8C">
+                    No revenue data for this period
+                  </Text>
                 </View>
               )}
             </View>
