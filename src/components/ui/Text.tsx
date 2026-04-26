@@ -54,7 +54,7 @@ export const Text = ({
         return "Gilroy-Medium";
       case "regular":
       default:
-        return "Gilroy-Light";
+        return "Gilroy-Medium";
     }
   };
 

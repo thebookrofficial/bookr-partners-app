@@ -52,7 +52,15 @@ export const VendorProfileScreen = () => {
       {/* 1. App Bar - Branding & Global Actions */}
       <View style={styles.appBar}>
         <View style={styles.appBarLeft}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate("Dashboard");
+              }
+            }}>
             <ArrowLeft size={ms(20)} color={COLORS.text.primary} />
           </TouchableOpacity>
           <Text variant="h3" weight="bold">
@@ -130,11 +138,18 @@ export const VendorProfileScreen = () => {
                     screen: "DineHome",
                     params: { serviceId: venue.id },
                   });
+                } else if (venue.vertical === "staycation") {
+                  navigation.navigate("StaycationServiceTabs", {
+                    screen: "StaycationHome",
+                    params: { serviceId: venue.id },
+                  });
                 } else if (venue.vertical === "events") {
                   navigation.navigate("EventServiceTabs", {
                     screen: "EventHome",
                     params: { serviceId: venue.id },
                   });
+                } else if (venue.vertical === "profile") {
+                  navigation.navigate("VendorProfile");
                 }
               }}
             />

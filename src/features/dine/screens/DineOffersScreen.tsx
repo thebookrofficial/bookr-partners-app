@@ -294,7 +294,7 @@ export const DineOffersScreen = () => {
                 <View
                   style={[
                     styles.statusDot,
-                    { backgroundColor: offer.status === "pending" ? "#FFB800" : "#00B562" },
+                    offer.status === "pending" ? styles.statusDotPending : styles.statusDotActive,
                   ]}
                 />
                 <View style={styles.offerTextContainer}>
@@ -730,9 +730,15 @@ const styles = StyleSheet.create({
     gap: hs(10),
   },
   statusDot: {
-    width: ms(10),
-    height: ms(10),
-    borderRadius: ms(5),
+    width: ms(8),
+    height: ms(8),
+    borderRadius: ms(4),
+  },
+  statusDotPending: {
+    backgroundColor: "#FFB800",
+  },
+  statusDotActive: {
+    backgroundColor: "#00B562",
   },
   offerTextContainer: {
     flex: 1,

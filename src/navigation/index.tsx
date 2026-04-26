@@ -11,11 +11,12 @@ import {
   MainStackParamList,
   SportsTabParamList,
   DineTabParamList,
+  StaycationTabParamList,
   EventTabParamList,
 } from "./navigation.types";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import {
-  Calendar,
+  CalendarCheck,
   FileText,
   History as HistoryIcon,
   LayoutDashboard,
@@ -36,6 +37,13 @@ import { SportsEssentialsScreen } from "@/features/sports/screens/SportsEssentia
 import { BlockUnblockScreen } from "@/features/sports/screens/BlockUnblockScreen";
 import { BulkBookingScreen } from "@/features/sports/screens/BulkBookingScreen";
 import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingDetailsScreen";
+import { StaycationBookingDetailsScreen } from "@/features/staycation/screens/StaycationBookingDetailsScreen";
+import { StaycationOffersScreen } from "@/features/staycation/screens/StaycationOffersScreen";
+import { StaycationHomeScreen } from "@/features/staycation/screens/StaycationHomeScreen";
+import { StaycationHistoryScreen } from "@/features/staycation/screens/StaycationHistoryScreen";
+import { StaycationDashboardScreen } from "@/features/staycation/screens/StaycationDashboardScreen";
+import { StaycationEssentialsScreen } from "@/features/staycation/screens/StaycationEssentialsScreen";
+import { StaycationCloseDateScreen } from "@/features/staycation/screens/StaycationCloseDateScreen";
 import { DineHomeScreen } from "@/features/dine/screens/DineHomeScreen";
 import { DineDashboardScreen } from "@/features/dine/screens/DineDashboardScreen";
 import { DineHistoryScreen } from "@/features/dine/screens/DineHistoryScreen";
@@ -50,6 +58,7 @@ import { EventOffersScreen } from "@/features/event/screens/EventOffersScreen";
 import { EventGuestInviteScreen } from "@/features/event/screens/EventGuestInviteScreen";
 import { EventDashboardScreen } from "@/features/event/screens/EventDashboardScreen";
 import { EventScanScreen } from "@/features/event/screens/EventScanScreen";
+import { LegalViewScreen } from "@/features/settings/screens/LegalViewScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
 import { Text } from "@/components/ui";
@@ -76,6 +85,7 @@ const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainStack = createNativeStackNavigator<MainStackParamList>();
 const SportsTab = createBottomTabNavigator<SportsTabParamList>();
 const DineTab = createBottomTabNavigator<DineTabParamList>();
+const StaycationTab = createBottomTabNavigator<StaycationTabParamList>();
 const EventTab = createBottomTabNavigator<EventTabParamList>();
 
 const TabIcon =
@@ -83,37 +93,45 @@ const TabIcon =
   ({ color }: { color: string }) =>
     <IconComponent color={color} size={ms(24)} />;
 
+const COMMON_TAB_SCREEN_OPTIONS = {
+  headerShown: false,
+  tabBarActiveTintColor: COLORS.primary,
+  tabBarInactiveTintColor: COLORS.text.muted,
+  tabBarStyle: {
+    position: "absolute" as const,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.surface.primary,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border.navBar,
+    borderTopLeftRadius: ms(20),
+    borderTopRightRadius: ms(20),
+    height: vs(73),
+    paddingTop: vs(10),
+    paddingBottom: vs(25),
+    paddingHorizontal: hs(10),
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  tabBarItemStyle: {
+    marginHorizontal: 0,
+  },
+  tabBarLabelStyle: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(12),
+    lineHeight: fs(12),
+    marginTop: vs(2),
+  },
+};
+
 const SportsTabNavigator = () => {
   return (
-    <SportsTab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.text.muted,
-        tabBarStyle: {
-          position: "absolute",
-          backgroundColor: COLORS.surface.primary,
-          borderTopWidth: 1,
-          borderTopColor: COLORS.border.navBar,
-          borderTopLeftRadius: ms(20),
-          borderTopRightRadius: ms(20),
-          height: vs(80),
-          paddingTop: vs(4),
-          paddingBottom: vs(25),
-          paddingHorizontal: hs(10),
-          gap: vs(10),
-        },
-        tabBarLabelStyle: {
-          fontFamily: "Gilroy-Bold",
-          fontSize: fs(12),
-          lineHeight: fs(12),
-          marginTop: vs(2),
-        },
-      }}>
+    <SportsTab.Navigator screenOptions={COMMON_TAB_SCREEN_OPTIONS}>
       <SportsTab.Screen
         name="SportsHome"
         component={SportsHomeScreen}
-        options={{ title: "Home", tabBarIcon: TabIcon(Calendar) }}
+        options={{ title: "Home", tabBarIcon: TabIcon(CalendarCheck) }}
       />
       <SportsTab.Screen
         name="SportsHistory"
@@ -141,35 +159,11 @@ const SportsTabNavigator = () => {
 
 const DineTabNavigator = () => {
   return (
-    <DineTab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.text.muted,
-        tabBarStyle: {
-          position: "absolute",
-          backgroundColor: COLORS.surface.primary,
-          borderTopWidth: 1,
-          borderTopColor: COLORS.border.navBar,
-          borderTopLeftRadius: ms(20),
-          borderTopRightRadius: ms(20),
-          height: vs(80),
-          paddingTop: vs(4),
-          paddingBottom: vs(25),
-          paddingHorizontal: hs(10),
-          gap: vs(10),
-        },
-        tabBarLabelStyle: {
-          fontFamily: "Gilroy-Bold",
-          fontSize: fs(12),
-          lineHeight: fs(12),
-          marginTop: vs(2),
-        },
-      }}>
+    <DineTab.Navigator screenOptions={COMMON_TAB_SCREEN_OPTIONS}>
       <DineTab.Screen
         name="DineHome"
         component={DineHomeScreen}
-        options={{ title: "Home", tabBarIcon: TabIcon(Calendar) }}
+        options={{ title: "Home", tabBarIcon: TabIcon(CalendarCheck) }}
       />
       <DineTab.Screen
         name="DineHistory"
@@ -195,6 +189,46 @@ const DineTabNavigator = () => {
   );
 };
 
+const StaycationTabNavigator = () => {
+  return (
+    <StaycationTab.Navigator screenOptions={COMMON_TAB_SCREEN_OPTIONS}>
+      <StaycationTab.Screen
+        name="StaycationHome"
+        component={StaycationHomeScreen}
+        options={{ title: "Home", tabBarIcon: TabIcon(CalendarCheck) }}
+      />
+      <StaycationTab.Screen
+        name="StaycationHistory"
+        component={StaycationHistoryScreen}
+        options={{ title: "History", tabBarIcon: TabIcon(HistoryIcon) }}
+      />
+      <StaycationTab.Screen
+        name="StaycationDashboard"
+        component={StaycationDashboardScreen}
+        options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
+      />
+      <StaycationTab.Screen
+        name="StaycationEssentials"
+        component={StaycationEssentialsScreen}
+        options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
+      />
+      <StaycationTab.Screen
+        name="StaycationProfile"
+        component={VendorProfileScreen}
+        options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
+      />
+      <StaycationTab.Screen
+        name="StaycationCloseDate"
+        component={StaycationCloseDateScreen}
+        options={{
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: "none" },
+        }}
+      />
+    </StaycationTab.Navigator>
+  );
+};
+
 const ScanTabIcon = () => (
   <View style={styles.scanButton}>
     <View style={styles.scanInner}>
@@ -207,26 +241,10 @@ const EventTabNavigator = () => {
   return (
     <EventTab.Navigator
       screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.text.muted,
+        ...COMMON_TAB_SCREEN_OPTIONS,
         tabBarStyle: {
-          position: "absolute",
-          backgroundColor: COLORS.surface.primary,
-          borderTopWidth: 1,
-          borderTopColor: COLORS.border.navBar,
-          borderTopLeftRadius: ms(20),
-          borderTopRightRadius: ms(20),
-          height: vs(80),
-          paddingTop: vs(4),
-          paddingBottom: vs(25),
-          paddingHorizontal: hs(10),
-        },
-        tabBarLabelStyle: {
-          fontFamily: "Gilroy-Bold",
-          fontSize: fs(12),
-          lineHeight: fs(12),
-          marginTop: vs(2),
+          ...COMMON_TAB_SCREEN_OPTIONS.tabBarStyle,
+          paddingTop: vs(4), // Slightly less padding to accommodate elevated scan button
         },
       }}>
       <EventTab.Screen
@@ -283,10 +301,14 @@ const MainNavigator = () => (
     <MainStack.Screen name="Settings" component={SettingsScreen} />
     <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
     <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
+    <MainStack.Screen name="LegalView" component={LegalViewScreen} />
     <MainStack.Screen name="SportsServiceTabs" component={SportsTabNavigator} />
     <MainStack.Screen name="DineServiceTabs" component={DineTabNavigator} />
+    <MainStack.Screen name="StaycationServiceTabs" component={StaycationTabNavigator} />
     <MainStack.Screen name="EventServiceTabs" component={EventTabNavigator} />
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
+    <MainStack.Screen name="StaycationBookingDetails" component={StaycationBookingDetailsScreen} />
+    <MainStack.Screen name="StaycationOffers" component={StaycationOffersScreen} />
     <MainStack.Screen name="DineBookingDetails" component={DineBookingDetailsScreen} />
     <MainStack.Screen name="DinePaymentDetails" component={DinePaymentDetailsScreen} />
     <MainStack.Screen name="DineCloseDate" component={DineCloseDateScreen} />
