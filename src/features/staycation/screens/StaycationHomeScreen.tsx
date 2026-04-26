@@ -20,6 +20,8 @@ import { COLORS } from "@/constants/theme";
 import { useStaycationHome } from "../hooks/useStaycationHome";
 import { Calendar } from "react-native-calendars";
 import { StaycationBooking } from "../types/staycation.types";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { StaycationTabParamList } from "@/navigation/navigation.types";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -37,7 +39,19 @@ const formatDisplayDate = (dateStr: string) => {
 };
 
 export const StaycationHomeScreen = () => {
-  const { isLoading, markedDates, groupedBookings, refetch, venue } = useStaycationHome();
+  const navigation = useNavigation<any>();
+  const route = useRoute<RouteProp<StaycationTabParamList, "StaycationHome">>();
+
+  // Extract serviceId with fallback from parent navigator
+  let serviceId = route.params?.serviceId;
+  if (!serviceId) {
+    const parentState = navigation.getParent()?.getState();
+    const tabRoute = parentState?.routes.find((r: any) => r.name === "StaycationServiceTabs");
+    const tabParams = tabRoute?.params as any;
+    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+  }
+
+  const { isLoading, markedDates, groupedBookings, refetch, venue } = useStaycationHome(serviceId);
 
   // Flatten categorized bookings for the list
   const flatListData = useMemo(() => {
@@ -59,6 +73,7 @@ export const StaycationHomeScreen = () => {
     }
     return (
       <StaycationBookingCard
+        bookingId={item.data.id}
         {...item.data}
         checkIn={formatDisplayDate(item.data.checkIn)}
         checkOut={formatDisplayDate(item.data.checkOut)}

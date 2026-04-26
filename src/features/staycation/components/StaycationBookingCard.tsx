@@ -1,20 +1,39 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React from "react";
-import { View, StyleSheet, TouchableOpacity, Linking, Alert } from "react-native";
+import React, { useMemo } from "react";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Linking,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { Text, Avatar } from "@/components/ui";
 import { Phone, Calendar } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { StaycationBooking } from "../types/staycation.types";
 import { useNavigation } from "@react-navigation/native";
+import { useStaycationBooking } from "../hooks/useStaycationBooking";
 
-interface StaycationBookingCardProps extends StaycationBooking {
+interface StaycationBookingCardProps extends Partial<StaycationBooking> {
+  bookingId?: string;
   onPress?: () => void;
 }
 
+// Helper to format date for card display (e.g., "2026-04-26" -> "26 Apr")
+const formatDisplayDate = (dateStr: string) => {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const day = date.getDate();
+  const month = date.toLocaleString("en-US", { month: "short" });
+  return `${day} ${month}`;
+};
+
 export const StaycationBookingCard = ({
+  bookingId,
   id,
   name,
   phone,
@@ -28,9 +47,35 @@ export const StaycationBookingCard = ({
 }: StaycationBookingCardProps) => {
   const navigation = useNavigation<any>();
 
+  // If bookingId is provided, we fetch the data.
+  // Otherwise, we use the props passed from parent (compatibility mode)
+  const { isLoading, booking: fetchedBooking } = useStaycationBooking(bookingId);
+
+  // Use fetched data if available, otherwise fallback to props
+  const displayData = useMemo(() => {
+    if (fetchedBooking) {
+      return {
+        ...fetchedBooking,
+        checkIn: formatDisplayDate(fetchedBooking.checkIn),
+        checkOut: formatDisplayDate(fetchedBooking.checkOut),
+      };
+    }
+    return {
+      id,
+      name,
+      phone,
+      avatarUrl,
+      amount,
+      status,
+      checkIn, // Assumes parent already formatted or we keep as is
+      checkOut,
+      guestCount,
+    };
+  }, [fetchedBooking, id, name, phone, avatarUrl, amount, status, checkIn, checkOut, guestCount]);
+
   const handleCall = () => {
-    if (phone) {
-      const cleanPhone = phone.replace(/[^\d+]/g, "");
+    if (displayData.phone) {
+      const cleanPhone = displayData.phone.replace(/[^\d+]/g, "");
       const url = `tel:${cleanPhone}`;
       Linking.openURL(url).catch(() => Alert.alert("Error", "Could not open dialer."));
     }
@@ -40,12 +85,20 @@ export const StaycationBookingCard = ({
     if (onPress) {
       onPress();
     } else {
-      navigation.navigate("StaycationBookingDetails", { bookingId: id });
+      // StaycationBookingDetailsScreen expects 'booking' object
+      navigation.navigate("StaycationBookingDetails", {
+        booking: {
+          ...displayData,
+          // Map back the numeric values for consistency with screen expectations
+          amount: displayData.amount,
+        },
+        isFromHistory: displayData.status === "Complete",
+      });
     }
   };
 
   const getStatusColor = () => {
-    switch (status) {
+    switch (displayData.status) {
       case "Online":
       case "Full":
       case "Complete":
@@ -54,15 +107,32 @@ export const StaycationBookingCard = ({
       case "Offline":
       case "Remaining":
         return "#E55959";
+      case "Cancelled":
+        return COLORS.text.muted;
       default:
         return COLORS.text.muted;
     }
   };
 
+  // Do not block render with a loader here if we have props (id check)
+  // Only show loader if we have NO data at all and are fetching
+  if (isLoading && bookingId && !displayData.id) {
+    return (
+      <View style={[styles.cardContainer, styles.loaderCard]}>
+        <ActivityIndicator size="small" color="#63A1FD" />
+      </View>
+    );
+  }
+
+  if (!displayData.id && bookingId && !isLoading) return null;
+
   return (
     <TouchableOpacity activeOpacity={0.8} onPress={handlePress} style={styles.cardContainer}>
       <View style={styles.avatarWrapper}>
-        <Avatar source={avatarUrl ? { uri: avatarUrl } : undefined} size={50} />
+        <Avatar
+          source={displayData.avatarUrl ? { uri: displayData.avatarUrl } : undefined}
+          size={50}
+        />
       </View>
 
       <View style={styles.mainContent}>
@@ -70,22 +140,22 @@ export const StaycationBookingCard = ({
         <View style={styles.topHeader}>
           <View style={styles.namePhoneContainer}>
             <Text weight="bold" style={styles.nameText}>
-              {name}
+              {displayData.name}
             </Text>
             <View style={styles.phoneRow}>
               <Phone size={ms(20)} color={COLORS.text.primary} fill={COLORS.text.primary} />
               <Text weight="medium" style={styles.phoneText}>
-                {phone}
+                {displayData.phone}
               </Text>
             </View>
           </View>
 
           <View style={styles.amountStatusWrapper}>
             <Text weight="semiBold" style={styles.amountText}>
-              ₹{amount}
+              ₹{displayData.amount}
             </Text>
             <Text weight="semiBold" style={[styles.statusLabel, { color: getStatusColor() }]}>
-              {status}
+              {displayData.status}
             </Text>
           </View>
         </View>
@@ -95,13 +165,13 @@ export const StaycationBookingCard = ({
           <View style={styles.dateContainer}>
             <Calendar size={ms(20)} color={COLORS.text.primary} />
             <Text weight="semiBold" style={styles.dateText}>
-              {checkIn} - {checkOut}
+              {displayData.checkIn} - {displayData.checkOut}
             </Text>
           </View>
 
           <View style={styles.guestWrapper}>
             <Text weight="semiBold" style={styles.guestText}>
-              {guestCount} Guest
+              {displayData.guestCount} Guest
             </Text>
           </View>
 
@@ -127,6 +197,10 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     gap: hs(10),
+  },
+  loaderCard: {
+    justifyContent: "center",
+    minHeight: vs(80),
   },
   avatarWrapper: {
     // No specific margin needed due to parent gap

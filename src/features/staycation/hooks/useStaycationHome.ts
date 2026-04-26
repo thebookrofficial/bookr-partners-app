@@ -75,11 +75,15 @@ export const useStaycationHome = (serviceId?: string) => {
           `
           id,
           booking_type,
+          booking_status,
+          platform_fee,
           check_in_date,
           check_out_date,
           guest_count,
           total_amount,
           paid_amount,
+          guest_name,
+          guest_phone,
           profiles:user_id ( full_name, phone, avatar_url )
         `,
         )
@@ -99,10 +103,9 @@ export const useStaycationHome = (serviceId?: string) => {
         const checkOutStr = booking.check_out_date;
         const profile = booking.profiles;
 
-        // Determine Color based on online vs manual
-        // Defaulting green for online, orange for manual
-        const isOnline = booking.booking_type === "online";
-        const rangeColor = isOnline ? COLORS.primary : COLORS.danger; // Tailwind Emerald-500 & Amber-500
+        // Differentiate Manual vs Online (consistent with Details screen)
+        const isOnline = (parseFloat(booking.platform_fee) || 0) > 0 && !booking.guest_name;
+        const rangeColor = isOnline ? COLORS.primary : COLORS.danger;
 
         // Map marked dates for Calendar (Period Marking)
         let currentDate = new Date(checkInStr);
@@ -124,14 +127,25 @@ export const useStaycationHome = (serviceId?: string) => {
 
         // Determine Status logic for UI
         let statusTag: StaycationBooking["status"] = isOnline ? "Online" : "Offline";
-        if (booking.paid_amount >= booking.total_amount) statusTag = "Full";
-        else if (booking.paid_amount > 0) statusTag = "Advance";
+
+        if (booking.booking_status === "cancelled") {
+          statusTag = "Cancelled";
+        } else if (booking.paid_amount >= booking.total_amount) {
+          statusTag = "Full";
+        } else if (booking.paid_amount > 0) {
+          statusTag = "Advance";
+        }
+
+        // Additional status: Complete if check_out_date is in the past and NOT cancelled
+        if (checkOutStr < todayStr && booking.booking_status !== "cancelled") {
+          statusTag = "Complete";
+        }
 
         // Format for UI
         const formattedBooking: StaycationBooking = {
           id: booking.id,
-          name: profile?.full_name || "Guest",
-          phone: profile?.phone || "N/A",
+          name: booking.guest_name || profile?.full_name || "Guest",
+          phone: booking.guest_phone || profile?.phone || "N/A",
           avatarUrl: profile?.avatar_url,
           amount: booking.total_amount.toString(),
           status: statusTag,
