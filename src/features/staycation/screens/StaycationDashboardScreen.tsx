@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, LayoutAnimation } from "react-native";
+import React, { useState, useMemo } from "react";
+import { View, StyleSheet, TouchableOpacity, LayoutAnimation, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
@@ -14,46 +14,15 @@ import { CustomRangeSheet } from "../components/CustomRangeSheet";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
 import { useStaycationHome } from "../hooks/useStaycationHome";
+import { useStaycationDashboard } from "../hooks/useStaycationDashboard";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
-// Mock Data
-const MOCK_DATA = {
-  totalBookings: 12,
-  onlineBookings: 5,
-  offlineBookings: 7,
-  totalRevenue: "56000",
-  onlineRevenue: "32000",
-  offlineRevenue: "24000",
-  weeklyRevenue: [
-    { id: "w1", week: "Week 1", dates: "Apr 1- Apr 4", amount: "10400", percentage: 40 },
-    {
-      id: "w2",
-      week: "Week 2",
-      dates: "Apr 5- Apr 11",
-      amount: "56000",
-      percentage: 90,
-      isPrimary: true,
-      dailyBreakdown: [
-        { date: "12 Apr", amount: "10400", percentage: 95 },
-        { date: "13 Apr", amount: "5600", percentage: 50 },
-        { date: "14 Apr", amount: "6400", percentage: 60 },
-        { date: "15 Apr", amount: "4000", percentage: 35 },
-        { date: "16 Apr", amount: "8000", percentage: 75 },
-        { date: "17 Apr", amount: "10400", percentage: 95 },
-        { date: "18 Apr", amount: "11200", percentage: 100 },
-      ],
-    },
-    { id: "w3", week: "Week 2", dates: "Apr 12 - Apr 18", amount: "8000", percentage: 75 },
-    { id: "w4", week: "Week 2", dates: "Apr 19 - Apr 25", amount: "10400", percentage: 85 },
-    { id: "w5", week: "Week 2", dates: "Apr 26 - Apr 30", amount: "10400", percentage: 70 },
-  ],
-};
-
-const DonutChart = ({ size = ms(100), strokeWidth = 6 }) => {
-  // Paths for segments (simplified as static for now, representing Online vs Offline)
-  // Total is 56000. Online 32000 (~57%), Offline 24000 (~43%)
-  const onlineAngle = (32000 / 56000) * 360;
+const DonutChart = ({ size = ms(100), strokeWidth = 6, onlineRevenue, totalRevenue }: any) => {
+  const onlineRevNum = parseFloat(onlineRevenue) || 0;
+  const totalRevNum = parseFloat(totalRevenue) || 0;
+  
+  const onlineAngle = totalRevNum > 0 ? (onlineRevNum / totalRevNum) * 360 : 0;
 
   const createArc = (startAngle: number, sweepAngle: number) => {
     const path = Skia.Path.Make();
@@ -71,24 +40,36 @@ const DonutChart = ({ size = ms(100), strokeWidth = 6 }) => {
   return (
     <View style={{ width: size, height: size }}>
       <Canvas style={styles.flex1}>
-        <Path
-          path={onlinePath}
-          color="#001C65"
-          style="stroke"
-          strokeWidth={strokeWidth}
-          strokeCap="round"
-        />
-        <Path
-          path={offlinePath}
-          color="#63A1FD"
-          style="stroke"
-          strokeWidth={strokeWidth}
-          strokeCap="round"
-        />
+        {totalRevNum > 0 ? (
+          <>
+            <Path
+              path={onlinePath}
+              color="#001C65"
+              style="stroke"
+              strokeWidth={strokeWidth}
+              strokeCap="round"
+            />
+            <Path
+              path={offlinePath}
+              color="#63A1FD"
+              style="stroke"
+              strokeWidth={strokeWidth}
+              strokeCap="round"
+            />
+          </>
+        ) : (
+          <Path
+            path={createArc(0, 360)}
+            color="#F4F7FC"
+            style="stroke"
+            strokeWidth={strokeWidth}
+            strokeCap="round"
+          />
+        )}
       </Canvas>
       <View style={[StyleSheet.absoluteFill, styles.donutOverlay]}>
         <Text variant="body2" weight="bold" color="#00B562" style={styles.revenueAmountText}>
-          +₹{MOCK_DATA.totalRevenue}
+          +₹{totalRevenue}
         </Text>
         <Text variant="body2" color={COLORS.text.primary} style={styles.totalText}>
           Total
@@ -112,16 +93,46 @@ export const StaycationDashboardScreen = () => {
   }
 
   const { venue } = useStaycationHome(serviceId);
+  
   const [selection, setSelection] = useState("This Month");
-  const [activeTab, setActiveTab] = useState("Farmhouse");
+  const [activeTab, setActiveTab] = useState("All Rooms");
   const [expandedWeek, setExpandedWeek] = useState<string | null>(null);
   const [isCustomSheetVisible, setIsCustomSheetVisible] = useState(false);
-  const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>({
-    start: new Date(),
-    end: new Date(),
+  
+  const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(() => {
+    const now = new Date();
+    return {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+    };
   });
 
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    if (selection === "This Month") {
+      return {
+        start: new Date(now.getFullYear(), now.getMonth(), 1),
+        end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+      };
+    } else if (selection === "Last Month") {
+      return {
+        start: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+        end: new Date(now.getFullYear(), now.getMonth(), 0),
+      };
+    }
+    return customRange;
+  }, [selection, customRange]);
+
   const SELECTION_TABS = ["This Month", "Last Month", "Custom"];
+
+  const { isLoading, rooms, stats } = useStaycationDashboard(
+    serviceId || "",
+    dateRange.start,
+    dateRange.end,
+    activeTab
+  );
+
+  const roomTabs = useMemo(() => ["All Rooms", ...rooms.map(r => r.name)], [rooms]);
 
   const toggleWeek = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -139,12 +150,13 @@ export const StaycationDashboardScreen = () => {
   const handleApplyCustomRange = (start: Date, end: Date) => {
     setCustomRange({ start, end });
     setSelection("Custom");
+    setIsCustomSheetVisible(false);
   };
 
   return (
     <ScreenContainer scrollable paddingHorizontal={hs(12)}>
       <StaycationHeader
-        title={venue?.name || "Vally view farmhouse"}
+        title={venue?.name || "Staycation Property"}
         subtitle="Dashboard"
         imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
       />
@@ -191,170 +203,189 @@ export const StaycationDashboardScreen = () => {
         <Text variant="body1" weight="bold" style={styles.bookingsLabel}>
           Bookings
         </Text>
-        <PillTabs
-          tabs={["Farmhouse", "Delux Rooms", "Cottages"]}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          variant="dark"
-          style={styles.pillTabs}
-        />
+        {roomTabs.length > 0 && (
+          <PillTabs
+            tabs={roomTabs}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            variant="dark"
+            style={styles.pillTabs}
+          />
+        )}
       </View>
 
-      {/* Booking Details Section */}
-      <View style={styles.sectionContainer}>
-        <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-          BOOKING DETAILS
-        </Text>
-        <View style={styles.bookingDetailsCard}>
-          <View style={styles.totalBookingsBox}>
-            <View style={styles.totalRow}>
-              <Text variant="h1" weight="bold" style={styles.totalNumber}>
-                {MOCK_DATA.totalBookings}
-              </Text>
-              <Text variant="body2" weight="semiBold" color="#00B562" style={styles.smallTotal}>
-                {MOCK_DATA.totalBookings}
-              </Text>
-            </View>
-            <Text variant="body1" color={COLORS.text.primary} style={styles.totalLabel}>
-              Total bookings
+      {isLoading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      ) : (
+        <>
+          {/* Booking Details Section */}
+          <View style={styles.sectionContainer}>
+            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+              BOOKING DETAILS
             </Text>
-          </View>
+            <View style={styles.bookingDetailsCard}>
+              <View style={styles.totalBookingsBox}>
+                <View style={styles.totalRow}>
+                  <Text variant="h1" weight="bold" style={styles.totalNumber}>
+                    {stats.totalBookings}
+                  </Text>
+                  <Text variant="body2" weight="semiBold" color="#00B562" style={styles.smallTotal}>
+                    {stats.totalBookings}
+                  </Text>
+                </View>
+                <Text variant="body1" color={COLORS.text.primary} style={styles.totalLabel}>
+                  Total bookings
+                </Text>
+              </View>
 
-          <View style={styles.onlineOfflineCol}>
-            <View style={styles.badgeBox}>
-              <Text variant="body2" color="#001C65" style={styles.badgeText}>
-                Online bookings
-              </Text>
-              <Text variant="body1" weight="bold" color="#001C65">
-                {MOCK_DATA.onlineBookings}
-              </Text>
-            </View>
-            <View style={styles.badgeBox}>
-              <Text variant="body2" color="#63A1FD" style={styles.badgeText}>
-                Offline bookings
-              </Text>
-              <Text variant="body1" weight="bold" color="#63A1FD">
-                {MOCK_DATA.offlineBookings}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Revenue Details Section */}
-      <View style={styles.sectionContainer}>
-        <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-          REVENUE DETAILS
-        </Text>
-        <View style={styles.revenueCard}>
-          <DonutChart />
-
-          <View style={styles.revenueCol}>
-            <View style={styles.revenueItem}>
-              <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
-                Online Revenue
-              </Text>
-              <Text variant="h2" weight="bold" color="#001C65">
-                ₹{MOCK_DATA.onlineRevenue}
-              </Text>
-            </View>
-            <View style={styles.revenueItem}>
-              <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
-                Offline Revenue
-              </Text>
-              <Text variant="h2" weight="bold" color="#63A1FD">
-                ₹{MOCK_DATA.offlineRevenue}
-              </Text>
+              <View style={styles.onlineOfflineCol}>
+                <View style={styles.badgeBox}>
+                  <Text variant="body2" color="#001C65" style={styles.badgeText}>
+                    Online bookings
+                  </Text>
+                  <Text variant="body1" weight="bold" color="#001C65">
+                    {stats.onlineBookings}
+                  </Text>
+                </View>
+                <View style={styles.badgeBox}>
+                  <Text variant="body2" color="#63A1FD" style={styles.badgeText}>
+                    Offline bookings
+                  </Text>
+                  <Text variant="body1" weight="bold" color="#63A1FD">
+                    {stats.offlineBookings}
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
-        </View>
-      </View>
 
-      {/* Revenue Graph Section */}
-      <View style={styles.sectionContainer}>
-        <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-          REVENUE GRAPH
-        </Text>
-        <View style={styles.graphList}>
-          {MOCK_DATA.weeklyRevenue.map(item => {
-            const isExpanded = expandedWeek === item.id;
-            return (
-              <View key={item.id}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => item.dailyBreakdown && toggleWeek(item.id)}
-                  style={styles.graphRow}>
-                  <View style={styles.weekLabelBox}>
-                    <Text variant="body2" weight="semiBold" color="#8C8C8C" style={styles.weekText}>
-                      {item.week}
-                    </Text>
-                    <Text variant="body2" style={styles.dateRangeText}>
-                      {item.dates}
-                    </Text>
-                  </View>
-                  <View style={styles.barWrapper}>
-                    <View
-                      style={[
-                        styles.bar,
-                        { width: hs(item.percentage * 2) },
-                        item.isPrimary && styles.primaryBar,
-                      ]}>
-                      <Text
-                        variant="body2"
-                        weight="semiBold"
-                        color={item.isPrimary ? "#FFFFFF" : "#00B562"}
-                        style={styles.barAmount}>
-                        +₹{item.amount}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.arrowIcon}>
-                    {item.dailyBreakdown ? (
-                      isExpanded ? (
-                        <ChevronDown size={ms(18)} color={COLORS.text.primary} />
-                      ) : (
-                        <ChevronRight size={ms(18)} color={COLORS.text.primary} />
-                      )
-                    ) : (
-                      <ChevronRight size={ms(18)} color={COLORS.text.primary} />
-                    )}
-                  </View>
-                </TouchableOpacity>
+          {/* Revenue Details Section */}
+          <View style={styles.sectionContainer}>
+            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+              REVENUE DETAILS
+            </Text>
+            <View style={styles.revenueCard}>
+              <DonutChart 
+                onlineRevenue={stats.onlineRevenue} 
+                totalRevenue={stats.totalRevenue} 
+              />
 
-                {isExpanded && item.dailyBreakdown && (
-                  <View style={styles.dailyList}>
-                    {item.dailyBreakdown.map((day, dIdx) => (
-                      <View key={dIdx} style={styles.dailyRow}>
-                        <View style={styles.dayLabelBox}>
-                          <Text
-                            variant="body2"
-                            weight="semiBold"
-                            color={COLORS.text.primary}
-                            style={styles.dayText}>
-                            {day.date}
+              <View style={styles.revenueCol}>
+                <View style={styles.revenueItem}>
+                  <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
+                    Online Revenue
+                  </Text>
+                  <Text variant="h2" weight="bold" color="#001C65">
+                    ₹{stats.onlineRevenue}
+                  </Text>
+                </View>
+                <View style={styles.revenueItem}>
+                  <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
+                    Offline Revenue
+                  </Text>
+                  <Text variant="h2" weight="bold" color="#63A1FD">
+                    ₹{stats.offlineRevenue}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Revenue Graph Section */}
+          <View style={styles.sectionContainer}>
+            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+              REVENUE GRAPH
+            </Text>
+            <View style={styles.graphList}>
+              {stats.weeklyRevenue.length > 0 ? (
+                stats.weeklyRevenue.map(item => {
+                  const isExpanded = expandedWeek === item.id;
+                  return (
+                    <View key={item.id}>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => item.dailyBreakdown && toggleWeek(item.id)}
+                        style={styles.graphRow}>
+                        <View style={styles.weekLabelBox}>
+                          <Text variant="body2" weight="semiBold" color="#8C8C8C" style={styles.weekText}>
+                            {item.week}
+                          </Text>
+                          <Text variant="body2" style={styles.dateRangeText}>
+                            {item.dates}
                           </Text>
                         </View>
                         <View style={styles.barWrapper}>
-                          <View style={[styles.bar, { width: hs(day.percentage * 2) }]}>
+                          <View
+                            style={[
+                              styles.bar,
+                              { width: hs(Math.max(item.percentage * 2, 20)) }, // Min width for visibility
+                              item.isPrimary && styles.primaryBar,
+                            ]}>
                             <Text
                               variant="body2"
                               weight="semiBold"
-                              color="#63A1FD"
+                              color={item.isPrimary ? "#FFFFFF" : "#00B562"}
                               style={styles.barAmount}>
-                              +₹{day.amount}
+                              +₹{item.amount}
                             </Text>
                           </View>
                         </View>
-                        <View style={styles.arrowIcon} />
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            );
-          })}
-        </View>
-      </View>
+                        <View style={styles.arrowIcon}>
+                          {item.dailyBreakdown ? (
+                            isExpanded ? (
+                              <ChevronDown size={ms(18)} color={COLORS.text.primary} />
+                            ) : (
+                              <ChevronRight size={ms(18)} color={COLORS.text.primary} />
+                            )
+                          ) : (
+                            <ChevronRight size={ms(18)} color={COLORS.text.primary} />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+
+                      {isExpanded && item.dailyBreakdown && (
+                        <View style={styles.dailyList}>
+                          {item.dailyBreakdown.map((day, dIdx) => (
+                            <View key={dIdx} style={styles.dailyRow}>
+                              <View style={styles.dayLabelBox}>
+                                <Text
+                                  variant="body2"
+                                  weight="semiBold"
+                                  color={COLORS.text.primary}
+                                  style={styles.dayText}>
+                                  {day.date}
+                                </Text>
+                              </View>
+                              <View style={styles.barWrapper}>
+                                <View style={[styles.bar, { width: hs(Math.max(day.percentage * 2, 20)) }]}>
+                                  <Text
+                                    variant="body2"
+                                    weight="semiBold"
+                                    color="#63A1FD"
+                                    style={styles.barAmount}>
+                                    +₹{day.amount}
+                                  </Text>
+                                </View>
+                              </View>
+                              <View style={styles.arrowIcon} />
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Text variant="body2" color="#8C8C8C">No revenue data for this period</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </>
+      )}
 
       <View style={{ height: vs(120) }} />
     </ScreenContainer>
@@ -564,5 +595,17 @@ const styles = StyleSheet.create({
   },
   totalText: {
     fontSize: fs(10),
+  },
+  loaderContainer: {
+    height: vs(300),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyContainer: {
+    height: vs(100),
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
   },
 });
