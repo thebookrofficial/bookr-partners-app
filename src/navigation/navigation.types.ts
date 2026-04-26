@@ -10,6 +10,7 @@ export type AuthStackParamList = {
   Login: undefined;
   Otp: { email: string };
   Signup: undefined;
+  LegalView: { title: string; content: string };
 };
 
 // 2. Define the Bottom Tab screens for Sports

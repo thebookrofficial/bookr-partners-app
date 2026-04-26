@@ -10,6 +10,7 @@ import { vs, hs, ms, fs } from "@/utils/responsive.utils";
 import { useAuthLogic } from "../hooks/useAuthLogic";
 import { AuthTextInput } from "../components/AuthTextInput";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LEGAL_TEXT } from "@/constants/legal";
 
 export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
   const [email, setEmail] = useState("");
@@ -18,6 +19,20 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
   const handleEmailContinue = () => {
     loginWithEmail(email, () => {
       navigation.navigate("Otp", { email: email.trim() });
+    });
+  };
+
+  const navigateToPrivacyPolicy = () => {
+    navigation.navigate("LegalView", {
+      title: LEGAL_TEXT.privacy.title,
+      content: LEGAL_TEXT.privacy.content,
+    });
+  };
+
+  const navigateToTerms = () => {
+    navigation.navigate("LegalView", {
+      title: LEGAL_TEXT.terms.title,
+      content: LEGAL_TEXT.terms.content,
     });
   };
 
@@ -82,7 +97,7 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
           By continuing, you agree to our
         </Text>
         <View style={styles.footerLinks}>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={navigateToPrivacyPolicy}>
             <Text
               variant="caption"
               weight="bold"
@@ -95,7 +110,7 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
             {" "}
             and{" "}
           </Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={navigateToTerms}>
             <Text
               variant="caption"
               weight="bold"
