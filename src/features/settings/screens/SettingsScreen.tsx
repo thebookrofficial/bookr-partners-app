@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import { View, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Alert, Linking } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { SettingsActionRow } from "../components/SettingsActionRow";
@@ -28,13 +28,39 @@ export const SettingsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { logout } = useAuthLogic();
 
+  // HIGHLY COMPLIANT DELETION LOGIC
   const handleDeleteAccount = () => {
     Alert.alert(
       "Delete Account",
-      "To delete your account and permanently remove all associated venue data from the platform, please contact us at support@thebookr.in.\n\nOur team will process your account termination request within 30 days.",
+      "Are you sure you want to delete your account? This will permanently remove your vendor profile and all associated data within 30 days.",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Understood", style: "default" },
+        {
+          text: "Request Deletion",
+          style: "destructive",
+          onPress: async () => {
+            const subject = encodeURIComponent("Account Deletion Request - Bookr Partner");
+            const body = encodeURIComponent(
+              "Hello Support Team,\n\nI would like to request the deletion of my Bookr Partner account and all associated data. Please process my request.\n\nThank you.",
+            );
+            const url = `mailto:support@thebookr.in?subject=${subject}&body=${body}`;
+
+            try {
+              const supported = await Linking.canOpenURL(url);
+              if (supported) {
+                await Linking.openURL(url);
+              } else {
+                // Fallback if no email client is installed
+                Alert.alert(
+                  "Action Required",
+                  "Please email support@thebookr.in directly from your registered email address to process your deletion.",
+                );
+              }
+            } catch (error) {
+              console.error("Error opening email client", error);
+            }
+          },
+        },
       ],
     );
   };
