@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput } from "react-native";
 import { Text } from "@/components/ui";
 import { AuthScreenProps } from "@/navigation/navigation.types";
@@ -10,6 +10,7 @@ import { vs, hs, ms, fs } from "@/utils/responsive.utils";
 import { ChevronLeft } from "lucide-react-native";
 import { useAuthLogic } from "../hooks/useAuthLogic";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LEGAL_TEXT } from "@/constants/legal";
 
 const OTP_LENGTH = 6;
 const TIMER_SECONDS = 30;
@@ -23,6 +24,8 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
   const [isFocused, setIsFocused] = useState(false);
   const [timer, setTimer] = useState(TIMER_SECONDS);
 
+  const hasSubmitted = useRef(false);
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (timer > 0) {
@@ -33,8 +36,12 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
 
   // Trigger API call the exact millisecond the 6th digit is typed
   useEffect(() => {
-    if (code.length === OTP_LENGTH) {
+    if (code.length === OTP_LENGTH && !hasSubmitted.current) {
+      hasSubmitted.current = true; // Lock the gate!
       verifyOtpCode(email, code);
+    } else if (code.length < OTP_LENGTH) {
+      // If the user deletes a number to fix a typo, unlock the gate so they can submit again
+      hasSubmitted.current = false;
     }
   }, [code, email, verifyOtpCode]);
 
@@ -46,6 +53,20 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
 
   const handleResend = () => {
     resendOtpCode(email, () => setTimer(TIMER_SECONDS));
+  };
+
+  const navigateToPrivacyPolicy = () => {
+    navigation.navigate("LegalView", {
+      title: LEGAL_TEXT.privacy.title,
+      content: LEGAL_TEXT.privacy.content,
+    });
+  };
+
+  const navigateToTerms = () => {
+    navigation.navigate("LegalView", {
+      title: LEGAL_TEXT.terms.title,
+      content: LEGAL_TEXT.terms.content,
+    });
   };
 
   return (
@@ -129,7 +150,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
           By continuing, you agree to our
         </Text>
         <View style={styles.footerLinks}>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={navigateToPrivacyPolicy}>
             <Text
               variant="caption"
               weight="bold"
@@ -142,7 +163,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
             {" "}
             and{" "}
           </Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={navigateToTerms}>
             <Text
               variant="caption"
               weight="bold"

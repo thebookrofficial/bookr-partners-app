@@ -14,27 +14,32 @@ import { useNavigation } from "@react-navigation/native";
 import { COLORS } from "@/constants/theme";
 import { useAuthStore } from "@/store";
 import { useEditProfile } from "../hooks/useEditProfile";
-import { launchImageLibrary } from "react-native-image-picker";
+// import { launchImageLibrary } from "react-native-image-picker";
 
-const GstinLabel = () => (
-  <View style={styles.gstinLabelContainer}>
-    <Text variant="body2" weight="medium" color={COLORS.text.muted}>
-      GSTIN No
-    </Text>
-    <TouchableOpacity style={styles.checkboxWrapper} activeOpacity={0.7}>
-      <Text variant="body2" weight="medium" color={COLORS.text.muted}>
-        Dont have
-      </Text>
-      <View style={styles.checkboxOutline} />
-    </TouchableOpacity>
-  </View>
-);
+// const GstinLabel = () => (
+//   <View style={styles.gstinLabelContainer}>
+//     <Text variant="body2" weight="medium" color={COLORS.text.muted}>
+//       GSTIN No
+//     </Text>
+//     <TouchableOpacity style={styles.checkboxWrapper} activeOpacity={0.7}>
+//       <Text variant="body2" weight="medium" color={COLORS.text.muted}>
+//         Dont have
+//       </Text>
+//       <View style={styles.checkboxOutline} />
+//     </TouchableOpacity>
+//   </View>
+// );
 
 export const EditProfileScreen = () => {
   const navigation = useNavigation();
   // Destructure 'profile' instead of 'user' for custom DB fields
   const { user, profile, clientProfile } = useAuthStore();
-  const { updateProfile, isUpdating, uploadAvatar, isUploading } = useEditProfile();
+  const {
+    updateProfile,
+    isUpdating,
+    // uploadAvatar,
+    isUploading,
+  } = useEditProfile();
 
   // Correctly map to the Profile interface (Blueprint Table 4.1)
   const [fullName, setFullName] = useState(profile?.full_name || "");
@@ -46,24 +51,24 @@ export const EditProfileScreen = () => {
     if (profile?.phone) setMobile(profile.phone);
   }, [profile]);
 
-  const handlePickImage = async () => {
-    try {
-      const result = await launchImageLibrary({
-        mediaType: "photo",
-        includeBase64: true,
-        quality: 0.7,
-        selectionLimit: 1, // Only one photo
-      });
+  // const handlePickImage = async () => {
+  //   try {
+  //     const result = await launchImageLibrary({
+  //       mediaType: "photo",
+  //       includeBase64: true,
+  //       quality: 0.7,
+  //       selectionLimit: 1, // Only one photo
+  //     });
 
-      if (result.didCancel) {
-      } else if (result.errorCode) {
-      } else if (result.assets && result.assets.length > 0) {
-        await uploadAvatar(result.assets[0]);
-      }
-    } catch (error) {
-      console.error("Gallery Error:", error);
-    }
-  };
+  //     if (result.didCancel) {
+  //     } else if (result.errorCode) {
+  //     } else if (result.assets && result.assets.length > 0) {
+  //       await uploadAvatar(result.assets[0]);
+  //     }
+  //   } catch (error) {
+  //     console.error("Gallery Error:", error);
+  //   }
+  // };
 
   /**
    * Coordinate the state variables with the hook parameters.
@@ -105,7 +110,7 @@ export const EditProfileScreen = () => {
           size={100}
           source={profile?.avatar_url ? { uri: profile.avatar_url } : undefined}
           fallbackInitials={profile?.full_name?.charAt(0) || "P"}
-          onEditPress={handlePickImage} // Wired up!
+          // onEditPress={handlePickImage} // Wired up!
           loading={isUploading}
         />
       </View>
@@ -131,7 +136,7 @@ export const EditProfileScreen = () => {
       </View>
 
       {/* 4. Read-Only Financial Info (Blueprint Tables 4.2 & 4.3) */}
-      <View style={styles.formSection}>
+      {/* <View style={styles.formSection}>
         <View style={styles.row}>
           <View style={styles.halfWidth}>
             <TextInput
@@ -176,7 +181,7 @@ export const EditProfileScreen = () => {
           editable={false}
           style={styles.disabledInput}
         />
-      </View>
+      </View> */}
 
       {/* 5. Help & Support Section */}
       <View style={styles.helpSection}>

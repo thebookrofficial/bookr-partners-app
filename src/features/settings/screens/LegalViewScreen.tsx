@@ -51,7 +51,7 @@ export const LegalViewScreen = () => {
         );
       }
 
-      // 3. Bullet points
+      // 3. Bullet points (SAFE RENDER FOR ANDROID)
       if (line.trim().startsWith("* ")) {
         const parts = line.trim().replace("* ", "").split(":");
         if (parts.length > 1) {
@@ -60,12 +60,14 @@ export const LegalViewScreen = () => {
               <Text variant="body2" style={styles.bulletSymbol}>
                 •
               </Text>
-              <Text variant="body2" style={styles.bulletText}>
-                <Text variant="body2" weight="bold">
+              <View style={styles.bulletContent}>
+                <Text variant="body2" weight="bold" style={styles.primaryText}>
                   {parts[0]}:
                 </Text>
-                {parts.slice(1).join(":")}
-              </Text>
+                <Text variant="body2" style={styles.primaryText}>
+                  {" " + parts.slice(1).join(":")}
+                </Text>
+              </View>
             </View>
           );
         }
@@ -91,18 +93,22 @@ export const LegalViewScreen = () => {
       const parts = line.split(boldRegex);
       if (parts.length > 1) {
         return (
-          <Text key={index} variant="body2" style={styles.paragraph}>
+          <View key={index} style={styles.inlineBoldContainer}>
             {parts.map((part, i) => {
               if (i % 2 === 1) {
                 return (
-                  <Text key={i} variant="body2" weight="bold">
+                  <Text key={i} variant="body2" weight="bold" style={styles.primaryText}>
                     {part}
                   </Text>
                 );
               }
-              return part;
+              return (
+                <Text key={i} variant="body2" style={styles.primaryText}>
+                  {part}
+                </Text>
+              );
             })}
-          </Text>
+          </View>
         );
       }
 
@@ -206,5 +212,18 @@ const styles = StyleSheet.create({
   },
   spacing: {
     height: vs(8),
+  },
+  bulletContent: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  inlineBoldContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: vs(12),
+  },
+  primaryText: {
+    color: COLORS.text.primary,
   },
 });

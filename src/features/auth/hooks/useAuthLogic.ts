@@ -14,22 +14,39 @@ import {
 export const useAuthLogic = () => {
   const [isLoading, setIsLoading] = useState(false);
 
-  const loginWithEmail = async (email: string, onSuccess: () => void) => {
+  // We added an 'isBypass' flag to the onSuccess callback
+  const loginWithEmail = async (email: string, onSuccess: (isBypass?: boolean) => void) => {
     if (!email.trim() || !email.includes("@")) {
       Alert.alert("Invalid Email", "Please enter a valid email address.");
       return;
     }
 
+    const formattedEmail = email.trim().toLowerCase();
     setIsLoading(true);
+
+    // --- TEST ACCOUNT PASSWORD BYPASS ---
+    if (formattedEmail === "test.client@gmail.com") {
+      // Simulation delay for realism
+      setTimeout(() => {
+        setIsLoading(false);
+        onSuccess(false); // Force navigation to OTP screen even for test account
+      }, 800);
+      return;
+    }
+    // ------------------------------------
+
+    // --- NORMAL OTP FLOW FOR EVERYONE ELSE ---
     const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
+      email: formattedEmail,
     });
+
     setIsLoading(false);
 
     if (error) {
       Alert.alert("Login Error", error.message);
     } else {
-      onSuccess();
+      // Pass 'false' so the UI knows to navigate to the OTP screen
+      onSuccess(false);
     }
   };
 
@@ -39,24 +56,20 @@ export const useAuthLogic = () => {
       await GoogleSignin.hasPlayServices();
       const response = await GoogleSignin.signIn();
 
-      // v11+: Check if the response was successful before accessing data
       if (isSuccessResponse(response)) {
         if (response.data.idToken) {
           const { error } = await supabase.auth.signInWithIdToken({
             provider: "google",
-            token: response.data.idToken, // ID Token is now nested inside `data`
+            token: response.data.idToken,
           });
           if (error) throw error;
         } else {
           throw new Error("No ID token present!");
         }
       } else {
-        // Sign in was cancelled by the user.
-        // We removed the console.log to fix the ESLint warning!
         return;
       }
     } catch (error: any) {
-      // v11+: Use the built-in type guard for error checking
       if (isErrorWithCode(error)) {
         if (error.code === statusCodes.IN_PROGRESS) {
           // operation is in progress already
@@ -75,11 +88,25 @@ export const useAuthLogic = () => {
 
   const verifyOtpCode = async (email: string, code: string) => {
     setIsLoading(true);
+    const formattedEmail = email.trim().toLowerCase();
+
+    // HARDCODED BYPASS FOR GOOGLE REVIEWER
+    if (formattedEmail === "test.client@gmail.com" && code === "123456") {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: formattedEmail,
+        password: "@TheBookr!official18",
+      });
+      setIsLoading(false);
+      if (error) Alert.alert("Reviewer Login Error", error.message);
+      return;
+    }
+
     const { error } = await supabase.auth.verifyOtp({
-      email,
+      email: email.trim().toLowerCase(),
       token: code,
       type: "email",
     });
+
     setIsLoading(false);
 
     if (error) {
@@ -88,7 +115,10 @@ export const useAuthLogic = () => {
   };
 
   const resendOtpCode = async (email: string, onResent: () => void) => {
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const formattedEmail = email.trim().toLowerCase();
+
+    const { error } = await supabase.auth.signInWithOtp({ email: formattedEmail });
+
     if (error) {
       Alert.alert("Error", error.message);
     } else {

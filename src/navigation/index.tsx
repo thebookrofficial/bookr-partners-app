@@ -292,6 +292,7 @@ const AuthNavigator = () => (
     <AuthStack.Screen name="Login" component={LoginScreen} />
     <AuthStack.Screen name="Otp" component={OtpScreen} />
     <AuthStack.Screen name="Signup" component={SignupScreen} />
+    <AuthStack.Screen name="LegalView" component={LegalViewScreen} />
   </AuthStack.Navigator>
 );
 

@@ -90,3 +90,14 @@ jest.mock("react-native-reanimated", () => {
     makeMutable: jest.fn(val => ({ value: val })),
   };
 });
+
+// Mock Stallion OTA wrapper
+jest.mock(
+  "react-native-stallion",
+  () => {
+    return {
+      withStallion: Component => Component,
+    };
+  },
+  { virtual: true },
+); // <-- This tells Jest to skip verifying if the module exists

@@ -6,14 +6,40 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppNavigator } from "@/navigation";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 
+import { withStallion } from "react-native-stallion";
+import * as Sentry from "@sentry/react-native";
+
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+
+Sentry.init({
+  dsn: "https://1e5c2af53e98693d5aeb9e7594f94637@o4510850078408704.ingest.us.sentry.io/4511290945699840",
+
+  // Adds more context data to events (IP address, cookies, user, etc.)
+  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: true,
+
+  // Enable Logs
+  enableLogs: true,
+
+  // Configure Session Replay
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1,
+  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // spotlight: __DEV__,
+});
+
 // 1. Global Initializations
 GoogleSignin.configure({
   scopes: ["https://www.googleapis.com/auth/userinfo.email"],
-  webClientId: "YOUR_NEW_WEB_CLIENT_ID.apps.googleusercontent.com",
+  webClientId: "1077467918306-rc8kc027ijd7oheqomq550s44udqfu32.apps.googleusercontent.com",
 });
 
 function App() {
   const isDarkMode = useColorScheme() === "dark";
+
+  usePushNotifications();
 
   return (
     <SafeAreaProvider>
@@ -27,4 +53,4 @@ function App() {
   );
 }
 
-export default App;
+export default Sentry.wrap(withStallion(App));
