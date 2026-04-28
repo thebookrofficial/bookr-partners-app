@@ -11,6 +11,7 @@ export interface BookingDetailData {
   paid_amount: number;
   guest_name: string | null; // Added
   guest_phone: string | null; // Added
+  slot_id: string; // Added
   profiles: { full_name: string; phone: string; avatar_url: string };
   sports_slots: { start_time: string; end_time: string; slot_date: string };
   venues: { name: string; vertical: string };
@@ -38,7 +39,7 @@ export const useBookingDetails = (bookingId: string) => {
         .from("sports_bookings")
         .select(
           `
-          id, total_amount, paid_amount, guest_name, guest_phone,
+          id, total_amount, paid_amount, guest_name, guest_phone, slot_id,
           profiles ( full_name, phone, avatar_url ),
           sports_slots ( start_time, end_time, slot_date ),
           venues ( name, vertical )
@@ -125,9 +126,48 @@ export const useBookingDetails = (bookingId: string) => {
     }
   };
 
+  const cancelBooking = async () => {
+    if (!booking) return false;
+    setIsSaving(true);
+    try {
+      // 1. Update booking status
+      const { error: bookingError } = await supabase
+        .from("sports_bookings")
+        .update({ booking_status: "cancelled" })
+        .eq("id", bookingId);
+
+      if (bookingError) throw bookingError;
+
+      // 2. Update slot status to available
+      const { error: slotError } = await supabase
+        .from("sports_slots")
+        .update({ status: "available" })
+        .eq("id", booking.slot_id);
+
+      if (slotError) throw slotError;
+
+      Alert.alert("Success", "Booking cancelled successfully.");
+      await fetchDetails();
+      return true;
+    } catch (error: any) {
+      Alert.alert("Cancellation Failed", error.message);
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (bookingId) fetchDetails();
   }, [bookingId, fetchDetails]);
 
-  return { booking, paymentLogs, loading, isSaving, logPayment, refresh: fetchDetails };
+  return {
+    booking,
+    paymentLogs,
+    loading,
+    isSaving,
+    logPayment,
+    cancelBooking,
+    refresh: fetchDetails,
+  };
 };

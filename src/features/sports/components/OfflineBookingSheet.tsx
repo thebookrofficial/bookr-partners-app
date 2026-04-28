@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Pressable,
 } from "react-native";
 import { Text, TextInput } from "@/components/ui";
 import {
@@ -59,6 +60,7 @@ const offlineBookingSchema = z.object({
 });
 
 const parseTimeTo24Hour = (time12h: string) => {
+  if (time12h === "12 AM") return "00:00:00";
   const [time, modifier] = time12h.split(" ");
   let hours = parseInt(time, 10);
   if (hours === 12 && modifier === "AM") hours = 0;
@@ -98,32 +100,38 @@ export const OfflineBookingSheet = ({
   const [bookedHours, setBookedHours] = useState<string[]>([]);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
 
+  // Pricing State
+  const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0 });
+
   // Hour Selection State
-  const [fromTime, setFromTime] = useState("7 AM");
-  const [toTime, setToTime] = useState("8 AM");
+  const [fromTime, setFromTime] = useState("Start Time");
+  const [toTime, setToTime] = useState("End Time");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
 
-  const HOURS = [
-    "6 AM",
-    "7 AM",
-    "8 AM",
-    "9 AM",
-    "10 AM",
-    "11 AM",
-    "12 PM",
-    "1 PM",
-    "2 PM",
-    "3 PM",
-    "4 PM",
-    "5 PM",
-    "6 PM",
-    "7 PM",
-    "8 PM",
-    "9 PM",
-    "10 PM",
-    "11 PM",
-    "12 AM",
-  ];
+  const HOURS = useMemo(
+    () => [
+      "6 AM",
+      "7 AM",
+      "8 AM",
+      "9 AM",
+      "10 AM",
+      "11 AM",
+      "12 PM",
+      "1 PM",
+      "2 PM",
+      "3 PM",
+      "4 PM",
+      "5 PM",
+      "6 PM",
+      "7 PM",
+      "8 PM",
+      "9 PM",
+      "10 PM",
+      "11 PM",
+      "12 AM",
+    ],
+    [],
+  );
 
   useEffect(() => {
     const fetchUnavailableSlots = async () => {
@@ -178,57 +186,80 @@ export const OfflineBookingSheet = ({
   // UPDATED AUTO-FILL & HISTORY CHECK LOGIC
   useEffect(() => {
     const lookupGuestAndHistory = async () => {
+      // Clean the mobile number to digits only
       const cleanMobile = mobile.replace(/[^\d]/g, "");
 
-      if (cleanMobile.length < 10) {
-        setName("");
+      // ONLY trigger the database lookup when we have exactly 10 digits (Standard Indian Mobile)
+      if (cleanMobile.length !== 10) {
         setHasHistory(false);
         return;
       }
+
+      // Generate the variants to match how it might be saved in the database
+      const phoneVariants = [cleanMobile, `+91${cleanMobile}`, `+91 ${cleanMobile}`];
+
+      // Build safe OR query strings for Supabase
+      const phoneOrQuery = phoneVariants.map(v => `phone.eq.${v}`).join(",");
+      const guestPhoneOrQuery = phoneVariants.map(v => `guest_phone.eq.${v}`).join(",");
 
       try {
         // 1. Try to Resolve Bookr Profile
         const { data: profile } = await supabase
           .from("profiles")
           .select("id, full_name")
-          .eq("phone", cleanMobile)
+          .or(phoneOrQuery)
           .maybeSingle();
 
         let foundName = profile?.full_name || "";
 
-        // 2. If no Bookr Profile, lookup latest Manual Guest Name from bookings
+        // 2. If no Bookr Profile, lookup latest Manual Guest Name from Sports
         if (!foundName) {
-          const { data: lastManualBooking } = await supabase
+          const { data: sportsBooking } = await supabase
             .from("sports_bookings")
             .select("guest_name")
-            .eq("guest_phone", cleanMobile)
+            .or(guestPhoneOrQuery)
             .not("guest_name", "is", null)
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (lastManualBooking?.guest_name) {
-            foundName = lastManualBooking.guest_name;
+          if (sportsBooking?.guest_name) {
+            foundName = sportsBooking.guest_name;
           }
         }
 
-        setName(foundName);
+        // 3. If still nothing, check Dining Bookings
+        if (!foundName) {
+          const { data: diningBooking } = await supabase
+            .from("dining_bookings")
+            .select("guest_name")
+            .or(guestPhoneOrQuery)
+            .not("guest_name", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-        // 3. Check for Previous History (Manual Guest OR Bookr Profile)
-        // We check if either user_id matches profile OR guest_phone matches input
+          if (diningBooking?.guest_name) {
+            foundName = diningBooking.guest_name;
+          }
+        }
+
+        // IMPORTANT: Only set the name if we ACTUALLY found one in the DB!
+        // This prevents erasing the name if the vendor has already started typing it manually.
+        if (foundName) {
+          setName(foundName);
+        }
+
+        // 4. Check for Previous History (For the History Button)
+        const historyOrQuery = guestPhoneOrQuery + (profile?.id ? `,user_id.eq.${profile.id}` : "");
         const { count, error: historyError } = await supabase
           .from("sports_bookings")
           .select("id", { count: "exact", head: true })
-          .or(
-            `guest_phone.eq.${cleanMobile},user_id.eq.${
-              profile?.id || "00000000-0000-0000-0000-000000000000"
-            }`,
-          );
+          .or(historyOrQuery);
 
         setHasHistory(!historyError && !!count && count > 0);
       } catch (err) {
         console.error("Lookup error:", err);
-        setName("");
         setHasHistory(false);
       }
     };
@@ -243,12 +274,16 @@ export const OfflineBookingSheet = ({
       try {
         const { data } = await supabase
           .from("venues")
-          .select("price_per_hour, min_advance_amount")
+          .select("price_per_hour, day_price, night_price, min_advance_amount")
           .eq("id", venueId)
           .single();
 
         if (data) {
-          setTotalPayment(data.price_per_hour?.toString() || "");
+          setPricing({
+            day: (data as any).day_price || data.price_per_hour || 0,
+            night: (data as any).night_price || data.price_per_hour || 0,
+            default: data.price_per_hour || 0,
+          });
           setAdvancePaid(data.min_advance_amount?.toString() || "");
         }
       } catch (err) {
@@ -257,6 +292,42 @@ export const OfflineBookingSheet = ({
     };
     fetchVenuePricing();
   }, [venueId, isVisible]);
+
+  // AUTO-CALCULATE TOTAL PAYMENT
+  useEffect(() => {
+    if (
+      !fromTime ||
+      !toTime ||
+      fromTime === "Start Time" ||
+      toTime === "End Time" ||
+      pricing.default === 0
+    ) {
+      return;
+    }
+
+    const startIdx = HOURS.indexOf(fromTime);
+    const endIdx = HOURS.indexOf(toTime);
+
+    if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) return;
+
+    const selectedHours = HOURS.slice(startIdx, endIdx);
+    let total = 0;
+
+    selectedHours.forEach(hour => {
+      // Day Session: 6 AM to 5 PM
+      // Night Session: 5 PM to 12 AM
+      const hIdx = HOURS.indexOf(hour);
+      const fivePMIdx = HOURS.indexOf("5 PM");
+
+      if (hIdx < fivePMIdx) {
+        total += pricing.day || pricing.default;
+      } else {
+        total += pricing.night || pricing.default;
+      }
+    });
+
+    setTotalPayment(total.toString());
+  }, [fromTime, toTime, pricing, HOURS]);
 
   const handleBookNow = async () => {
     const cleanMobile = mobile.replace(/[^\d]/g, "");
@@ -492,12 +563,10 @@ export const OfflineBookingSheet = ({
         </TouchableOpacity>
       </TouchableOpacity>
 
-      {/* Picker Modals (Same as before) */}
+      {/* FIXED HOUR PICKER MODAL */}
       <Modal visible={!!showHourPicker} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowHourPicker(null)}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowHourPicker(null)} />
           <View style={styles.hourPickerContainer}>
             <Text variant="body1" weight="bold" style={styles.pickerHeader}>
               Select {showHourPicker === "from" ? "Start" : "End"} Time
@@ -506,7 +575,10 @@ export const OfflineBookingSheet = ({
             {isFetchingSlots ? (
               <ActivityIndicator color={COLORS.primary} style={{ margin: vs(20) }} />
             ) : (
-              <ScrollView style={styles.hourList} showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={styles.hourList}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}>
                 {HOURS.map((hour, index) => {
                   const isBooked = bookedHours.includes(hour);
                   let isDisabled = false;
@@ -569,7 +641,7 @@ export const OfflineBookingSheet = ({
               </ScrollView>
             )}
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       <Modal

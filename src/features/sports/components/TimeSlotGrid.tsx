@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useState, useMemo } from "react";
+import { View, StyleSheet, TouchableOpacity, LayoutChangeEvent } from "react-native";
 import { Text } from "@/components/ui";
 import { ChevronRight, ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -26,6 +26,9 @@ interface TimeSlotGridProps {
   isNested?: boolean; // Determines if it renders as a flat grid or categorized accordions
 }
 
+const NUM_COLUMNS = 6;
+const SLOT_GAP = hs(10);
+
 // ----------------------------------------------------
 // HELPER COMPONENT: Render a single Slot Pill
 // ----------------------------------------------------
@@ -37,6 +40,7 @@ const SlotPill = ({
   isOnline,
   isManual,
   onSlotPress,
+  slotWidth,
 }: any) => (
   <TouchableOpacity
     activeOpacity={0.7}
@@ -44,6 +48,7 @@ const SlotPill = ({
     onPress={() => onSlotPress?.(slot)}
     style={[
       styles.slot,
+      { width: slotWidth },
       isAvailable && styles.slotAvailable,
       isBlocked && styles.slotBlocked,
       isOnline && styles.slotOnline,
@@ -54,6 +59,7 @@ const SlotPill = ({
       variant="body2"
       weight="semiBold"
       color={isAvailable ? COLORS.text.primary : isUnavailable ? "#BEBEBE" : COLORS.text.inverse}
+      align="center"
       style={styles.tabText}>
       {slot.time}
     </Text>
@@ -63,7 +69,7 @@ const SlotPill = ({
 // ----------------------------------------------------
 // HELPER COMPONENT: Accordion Section
 // ----------------------------------------------------
-const SlotAccordion = ({ title, data, selectedDate, onSlotPress }: any) => {
+const SlotAccordion = ({ title, data, selectedDate, onSlotPress, slotWidth }: any) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const now = new Date();
@@ -117,6 +123,7 @@ const SlotAccordion = ({ title, data, selectedDate, onSlotPress }: any) => {
                 isOnline={isOnline}
                 isManual={isManual}
                 onSlotPress={onSlotPress}
+                slotWidth={slotWidth}
               />
             );
           })}
@@ -132,6 +139,17 @@ export const TimeSlotGrid = ({
   onSlotPress,
   isNested = false,
 }: TimeSlotGridProps) => {
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  const onLayout = (event: LayoutChangeEvent) => {
+    setContainerWidth(event.nativeEvent.layout.width);
+  };
+
+  const slotWidth = useMemo(() => {
+    if (!containerWidth) return 0;
+    return (containerWidth - (NUM_COLUMNS - 1) * SLOT_GAP) / NUM_COLUMNS;
+  }, [containerWidth]);
+
   const now = new Date();
   const isToday =
     selectedDate.getDate() === now.getDate() &&
@@ -157,24 +175,27 @@ export const TimeSlotGrid = ({
     });
 
     return (
-      <View style={styles.nestedContainer}>
+      <View style={styles.nestedContainer} onLayout={onLayout}>
         <SlotAccordion
           title="Morning Slots"
           data={morningSlots}
           selectedDate={selectedDate}
           onSlotPress={onSlotPress}
+          slotWidth={slotWidth}
         />
         <SlotAccordion
           title="Afternoon Slots"
           data={afternoonSlots}
           selectedDate={selectedDate}
           onSlotPress={onSlotPress}
+          slotWidth={slotWidth}
         />
         <SlotAccordion
           title="Evening Slots"
           data={eveningSlots}
           selectedDate={selectedDate}
           onSlotPress={onSlotPress}
+          slotWidth={slotWidth}
         />
       </View>
     );
@@ -182,7 +203,7 @@ export const TimeSlotGrid = ({
 
   // Fallback to traditional flat grid for Football
   return (
-    <View style={styles.grid}>
+    <View style={styles.grid} onLayout={onLayout}>
       {slots.map(slot => {
         let isPast = false;
         if (isToday && slot.raw_start_time) {
@@ -208,6 +229,7 @@ export const TimeSlotGrid = ({
             isOnline={isOnline}
             isManual={isManual}
             onSlotPress={onSlotPress}
+            slotWidth={slotWidth}
           />
         );
       })}
@@ -219,15 +241,13 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: hs(10),
+    gap: SLOT_GAP,
     width: "100%",
     marginBottom: vs(15),
   },
   tabText: { textTransform: "capitalize", fontSize: fs(14) },
 
-  // Notice the width is now 'auto' with padding, to accommodate varying text lengths like "11:30 AM"
   slot: {
-    paddingHorizontal: hs(14),
     height: vs(25),
     borderRadius: ms(25),
     justifyContent: "center",
@@ -240,7 +260,7 @@ const styles = StyleSheet.create({
     borderColor: "#CBDFFE",
   },
   slotOnline: { backgroundColor: COLORS.primary },
-  slotManual: { backgroundColor: "#E57C59" },
+  slotManual: { backgroundColor: COLORS.danger },
   slotUnavailable: { backgroundColor: "#E5E5E5", borderWidth: 1, borderColor: "#E5E5E5" },
   slotBlocked: { backgroundColor: "#BEBEBE" },
 

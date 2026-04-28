@@ -12,10 +12,10 @@ import { useNavigation } from "@react-navigation/native";
 interface ServiceHeaderProps {
   title: string;
   subtitle?: string;
-  category?: string; // Made optional so we can omit it on the dashboard
+  category?: string;
   imageSource?: ImageSourcePropType;
   onCategoryPress?: () => void;
-  rightComponent?: React.ReactNode; // <-- NEW PROP for the Edit button
+  rightComponent?: React.ReactNode;
 }
 
 export const ServiceHeader = ({
@@ -49,15 +49,21 @@ export const ServiceHeader = ({
         </View>
       </View>
 
-      {/* Render rightComponent if provided, otherwise render the default category dropdown */}
+      {/* Render rightComponent if provided, otherwise render the category text/dropdown */}
       {rightComponent ? (
         rightComponent
       ) : category ? (
-        <TouchableOpacity style={styles.dropdown} onPress={onCategoryPress} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.dropdown}
+          onPress={onCategoryPress}
+          activeOpacity={0.7}
+          disabled={!onCategoryPress} // Disables click if no function is passed
+        >
           <Text variant="body2" weight="semiBold" style={styles.categoryText}>
             {category}
           </Text>
-          <ChevronDown size={ms(16)} color={COLORS.text.primary} />
+          {/* Only show the dropdown arrow if the press action is available */}
+          {onCategoryPress && <ChevronDown size={ms(16)} color={COLORS.text.primary} />}
         </TouchableOpacity>
       ) : null}
     </View>

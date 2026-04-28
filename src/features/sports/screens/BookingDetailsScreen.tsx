@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -10,6 +10,9 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  Linking,
+  Modal,
+  Pressable,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -22,8 +25,10 @@ import {
   Minus,
   FileText,
   ChevronRight,
-  MessageCircle,
   CheckCircle2,
+  Send,
+  Trash2,
+  X,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -31,15 +36,63 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { useBookingDetails } from "../hooks/useBookingDetails";
+import { Canvas, Skia, Skottie, Group } from "@shopify/react-native-skia";
+import { useDerivedValue, useSharedValue, withTiming } from "react-native-reanimated";
+
+const whatsappAnimation = require("@/assets/animations/ic-whatsapp.json");
 
 export const BookingDetailsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<MainStackParamList, "BookingDetails">>();
   const { bookingId } = route.params;
 
-  const { booking, paymentLogs, loading, isSaving, logPayment } = useBookingDetails(bookingId);
+  const { booking, paymentLogs, loading, isSaving, logPayment, cancelBooking } =
+    useBookingDetails(bookingId);
+
+  const lottie = useMemo(() => {
+    try {
+      return Skia.Skottie.Make(JSON.stringify(whatsappAnimation));
+    } catch (e) {
+      console.error("Failed to load WhatsApp animation:", e);
+      return null;
+    }
+  }, []);
+
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    if (lottie) {
+      const duration = lottie.duration();
+      // Initial animation
+      progress.value = 0;
+      progress.value = withTiming(duration, { duration: duration * 1000 });
+
+      // Repeat animation after 5 seconds
+      const timer = setTimeout(() => {
+        progress.value = 0;
+        progress.value = withTiming(duration, { duration: duration * 1000 });
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [lottie, progress]);
+
+  const frame = useDerivedValue(() => {
+    if (!lottie) {
+      return 0;
+    }
+    const fps = lottie.fps();
+    return progress.value * fps;
+  }, [lottie]);
+
+  const scale = useMemo(() => {
+    if (!lottie) return 1;
+    const size = lottie.size();
+    return ms(30) / (size.width || 48);
+  }, [lottie]);
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [cashInput, setCashInput] = useState("");
   const [onlineInput, setOnlineInput] = useState("");
 
@@ -101,6 +154,71 @@ export const BookingDetailsScreen = () => {
     }
   };
 
+  const handleCall = () => {
+    // 1. Prioritize the profile phone, then fallback to guest_phone
+    const rawPhoneNumber = booking.profiles?.phone || booking.guest_phone;
+
+    if (!rawPhoneNumber) {
+      Alert.alert("Error", "No phone number available for this guest.");
+      return;
+    }
+
+    // 2. REGEX FIX: Remove EVERYTHING except digits and the '+' sign
+    // This removes spaces, hyphens, and hidden characters that break deep links
+    const cleanNumber = rawPhoneNumber.replace(/[^\d+]/g, "");
+    const url = `tel:${cleanNumber}`;
+
+    Linking.openURL(url).catch(err => {
+      console.error("Dialer error:", err);
+      Alert.alert("Error", "Unable to open the phone dialer.");
+    });
+  };
+
+  const handleShareWhatsApp = () => {
+    const rawPhoneNumber = booking.profiles?.phone || booking.guest_phone;
+    if (!rawPhoneNumber) return;
+
+    // Clean phone number
+    let cleanNumber = rawPhoneNumber.replace(/\D/g, "");
+    if (cleanNumber.length === 10) {
+      cleanNumber = `91${cleanNumber}`;
+    }
+
+    const bookingDate = new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB");
+    const bookingTime = `${formatHour(booking.sports_slots.start_time)} to ${formatHour(
+      booking.sports_slots.end_time,
+    )}`;
+
+    const guestName = booking.profiles?.full_name || booking.guest_name || "Guest";
+    const venueName = booking.venues?.name || "the venue";
+
+    const message = encodeURIComponent(
+      `Booking Confirmed! 🎉\n` +
+        `Hi ${guestName},\n` +
+        `Your booking at ${venueName} has been successfully reserved by the venue manager.\n\n` +
+        `Date: ${bookingDate}\n` +
+        `Time: ${bookingTime}\n\n` +
+        `Payment Summary:\n` +
+        `Total: ${totalAmount}\n` +
+        `Paid: ${currentPaid}\n` +
+        `Due at Venue: ${remainingAmount}\n\n` +
+        `Thank you for booking.`,
+    );
+
+    const url = `whatsapp://send?phone=${cleanNumber}&text=${message}`;
+
+    Linking.canOpenURL(url)
+      .then(supported => {
+        if (supported) {
+          return Linking.openURL(url);
+        } else {
+          const webUrl = `https://wa.me/${cleanNumber}?text=${message}`;
+          return Linking.openURL(webUrl);
+        }
+      })
+      .catch(err => console.error("An error occurred", err));
+  };
+
   return (
     <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       {/* 1. Header Section */}
@@ -137,16 +255,12 @@ export const BookingDetailsScreen = () => {
           </Text>
         </View>
         <View style={styles.inputBoxRow}>
-          <Text variant="body2" weight="semiBold" style={styles.inputText}>
+          <Text variant="body2" weight="semiBold" style={styles.inputText} onPress={handleCall}>
             {booking.profiles?.phone || booking.guest_phone || "N/A"}
           </Text>
 
           <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.whatsappBtn} activeOpacity={0.7}>
-              <MessageCircle size={ms(14)} color={COLORS.text.inverse} />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.callButton} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.callButton} activeOpacity={0.7} onPress={handleCall}>
               <Text variant="body2" weight="bold" color={COLORS.text.inverse}>
                 Call
               </Text>
@@ -344,6 +458,91 @@ export const BookingDetailsScreen = () => {
         <ChevronRight size={ms(20)} color={COLORS.text.primary} />
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.shareWhatsappBtn}
+        activeOpacity={0.8}
+        onPress={handleShareWhatsApp}>
+        <View style={styles.whatsappAnimWrapper}>
+          <Canvas style={styles.whatsappCanvas}>
+            {lottie && (
+              <Group transform={[{ translateX: 0 }, { translateY: 0 }, { scale }]}>
+                <Skottie animation={lottie} frame={frame} />
+              </Group>
+            )}
+          </Canvas>
+        </View>
+        <Text variant="body1" weight="bold" color={COLORS.text.inverse} style={styles.shareText}>
+          Share confirmation
+        </Text>
+        <Send size={ms(20)} color={COLORS.text.inverse} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.cancelBookingBtn}
+        activeOpacity={0.7}
+        onPress={() => setShowCancelModal(true)}>
+        <Text
+          variant="body1"
+          weight="bold"
+          color={COLORS.text.primary}
+          style={styles.cancelBtnText}>
+          Cancel Booking
+        </Text>
+        <Trash2 size={ms(24)} color={COLORS.text.primary} />
+      </TouchableOpacity>
+
+      {/* --- CANCELLATION MODAL --- */}
+      <Modal visible={showCancelModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCancelModal(false)} />
+          <View style={styles.cancelModalContainer}>
+            <View style={styles.modalHeader}>
+              <Text variant="body1" weight="bold" style={styles.modalTitle}>
+                BOOKING CANCELLATION
+              </Text>
+              <TouchableOpacity onPress={() => setShowCancelModal(false)}>
+                <X size={ms(20)} color={COLORS.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text variant="body1" weight="bold" style={styles.modalMessage}>
+              Are you sure you want to cancel this booking?
+            </Text>
+
+            <Text variant="body2" color={COLORS.text.muted} style={styles.modalSubtext}>
+              Once cancelled, this booking cannot be restored, and refund will be processed as per
+              our cancellation policy.
+            </Text>
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity
+                style={styles.modalBackBtn}
+                onPress={() => setShowCancelModal(false)}>
+                <Text variant="h3" family="nichrome" style={styles.modalBackText}>
+                  no go back
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalConfirmBtn}
+                onPress={async () => {
+                  setShowCancelModal(false);
+                  const success = await cancelBooking();
+
+                  // If cancellation was successful in the database, close this screen!
+                  if (success) {
+                    navigation.goBack();
+                  }
+                }}>
+                <Text variant="h3" family="nichrome" color="#FFF" style={styles.modalConfirmText}>
+                  Yes, cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={{ height: vs(40) }} />
     </ScreenContainer>
   );
@@ -425,15 +624,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: hs(8),
   },
-  whatsappBtn: {
-    backgroundColor: "#25D366", // WhatsApp Green
-    paddingHorizontal: hs(16),
-    paddingVertical: vs(7),
-    borderRadius: ms(6),
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
+  whatsappAnimWrapper: {
+    width: ms(30),
+    height: ms(30),
     justifyContent: "center",
     alignItems: "center",
+  },
+  whatsappCanvas: {
+    width: ms(30),
+    height: ms(30),
   },
   callButton: {
     backgroundColor: "#000000",
@@ -485,6 +684,101 @@ const styles = StyleSheet.create({
   historyText: {
     flex: 1,
     marginLeft: hs(6),
+  },
+  shareWhatsappBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#25D366",
+    borderRadius: ms(10),
+    padding: ms(6),
+    gap: hs(6),
+    marginTop: vs(10),
+  },
+  shareText: {
+    flex: 1,
+    fontSize: fs(14),
+  },
+  cancelBookingBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#CBDFFE",
+    borderRadius: ms(10),
+    padding: ms(6),
+    gap: hs(6),
+    marginTop: vs(10),
+  },
+  cancelBtnText: {
+    flex: 1,
+    fontSize: fs(14),
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cancelModalContainer: {
+    width: "90%",
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: "#63A1FD",
+    padding: ms(12),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: vs(10),
+  },
+  modalTitle: {
+    fontSize: fs(16),
+    textTransform: "uppercase",
+  },
+  modalMessage: {
+    fontSize: fs(16),
+    marginBottom: vs(6),
+    lineHeight: vs(20),
+  },
+  modalSubtext: {
+    fontSize: fs(12),
+    marginBottom: vs(16),
+    lineHeight: vs(16),
+  },
+  modalActionRow: {
+    flexDirection: "row",
+    gap: hs(10),
+  },
+  modalBackBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#CBDFFE",
+    borderRadius: ms(10),
+    height: vs(44),
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    backgroundColor: "#E55959",
+    borderRadius: ms(10),
+    height: vs(44),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBackText: {
+    fontSize: fs(20),
+    textTransform: "lowercase",
+  },
+  modalConfirmText: {
+    fontSize: fs(20),
   },
   ledgerContainer: {
     marginTop: vs(4),
