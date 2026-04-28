@@ -12,7 +12,7 @@ import { BookingCard } from "../components/BookingCard";
 import { Calendar as CalendarIcon, Plus } from "lucide-react-native";
 import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
 import { OfflineBookingSheet } from "../components/OfflineBookingSheet";
@@ -45,6 +45,19 @@ export const SportsHomeScreen = () => {
 
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
+  };
 
   // Auto-select the first available category if the current one isn't valid for this vendor
   useEffect(() => {
@@ -78,7 +91,12 @@ export const SportsHomeScreen = () => {
 
   return (
     <View style={styles.root}>
-      <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
+      <ScreenContainer
+        scrollable
+        backgroundColor={COLORS.background}
+        paddingHorizontal={hs(12)}
+        refreshing={refreshing}
+        onRefresh={onRefresh}>
         <ServiceHeader
           title={venue?.name || "Loading..."}
           category={selectedCategory}
@@ -171,6 +189,8 @@ export const SportsHomeScreen = () => {
                     status={booking.status}
                     avatarUrl={booking.avatarUrl}
                     isOfflineRecord={booking.isOfflineRecord}
+                    isDisabled={booking.isDisabled}
+                    isPaymentPending={booking.isPaymentPending}
                     onPress={() => navigation.navigate("BookingDetails", { bookingId: booking.id })}
                   />
                 ))

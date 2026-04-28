@@ -11,6 +11,8 @@ import {
   TextInput,
   Alert,
   Linking,
+  Modal,
+  Pressable,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -25,6 +27,8 @@ import {
   ChevronRight,
   CheckCircle2,
   Send,
+  Trash2,
+  X,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -42,7 +46,8 @@ export const BookingDetailsScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "BookingDetails">>();
   const { bookingId } = route.params;
 
-  const { booking, paymentLogs, loading, isSaving, logPayment } = useBookingDetails(bookingId);
+  const { booking, paymentLogs, loading, isSaving, logPayment, cancelBooking } =
+    useBookingDetails(bookingId);
 
   const lottie = useMemo(() => {
     try {
@@ -87,6 +92,7 @@ export const BookingDetailsScreen = () => {
   }, [lottie]);
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [cashInput, setCashInput] = useState("");
   const [onlineInput, setOnlineInput] = useState("");
 
@@ -179,15 +185,25 @@ export const BookingDetailsScreen = () => {
     }
 
     const bookingDate = new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB");
-    const bookingTime = `${formatHour(booking.sports_slots.start_time)} - ${formatHour(
+    const bookingTime = `${formatHour(booking.sports_slots.start_time)} to ${formatHour(
       booking.sports_slots.end_time,
     )}`;
 
-    const message = `*Booking Confirmation*%0A%0A*Name:* ${
-      booking.profiles?.full_name || booking.guest_name || "Guest"
-    }%0A*Venue:* ${
-      booking.venues?.name
-    }%0A*Date:* ${bookingDate}%0A*Time:* ${bookingTime}%0A*Total:* ₹${totalAmount}%0A%0A_Thank you for booking with Bookr!_`;
+    const guestName = booking.profiles?.full_name || booking.guest_name || "Guest";
+    const venueName = booking.venues?.name || "the venue";
+
+    const message = encodeURIComponent(
+      `Booking Confirmed! 🎉\n` +
+        `Hi ${guestName},\n` +
+        `Your booking at ${venueName} has been successfully reserved by the venue manager.\n\n` +
+        `Date: ${bookingDate}\n` +
+        `Time: ${bookingTime}\n\n` +
+        `Payment Summary:\n` +
+        `Total: ${totalAmount}\n` +
+        `Paid: ${currentPaid}\n` +
+        `Due at Venue: ${remainingAmount}\n\n` +
+        `Thank you for booking.`,
+    );
 
     const url = `whatsapp://send?phone=${cleanNumber}&text=${message}`;
 
@@ -461,6 +477,72 @@ export const BookingDetailsScreen = () => {
         <Send size={ms(20)} color={COLORS.text.inverse} />
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.cancelBookingBtn}
+        activeOpacity={0.7}
+        onPress={() => setShowCancelModal(true)}>
+        <Text
+          variant="body1"
+          weight="bold"
+          color={COLORS.text.primary}
+          style={styles.cancelBtnText}>
+          Cancel Booking
+        </Text>
+        <Trash2 size={ms(24)} color={COLORS.text.primary} />
+      </TouchableOpacity>
+
+      {/* --- CANCELLATION MODAL --- */}
+      <Modal visible={showCancelModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCancelModal(false)} />
+          <View style={styles.cancelModalContainer}>
+            <View style={styles.modalHeader}>
+              <Text variant="body1" weight="bold" style={styles.modalTitle}>
+                BOOKING CANCELLATION
+              </Text>
+              <TouchableOpacity onPress={() => setShowCancelModal(false)}>
+                <X size={ms(20)} color={COLORS.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text variant="body1" weight="bold" style={styles.modalMessage}>
+              Are you sure you want to cancel this booking?
+            </Text>
+
+            <Text variant="body2" color={COLORS.text.muted} style={styles.modalSubtext}>
+              Once cancelled, this booking cannot be restored, and refund will be processed as per
+              our cancellation policy.
+            </Text>
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity
+                style={styles.modalBackBtn}
+                onPress={() => setShowCancelModal(false)}>
+                <Text variant="h3" family="nichrome" style={styles.modalBackText}>
+                  no go back
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalConfirmBtn}
+                onPress={async () => {
+                  setShowCancelModal(false);
+                  const success = await cancelBooking();
+
+                  // If cancellation was successful in the database, close this screen!
+                  if (success) {
+                    navigation.goBack();
+                  }
+                }}>
+                <Text variant="h3" family="nichrome" color="#FFF" style={styles.modalConfirmText}>
+                  Yes, cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={{ height: vs(40) }} />
     </ScreenContainer>
   );
@@ -615,6 +697,88 @@ const styles = StyleSheet.create({
   shareText: {
     flex: 1,
     fontSize: fs(14),
+  },
+  cancelBookingBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#CBDFFE",
+    borderRadius: ms(10),
+    padding: ms(6),
+    gap: hs(6),
+    marginTop: vs(10),
+  },
+  cancelBtnText: {
+    flex: 1,
+    fontSize: fs(14),
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cancelModalContainer: {
+    width: "90%",
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: "#63A1FD",
+    padding: ms(12),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: vs(10),
+  },
+  modalTitle: {
+    fontSize: fs(16),
+    textTransform: "uppercase",
+  },
+  modalMessage: {
+    fontSize: fs(16),
+    marginBottom: vs(6),
+    lineHeight: vs(20),
+  },
+  modalSubtext: {
+    fontSize: fs(12),
+    marginBottom: vs(16),
+    lineHeight: vs(16),
+  },
+  modalActionRow: {
+    flexDirection: "row",
+    gap: hs(10),
+  },
+  modalBackBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#CBDFFE",
+    borderRadius: ms(10),
+    height: vs(44),
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    backgroundColor: "#E55959",
+    borderRadius: ms(10),
+    height: vs(44),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBackText: {
+    fontSize: fs(20),
+    textTransform: "lowercase",
+  },
+  modalConfirmText: {
+    fontSize: fs(20),
   },
   ledgerContainer: {
     marginTop: vs(4),

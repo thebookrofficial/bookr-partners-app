@@ -46,7 +46,7 @@ export const BookingCard = ({
 }: BookingCardProps) => {
   const textColor = isDisabled ? COLORS.text.secondary : COLORS.text.primary;
   const iconColor = COLORS.text.muted;
-  const cardBg = isDisabled ? "#F3F4F6" : COLORS.surface.primary; // Light grey for disabled state
+  const cardBg = isDisabled ? "#E0E0E0" : COLORS.surface.primary; // Light grey for disabled state
 
   // Blinking Animation Logic
   const fadeAnim = useRef(new Animated.Value(1)).current;

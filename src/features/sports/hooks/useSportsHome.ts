@@ -35,6 +35,9 @@ export interface BookingData {
   status: "Online" | "Offline" | "Advance" | "Settlement" | "Full";
   avatarUrl?: string;
   isOfflineRecord: boolean;
+  isDisabled?: boolean;
+  isPaymentPending?: boolean;
+  startTimeRaw?: string;
 }
 
 // Helper to guarantee timezone-safe local date strings!
@@ -190,7 +193,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
       const formattedSlots: SlotData[] = (slotsData || []).map(slot => {
         const [startHStr, startMStr] = slot.start_time.split(":");
         const hourInt = parseInt(startHStr, 10);
-        const ampm = hourInt >= 12 ? "Pm" : "AM";
+        const ampm = hourInt >= 12 ? "PM" : "AM";
         const displayHour = hourInt % 12 || 12;
         const displayMins = startMStr === "00" ? "" : `:${startMStr}`;
 
@@ -236,6 +239,8 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           `
           id,
           total_amount,
+          paid_amount,
+          booking_status,
           platform_fee,
           gateway_fee,
           guest_name,
@@ -246,45 +251,85 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         )
         .eq("venue_id", currentVenueId)
         .eq("sports_slots.ground_id", activeGroundId)
-        .eq("sports_slots.slot_date", localDateString) // <--- SAFE DATE (This is what caused the desync)
-        .order("created_at", { ascending: false });
+        .eq("sports_slots.slot_date", localDateString);
 
       if (error) throw error;
 
-      const formattedBookings: BookingData[] = (bookingsData || []).map((b: any) => {
-        const formatTime = (timeStr: string) => {
-          const [h, m] = timeStr.split(":");
-          const hourInt = parseInt(h, 10);
-          const ampm = hourInt >= 12 ? "Pm" : "Am";
-          const displayHour = hourInt % 12 || 12;
-          const displayMins = m === "00" ? "" : `:${m}`;
-          return `${displayHour}${displayMins} ${ampm}`;
-        };
+      const now = new Date();
 
-        const slotDate = new Date(b.sports_slots.slot_date);
-        const formattedDate = slotDate.toLocaleDateString("en-GB", {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-          year: "numeric",
+      const formattedBookings: BookingData[] = (bookingsData || [])
+        .filter((b: any) => b.booking_status !== "cancelled")
+        .map((b: any) => {
+          const formatTime = (timeStr: string) => {
+            const [h, m] = timeStr.split(":");
+            const hourInt = parseInt(h, 10);
+            const ampm = hourInt >= 12 ? "PM" : "AM";
+            const displayHour = hourInt % 12 || 12;
+            const displayMins = m === "00" ? "" : `:${m}`;
+            return `${displayHour}${displayMins} ${ampm}`;
+          };
+
+          const slotDate = new Date(b.sports_slots.slot_date);
+          const formattedDate = slotDate.toLocaleDateString("en-GB", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          });
+
+          const isOffline = b.platform_fee === 0 && b.gateway_fee === 0;
+
+          // Calculate if slot has passed
+          const [endH, endM] = b.sports_slots.end_time.split(":").map(Number);
+          const slotEndTime = new Date(b.sports_slots.slot_date);
+          slotEndTime.setHours(endH, endM, 0, 0);
+
+          const isDisabled = now > slotEndTime;
+          const isUnpaid = Number(b.paid_amount || 0) < Number(b.total_amount || 0);
+
+          // Keep at top for 45 mins if payment pending
+          const diffMs = now.getTime() - slotEndTime.getTime();
+          const diffMins = diffMs / (1000 * 60);
+          const isRecentlyPassedPending = isDisabled && isUnpaid && diffMins <= 45;
+
+          return {
+            id: b.id,
+            name: b.profiles?.full_name || b.guest_name || "Guest User",
+            phone: b.profiles?.phone || b.guest_phone || "",
+            date: formattedDate,
+            time: `${formatTime(b.sports_slots.start_time)} - ${formatTime(
+              b.sports_slots.end_time,
+            )}`,
+            price: `₹${b.total_amount || 0}`,
+            status: isOffline ? "Offline" : "Online",
+            avatarUrl: b.profiles?.avatar_url,
+            isOfflineRecord: isOffline,
+            isDisabled: isDisabled,
+            // Only show "Payment Pending" status once the slot has passed
+            isPaymentPending: isDisabled && isUnpaid,
+            // Internal fields for sorting
+            isRecentlyPassedPending,
+            startTimeRaw: b.sports_slots.start_time,
+          };
         });
 
-        const isOffline = b.platform_fee === 0 && b.gateway_fee === 0;
+      // Sort logic
+      // Priority 1: !isDisabled OR isRecentlyPassedPending
+      // Priority 2: everything else (isDisabled and not recently passed pending)
+      const sortedBookings = [...formattedBookings].sort((a: any, b: any) => {
+        const aPriority = !a.isDisabled || a.isRecentlyPassedPending ? 0 : 1;
+        const bPriority = !b.isDisabled || b.isRecentlyPassedPending ? 0 : 1;
 
-        return {
-          id: b.id,
-          name: b.profiles?.full_name || b.guest_name || "Guest User",
-          phone: b.profiles?.phone || b.guest_phone || "",
-          date: formattedDate,
-          time: `${formatTime(b.sports_slots.start_time)} - ${formatTime(b.sports_slots.end_time)}`,
-          price: `₹${b.total_amount || 0}`,
-          status: isOffline ? "Offline" : "Online",
-          avatarUrl: b.profiles?.avatar_url,
-          isOfflineRecord: isOffline,
-        };
+        if (aPriority !== bPriority) return aPriority - bPriority;
+
+        // Recently passed pending bookings should be at the VERY top (priority within Priority 0)
+        if (a.isRecentlyPassedPending && !b.isRecentlyPassedPending) return -1;
+        if (!a.isRecentlyPassedPending && b.isRecentlyPassedPending) return 1;
+
+        return a.startTimeRaw.localeCompare(b.startTimeRaw);
       });
 
-      setBookings(formattedBookings);
+      setBookings(sortedBookings);
     } catch (error) {
       console.error("Error fetching bookings:", error);
     } finally {
@@ -327,6 +372,10 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     };
   }, [currentVenueId, fetchSlots, fetchBookings]);
 
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([fetchSlots(), fetchBookings()]);
+  }, [fetchSlots, fetchBookings]);
+
   return {
     venue,
     grounds,
@@ -340,9 +389,6 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     bookingsLoading,
     loading,
     availableCategories,
-    refresh: () => {
-      fetchSlots();
-      fetchBookings();
-    },
+    refresh: handleRefresh,
   };
 };
