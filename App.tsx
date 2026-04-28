@@ -9,6 +9,8 @@ import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { withStallion } from "react-native-stallion";
 import * as Sentry from "@sentry/react-native";
 
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+
 Sentry.init({
   dsn: "https://1e5c2af53e98693d5aeb9e7594f94637@o4510850078408704.ingest.us.sentry.io/4511290945699840",
 
@@ -36,6 +38,8 @@ GoogleSignin.configure({
 
 function App() {
   const isDarkMode = useColorScheme() === "dark";
+
+  usePushNotifications();
 
   return (
     <SafeAreaProvider>

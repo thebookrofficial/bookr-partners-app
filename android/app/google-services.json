@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "536786058157",
+    "project_id": "bookr-722c7",
+    "storage_bucket": "bookr-722c7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:536786058157:android:5b386108eadf5f5dae7f24",
+        "android_client_info": {
+          "package_name": "com.bookr_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlW89HT0GL4VAYqGJJnq4R28Mj223tTH8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:536786058157:android:222b3438dc352e9cae7f24",
+        "android_client_info": {
+          "package_name": "com.bookrpartners"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlW89HT0GL4VAYqGJJnq4R28Mj223tTH8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
