@@ -39,7 +39,8 @@ export const SportsHomeScreen = () => {
     bookings,
     bookingsLoading,
     loading,
-    availableCategories, // Dynamically fetched from the DB!
+    availableCategories,
+    refresh,
   } = useSportsHome(serviceId, selectedCategory);
 
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
@@ -114,7 +115,7 @@ export const SportsHomeScreen = () => {
               <CalendarIcon size={ms(16)} color="#00327B" />
             </TouchableOpacity>
 
-            {grounds.length > 1 && (
+            {grounds.length > 0 && (
               <View style={styles.groundTabs}>
                 <PillTabs
                   tabs={grounds.map(g => g.name)}
@@ -196,7 +197,10 @@ export const SportsHomeScreen = () => {
           venueId={venue.id}
           _groundId={activeGroundId}
           selectedDate={selectedDate}
-          onSuccess={() => setIsBottomSheetOpen(false)}
+          onSuccess={() => {
+            setIsBottomSheetOpen(false);
+            refresh();
+          }}
         />
       )}
 

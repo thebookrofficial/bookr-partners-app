@@ -301,6 +301,32 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     fetchBookings();
   }, [fetchSlots, fetchBookings]);
 
+  // Real-time listener for bookings
+  useEffect(() => {
+    if (!currentVenueId) return;
+
+    const channel = supabase
+      .channel(`sports_bookings_${currentVenueId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "sports_bookings",
+          filter: `venue_id=eq.${currentVenueId}`,
+        },
+        () => {
+          fetchSlots();
+          fetchBookings();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentVenueId, fetchSlots, fetchBookings]);
+
   return {
     venue,
     grounds,
