@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React from "react";
-import { View, StyleSheet, TouchableOpacity, Image, Linking, Alert } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, StyleSheet, TouchableOpacity, Image, Linking, Alert, Animated } from "react-native";
 import { Text } from "@/components/ui";
 import { Phone, Calendar, Clock } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -21,6 +21,8 @@ interface BookingCardProps {
   hideCallButton?: boolean;
   hideDateText?: boolean;
   useClockIcon?: boolean;
+  isDisabled?: boolean; // NEW: Triggers the greyed-out state
+  isPaymentPending?: boolean; // NEW: Triggers the red blinking text
   onPress?: () => void;
   onCallPress?: () => void;
 }
@@ -34,26 +36,49 @@ export const BookingCard = ({
   price,
   status,
   avatarUrl,
-  // isOfflineRecord = false,
   hideCallButton = false,
   hideDateText = false,
   useClockIcon = false,
+  isDisabled = false,
+  isPaymentPending = false,
   onPress,
   onCallPress,
 }: BookingCardProps) => {
-  const textColor = COLORS.text.primary;
-  const iconColor = COLORS.text.secondary;
-  const cardBg = COLORS.surface.primary;
+  const textColor = isDisabled ? COLORS.text.secondary : COLORS.text.primary;
+  const iconColor = COLORS.text.muted;
+  const cardBg = isDisabled ? "#F3F4F6" : COLORS.surface.primary; // Light grey for disabled state
+
+  // Blinking Animation Logic
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (isPaymentPending) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(fadeAnim, {
+            toValue: 0.2,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    } else {
+      fadeAnim.setValue(1); // Reset to fully visible if not pending
+    }
+  }, [isPaymentPending, fadeAnim]);
 
   const handleCall = () => {
-    // If a custom onCallPress is provided, use it. Otherwise, trigger deep link.
     if (onCallPress) {
       onCallPress();
       return;
     }
 
     if (phone) {
-      // Remove spaces and special characters for the dialer
       const cleanPhone = phone.replace(/[^\d+]/g, "");
       const url = `tel:${cleanPhone}`;
 
@@ -66,13 +91,14 @@ export const BookingCard = ({
   };
 
   const getStatusColor = () => {
+    if (isDisabled) return COLORS.text.muted; // Mute status color if past
     if (status === "Offline") return COLORS.danger;
     if (status === "Online") return COLORS.primary;
     return COLORS.text.muted;
   };
 
   const getPriceColor = () => {
-    // if (isOfflineRecord && status === "Offline") return COLORS.danger;
+    if (isDisabled && !isPaymentPending) return COLORS.text.muted;
     return "#00B562";
   };
 
@@ -81,7 +107,9 @@ export const BookingCard = ({
       activeOpacity={0.7}
       onPress={onPress}
       style={[styles.cardContainer, { backgroundColor: cardBg }]}>
-      <Image source={{ uri: avatarUrl || "https://placeholder.com/50" }} style={styles.avatar} />
+      <View style={[styles.avatarContainer, isDisabled && styles.avatarDisabled]}>
+        <Image source={{ uri: avatarUrl || "https://placeholder.com/50" }} style={styles.avatar} />
+      </View>
 
       <View style={styles.rightContent}>
         <View style={styles.topRow}>
@@ -107,9 +135,17 @@ export const BookingCard = ({
           </View>
 
           <View style={styles.priceStatusWrapper}>
-            <Text variant="body2" weight="semiBold" color={getPriceColor()}>
-              {price}
-            </Text>
+            <View style={styles.priceRow}>
+              {isPaymentPending && (
+                <Animated.Text style={[styles.blinkingText, { opacity: fadeAnim }]}>
+                  Payment Pending
+                </Animated.Text>
+              )}
+              <Text variant="body2" weight="semiBold" color={getPriceColor()}>
+                {price}
+              </Text>
+            </View>
+
             <Text
               variant="caption"
               weight="semiBold"
@@ -142,11 +178,14 @@ export const BookingCard = ({
           </Text>
 
           {!hideCallButton && (
-            <TouchableOpacity style={styles.callButton} onPress={handleCall} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={[styles.callButton, isDisabled && styles.callButtonDisabled]}
+              onPress={handleCall}
+              activeOpacity={0.7}>
               <Text
                 variant="caption"
                 weight="bold"
-                color={COLORS.text.inverse}
+                color={isDisabled ? COLORS.text.secondary : COLORS.text.inverse}
                 style={styles.callText}>
                 Call
               </Text>
@@ -169,6 +208,12 @@ const styles = StyleSheet.create({
     marginBottom: vs(10),
     width: "100%",
     minHeight: vs(97),
+  },
+  avatarContainer: {
+    justifyContent: "center",
+  },
+  avatarDisabled: {
+    opacity: 0.6,
   },
   avatar: {
     width: ms(50),
@@ -204,8 +249,19 @@ const styles = StyleSheet.create({
   },
   priceStatusWrapper: {
     flexDirection: "column",
-    alignItems: "center",
+    alignItems: "flex-end", // Align right to keep the pending text neat
     justifyContent: "center",
+  },
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+  },
+  blinkingText: {
+    color: COLORS.danger,
+    fontSize: fs(10),
+    fontFamily: "Gilroy-Bold", // Match your app's font
+    textTransform: "uppercase",
   },
   statusText: {
     fontSize: fs(10),
@@ -237,6 +293,10 @@ const styles = StyleSheet.create({
     borderColor: "rgba(0,0,0,0.25)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  callButtonDisabled: {
+    backgroundColor: "transparent",
+    borderColor: COLORS.text.muted,
   },
   callText: {
     fontSize: fs(14),

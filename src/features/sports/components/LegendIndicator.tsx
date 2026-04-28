@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#CBDFFE",
   },
-  manual: { backgroundColor: "#E57C59" }, // Coral/Red for Manual
+  manual: { backgroundColor: COLORS.danger }, // Coral/Red for Manual
   online: { backgroundColor: COLORS.primary }, // Blue for Online
   unavailable: { backgroundColor: "#E5E5E5" }, // Grey for Unavailable
 });
