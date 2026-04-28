@@ -33,9 +33,11 @@ export const usePushNotifications = () => {
 
     if (enabled) {
       try {
-        const token = await messaging().getToken();
+        // const token = await messaging().getToken();
+
+        // console.log("FCM Device Token:", token);
         // eslint-disable-next-line no-console
-        console.log("FCM Device Token:", token);
+        console.log("FCM Device stored.");
       } catch (error) {
         console.error("Failed to get FCM token:", error);
       }

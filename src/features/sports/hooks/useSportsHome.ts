@@ -45,12 +45,29 @@ const getLocalDateString = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+// Helper to format raw database sports_type into beautiful display names
+const formatCategoryName = (dbName: string) => {
+  const MAP: Record<string, string> = {
+    football: "Football",
+    box_cricket: "Box Cricket",
+    pickleball: "Pickleball",
+    cricket: "Cricket",
+  };
+  if (MAP[dbName]) return MAP[dbName];
+  // Fallback: replaces underscores with spaces and capitalizes each word
+  return dbName
+    .split("_")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
 export const useSportsHome = (initialVenueId: string, category: string) => {
   const [currentVenueId, setCurrentVenueId] = useState<string>(initialVenueId);
   const [venue, setVenue] = useState<VenueData | null>(null);
   const [grounds, setGrounds] = useState<GroundData[]>([]);
   const [activeGroundId, setActiveGroundId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
@@ -64,12 +81,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
   const fetchVenueDetails = useCallback(async () => {
     setLoading(true);
     try {
-      const CATEGORY_DB_MAP: Record<string, string> = {
-        Football: "football",
-        "Box Cricket": "box_cricket",
-        Pickleball: "pickleball",
-      };
-      const dbSportType = CATEGORY_DB_MAP[category] || category;
+      const dbSportType = category.toLowerCase().replace(" ", "_");
 
       const { data: initialVenue, error: initialError } = await supabase
         .from("venues")
@@ -78,6 +90,26 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         .single();
 
       if (initialError || !initialVenue) throw initialError || new Error("Owner not found");
+
+      // Fetch all sports categories owned by this specific vendor
+      const { data: allSportsData } = await supabase
+        .from("venues")
+        .select(`sports_venues!inner ( sports_type )`)
+        .eq("owner_id", initialVenue.owner_id);
+
+      if (allSportsData) {
+        const uniqueTypes = new Set<string>();
+        allSportsData.forEach((v: any) => {
+          const sv = v.sports_venues;
+          if (Array.isArray(sv)) {
+            sv.forEach((s: any) => uniqueTypes.add(s.sports_type));
+          } else if (sv) {
+            uniqueTypes.add(sv.sports_type);
+          }
+        });
+        const categoriesArray = Array.from(uniqueTypes).map(formatCategoryName);
+        setAvailableCategories(categoriesArray);
+      }
 
       const { data: matchedVenue, error: matchedError } = await supabase
         .from("venues")
@@ -281,6 +313,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     bookings,
     bookingsLoading,
     loading,
+    availableCategories,
     refresh: () => {
       fetchSlots();
       fetchBookings();
