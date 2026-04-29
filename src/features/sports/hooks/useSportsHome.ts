@@ -294,8 +294,8 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
 
           return {
             id: b.id,
-            name: b.profiles?.full_name || b.guest_name || "Guest User",
-            phone: b.profiles?.phone || b.guest_phone || "",
+            name: b.guest_name || b.profiles?.full_name || "Guest User",
+            phone: b.guest_phone || b.profiles?.phone || "",
             date: formattedDate,
             time: `${formatTime(b.sports_slots.start_time)} - ${formatTime(
               b.sports_slots.end_time,

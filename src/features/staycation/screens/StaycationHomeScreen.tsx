@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -14,7 +14,8 @@ import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import { StaycationBookingCard } from "../components/StaycationBookingCard";
-import { Plus } from "lucide-react-native";
+import { StaycationOfflineBookingSheet } from "../components/StaycationOfflineBookingSheet";
+import { Plus, Calendar as CalendarIcon } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useStaycationHome } from "../hooks/useStaycationHome";
@@ -25,24 +26,24 @@ import { StaycationTabParamList } from "@/navigation/navigation.types";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
-// Current Date for logic: 2026-04-26
-const CURRENT_DATE = "2026-04-26";
-
 type ListEntry = { type: "header"; title: string } | { type: "booking"; data: StaycationBooking };
-
-// Helper to format date for card display (e.g., "2026-04-26" -> "26 Apr")
-const formatDisplayDate = (dateStr: string) => {
-  const date = new Date(dateStr);
-  const day = date.getDate();
-  const month = date.toLocaleString("en-US", { month: "short" });
-  return `${day} ${month}`;
-};
 
 export const StaycationHomeScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationHome">>();
 
-  // Extract serviceId with fallback from parent navigator
+  // State for sub-categories and filters
+  const [activeCategory, setActiveCategory] = useState<"Farmhouse" | "Rooms">("Farmhouse");
+  // For Rooms: "All", "Deluxe Rooms", "Private Rooms"
+  const [activeRoomType, setActiveRoomType] = useState<"All" | "Deluxe Rooms" | "Private Rooms">(
+    "All",
+  );
+
+  // For Rooms: "Check outs", "Bookings" pill tabs
+  const [activeRoomStatus, setActiveRoomStatus] = useState<"Check outs" | "bookings">("Check outs");
+
+  const [isOfflineSheetVisible, setIsOfflineSheetVisible] = useState(false);
+
   let serviceId = route.params?.serviceId;
   if (!serviceId) {
     const parentState = navigation.getParent()?.getState();
@@ -51,32 +52,56 @@ export const StaycationHomeScreen = () => {
     serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
   }
 
-  const { isLoading, markedDates, groupedBookings, refetch, venue } = useStaycationHome(serviceId);
+  const { isLoading, markedDates, groupedBookings, refetch, venue } = useStaycationHome(
+    serviceId,
+    activeCategory,
+  );
 
   // Flatten categorized bookings for the list
   const flatListData = useMemo(() => {
     const data: ListEntry[] = [];
     groupedBookings.forEach((section: { title: string; data: StaycationBooking[] }) => {
-      data.push({ type: "header", title: section.title });
-      section.data.forEach(b => data.push({ type: "booking", data: b }));
+      // We only inject specific headers for Rooms if required, or we just rely on section title
+      let headerTitle = section.title;
+      if (activeCategory === "Rooms") {
+        if (section.title === "Today's Check-ins") {
+          // This header is actually replaced by the filter row, so we might skip it or keep it empty
+          // But Figma shows "Upcoming Bookings" as a section header for Rooms.
+          // Let's just skip "Today's Check-ins" header since it has custom filters
+          return;
+        }
+      }
+
+      // Add the section header
+      data.push({ type: "header", title: headerTitle });
+
+      // Inject bookings
+      section.data.forEach(b => {
+        // Mocking roomName for Rooms view as per Figma
+        const enrichedData =
+          activeCategory === "Rooms" ? { ...b, roomName: `Room ${data.length % 5 || 1}` } : b;
+        data.push({ type: "booking", data: enrichedData });
+      });
     });
     return data;
-  }, [groupedBookings]);
+  }, [groupedBookings, activeCategory]);
 
   const renderItem = ({ item }: { item: ListEntry }) => {
     if (item.type === "header") {
+      // In Rooms view, "Upcoming Bookings" is just text
       return (
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{item.title}</Text>
+        <View style={[styles.sectionHeader, activeCategory === "Rooms" && { marginTop: vs(0) }]}>
+          <View style={styles.headerRow}>
+            <Text style={styles.sectionTitle}>{item.title}</Text>
+          </View>
         </View>
       );
     }
     return (
       <StaycationBookingCard
         bookingId={item.data.id}
+        isFarmhouse={activeCategory === "Farmhouse"}
         {...item.data}
-        checkIn={formatDisplayDate(item.data.checkIn)}
-        checkOut={formatDisplayDate(item.data.checkOut)}
       />
     );
   };
@@ -90,84 +115,250 @@ export const StaycationHomeScreen = () => {
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
         />
 
-        {/* Status Legend */}
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={styles.availableDot} />
-            <Text style={styles.legendText}>Available</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.dot, styles.manuelDot]} />
-            <Text style={styles.legendText}>manuel</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.dot, styles.onlineDot]} />
-            <Text style={styles.legendText}>Online</Text>
+        {/* Top Segmented Toggle: Bookings | Farmhouse | Rooms */}
+        <View style={styles.topToggleContainer}>
+          <Text style={styles.topToggleLabel}>Bookings</Text>
+          <View style={styles.topSegmentedControl}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setActiveCategory("Farmhouse")}
+              style={[
+                styles.topSegment,
+                activeCategory === "Farmhouse"
+                  ? styles.topSegmentActive
+                  : styles.topSegmentInactive,
+              ]}>
+              <Text
+                weight="semiBold"
+                style={[
+                  styles.topSegmentText,
+                  activeCategory === "Farmhouse"
+                    ? styles.topSegmentTextActive
+                    : styles.topSegmentTextInactive,
+                ]}>
+                Farmhouse
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setActiveCategory("Rooms")}
+              style={[
+                styles.topSegment,
+                activeCategory === "Rooms" ? styles.topSegmentActive : styles.topSegmentInactive,
+              ]}>
+              <Text
+                weight="semiBold"
+                style={[
+                  styles.topSegmentText,
+                  activeCategory === "Rooms"
+                    ? styles.topSegmentTextActive
+                    : styles.topSegmentTextInactive,
+                ]}>
+                Rooms
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Inline Calendar */}
-        <View style={styles.calendarContainer}>
-          <Calendar
-            current={CURRENT_DATE}
-            markingType={"period"}
-            markedDates={markedDates}
-            renderArrow={direction => (
-              <Text style={styles.calendarArrow}>{direction === "left" ? "<" : ">"}</Text>
-            )}
-            enableSwipeMonths={true}
-            disableAllTouchEventsForDisabledDays={true}
-            onDayPress={() => {}} // Disabled for read-only behavior
-            theme={
-              {
-                backgroundColor: COLORS.background,
-                calendarBackground: COLORS.background,
-                textSectionTitleColor: "#b3b3b3",
-                selectedDayBackgroundColor: COLORS.primary,
-                selectedDayTextColor: COLORS.text.inverse,
-                todayTextColor: COLORS.text.primary,
-                dayTextColor: COLORS.text.primary,
-                textDisabledColor: "transparent",
-                monthTextColor: COLORS.text.primary,
-                textDayFontFamily: "Gilroy-Bold",
-                textMonthFontFamily: "Gilroy-Bold",
-                textDayHeaderFontFamily: "Gilroy-Bold",
-                textDayFontSize: fs(11),
-                textMonthFontSize: fs(14),
-                textDayHeaderFontSize: fs(14),
-                "stylesheet.calendar.header": {
-                  dayHeader: {
-                    marginTop: 2,
-                    marginBottom: 7,
-                    width: 32,
-                    textAlign: "center",
-                    fontSize: fs(14),
-                    fontFamily: "Gilroy-Bold",
-                    color: "#b3b3b3",
-                  },
-                  dayTextAtIndex5: { color: COLORS.primary },
-                  dayTextAtIndex6: { color: COLORS.primary },
-                  header: {
-                    flexDirection: "row",
-                    justifyContent: "center",
-                    paddingLeft: 10,
-                    paddingRight: 10,
-                    marginTop: 10,
-                    alignItems: "center",
-                    gap: hs(40),
-                  },
-                },
-              } as any
-            }
-          />
-        </View>
+        {activeCategory === "Farmhouse" ? (
+          <>
+            {/* Status Legend */}
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View style={styles.availableDot} />
+                <Text style={styles.legendText}>Available</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.dot, styles.manuelDot]} />
+                <Text style={styles.legendText}>Manuel</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.dot, styles.onlineDot]} />
+                <Text style={styles.legendText}>Online</Text>
+              </View>
+            </View>
 
-        <View style={styles.bookingsHeader}>
-          <Text style={styles.bookingsTitle}>Recent Bookings</Text>
-        </View>
+            <View style={styles.calendarContainer}>
+              <Calendar
+                current={new Date().toISOString().split("T")[0]}
+                markingType={"custom"}
+                markedDates={markedDates}
+                renderArrow={direction => (
+                  <Text style={styles.calendarArrow}>{direction === "left" ? "<" : ">"}</Text>
+                )}
+                enableSwipeMonths={true}
+                disableAllTouchEventsForDisabledDays={true}
+                onDayPress={() => {}} // Disabled for read-only behavior
+                theme={
+                  {
+                    backgroundColor: COLORS.background,
+                    calendarBackground: COLORS.background,
+                    textSectionTitleColor: "#b3b3b3",
+                    selectedDayBackgroundColor: COLORS.primary,
+                    selectedDayTextColor: COLORS.text.inverse,
+                    todayTextColor: "black",
+                    dayTextColor: "black",
+                    textDisabledColor: "transparent",
+                    monthTextColor: "black",
+                    textDayFontFamily: "Gilroy-Medium",
+                    textMonthFontFamily: "Gilroy-Bold",
+                    textDayHeaderFontFamily: "Gilroy-Bold",
+                    textDayFontSize: fs(13),
+                    textMonthFontSize: fs(16),
+                    textDayHeaderFontSize: fs(14),
+                    "stylesheet.calendar.header": {
+                      dayHeader: {
+                        marginTop: 2,
+                        marginBottom: 7,
+                        width: 32,
+                        textAlign: "center",
+                        fontSize: fs(14),
+                        fontFamily: "Gilroy-Bold",
+                        color: "#b3b3b3",
+                      },
+                      dayTextAtIndex5: { color: "#009bff" },
+                      dayTextAtIndex6: { color: "#009bff" },
+                      header: {
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        paddingLeft: 20,
+                        paddingRight: 20,
+                        marginTop: 10,
+                        alignItems: "center",
+                      },
+                      monthText: {
+                        fontFamily: "Gilroy-Bold",
+                        fontSize: fs(16),
+                        color: "black",
+                      },
+                    },
+                    "stylesheet.day.basic": {
+                      base: {
+                        width: 32,
+                        height: 32,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      },
+                      todayText: {
+                        color: "black",
+                      },
+                    },
+                  } as any
+                }
+              />
+            </View>
+
+            <View style={styles.bookingsHeader}>
+              <Text style={styles.bookingsTitle}>Booking For April</Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.roomsFiltersContainer}>
+            {/* Types Toggle */}
+            <View style={styles.typesToggleContainer}>
+              <Text style={styles.typesToggleLabel}>Types</Text>
+              <View style={styles.typesSegmentedControl}>
+                {(["All", "Deluxe Rooms", "Private Rooms"] as const).map(type => {
+                  const isActive = activeRoomType === type;
+                  // Handle line breaks for text
+                  const textLines = type === "All" ? ["All"] : type.split(" ");
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      activeOpacity={0.8}
+                      onPress={() => setActiveRoomType(type)}
+                      style={[
+                        styles.typeSegment,
+                        isActive ? styles.typeSegmentActive : styles.typeSegmentInactive,
+                      ]}>
+                      <View style={styles.typeTextWrapper}>
+                        {textLines.map((line, idx) => (
+                          <Text
+                            key={idx}
+                            weight="semiBold"
+                            style={[
+                              styles.typeSegmentText,
+                              isActive
+                                ? styles.typeSegmentTextActive
+                                : styles.typeSegmentTextInactive,
+                            ]}>
+                            {line}
+                          </Text>
+                        ))}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Check outs / Bookings and Date */}
+            <View style={styles.statusDateRow}>
+              <View style={styles.statusPills}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setActiveRoomStatus("Check outs")}
+                  style={[
+                    styles.statusPill,
+                    activeRoomStatus === "Check outs"
+                      ? styles.statusPillActive
+                      : styles.statusPillInactive,
+                  ]}>
+                  <Text
+                    weight="semiBold"
+                    style={[
+                      styles.statusPillText,
+                      activeRoomStatus === "Check outs"
+                        ? styles.statusPillTextActive
+                        : styles.statusPillTextInactive,
+                    ]}>
+                    Check outs
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setActiveRoomStatus("bookings")}
+                  style={[
+                    styles.statusPill,
+                    activeRoomStatus === "bookings"
+                      ? styles.statusPillActive
+                      : styles.statusPillInactive,
+                  ]}>
+                  <Text
+                    weight="semiBold"
+                    style={[
+                      styles.statusPillText,
+                      activeRoomStatus === "bookings"
+                        ? styles.statusPillTextActive
+                        : styles.statusPillTextInactive,
+                    ]}>
+                    bookings
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.dateRight}>
+                <Text weight="semiBold" style={styles.todayText}>
+                  23 Apr 2026 (Today)
+                </Text>
+                <CalendarIcon size={ms(16)} color={COLORS.text.primary} />
+              </View>
+            </View>
+
+            {/* Rooms Filled */}
+            <View style={styles.roomsFilledContainer}>
+              <Text weight="semiBold" style={styles.roomsFilledLabel}>
+                Rooms Filled
+              </Text>
+              <Text weight="semiBold" style={styles.roomsFilledValue}>
+                3/5
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
     ),
-    [venue, markedDates],
+    [venue, markedDates, activeCategory, activeRoomType, activeRoomStatus],
   );
 
   return (
@@ -207,9 +398,24 @@ export const StaycationHomeScreen = () => {
         )}
       </ScreenContainer>
 
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
+      {/* Basic Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.8}
+        onPress={() => {
+          setIsOfflineSheetVisible(true);
+        }}>
         <Plus size={ms(30)} color={COLORS.text.inverse} strokeWidth={2} />
       </TouchableOpacity>
+
+      {/* Offline Booking Sheet */}
+      <StaycationOfflineBookingSheet
+        visible={isOfflineSheetVisible}
+        onClose={() => setIsOfflineSheetVisible(false)}
+        onSuccess={refetch}
+        activeCategory={activeCategory}
+        venueId={serviceId || venue?.id || ""}
+      />
     </View>
   );
 };
@@ -221,6 +427,45 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     paddingTop: vs(10),
+  },
+  topToggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: vs(10),
+  },
+  topToggleLabel: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(16),
+    color: COLORS.text.primary,
+  },
+  topSegmentedControl: {
+    flexDirection: "row",
+    gap: hs(6),
+  },
+  topSegment: {
+    borderRadius: ms(10),
+    paddingHorizontal: hs(14),
+    paddingVertical: vs(10),
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: hs(90),
+  },
+  topSegmentActive: {
+    backgroundColor: "#282828",
+  },
+  topSegmentInactive: {
+    backgroundColor: "#F4F7FC",
+  },
+  topSegmentText: {
+    fontSize: fs(12),
+    lineHeight: fs(12),
+  },
+  topSegmentTextActive: {
+    color: "white",
+  },
+  topSegmentTextInactive: {
+    color: "#8C8C8C",
   },
   legendRow: {
     flexDirection: "row",
@@ -257,7 +502,7 @@ const styles = StyleSheet.create({
     fontFamily: "Gilroy-Bold",
     fontSize: fs(14),
     color: COLORS.text.primary,
-    textTransform: "lowercase",
+    textTransform: "capitalize", // Figma says "Manuel" etc.
   },
   calendarContainer: {
     backgroundColor: COLORS.background,
@@ -280,10 +525,119 @@ const styles = StyleSheet.create({
     marginTop: vs(10),
     marginBottom: vs(5),
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: vs(8),
+  },
   sectionTitle: {
+    fontFamily: "Gilroy-SemiBold", // "Upcoming Bookings" is semi-bold
+    fontSize: fs(14),
+    color: COLORS.text.primary,
+  },
+  roomsFiltersContainer: {
+    gap: vs(12),
+    marginBottom: vs(10),
+  },
+  typesToggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  typesToggleLabel: {
     fontFamily: "Gilroy-Bold",
     fontSize: fs(16),
-    color: COLORS.text.muted,
+    color: COLORS.text.primary,
+  },
+  typesSegmentedControl: {
+    flexDirection: "row",
+    gap: hs(6),
+  },
+  typeSegment: {
+    borderRadius: ms(10),
+    paddingHorizontal: hs(14),
+    paddingVertical: vs(8),
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: hs(50),
+  },
+  typeSegmentActive: {
+    backgroundColor: "#282828",
+  },
+  typeSegmentInactive: {
+    backgroundColor: "#F4F7FC",
+  },
+  typeTextWrapper: {
+    alignItems: "center",
+  },
+  typeSegmentText: {
+    fontSize: fs(12),
+    lineHeight: fs(12 * 1.2),
+  },
+  typeSegmentTextActive: {
+    color: "white",
+  },
+  typeSegmentTextInactive: {
+    color: "#8C8C8C",
+  },
+  statusDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: vs(8),
+  },
+  statusPills: {
+    flexDirection: "row",
+    gap: hs(6),
+  },
+  statusPill: {
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(8),
+    borderRadius: ms(6),
+  },
+  statusPillActive: {
+    backgroundColor: "#F4F7FC",
+    borderWidth: 1,
+    borderColor: "#63A1FD",
+  },
+  statusPillInactive: {
+    backgroundColor: "#F4F7FC",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  statusPillText: {
+    fontSize: fs(14),
+    textTransform: "capitalize",
+  },
+  statusPillTextActive: {
+    color: "#63A1FD",
+  },
+  statusPillTextInactive: {
+    color: COLORS.text.primary,
+  },
+  dateRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+  },
+  todayText: {
+    fontSize: fs(14),
+    color: COLORS.text.primary,
+  },
+  roomsFilledContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: vs(4),
+  },
+  roomsFilledLabel: {
+    fontSize: fs(14),
+    color: COLORS.text.primary,
+  },
+  roomsFilledValue: {
+    fontSize: fs(14),
+    color: COLORS.text.primary,
   },
   listContent: {
     paddingBottom: vs(20),

@@ -189,7 +189,7 @@ export const BookingDetailsScreen = () => {
       booking.sports_slots.end_time,
     )}`;
 
-    const guestName = booking.profiles?.full_name || booking.guest_name || "Guest";
+    const guestName = booking.guest_name || booking.profiles?.full_name || "Guest";
     const venueName = booking.venues?.name || "the venue";
 
     const message = encodeURIComponent(
@@ -231,14 +231,14 @@ export const BookingDetailsScreen = () => {
             uri:
               booking.profiles?.avatar_url ||
               `https://ui-avatars.com/api/?name=${
-                booking.profiles?.full_name || booking.guest_name || "Guest"
+                booking.guest_name || booking.profiles?.full_name || "Guest"
               }&background=random`,
           }}
           style={styles.avatar}
         />
 
         <Text variant="h3" weight="bold" style={styles.headerName}>
-          {booking.profiles?.full_name || booking.guest_name || "Guest User"}
+          {booking.guest_name || booking.profiles?.full_name || "Guest User"}
         </Text>
 
         <Text variant="body2" weight="semiBold" style={styles.categoryText}>

@@ -11,6 +11,7 @@ export interface StaycationBooking {
   checkIn: string;
   checkOut: string;
   guestCount: number;
+  roomName?: string;
 }
 
 export interface StaycationDashboardData {

@@ -127,8 +127,16 @@ export const StaycationBookingDetailsScreen = () => {
   const bookingType = isOnline ? "Online" : "Manual";
 
   const bookingData = {
-    name: bookingDetails?.profiles?.full_name || initialBooking?.name || "Guest",
-    phone: bookingDetails?.profiles?.phone || initialBooking?.phone || "N/A",
+    name:
+      bookingDetails?.guest_name ||
+      bookingDetails?.profiles?.full_name ||
+      initialBooking?.name ||
+      "Guest",
+    phone:
+      bookingDetails?.guest_phone ||
+      bookingDetails?.profiles?.phone ||
+      initialBooking?.phone ||
+      "N/A",
     avatarUrl: bookingDetails?.profiles?.avatar_url || initialBooking?.avatarUrl,
     checkIn: formatDate(bookingDetails?.check_in_date || initialBooking?.checkIn),
     checkOut: formatDate(bookingDetails?.check_out_date || initialBooking?.checkOut),

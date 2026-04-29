@@ -106,7 +106,7 @@ export const useSportsHistory = (
         });
         const rawDate = dateObj.getTime();
 
-        const name = b.profiles?.full_name || b.guest_name || "Guest";
+        const name = b.guest_name || b.profiles?.full_name || "Guest";
         const phone = b.profiles?.phone || b.guest_phone || "N/A";
         const userKey = `${name}-${phone}`;
 

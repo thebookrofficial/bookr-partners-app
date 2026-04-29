@@ -32,8 +32,10 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
           platform_fee,
           total_amount,
           paid_amount,
+          guest_name,   
+          guest_phone,   
           booking_status,
-          profiles:user_id ( full_name, phone, avatar_url )
+          profiles:user_id ( full_name, phone, avatar_url, email )
         `,
         )
         .eq("id", bookingId)

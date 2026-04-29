@@ -397,8 +397,8 @@ export const OfflineBookingSheet = ({
 
       const { error: bookingError } = await supabase.from("sports_bookings").insert({
         user_id: userId,
-        guest_name: userId ? null : name.trim(),
-        guest_phone: userId ? null : cleanMobile,
+        guest_name: name.trim(),
+        guest_phone: cleanMobile,
         venue_id: venueId,
         slot_id: slotId,
         booking_status: "confirmed",

@@ -33,6 +33,8 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
           guest_count,
           total_amount,
           paid_amount,
+          guest_name,
+          guest_phone,
           profiles:user_id ( full_name, phone, avatar_url )
         `,
         )
@@ -73,8 +75,8 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
 
         const formattedBooking: StaycationBooking = {
           id: bookingData.id,
-          name: profile?.full_name || "Guest",
-          phone: profile?.phone || "N/A",
+          name: bookingData.guest_name || profile?.full_name || "Guest",
+          phone: bookingData.guest_phone || profile?.phone || "N/A",
           avatarUrl: profile?.avatar_url,
           amount: totalAmount.toString(),
           status: statusTag,
