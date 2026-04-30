@@ -10,9 +10,10 @@ import { withStallion } from "react-native-stallion";
 import * as Sentry from "@sentry/react-native";
 
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import Config from "react-native-config";
 
 Sentry.init({
-  dsn: "https://1e5c2af53e98693d5aeb9e7594f94637@o4510850078408704.ingest.us.sentry.io/4511290945699840",
+  dsn: Config.SENTRY_DSN,
 
   // Adds more context data to events (IP address, cookies, user, etc.)
   // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
@@ -31,9 +32,17 @@ Sentry.init({
 });
 
 // 1. Global Initializations
+// eslint-disable-next-line no-console
+console.log("Configured Google Web Client ID:", Config.GOOGLE_WEB_CLIENT_ID);
+
+if (!Config.GOOGLE_WEB_CLIENT_ID) {
+  console.warn("GOOGLE_WEB_CLIENT_ID is missing in your .env file!");
+}
+
 GoogleSignin.configure({
   scopes: ["https://www.googleapis.com/auth/userinfo.email"],
-  webClientId: "1077467918306-rc8kc027ijd7oheqomq550s44udqfu32.apps.googleusercontent.com",
+  webClientId: Config.GOOGLE_WEB_CLIENT_ID,
+  offlineAccess: true, // Required to consistently get the idToken
 });
 
 function App() {

@@ -16,6 +16,7 @@ import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
+import { Button } from "@/components/ui/Button";
 import { EventHeader } from "../components/EventHeader";
 import {
   Calendar,
@@ -40,6 +41,42 @@ import {
 import { Platform } from "react-native";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
+
+/**
+ * Prominent Disclosure Modal for Camera Permission (Google Play Compliance)
+ */
+const CameraDisclosureModal = ({
+  visible,
+  onAccept,
+  onClose,
+}: {
+  visible: boolean;
+  onAccept: () => void;
+  onClose: () => void;
+}) => (
+  <Modal visible={visible} transparent animationType="fade">
+    <View style={styles.disclosureOverlay}>
+      <View style={styles.disclosureContainer}>
+        <View style={styles.disclosureIconContainer}>
+          <CameraIcon size={ms(32)} color={COLORS.primary} />
+        </View>
+        <Text variant="h3" weight="bold" style={styles.disclosureTitle}>
+          Camera Access
+        </Text>
+        <Text variant="body1" style={styles.disclosureDescription}>
+          Bookr Partner requires access to your camera to scan ticket QR codes and verify attendee
+          entries at your event.
+        </Text>
+        <Button title="Continue" onPress={onAccept} style={styles.disclosureButton} />
+        <TouchableOpacity onPress={onClose} style={styles.disclosureCancel}>
+          <Text variant="body2" color={COLORS.text.secondary}>
+            Not Now
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </Modal>
+);
 
 /**
  * iOS Specific Camera with Scanning
@@ -311,6 +348,7 @@ export const EventScanScreen = () => {
   const [alreadyScannedCodes, setAlreadyScannedCodes] = useState<string[]>([]);
   const [modalMode, setModalMode] = useState<"confirmation" | "warning" | null>(null);
   const [activeAttendee, setActiveAttendee] = useState<Attendee | null>(null);
+  const [showDisclosure, setShowDisclosure] = useState(false);
 
   const { hasPermission, requestPermission } = useCameraPermission();
 
@@ -345,17 +383,24 @@ export const EventScanScreen = () => {
 
   const handleOpenScanner = useCallback(async () => {
     if (!hasPermission) {
-      const granted = await requestPermission();
-      if (!granted) {
-        Alert.alert("Permission Required", "Allow camera access in settings to scan tickets.", [
-          { text: "Open Settings", onPress: () => Linking.openSettings() },
-          { text: "Cancel", style: "cancel" },
-        ]);
-        return;
-      }
+      setShowDisclosure(true);
+      return;
     }
     setIsScanningMode(true);
-  }, [hasPermission, requestPermission]);
+  }, [hasPermission]);
+
+  const handleAcceptDisclosure = async () => {
+    setShowDisclosure(false);
+    const granted = await requestPermission();
+    if (granted) {
+      setIsScanningMode(true);
+    } else {
+      Alert.alert("Permission Required", "Allow camera access in settings to scan tickets.", [
+        { text: "Open Settings", onPress: () => Linking.openSettings() },
+        { text: "Cancel", style: "cancel" },
+      ]);
+    }
+  };
 
   const handleCodeScanned = useCallback(
     (code: string) => {
@@ -536,6 +581,12 @@ export const EventScanScreen = () => {
         activeAttendee={activeAttendee}
         onClose={handleCloseModal}
         onConfirm={handleConfirmEntry}
+      />
+
+      <CameraDisclosureModal
+        visible={showDisclosure}
+        onAccept={handleAcceptDisclosure}
+        onClose={() => setShowDisclosure(false)}
       />
     </View>
   );
@@ -833,5 +884,45 @@ const styles = StyleSheet.create({
     fontSize: fs(20),
     color: COLORS.text.inverse,
     fontFamily: "Bison-Bold",
+  },
+  disclosureOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: hs(20),
+  },
+  disclosureContainer: {
+    backgroundColor: COLORS.background,
+    borderRadius: ms(20),
+    padding: ms(24),
+    alignItems: "center",
+    width: "100%",
+  },
+  disclosureIconContainer: {
+    width: ms(64),
+    height: ms(64),
+    borderRadius: ms(32),
+    backgroundColor: COLORS.surface.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: vs(16),
+  },
+  disclosureTitle: {
+    marginBottom: vs(12),
+    textAlign: "center",
+  },
+  disclosureDescription: {
+    textAlign: "center",
+    color: COLORS.text.secondary,
+    marginBottom: vs(24),
+    lineHeight: fs(22),
+  },
+  disclosureButton: {
+    width: "100%",
+    marginBottom: vs(12),
+  },
+  disclosureCancel: {
+    padding: ms(8),
   },
 });

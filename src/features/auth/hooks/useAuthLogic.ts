@@ -56,6 +56,9 @@ export const useAuthLogic = () => {
       await GoogleSignin.hasPlayServices();
       const response = await GoogleSignin.signIn();
 
+      // eslint-disable-next-line no-console
+      console.log("Google Sign-In Response:", JSON.stringify(response, null, 2));
+
       if (isSuccessResponse(response)) {
         if (response.data.idToken) {
           const { error } = await supabase.auth.signInWithIdToken({
@@ -64,6 +67,7 @@ export const useAuthLogic = () => {
           });
           if (error) throw error;
         } else {
+          console.error("Google Sign-In Success but No ID Token. Check webClientId in .env");
           throw new Error("No ID token present!");
         }
       } else {
