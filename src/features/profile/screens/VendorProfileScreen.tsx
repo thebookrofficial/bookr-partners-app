@@ -6,8 +6,13 @@ import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-nat
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Avatar, PillTabs } from "@/components/ui";
 import { ServiceCard } from "../components/ServiceCard";
-import { StaffCard } from "../components/StaffCard";
-import { ArrowLeft, Bell, Settings, Contact, Plus } from "lucide-react-native";
+// import { StaffCard } from "../components/StaffCard";
+import {
+  // ArrowLeft,
+  Bell,
+  Settings,
+  // Contact, Plus
+} from "lucide-react-native";
 import { vs, hs, ms } from "@/utils/responsive.utils";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -84,7 +89,7 @@ export const VendorProfileScreen = () => {
       {/* 1. App Bar - Branding & Global Actions */}
       <View style={styles.appBar}>
         <View style={styles.appBarLeft}>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.backBtn}
             onPress={() => {
               if (navigation.canGoBack()) {
@@ -94,7 +99,7 @@ export const VendorProfileScreen = () => {
               }
             }}>
             <ArrowLeft size={ms(20)} color={COLORS.text.primary} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           <Text variant="h3" weight="bold">
             {STRINGS.profile.title}
           </Text>
@@ -196,7 +201,7 @@ export const VendorProfileScreen = () => {
       </View>
 
       {/* 4. Staff Management Section [cite: 58] */}
-      <View style={styles.sectionHeader}>
+      {/* <View style={styles.sectionHeader}>
         <Text variant="body1" weight="bold" style={styles.sectionTitle}>
           {STRINGS.profile.yourStaff}
         </Text>
@@ -207,11 +212,11 @@ export const VendorProfileScreen = () => {
           {STRINGS.profile.addStaff}
         </Text>
         <Plus size={ms(17)} color={COLORS.text.primary} style={styles.plusSign} />
-      </TouchableOpacity>
+      </TouchableOpacity> */}
 
       {/* Note: In Phase 7, we will map these from the database as well */}
-      <StaffCard name="Talia Mar" role="Restaurant" type="Manager" />
-      <StaffCard name="Rohit Sharma" role="Turf" type="Employee" />
+      {/* <StaffCard name="Talia Mar" role="Restaurant" type="Manager" />
+      <StaffCard name="Rohit Sharma" role="Turf" type="Employee" /> */}
 
       <View style={{ height: vs(40) }} />
     </ScreenContainer>
