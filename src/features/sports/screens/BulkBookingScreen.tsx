@@ -13,6 +13,7 @@ import { COLORS } from "@/constants/theme";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useServiceStore } from "@/store/serviceStore";
 import { supabase } from "@/lib/supabase";
 
 // Match the exact status type defined in BookingData/BookingCard
@@ -33,6 +34,16 @@ export const BulkBookingScreen = () => {
   const [loading, setLoading] = useState(true);
 
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+
+  // Extract initial serviceId
+  const parentState = navigation.getParent()?.getState();
+  const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
+  const serviceId =
+    (tabRoute?.params as any)?.serviceId || (tabRoute?.params as any)?.params?.serviceId || "";
+
+  const { selectedCategories, setServiceCategory } = useServiceStore();
+  const selectedCategory = selectedCategories[serviceId] || "Football";
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
   const fetchBulkBookings = useCallback(async () => {
     setLoading(true);
@@ -199,7 +210,12 @@ export const BulkBookingScreen = () => {
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-      <ServiceHeader title="Elite Strikers Club" subtitle="Bulk Booking" />
+      <ServiceHeader
+        title="Elite Strikers Club"
+        subtitle="Bulk Booking"
+        category={selectedCategory}
+        onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
+      />
 
       <View style={styles.tabContainer}>
         <TouchableOpacity
@@ -240,6 +256,36 @@ export const BulkBookingScreen = () => {
         }>
         <Plus size={ms(30)} color={COLORS.text.inverse} />
       </TouchableOpacity>
+
+      {/* --- FIXED OVERLAY DROPDOWN --- */}
+      {isCategoryOpen && (
+        <View style={styles.dropdownOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setIsCategoryOpen(false)}
+          />
+          <View style={styles.dropdownMenu}>
+            {["Football", "Box Cricket", "Pickleball"].map(cat => (
+              <TouchableOpacity
+                key={cat}
+                style={styles.dropdownItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setServiceCategory(serviceId, cat);
+                  setIsCategoryOpen(false);
+                }}>
+                <Text variant="body2" weight="semiBold">
+                  {cat}
+                </Text>
+                <View style={styles.radioOuter}>
+                  {selectedCategory === cat && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
     </ScreenContainer>
   );
 };
@@ -274,5 +320,50 @@ const styles = StyleSheet.create({
     backgroundColor: "#63A1FD",
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  /* --- FIXED OVERLAY DROPDOWN STYLES --- */
+  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
+  dropdownMenu: {
+    position: "absolute",
+    top: vs(55),
+    right: hs(12),
+    backgroundColor: COLORS.background,
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    width: hs(180),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    padding: hs(6),
+    gap: vs(6),
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(8),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    borderRadius: ms(8),
+  },
+  radioOuter: {
+    width: ms(20),
+    height: ms(20),
+    borderRadius: ms(10),
+    borderWidth: 2,
+    borderColor: COLORS.text.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioInner: {
+    width: ms(10),
+    height: ms(10),
+    borderRadius: ms(5),
+    backgroundColor: COLORS.text.primary,
   },
 });

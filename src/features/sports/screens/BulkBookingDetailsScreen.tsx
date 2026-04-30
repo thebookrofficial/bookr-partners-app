@@ -20,6 +20,7 @@ import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { useBulkBooking } from "../hooks/useBulkBooking";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useServiceStore } from "@/store/serviceStore";
 import { supabase } from "@/lib/supabase";
 
 // IMPORT THE NEW VIEW COMPONENT
@@ -52,6 +53,17 @@ const HOURS = [
 // ==========================================
 const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
   const navigation = useNavigation();
+
+  // Extract initial serviceId
+  const parentState = navigation.getParent()?.getState();
+  const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
+  const serviceId =
+    (tabRoute?.params as any)?.serviceId || (tabRoute?.params as any)?.params?.serviceId || "";
+
+  const { selectedCategories, setServiceCategory } = useServiceStore();
+  const selectedCategory = selectedCategories[serviceId] || "Football";
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+
   const [bookingType, setBookingType] = useState<"multi" | "single">(type);
   const [mobile, setMobile] = useState("");
   const [name, setName] = useState("");
@@ -146,7 +158,8 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
         <ServiceHeader
           title="Elite Strikers Club"
           subtitle="Bulk Booking"
-          rightComponent={<Text style={[styles.bisonText, styles.headerBadgeText]}>FOOTBALL</Text>}
+          category={selectedCategory}
+          onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
         />
 
         <View style={styles.tabBar}>
@@ -381,6 +394,36 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* --- FIXED OVERLAY DROPDOWN --- */}
+      {isCategoryOpen && (
+        <View style={styles.dropdownOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setIsCategoryOpen(false)}
+          />
+          <View style={styles.dropdownMenu}>
+            {["Football", "Box Cricket", "Pickleball"].map(cat => (
+              <TouchableOpacity
+                key={cat}
+                style={styles.dropdownItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setServiceCategory(serviceId, cat);
+                  setIsCategoryOpen(false);
+                }}>
+                <Text variant="body2" weight="semiBold" style={styles.dropdownItemText}>
+                  {cat}
+                </Text>
+                <View style={styles.radioOuter}>
+                  {selectedCategory === cat && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -528,5 +571,53 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#EEE",
     alignItems: "center",
+  },
+
+  /* --- FIXED OVERLAY DROPDOWN STYLES --- */
+  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
+  dropdownMenu: {
+    position: "absolute",
+    top: vs(55),
+    right: hs(12),
+    backgroundColor: "#FFF",
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: "#EEE",
+    width: hs(180),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    padding: hs(6),
+    gap: vs(6),
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(8),
+    borderWidth: 1,
+    borderColor: "#EEE",
+    borderRadius: ms(8),
+  },
+  dropdownItemText: {
+    color: "#000",
+  },
+  radioOuter: {
+    width: ms(20),
+    height: ms(20),
+    borderRadius: ms(10),
+    borderWidth: 2,
+    borderColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioInner: {
+    width: ms(10),
+    height: ms(10),
+    borderRadius: ms(5),
+    backgroundColor: "#000",
   },
 });

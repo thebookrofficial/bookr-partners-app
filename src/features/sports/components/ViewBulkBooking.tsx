@@ -27,6 +27,7 @@ import {
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useNavigation } from "@react-navigation/native";
+import { useServiceStore } from "@/store/serviceStore";
 import { supabase } from "@/lib/supabase";
 
 interface ViewBulkBookingProps {
@@ -36,6 +37,16 @@ interface ViewBulkBookingProps {
 
 export const ViewBulkBooking = ({ bookingId: _bookingId, type }: ViewBulkBookingProps) => {
   const navigation = useNavigation();
+
+  // Extract initial serviceId
+  const parentState = navigation.getParent()?.getState();
+  const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
+  const serviceId =
+    (tabRoute?.params as any)?.serviceId || (tabRoute?.params as any)?.params?.serviceId || "";
+
+  const { selectedCategories } = useServiceStore();
+  const selectedCategory = selectedCategories[serviceId] || "Football";
+
   const [historyOpen, setHistoryOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
@@ -224,7 +235,7 @@ export const ViewBulkBooking = ({ bookingId: _bookingId, type }: ViewBulkBooking
         </TouchableOpacity>
         <Image source={{ uri: data.avatar }} style={styles.avatar} />
         <Text style={styles.viewHeaderTitle}>{data.name}</Text>
-        <Text style={styles.viewHeaderBadge}>Football</Text>
+        <Text style={styles.viewHeaderBadge}>{selectedCategory}</Text>
       </View>
 
       <Text style={styles.bookingTypeTitle}>
