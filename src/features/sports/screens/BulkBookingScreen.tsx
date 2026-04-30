@@ -16,7 +16,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { supabase } from "@/lib/supabase";
 
 // Match the exact status type defined in BookingData/BookingCard
-type BookingStatus = "Full" | "Online" | "Offline" | "Advance" | "Settlement";
+type BookingStatus = "Online" | "Offline" | "Settlement";
 
 interface BulkBookingItem {
   id: string;
@@ -131,7 +131,7 @@ export const BulkBookingScreen = () => {
 
         const timeRangeStr = `${formatTime(firstStartTime)} - ${formatTime(lastSlot.end_time)}`;
         const statusValue: BookingStatus =
-          totalPaid >= totalCost && totalCost > 0 ? "Full" : "Offline";
+          totalPaid >= totalCost && totalCost > 0 ? "Online" : "Offline";
 
         return {
           id: base.id,

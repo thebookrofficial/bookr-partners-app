@@ -19,18 +19,11 @@ interface CreateOfflineBookingPayload {
   groupType?: string;
 }
 
-/**
- * Custom hook to handle offline booking creation for Staycations (Farmhouse / Rooms).
- * Handles Supabase insertion logic entirely separated from UI.
- */
 export const useCreateStaycationOfflineBooking = () => {
   const { clientProfile } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Helper to format dates avoiding timezone shifts
-   */
   const formatLocalDate = (date: Date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -38,24 +31,29 @@ export const useCreateStaycationOfflineBooking = () => {
     return `${year}-${month}-${day}`;
   };
 
-  /**
-   * Creates an offline booking record in Supabase
-   * @param payload The structured booking data from the UI sheet
-   */
-  const createBooking = async (payload: CreateOfflineBookingPayload): Promise<boolean> => {
+  // UPDATED: Now returns the venueName alongside success status
+  const createBooking = async (
+    payload: CreateOfflineBookingPayload,
+  ): Promise<{ success: boolean; venueName?: string }> => {
     if (!clientProfile?.id) {
       setError("User profile not found.");
-      return false;
+      return { success: false };
     }
 
     try {
       setIsLoading(true);
       setError(null);
 
-      // Clean phone number for lookup
+      // Fetch the Venue Name so we can use it in the WhatsApp message
+      const { data: venueData } = await supabase
+        .from("venues")
+        .select("name")
+        .eq("id", payload.venueId)
+        .maybeSingle();
+      const venueName = venueData?.name || "our venue";
+
       const cleanMobile = payload.guestPhone.replace(/[^\d]/g, "");
 
-      // 1. Try to resolve an existing Bookr profile by phone number (Optional)
       let userId: string | null = null;
       if (cleanMobile.length >= 10) {
         const { data: profile } = await supabase
@@ -68,11 +66,9 @@ export const useCreateStaycationOfflineBooking = () => {
         }
       }
 
-      // Format dates safely
       const checkInStr = formatLocalDate(payload.checkInDate);
       const checkOutStr = formatLocalDate(payload.checkOutDate);
 
-      // Calculate nights count
       const nightsCount = Math.max(
         1,
         Math.round(
@@ -82,8 +78,6 @@ export const useCreateStaycationOfflineBooking = () => {
 
       const bookingTypeValue = payload.bookingType === "farmhouse" ? "full_property" : "per_room";
 
-      // Insert directly into staycation_bookings based on schema.
-      // We pass user_id as null if no Bookr user matches the phone number, allowing the guest_name and guest_phone to represent the offline user.
       const { error: insertError } = await supabase.from("staycation_bookings").insert({
         user_id: userId,
         venue_id: payload.venueId,
@@ -112,7 +106,7 @@ export const useCreateStaycationOfflineBooking = () => {
         throw new Error(insertError.message);
       }
 
-      // Manually block dates in staycation_availability
+      // Manually block dates
       try {
         const targetDates: string[] = [];
         let currentDate = new Date(payload.checkInDate);
@@ -124,7 +118,6 @@ export const useCreateStaycationOfflineBooking = () => {
         }
 
         if (targetDates.length > 0) {
-          // 1. Fetch rooms for the venue (if any)
           const { data: rooms } = await supabase
             .from("staycation_rooms")
             .select("id")
@@ -132,7 +125,6 @@ export const useCreateStaycationOfflineBooking = () => {
 
           const roomIds = rooms && rooms.length > 0 ? rooms.map(r => r.id) : [null];
 
-          // 2. Identify existing records to avoid duplicates
           const { data: existingAvail } = await supabase
             .from("staycation_availability")
             .select("id, room_id, date")
@@ -158,32 +150,26 @@ export const useCreateStaycationOfflineBooking = () => {
             }
           }
 
-          // 3. Insert new records
           if (toInsert.length > 0) {
-            const { error: availInsertError } = await supabase
-              .from("staycation_availability")
-              .insert(toInsert);
-            if (availInsertError) console.warn("Failed to insert availability:", availInsertError);
+            await supabase.from("staycation_availability").insert(toInsert);
           }
 
-          // 4. Update existing records
           if (existingAvail && existingAvail.length > 0) {
             const existingIds = existingAvail.map(ea => ea.id);
-            const { error: updateError } = await supabase
+            await supabase
               .from("staycation_availability")
               .update({ is_blocked: true, is_available: false })
               .in("id", existingIds);
-            if (updateError) console.warn("Failed to update availability:", updateError);
           }
         }
       } catch (avErr) {
         console.warn("Availability update failed:", avErr);
       }
 
-      return true;
+      return { success: true, venueName };
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred while creating booking.");
-      return false;
+      return { success: false };
     } finally {
       setIsLoading(false);
     }

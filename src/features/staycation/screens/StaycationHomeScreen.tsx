@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -34,6 +34,7 @@ export const StaycationHomeScreen = () => {
 
   // State for sub-categories and filters
   const [activeCategory, setActiveCategory] = useState<"Farmhouse" | "Rooms">("Farmhouse");
+
   // For Rooms: "All", "Deluxe Rooms", "Private Rooms"
   const [activeRoomType, setActiveRoomType] = useState<"All" | "Deluxe Rooms" | "Private Rooms">(
     "All",
@@ -57,27 +58,34 @@ export const StaycationHomeScreen = () => {
     activeCategory,
   );
 
+  // Automatically adjust layout based on backend property_type
+  useEffect(() => {
+    // Only update if venue data has finished loading
+    if (venue && venue.property_type) {
+      // The database ENUM values are: villa, farmhouse, resort, hotel, homestay
+      // We explicitly check for 'farmhouse'. Everything else uses the 'Rooms' layout.
+      if (venue.property_type.toLowerCase() === "farmhouse") {
+        setActiveCategory("Farmhouse");
+      } else {
+        setActiveCategory("Rooms");
+      }
+    }
+  }, [venue]);
+
   // Flatten categorized bookings for the list
   const flatListData = useMemo(() => {
     const data: ListEntry[] = [];
     groupedBookings.forEach((section: { title: string; data: StaycationBooking[] }) => {
-      // We only inject specific headers for Rooms if required, or we just rely on section title
       let headerTitle = section.title;
       if (activeCategory === "Rooms") {
         if (section.title === "Today's Check-ins") {
-          // This header is actually replaced by the filter row, so we might skip it or keep it empty
-          // But Figma shows "Upcoming Bookings" as a section header for Rooms.
-          // Let's just skip "Today's Check-ins" header since it has custom filters
           return;
         }
       }
 
-      // Add the section header
       data.push({ type: "header", title: headerTitle });
 
-      // Inject bookings
       section.data.forEach(b => {
-        // Mocking roomName for Rooms view as per Figma
         const enrichedData =
           activeCategory === "Rooms" ? { ...b, roomName: `Room ${data.length % 5 || 1}` } : b;
         data.push({ type: "booking", data: enrichedData });
@@ -88,7 +96,6 @@ export const StaycationHomeScreen = () => {
 
   const renderItem = ({ item }: { item: ListEntry }) => {
     if (item.type === "header") {
-      // In Rooms view, "Upcoming Bookings" is just text
       return (
         <View style={[styles.sectionHeader, activeCategory === "Rooms" && { marginTop: vs(0) }]}>
           <View style={styles.headerRow}>
@@ -115,54 +122,8 @@ export const StaycationHomeScreen = () => {
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
         />
 
-        {/* Top Segmented Toggle: Bookings | Farmhouse | Rooms */}
-        <View style={styles.topToggleContainer}>
-          <Text style={styles.topToggleLabel}>Bookings</Text>
-          <View style={styles.topSegmentedControl}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setActiveCategory("Farmhouse")}
-              style={[
-                styles.topSegment,
-                activeCategory === "Farmhouse"
-                  ? styles.topSegmentActive
-                  : styles.topSegmentInactive,
-              ]}>
-              <Text
-                weight="semiBold"
-                style={[
-                  styles.topSegmentText,
-                  activeCategory === "Farmhouse"
-                    ? styles.topSegmentTextActive
-                    : styles.topSegmentTextInactive,
-                ]}>
-                Farmhouse
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setActiveCategory("Rooms")}
-              style={[
-                styles.topSegment,
-                activeCategory === "Rooms" ? styles.topSegmentActive : styles.topSegmentInactive,
-              ]}>
-              <Text
-                weight="semiBold"
-                style={[
-                  styles.topSegmentText,
-                  activeCategory === "Rooms"
-                    ? styles.topSegmentTextActive
-                    : styles.topSegmentTextInactive,
-                ]}>
-                Rooms
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {activeCategory === "Farmhouse" ? (
           <>
-            {/* Status Legend */}
             <View style={styles.legendRow}>
               <View style={styles.legendItem}>
                 <View style={styles.availableDot} />
@@ -260,7 +221,6 @@ export const StaycationHomeScreen = () => {
               <View style={styles.typesSegmentedControl}>
                 {(["All", "Deluxe Rooms", "Private Rooms"] as const).map(type => {
                   const isActive = activeRoomType === type;
-                  // Handle line breaks for text
                   const textLines = type === "All" ? ["All"] : type.split(" ");
                   return (
                     <TouchableOpacity
@@ -428,45 +388,6 @@ const styles = StyleSheet.create({
   headerContainer: {
     paddingTop: vs(10),
   },
-  topToggleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: vs(10),
-  },
-  topToggleLabel: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(16),
-    color: COLORS.text.primary,
-  },
-  topSegmentedControl: {
-    flexDirection: "row",
-    gap: hs(6),
-  },
-  topSegment: {
-    borderRadius: ms(10),
-    paddingHorizontal: hs(14),
-    paddingVertical: vs(10),
-    justifyContent: "center",
-    alignItems: "center",
-    minWidth: hs(90),
-  },
-  topSegmentActive: {
-    backgroundColor: "#282828",
-  },
-  topSegmentInactive: {
-    backgroundColor: "#F4F7FC",
-  },
-  topSegmentText: {
-    fontSize: fs(12),
-    lineHeight: fs(12),
-  },
-  topSegmentTextActive: {
-    color: "white",
-  },
-  topSegmentTextInactive: {
-    color: "#8C8C8C",
-  },
   legendRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -502,7 +423,7 @@ const styles = StyleSheet.create({
     fontFamily: "Gilroy-Bold",
     fontSize: fs(14),
     color: COLORS.text.primary,
-    textTransform: "capitalize", // Figma says "Manuel" etc.
+    textTransform: "capitalize",
   },
   calendarContainer: {
     backgroundColor: COLORS.background,
@@ -532,7 +453,7 @@ const styles = StyleSheet.create({
     paddingVertical: vs(8),
   },
   sectionTitle: {
-    fontFamily: "Gilroy-SemiBold", // "Upcoming Bookings" is semi-bold
+    fontFamily: "Gilroy-SemiBold",
     fontSize: fs(14),
     color: COLORS.text.primary,
   },

@@ -133,14 +133,13 @@ export const StaycationBookingCard = ({
     const s = displayData.status?.toLowerCase();
     switch (s) {
       case "online":
-      case "advance":
-        return "#63A1FD";
+        return "#00B562"; // Using green for Online (Full)
       case "offline":
-      case "manuel": // manual? handled as well
-        return "#E55959";
+        return "#63A1FD"; // Using blue for Offline (Advance)
       case "complete":
-      case "full":
-        return "#00B562"; // Using green for complete if needed
+        return "#00B562";
+      case "cancelled":
+        return "#E55959";
       default:
         return COLORS.text.muted;
     }
@@ -202,7 +201,7 @@ export const StaycationBookingCard = ({
   // Determine card background color. From Figma, some cards are #E0E0E0 (grey) e.g., Rohit Sharma
   // For simplicity, we'll stick to the base #F4F7FC or conditionally style based on status.
   const isGreyBg =
-    displayData.status?.toLowerCase() === "advance" || displayData.name?.includes("Rohit");
+    displayData.status?.toLowerCase() === "offline" || displayData.name?.includes("Rohit");
 
   return (
     <TouchableOpacity

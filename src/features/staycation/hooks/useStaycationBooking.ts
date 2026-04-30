@@ -62,9 +62,9 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
         if (bookingData.booking_status === "cancelled") {
           statusTag = "Cancelled";
         } else if (paidAmount >= totalAmount) {
-          statusTag = "Full";
+          statusTag = "Online";
         } else if (paidAmount > 0) {
-          statusTag = "Advance";
+          statusTag = "Offline";
         }
 
         // Additional status: Complete if check_out_date is in the past and NOT cancelled

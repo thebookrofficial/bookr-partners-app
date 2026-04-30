@@ -12,6 +12,7 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
+  Share,
 } from "react-native";
 import { Text } from "@/components/ui";
 import {
@@ -37,7 +38,7 @@ interface StaycationOfflineBookingSheetProps {
   onClose: () => void;
   onSuccess?: () => void;
   activeCategory: "Farmhouse" | "Rooms";
-  venueId: string; // Passed from parent to link the booking to the current venue
+  venueId: string;
 }
 
 export const StaycationOfflineBookingSheet = ({
@@ -89,7 +90,6 @@ export const StaycationOfflineBookingSheet = ({
       const guestPhoneOrQuery = phoneVariants.map(v => `guest_phone.eq.${v}`).join(",");
 
       try {
-        // 1. Try to Resolve Bookr Profile
         const { data: profile } = await supabase
           .from("profiles")
           .select("id, full_name")
@@ -98,7 +98,6 @@ export const StaycationOfflineBookingSheet = ({
 
         let foundName = profile?.full_name || "";
 
-        // 2. If no Bookr Profile, lookup latest Manual Guest Name from Staycation
         if (!foundName) {
           const { data: stayBooking } = await supabase
             .from("staycation_bookings")
@@ -114,7 +113,6 @@ export const StaycationOfflineBookingSheet = ({
           }
         }
 
-        // 3. If still nothing, check Sports Bookings
         if (!foundName) {
           const { data: sportsBooking } = await supabase
             .from("sports_bookings")
@@ -134,7 +132,6 @@ export const StaycationOfflineBookingSheet = ({
           setName(foundName);
         }
 
-        // Check for Previous History
         const historyOrQuery = guestPhoneOrQuery + (profile?.id ? `,user_id.eq.${profile.id}` : "");
         const { count, error: historyError } = await supabase
           .from("staycation_bookings")
@@ -154,7 +151,6 @@ export const StaycationOfflineBookingSheet = ({
     setBookingFor(isFarmhouse ? "Farmhouse" : "Rooms");
     setGuestCount(isFarmhouse ? "" : "");
     setTotalPayment(isFarmhouse ? "" : "");
-    // Reset basic fields on mode switch
     setName("");
     setPhone("");
     setAdvancePaid("");
@@ -186,7 +182,7 @@ export const StaycationOfflineBookingSheet = ({
     const finalName = name.trim() || "Offline Guest";
     const finalPhone = phone.trim() || "";
 
-    const success = await createBooking({
+    const result = await createBooking({
       venueId,
       guestName: finalName,
       guestPhone: finalPhone,
@@ -200,7 +196,30 @@ export const StaycationOfflineBookingSheet = ({
       groupType: isFarmhouse ? groupType : undefined,
     });
 
-    if (success) {
+    if (result.success) {
+      // 1. Calculate due dynamically
+      const dueAmount = (parseFloat(totalPayment) || 0) - (parseFloat(advancePaid) || 0);
+
+      // 2. Build the dynamic template string
+      const shareMessage = `Booking Confirmed! 🎉
+Hi ${finalName},
+Your slot at ${result.venueName || "our venue"} is locked in via Bookr.
+Date: ${formatDate(checkInDate)} to ${formatDate(checkOutDate)}
+Payment Summary:
+Total: ₹${totalPayment || 0}
+Paid: ₹${advancePaid || 0}
+Due at Venue: ₹${dueAmount}
+Thank you for booking with Bookr!`;
+
+      // 3. Trigger Native Share
+      try {
+        await Share.share({
+          message: shareMessage,
+        });
+      } catch (error) {
+        console.warn("Error sharing message:", error);
+      }
+
       Alert.alert("Success", "Offline booking created successfully.");
       onSuccess?.();
       onClose();
@@ -213,7 +232,6 @@ export const StaycationOfflineBookingSheet = ({
     if (event.type === "set" && selectedDate) {
       if (showDatePicker === "in") {
         setCheckInDate(selectedDate);
-        // If check-out is before or same as check-in, push it forward
         const tomorrow = new Date(selectedDate);
         tomorrow.setDate(tomorrow.getDate() + 1);
         if (selectedDate >= checkOutDate) {
@@ -584,15 +602,10 @@ export const StaycationOfflineBookingSheet = ({
   );
 };
 
+// ... keep existing styles below ...
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0, 0, 0, 0.4)" },
+  backdrop: { ...StyleSheet.absoluteFillObject },
   sheetContainer: {
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: ms(20),
@@ -602,38 +615,14 @@ const styles = StyleSheet.create({
     paddingBottom: vs(30),
     maxHeight: "90%",
   },
-  header: {
-    marginBottom: vs(16),
-  },
-  title: {
-    fontSize: fs(16),
-    color: COLORS.text.primary,
-    textTransform: "uppercase",
-  },
-  scrollContent: {
-    gap: vs(16),
-  },
-  inputGroup: {
-    gap: vs(8),
-  },
-  row: {
-    flexDirection: "row",
-    gap: hs(16),
-  },
-  col: {
-    flex: 1,
-    gap: vs(8),
-  },
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(6),
-  },
-  label: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-    textTransform: "capitalize",
-  },
+  header: { marginBottom: vs(16) },
+  title: { fontSize: fs(16), color: COLORS.text.primary, textTransform: "uppercase" },
+  scrollContent: { gap: vs(16) },
+  inputGroup: { gap: vs(8) },
+  row: { flexDirection: "row", gap: hs(16) },
+  col: { flex: 1, gap: vs(8) },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6) },
+  label: { fontSize: fs(14), color: COLORS.text.primary, textTransform: "capitalize" },
   inputWrapper: {
     backgroundColor: "#F4F7FC",
     borderRadius: ms(10),
@@ -648,10 +637,7 @@ const styles = StyleSheet.create({
     padding: 0,
     margin: 0,
   },
-  inputText: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
+  inputText: { fontSize: fs(14), color: COLORS.text.primary },
   dropdownWrapper: {
     backgroundColor: "#F4F7FC",
     borderRadius: ms(10),
@@ -661,23 +647,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  dropdownText: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-    flex: 1,
-  },
-  mutedText: {
-    color: "#8C8C8C",
-  },
-  guestCountRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(6),
-  },
-  guestCountNum: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
+  dropdownText: { fontSize: fs(14), color: COLORS.text.primary, flex: 1 },
+  mutedText: { color: "#8C8C8C" },
+  guestCountRight: { flexDirection: "row", alignItems: "center", gap: hs(6) },
+  guestCountNum: { fontSize: fs(14), color: COLORS.text.primary },
   historyButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -689,15 +662,8 @@ const styles = StyleSheet.create({
     paddingVertical: vs(12),
     marginTop: vs(8),
   },
-  historyLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(8),
-  },
-  historyText: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
+  historyLeft: { flexDirection: "row", alignItems: "center", gap: hs(8) },
+  historyText: { fontSize: fs(14), color: COLORS.text.primary },
   bookNowButton: {
     backgroundColor: "#000000",
     borderRadius: ms(10),
@@ -706,11 +672,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: vs(16),
   },
-  bookNowText: {
-    color: "#FFFFFF",
-    fontSize: fs(20),
-    textTransform: "uppercase",
-  },
+  bookNowText: { color: "#FFFFFF", fontSize: fs(20), textTransform: "uppercase" },
   modalOverlayCenter: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -735,20 +697,13 @@ const styles = StyleSheet.create({
     padding: ms(16),
     maxHeight: vs(300),
   },
-  dropdownTitle: {
-    marginBottom: vs(12),
-    textAlign: "center",
-  },
-  dropdownScroll: {
-    maxHeight: vs(250),
-  },
+  dropdownTitle: { marginBottom: vs(12), textAlign: "center" },
+  dropdownScroll: { maxHeight: vs(250) },
   dropdownItem: {
     paddingVertical: vs(12),
     borderBottomWidth: 1,
     borderBottomColor: "#F4F7FC",
     alignItems: "center",
   },
-  dropdownItemText: {
-    color: COLORS.text.primary,
-  },
+  dropdownItemText: { color: COLORS.text.primary },
 });

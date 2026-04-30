@@ -164,9 +164,9 @@ export const useStaycationHistory = (
         if (booking.booking_status === "cancelled") {
           statusTag = "Cancelled";
         } else if (booking.paid_amount >= booking.total_amount) {
-          statusTag = "Full";
+          statusTag = "Online";
         } else if (booking.paid_amount > 0) {
-          statusTag = "Advance";
+          statusTag = "Offline";
         }
 
         if (checkOutStr < todayStr && booking.booking_status !== "cancelled") {

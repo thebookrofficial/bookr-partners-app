@@ -22,7 +22,7 @@ export interface AggregatedBooking {
   phone: string;
   timeRanges: string;
   price: number;
-  status: "Full" | "Advance" | "Offline";
+  status: "Online" | "Offline";
 }
 
 export const useSportsHistory = (
@@ -157,9 +157,9 @@ export const useSportsHistory = (
             const timeRanges = sortedSlots
               .map((s: any) => `${formatTime(s.start_time)} - ${formatTime(s.end_time)}`)
               .join("  |  ");
-            let status: "Full" | "Advance" | "Offline" = "Offline";
-            if (u.totalPaid >= u.totalCost && u.totalCost > 0) status = "Full";
-            else if (u.totalPaid > 0) status = "Advance";
+            let status: "Online" | "Offline" = "Offline";
+            if (u.totalPaid >= u.totalCost && u.totalCost > 0) status = "Online";
+            else if (u.totalPaid > 0) status = "Offline";
             return {
               id: u.id,
               name: u.name,

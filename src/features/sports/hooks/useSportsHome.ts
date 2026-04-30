@@ -32,7 +32,7 @@ export interface BookingData {
   date: string;
   time: string;
   price: string;
-  status: "Online" | "Offline" | "Advance" | "Settlement" | "Full";
+  status: "Online" | "Offline" | "Settlement";
   avatarUrl?: string;
   isOfflineRecord: boolean;
   isDisabled?: boolean;

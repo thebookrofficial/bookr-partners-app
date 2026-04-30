@@ -1,11 +1,12 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { supabase } from "../../../lib/supabase";
 import { useAuthStore } from "../../../store";
 import { StaycationBooking } from "../types/staycation.types";
 import { COLORS } from "@/constants/theme";
+import { useFocusEffect } from "@react-navigation/native";
 
 // Helper to format Date to YYYY-MM-DD
 const formatDate = (date: Date) => date.toISOString().split("T")[0];
@@ -24,6 +25,7 @@ export const useStaycationHome = (serviceId?: string, activeCategory?: "Farmhous
     id: string;
     name: string;
     cover_image_url: string | null;
+    property_type?: string;
   } | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
@@ -35,7 +37,7 @@ export const useStaycationHome = (serviceId?: string, activeCategory?: "Farmhous
       // 1. Get the Staycation Venue ID for this owner
       let venueQuery = supabase
         .from("venues")
-        .select("id, name, cover_image_url")
+        .select("id, name, cover_image_url, staycation_venues(property_type)")
         .eq("owner_id", clientProfile.id)
         .eq("vertical", "staycation");
 
@@ -57,10 +59,17 @@ export const useStaycationHome = (serviceId?: string, activeCategory?: "Farmhous
         return;
       }
 
+      // Handle the array return structure of a joined query
+      const propertyType =
+        venueData.staycation_venues && venueData.staycation_venues.length > 0
+          ? venueData.staycation_venues[0].property_type
+          : null;
+
       setVenue({
         id: venueData.id,
         name: venueData.name,
         cover_image_url: venueData.cover_image_url,
+        property_type: propertyType,
       });
 
       const today = new Date();
@@ -95,6 +104,7 @@ export const useStaycationHome = (serviceId?: string, activeCategory?: "Farmhous
         `,
         )
         .eq("venue_id", venueData.id)
+        .neq("booking_status", "cancelled")
         .gte("check_out_date", todayStr)
         .order("check_in_date", { ascending: true });
 
@@ -183,9 +193,9 @@ export const useStaycationHome = (serviceId?: string, activeCategory?: "Farmhous
         if (booking.booking_status === "cancelled") {
           statusTag = "Cancelled";
         } else if (booking.paid_amount >= booking.total_amount) {
-          statusTag = "Full";
+          statusTag = "Online";
         } else if (booking.paid_amount > 0) {
-          statusTag = "Advance";
+          statusTag = "Offline";
         }
 
         // Additional status: Complete if check_out_date is in the past and NOT cancelled
@@ -239,9 +249,11 @@ export const useStaycationHome = (serviceId?: string, activeCategory?: "Farmhous
     }
   }, [clientProfile, serviceId, activeCategory]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboardData();
+    }, [fetchDashboardData]),
+  );
 
   return {
     isLoading,

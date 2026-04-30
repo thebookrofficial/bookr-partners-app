@@ -13,7 +13,7 @@ This directory contains the primary screens for the Sports service category.
 - **`SportsHistoryScreen.tsx`**: Historical view of all transactions and bookings.
 
   - Grouped by month and date for easy tracking.
-  - Automated status indicators for "Full", "Online", and "Offline" settlements.
+  - Automated status indicators for "Online", and "Offline" settlements.
   - Integrates with total settlement amounts per month.
 
 - **`SportsDashboardScreen.tsx`**: Analytics hub for venue performance.
