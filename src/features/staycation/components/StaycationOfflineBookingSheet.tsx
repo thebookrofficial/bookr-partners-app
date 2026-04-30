@@ -489,7 +489,7 @@ Thank you for booking with Bookr!`;
                     <TextInput
                       style={styles.textInput}
                       placeholder={isFarmhouse ? "₹ 1000" : "₹ 2500"}
-                      placeholderTextColor={COLORS.text.primary}
+                      placeholderTextColor={COLORS.text.muted}
                       keyboardType="numeric"
                       value={totalPayment}
                       onChangeText={setTotalPayment}
