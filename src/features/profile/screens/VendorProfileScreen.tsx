@@ -26,6 +26,38 @@ export const VendorProfileScreen = () => {
   const [activeTab, setActiveTab] = useState(STRINGS.profile.tabs[0]);
 
   /**
+   * Dynamically compute available tabs based on venues recorded for the vendor.
+   * Always includes the first tab (e.g., "All Venues").
+   */
+  const availableTabs = useMemo(() => {
+    const allTabs = STRINGS.profile.tabs;
+    if (venues.length === 0) return [allTabs[0]];
+
+    const activeVerticals = new Set(venues.map(v => v.vertical.toLowerCase()));
+
+    return allTabs.filter((tab, index) => {
+      if (index === 0) return true; // Always show "All Venues"
+
+      const tabKey = tab.toLowerCase();
+      // Match tab name with vertical (handling plural/singular)
+      return (
+        activeVerticals.has(tabKey) ||
+        activeVerticals.has(tabKey.replace(/s$/, "")) ||
+        (tabKey === "dining" && activeVerticals.has("dining"))
+      );
+    });
+  }, [venues]);
+
+  /**
+   * Sync activeTab if the current selection is no longer available after data refresh.
+   */
+  React.useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0]);
+    }
+  }, [availableTabs, activeTab]);
+
+  /**
    * Filter venues based on the selected PillTab.
    * Standardizes comparison between UI labels and DB vertical_type enums.
    */
@@ -111,7 +143,7 @@ export const VendorProfileScreen = () => {
         </Text>
       </View>
 
-      <PillTabs tabs={STRINGS.profile.tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      <PillTabs tabs={availableTabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <View style={styles.servicesList}>
         {loading ? (
