@@ -133,13 +133,20 @@ export const OfflineBookingSheet = ({
     [],
   );
 
+  const getLocalDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   useEffect(() => {
     const fetchUnavailableSlots = async () => {
       if (!isVisible || !_groundId) return;
 
       setIsFetchingSlots(true);
       try {
-        const dateStr = currentDate.toISOString().split("T")[0];
+        const dateStr = getLocalDateString(currentDate);
 
         const { data, error } = await supabase
           .from("sports_slots")
@@ -355,7 +362,7 @@ export const OfflineBookingSheet = ({
         .maybeSingle();
 
       const userId = profile?.id || null;
-      const formattedDate = currentDate.toISOString().split("T")[0];
+      const formattedDate = getLocalDateString(currentDate);
       const startTime24 = parseTimeTo24Hour(fromTime);
       const endTime24 = parseTimeTo24Hour(toTime);
       const numericTotal = parseFloat(totalPayment);
@@ -417,7 +424,11 @@ export const OfflineBookingSheet = ({
       Alert.alert("Success", "Booking Saved!");
       onSuccess();
     } catch (error: any) {
-      Alert.alert("Booking Failed", error.message);
+      console.error("=== SPORTS BOOKING ERROR ===");
+      console.error("Error Code:", error.code);
+      console.error("Error Message:", error.message);
+      console.error("Error Details:", error.details);
+      console.error("=============================");
     } finally {
       setIsSubmitting(false);
     }
