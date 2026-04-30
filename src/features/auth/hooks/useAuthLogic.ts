@@ -56,8 +56,7 @@ export const useAuthLogic = () => {
       await GoogleSignin.hasPlayServices();
       const response = await GoogleSignin.signIn();
 
-      // eslint-disable-next-line no-console
-      console.log("Google Sign-In Response:", JSON.stringify(response, null, 2));
+      // console.log("Google Sign-In Response:", JSON.stringify(response, null, 2));
 
       if (isSuccessResponse(response)) {
         if (response.data.idToken) {
