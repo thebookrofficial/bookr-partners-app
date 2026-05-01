@@ -9,6 +9,7 @@ import { ServiceHeader } from "../components/ServiceHeader";
 import { Search, ChevronDown, SlidersHorizontal, Phone, Clock } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
+import { useServiceStore } from "@/store/serviceStore";
 import { useSportsHistory } from "../hooks/useSportsHistory";
 import { FilterBottomSheet, DateFilterOption } from "../components/FilterBottomSheet";
 
@@ -98,8 +99,10 @@ export const SportsHistoryScreen = () => {
       (tabRoute?.params as any)?.serviceId || (tabRoute?.params as any)?.params?.serviceId || "";
   }
 
+  const { selectedCategories, setServiceCategory } = useServiceStore();
+  const selectedCategory = selectedCategories[serviceId] || "Football";
+
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("Football");
   const [searchQuery, setSearchQuery] = useState("");
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -209,7 +212,7 @@ export const SportsHistoryScreen = () => {
                 style={styles.dropdownItem}
                 activeOpacity={0.7}
                 onPress={() => {
-                  setSelectedCategory(cat);
+                  setServiceCategory(serviceId, cat);
                   setIsCategoryOpen(false);
                 }}>
                 <Text variant="body2" weight="semiBold">

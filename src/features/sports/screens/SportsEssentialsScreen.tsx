@@ -16,6 +16,8 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
 import { supabase } from "@/lib/supabase";
 
+import { useServiceStore } from "@/store/serviceStore";
+
 const EssentialActionRow = ({ title, icon: Icon, onPress }: any) => (
   <TouchableOpacity style={styles.actionRow} onPress={onPress} activeOpacity={0.7}>
     <Icon size={ms(20)} color={COLORS.primary} />
@@ -40,8 +42,10 @@ export const SportsEssentialsScreen = () => {
   }
 
   // --- UI STATES ---
+  const { selectedCategories, setServiceCategory } = useServiceStore();
+  const selectedCategory = selectedCategories[venueId] || "Football";
+
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("Football");
 
   // --- DYNAMIC VENUE STATES ---
   const [currentVenueId, setCurrentVenueId] = useState<string>("");
@@ -129,7 +133,12 @@ export const SportsEssentialsScreen = () => {
           <EssentialActionRow
             title="Bulk Booking"
             icon={Files}
-            onPress={() => navigation.navigate("BulkBooking")}
+            onPress={() =>
+              navigation.navigate("BulkBooking", {
+                venueId: currentVenueId,
+                groundId: activeGroundId,
+              })
+            }
           />
           <EssentialActionRow
             title="Block / Unblock"
@@ -185,7 +194,7 @@ export const SportsEssentialsScreen = () => {
                 style={styles.dropdownItem}
                 activeOpacity={0.7}
                 onPress={() => {
-                  setSelectedCategory(cat);
+                  setServiceCategory(venueId, cat);
                   setIsCategoryOpen(false);
                 }}>
                 <Text variant="body2" weight="semiBold">

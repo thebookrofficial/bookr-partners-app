@@ -16,6 +16,8 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
 import { supabase } from "@/lib/supabase";
 
+import { useServiceStore } from "@/store/serviceStore";
+
 // --- DUMMY DATA FOR GRAPHS ---
 const BOOKING_DATA = [
   { date: "12 Apr", day: "Sun", value: 13 },
@@ -70,8 +72,10 @@ export const SportsDashboardScreen = () => {
   const [timeFilter, setTimeFilter] = useState("Today");
   const [groundFilter, setGroundFilter] = useState("Overall");
 
+  const { selectedCategories, setServiceCategory } = useServiceStore();
+  const selectedCategory = selectedCategories[serviceId] || "Football";
+
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("Football");
 
   // Dynamic Venue Resolution State
   const [currentVenueId, setCurrentVenueId] = useState<string>("");
@@ -344,7 +348,7 @@ export const SportsDashboardScreen = () => {
                 style={styles.dropdownItem}
                 activeOpacity={0.7}
                 onPress={() => {
-                  setSelectedCategory(cat);
+                  setServiceCategory(serviceId, cat);
                   setIsCategoryOpen(false);
                 }}>
                 <Text variant="body2" weight="semiBold">

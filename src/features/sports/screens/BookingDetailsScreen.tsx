@@ -13,6 +13,7 @@ import {
   Linking,
   Modal,
   Pressable,
+  Share,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -174,49 +175,50 @@ export const BookingDetailsScreen = () => {
     });
   };
 
-  const handleShareWhatsApp = () => {
-    const rawPhoneNumber = booking.profiles?.phone || booking.guest_phone;
-    if (!rawPhoneNumber) return;
-
-    // Clean phone number
-    let cleanNumber = rawPhoneNumber.replace(/\D/g, "");
-    if (cleanNumber.length === 10) {
-      cleanNumber = `91${cleanNumber}`;
-    }
-
+  const handleShareWhatsApp = async () => {
+    const guestName = booking.guest_name || booking.profiles?.full_name || "Guest";
+    const venueName = booking.venues?.name || "the venue";
     const bookingDate = new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB");
     const bookingTime = `${formatHour(booking.sports_slots.start_time)} to ${formatHour(
       booking.sports_slots.end_time,
     )}`;
 
-    const guestName = booking.profiles?.full_name || booking.guest_name || "Guest";
-    const venueName = booking.venues?.name || "the venue";
-
-    const message = encodeURIComponent(
+    // Construct the text template
+    const message =
       `Booking Confirmed! 🎉\n` +
-        `Hi ${guestName},\n` +
-        `Your booking at ${venueName} has been successfully reserved by the venue manager.\n\n` +
-        `Date: ${bookingDate}\n` +
-        `Time: ${bookingTime}\n\n` +
-        `Payment Summary:\n` +
-        `Total: ${totalAmount}\n` +
-        `Paid: ${currentPaid}\n` +
-        `Due at Venue: ${remainingAmount}\n\n` +
-        `Thank you for booking.`,
-    );
+      `Hi ${guestName},\n` +
+      `Your booking at ${venueName} has been successfully reserved.\n\n` +
+      `Date: ${bookingDate}\n` +
+      `Time: ${bookingTime}\n\n` +
+      `Payment Summary:\n` +
+      `Total: ₹${totalAmount}\n` +
+      `Paid: ₹${currentPaid}\n` +
+      `Due at Venue: ₹${remainingAmount}\n\n` +
+      `Thank you for booking.`;
 
-    const url = `whatsapp://send?phone=${cleanNumber}&text=${message}`;
+    try {
+      const result = await Share.share({
+        message: message,
+        title: "Booking Confirmation", // For email/dialog subjects
+      });
 
-    Linking.canOpenURL(url)
-      .then(supported => {
-        if (supported) {
-          return Linking.openURL(url);
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // shared with a specific activity type on iOS
+          // eslint-disable-next-line no-console
+          console.log("Shared via:", result.activityType);
         } else {
-          const webUrl = `https://wa.me/${cleanNumber}?text=${message}`;
-          return Linking.openURL(webUrl);
+          // shared
         }
-      })
-      .catch(err => console.error("An error occurred", err));
+      } else if (result.action === Share.dismissedAction) {
+        // dismissed
+        // eslint-disable-next-line no-console
+        console.log("Share sheet dismissed");
+      }
+    } catch (error: any) {
+      Alert.alert("Error", "Unable to open share sheet.");
+      console.error("Native Share Error:", error.message);
+    }
   };
 
   return (
@@ -231,14 +233,14 @@ export const BookingDetailsScreen = () => {
             uri:
               booking.profiles?.avatar_url ||
               `https://ui-avatars.com/api/?name=${
-                booking.profiles?.full_name || booking.guest_name || "Guest"
+                booking.guest_name || booking.profiles?.full_name || "Guest"
               }&background=random`,
           }}
           style={styles.avatar}
         />
 
         <Text variant="h3" weight="bold" style={styles.headerName}>
-          {booking.profiles?.full_name || booking.guest_name || "Guest User"}
+          {booking.guest_name || booking.profiles?.full_name || "Guest User"}
         </Text>
 
         <Text variant="body2" weight="semiBold" style={styles.categoryText}>

@@ -7,10 +7,11 @@ export interface StaycationBooking {
   phone: string;
   avatarUrl?: string;
   amount: string;
-  status: "Advance" | "Full" | "Offline" | "Complete" | "Remaining" | "Online" | "Cancelled";
+  status: "Offline" | "Complete" | "Remaining" | "Online" | "Cancelled";
   checkIn: string;
   checkOut: string;
   guestCount: number;
+  roomName?: string;
 }
 
 export interface StaycationDashboardData {

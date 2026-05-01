@@ -6,8 +6,13 @@ import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-nat
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Avatar, PillTabs } from "@/components/ui";
 import { ServiceCard } from "../components/ServiceCard";
-import { StaffCard } from "../components/StaffCard";
-import { ArrowLeft, Bell, Settings, Contact, Plus } from "lucide-react-native";
+// import { StaffCard } from "../components/StaffCard";
+import {
+  // ArrowLeft,
+  Bell,
+  Settings,
+  // Contact, Plus
+} from "lucide-react-native";
 import { vs, hs, ms } from "@/utils/responsive.utils";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -24,6 +29,38 @@ export const VendorProfileScreen = () => {
 
   // Set initial tab based on Blueprint standardized naming [cite: 237]
   const [activeTab, setActiveTab] = useState(STRINGS.profile.tabs[0]);
+
+  /**
+   * Dynamically compute available tabs based on venues recorded for the vendor.
+   * Always includes the first tab (e.g., "All Venues").
+   */
+  const availableTabs = useMemo(() => {
+    const allTabs = STRINGS.profile.tabs;
+    if (venues.length === 0) return [allTabs[0]];
+
+    const activeVerticals = new Set(venues.map(v => v.vertical.toLowerCase()));
+
+    return allTabs.filter((tab, index) => {
+      if (index === 0) return true; // Always show "All Venues"
+
+      const tabKey = tab.toLowerCase();
+      // Match tab name with vertical (handling plural/singular)
+      return (
+        activeVerticals.has(tabKey) ||
+        activeVerticals.has(tabKey.replace(/s$/, "")) ||
+        (tabKey === "dining" && activeVerticals.has("dining"))
+      );
+    });
+  }, [venues]);
+
+  /**
+   * Sync activeTab if the current selection is no longer available after data refresh.
+   */
+  React.useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0]);
+    }
+  }, [availableTabs, activeTab]);
 
   /**
    * Filter venues based on the selected PillTab.
@@ -52,7 +89,7 @@ export const VendorProfileScreen = () => {
       {/* 1. App Bar - Branding & Global Actions */}
       <View style={styles.appBar}>
         <View style={styles.appBarLeft}>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.backBtn}
             onPress={() => {
               if (navigation.canGoBack()) {
@@ -62,7 +99,7 @@ export const VendorProfileScreen = () => {
               }
             }}>
             <ArrowLeft size={ms(20)} color={COLORS.text.primary} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           <Text variant="h3" weight="bold">
             {STRINGS.profile.title}
           </Text>
@@ -111,7 +148,7 @@ export const VendorProfileScreen = () => {
         </Text>
       </View>
 
-      <PillTabs tabs={STRINGS.profile.tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      <PillTabs tabs={availableTabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <View style={styles.servicesList}>
         {loading ? (
@@ -164,7 +201,7 @@ export const VendorProfileScreen = () => {
       </View>
 
       {/* 4. Staff Management Section [cite: 58] */}
-      <View style={styles.sectionHeader}>
+      {/* <View style={styles.sectionHeader}>
         <Text variant="body1" weight="bold" style={styles.sectionTitle}>
           {STRINGS.profile.yourStaff}
         </Text>
@@ -175,11 +212,11 @@ export const VendorProfileScreen = () => {
           {STRINGS.profile.addStaff}
         </Text>
         <Plus size={ms(17)} color={COLORS.text.primary} style={styles.plusSign} />
-      </TouchableOpacity>
+      </TouchableOpacity> */}
 
       {/* Note: In Phase 7, we will map these from the database as well */}
-      <StaffCard name="Talia Mar" role="Restaurant" type="Manager" />
-      <StaffCard name="Rohit Sharma" role="Turf" type="Employee" />
+      {/* <StaffCard name="Talia Mar" role="Restaurant" type="Manager" />
+      <StaffCard name="Rohit Sharma" role="Turf" type="Employee" /> */}
 
       <View style={{ height: vs(40) }} />
     </ScreenContainer>

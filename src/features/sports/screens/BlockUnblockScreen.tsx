@@ -18,6 +18,7 @@ import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { SportsTabParamList } from "@/navigation/navigation.types";
+import { useServiceStore } from "@/store/serviceStore";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 // Sub-components & Hooks
@@ -71,6 +72,10 @@ const formatDisplayTime = (time24: string) => {
 export const BlockUnblockScreen = () => {
   const route = useRoute<RouteProp<SportsTabParamList, "BlockUnblock">>();
   const { venueId, groundId } = route.params || { venueId: "", groundId: "" };
+
+  const { selectedCategories, setServiceCategory } = useServiceStore();
+  const selectedCategory = selectedCategories[venueId] || "Football";
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
   const { activeBlocks, pastBlocks, loading, blockSlots, unblockSlots } = useBlockUnblock(
     venueId,
@@ -157,7 +162,12 @@ export const BlockUnblockScreen = () => {
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <ServiceHeader title="Elite Strikers Club" subtitle="Block / Unblock" />
+        <ServiceHeader
+          title="Elite Strikers Club"
+          subtitle="Block / Unblock"
+          category={selectedCategory}
+          onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
+        />
 
         {/* 1. CLOSED DATES (Active Blocks) */}
         <View style={styles.section}>
@@ -423,6 +433,36 @@ export const BlockUnblockScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* --- FIXED OVERLAY DROPDOWN --- */}
+      {isCategoryOpen && (
+        <View style={styles.dropdownOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setIsCategoryOpen(false)}
+          />
+          <View style={styles.dropdownMenu}>
+            {["Football", "Box Cricket", "Pickleball"].map(cat => (
+              <TouchableOpacity
+                key={cat}
+                style={styles.dropdownItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setServiceCategory(venueId, cat);
+                  setIsCategoryOpen(false);
+                }}>
+                <Text variant="body2" weight="semiBold">
+                  {cat}
+                </Text>
+                <View style={styles.radioOuter}>
+                  {selectedCategory === cat && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
     </ScreenContainer>
   );
 };
@@ -513,5 +553,50 @@ const styles = StyleSheet.create({
   },
   hourItemDisabled: {
     opacity: 0.5,
+  },
+
+  /* --- FIXED OVERLAY DROPDOWN STYLES --- */
+  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
+  dropdownMenu: {
+    position: "absolute",
+    top: vs(55),
+    right: hs(12),
+    backgroundColor: COLORS.background,
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    width: hs(180),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    padding: hs(6),
+    gap: vs(6),
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(8),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    borderRadius: ms(8),
+  },
+  radioOuter: {
+    width: ms(20),
+    height: ms(20),
+    borderRadius: ms(10),
+    borderWidth: 2,
+    borderColor: COLORS.text.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioInner: {
+    width: ms(10),
+    height: ms(10),
+    borderRadius: ms(5),
+    backgroundColor: COLORS.text.primary,
   },
 });

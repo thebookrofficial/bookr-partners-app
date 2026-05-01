@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -9,12 +9,14 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import { StaycationBookingCard } from "../components/StaycationBookingCard";
-import { Plus } from "lucide-react-native";
+import { StaycationOfflineBookingSheet } from "../components/StaycationOfflineBookingSheet";
+import { Plus, Calendar as CalendarIcon } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useStaycationHome } from "../hooks/useStaycationHome";
@@ -22,27 +24,29 @@ import { Calendar } from "react-native-calendars";
 import { StaycationBooking } from "../types/staycation.types";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
+import { supabase } from "@/lib/supabase";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
-// Current Date for logic: 2026-04-26
-const CURRENT_DATE = "2026-04-26";
-
 type ListEntry = { type: "header"; title: string } | { type: "booking"; data: StaycationBooking };
-
-// Helper to format date for card display (e.g., "2026-04-26" -> "26 Apr")
-const formatDisplayDate = (dateStr: string) => {
-  const date = new Date(dateStr);
-  const day = date.getDate();
-  const month = date.toLocaleString("en-US", { month: "short" });
-  return `${day} ${month}`;
-};
 
 export const StaycationHomeScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationHome">>();
 
-  // Extract serviceId with fallback from parent navigator
+  // State for sub-categories and filters
+  const [activeCategory, setActiveCategory] = useState<"Farmhouse" | "Rooms">("Farmhouse");
+
+  // For Rooms: "All", "Deluxe Rooms", "Private Rooms"
+  const [activeRoomType, setActiveRoomType] = useState<"All" | "Deluxe Rooms" | "Private Rooms">(
+    "All",
+  );
+
+  // For Rooms: "Check outs", "Bookings" pill tabs
+  const [activeRoomStatus, setActiveRoomStatus] = useState<"Check outs" | "bookings">("Check outs");
+
+  const [isOfflineSheetVisible, setIsOfflineSheetVisible] = useState(false);
+
   let serviceId = route.params?.serviceId;
   if (!serviceId) {
     const parentState = navigation.getParent()?.getState();
@@ -51,32 +55,116 @@ export const StaycationHomeScreen = () => {
     serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
   }
 
-  const { isLoading, markedDates, groupedBookings, refetch, venue } = useStaycationHome(serviceId);
+  const { isLoading, markedDates, groupedBookings, refetch, venue } = useStaycationHome(
+    serviceId,
+    activeCategory,
+  );
+
+  const handleCancel = async (id: string) => {
+    Alert.alert("Cancel Booking", "Are you sure you want to cancel this booking?", [
+      { text: "No", style: "cancel" },
+      {
+        text: "Yes, Cancel",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            // 1. Fetch booking details to know which dates to free up
+            const { data: booking, error: fetchErr } = await supabase
+              .from("staycation_bookings")
+              .select("venue_id, check_in_date, check_out_date")
+              .eq("id", id)
+              .single();
+
+            if (fetchErr) throw fetchErr;
+
+            // 2. Update booking status
+            const { error: cancelErr } = await supabase
+              .from("staycation_bookings")
+              .update({ booking_status: "cancelled" })
+              .eq("id", id);
+
+            if (cancelErr) throw cancelErr;
+
+            // 3. Free up availability
+            const targetDates: string[] = [];
+            let curr = new Date(booking.check_in_date);
+            const end = new Date(booking.check_out_date);
+            while (curr < end) {
+              targetDates.push(curr.toISOString().split("T")[0]);
+              curr.setDate(curr.getDate() + 1);
+            }
+
+            if (targetDates.length > 0) {
+              await supabase
+                .from("staycation_availability")
+                .update({ is_blocked: false, is_available: true })
+                .eq("venue_id", booking.venue_id)
+                .in("date", targetDates);
+            }
+
+            Alert.alert("Success", "Booking cancelled successfully.");
+            refetch();
+          } catch (err) {
+            console.error("Error cancelling staycation booking:", err);
+            Alert.alert("Error", "Failed to cancel booking.");
+          }
+        },
+      },
+    ]);
+  };
+
+  // Automatically adjust layout based on backend property_type
+  useEffect(() => {
+    // Only update if venue data has finished loading
+    if (venue && venue.property_type) {
+      // The database ENUM values are: villa, farmhouse, resort, hotel, homestay
+      // We explicitly check for 'farmhouse'. Everything else uses the 'Rooms' layout.
+      if (venue.property_type.toLowerCase() === "farmhouse") {
+        setActiveCategory("Farmhouse");
+      } else {
+        setActiveCategory("Rooms");
+      }
+    }
+  }, [venue]);
 
   // Flatten categorized bookings for the list
   const flatListData = useMemo(() => {
     const data: ListEntry[] = [];
     groupedBookings.forEach((section: { title: string; data: StaycationBooking[] }) => {
-      data.push({ type: "header", title: section.title });
-      section.data.forEach(b => data.push({ type: "booking", data: b }));
+      let headerTitle = section.title;
+      if (activeCategory === "Rooms") {
+        if (section.title === "Today's Check-ins") {
+          return;
+        }
+      }
+
+      data.push({ type: "header", title: headerTitle });
+
+      section.data.forEach(b => {
+        const enrichedData =
+          activeCategory === "Rooms" ? { ...b, roomName: `Room ${data.length % 5 || 1}` } : b;
+        data.push({ type: "booking", data: enrichedData });
+      });
     });
     return data;
-  }, [groupedBookings]);
+  }, [groupedBookings, activeCategory]);
 
   const renderItem = ({ item }: { item: ListEntry }) => {
     if (item.type === "header") {
       return (
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{item.title}</Text>
+        <View style={[styles.sectionHeader, activeCategory === "Rooms" && { marginTop: vs(0) }]}>
+          <View style={styles.headerRow}>
+            <Text style={styles.sectionTitle}>{item.title}</Text>
+          </View>
         </View>
       );
     }
     return (
       <StaycationBookingCard
         bookingId={item.data.id}
+        isFarmhouse={activeCategory === "Farmhouse"}
+        onCancelPress={handleCancel}
         {...item.data}
-        checkIn={formatDisplayDate(item.data.checkIn)}
-        checkOut={formatDisplayDate(item.data.checkOut)}
       />
     );
   };
@@ -90,84 +178,203 @@ export const StaycationHomeScreen = () => {
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
         />
 
-        {/* Status Legend */}
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={styles.availableDot} />
-            <Text style={styles.legendText}>Available</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.dot, styles.manuelDot]} />
-            <Text style={styles.legendText}>manuel</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.dot, styles.onlineDot]} />
-            <Text style={styles.legendText}>Online</Text>
-          </View>
-        </View>
+        {activeCategory === "Farmhouse" ? (
+          <>
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View style={styles.availableDot} />
+                <Text style={styles.legendText}>Available</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.dot, styles.manuelDot]} />
+                <Text style={styles.legendText}>Manuel</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.dot, styles.onlineDot]} />
+                <Text style={styles.legendText}>Online</Text>
+              </View>
+            </View>
 
-        {/* Inline Calendar */}
-        <View style={styles.calendarContainer}>
-          <Calendar
-            current={CURRENT_DATE}
-            markingType={"period"}
-            markedDates={markedDates}
-            renderArrow={direction => (
-              <Text style={styles.calendarArrow}>{direction === "left" ? "<" : ">"}</Text>
-            )}
-            enableSwipeMonths={true}
-            disableAllTouchEventsForDisabledDays={true}
-            onDayPress={() => {}} // Disabled for read-only behavior
-            theme={
-              {
-                backgroundColor: COLORS.background,
-                calendarBackground: COLORS.background,
-                textSectionTitleColor: "#b3b3b3",
-                selectedDayBackgroundColor: COLORS.primary,
-                selectedDayTextColor: COLORS.text.inverse,
-                todayTextColor: COLORS.text.primary,
-                dayTextColor: COLORS.text.primary,
-                textDisabledColor: "transparent",
-                monthTextColor: COLORS.text.primary,
-                textDayFontFamily: "Gilroy-Bold",
-                textMonthFontFamily: "Gilroy-Bold",
-                textDayHeaderFontFamily: "Gilroy-Bold",
-                textDayFontSize: fs(11),
-                textMonthFontSize: fs(14),
-                textDayHeaderFontSize: fs(14),
-                "stylesheet.calendar.header": {
-                  dayHeader: {
-                    marginTop: 2,
-                    marginBottom: 7,
-                    width: 32,
-                    textAlign: "center",
-                    fontSize: fs(14),
-                    fontFamily: "Gilroy-Bold",
-                    color: "#b3b3b3",
-                  },
-                  dayTextAtIndex5: { color: COLORS.primary },
-                  dayTextAtIndex6: { color: COLORS.primary },
-                  header: {
-                    flexDirection: "row",
-                    justifyContent: "center",
-                    paddingLeft: 10,
-                    paddingRight: 10,
-                    marginTop: 10,
-                    alignItems: "center",
-                    gap: hs(40),
-                  },
-                },
-              } as any
-            }
-          />
-        </View>
+            <View style={styles.calendarContainer}>
+              <Calendar
+                current={new Date().toISOString().split("T")[0]}
+                markingType={"custom"}
+                markedDates={markedDates}
+                renderArrow={direction => (
+                  <Text style={styles.calendarArrow}>{direction === "left" ? "<" : ">"}</Text>
+                )}
+                enableSwipeMonths={true}
+                disableAllTouchEventsForDisabledDays={true}
+                onDayPress={() => {}} // Disabled for read-only behavior
+                theme={
+                  {
+                    backgroundColor: COLORS.background,
+                    calendarBackground: COLORS.background,
+                    textSectionTitleColor: "#b3b3b3",
+                    selectedDayBackgroundColor: COLORS.primary,
+                    selectedDayTextColor: COLORS.text.inverse,
+                    todayTextColor: "black",
+                    dayTextColor: "black",
+                    textDisabledColor: "transparent",
+                    monthTextColor: "black",
+                    textDayFontFamily: "Gilroy-Medium",
+                    textMonthFontFamily: "Gilroy-Bold",
+                    textDayHeaderFontFamily: "Gilroy-Bold",
+                    textDayFontSize: fs(13),
+                    textMonthFontSize: fs(16),
+                    textDayHeaderFontSize: fs(14),
+                    "stylesheet.calendar.header": {
+                      dayHeader: {
+                        marginTop: 2,
+                        marginBottom: 7,
+                        width: 32,
+                        textAlign: "center",
+                        fontSize: fs(14),
+                        fontFamily: "Gilroy-Bold",
+                        color: "#b3b3b3",
+                      },
+                      dayTextAtIndex5: { color: "#009bff" },
+                      dayTextAtIndex6: { color: "#009bff" },
+                      header: {
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        paddingLeft: 20,
+                        paddingRight: 20,
+                        marginTop: 10,
+                        alignItems: "center",
+                      },
+                      monthText: {
+                        fontFamily: "Gilroy-Bold",
+                        fontSize: fs(16),
+                        color: "black",
+                      },
+                    },
+                    "stylesheet.day.basic": {
+                      base: {
+                        width: 32,
+                        height: 32,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      },
+                      todayText: {
+                        color: "black",
+                      },
+                    },
+                  } as any
+                }
+              />
+            </View>
 
-        <View style={styles.bookingsHeader}>
-          <Text style={styles.bookingsTitle}>Recent Bookings</Text>
-        </View>
+            <View style={styles.bookingsHeader}>
+              <Text style={styles.bookingsTitle}>Booking For April</Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.roomsFiltersContainer}>
+            {/* Types Toggle */}
+            <View style={styles.typesToggleContainer}>
+              <Text style={styles.typesToggleLabel}>Types</Text>
+              <View style={styles.typesSegmentedControl}>
+                {(["All", "Deluxe Rooms", "Private Rooms"] as const).map(type => {
+                  const isActive = activeRoomType === type;
+                  const textLines = type === "All" ? ["All"] : type.split(" ");
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      activeOpacity={0.8}
+                      onPress={() => setActiveRoomType(type)}
+                      style={[
+                        styles.typeSegment,
+                        isActive ? styles.typeSegmentActive : styles.typeSegmentInactive,
+                      ]}>
+                      <View style={styles.typeTextWrapper}>
+                        {textLines.map((line, idx) => (
+                          <Text
+                            key={idx}
+                            weight="semiBold"
+                            style={[
+                              styles.typeSegmentText,
+                              isActive
+                                ? styles.typeSegmentTextActive
+                                : styles.typeSegmentTextInactive,
+                            ]}>
+                            {line}
+                          </Text>
+                        ))}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Check outs / Bookings and Date */}
+            <View style={styles.statusDateRow}>
+              <View style={styles.statusPills}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setActiveRoomStatus("Check outs")}
+                  style={[
+                    styles.statusPill,
+                    activeRoomStatus === "Check outs"
+                      ? styles.statusPillActive
+                      : styles.statusPillInactive,
+                  ]}>
+                  <Text
+                    weight="semiBold"
+                    style={[
+                      styles.statusPillText,
+                      activeRoomStatus === "Check outs"
+                        ? styles.statusPillTextActive
+                        : styles.statusPillTextInactive,
+                    ]}>
+                    Check outs
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setActiveRoomStatus("bookings")}
+                  style={[
+                    styles.statusPill,
+                    activeRoomStatus === "bookings"
+                      ? styles.statusPillActive
+                      : styles.statusPillInactive,
+                  ]}>
+                  <Text
+                    weight="semiBold"
+                    style={[
+                      styles.statusPillText,
+                      activeRoomStatus === "bookings"
+                        ? styles.statusPillTextActive
+                        : styles.statusPillTextInactive,
+                    ]}>
+                    bookings
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.dateRight}>
+                <Text weight="semiBold" style={styles.todayText}>
+                  23 Apr 2026 (Today)
+                </Text>
+                <CalendarIcon size={ms(16)} color={COLORS.text.primary} />
+              </View>
+            </View>
+
+            {/* Rooms Filled */}
+            <View style={styles.roomsFilledContainer}>
+              <Text weight="semiBold" style={styles.roomsFilledLabel}>
+                Rooms Filled
+              </Text>
+              <Text weight="semiBold" style={styles.roomsFilledValue}>
+                3/5
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
     ),
-    [venue, markedDates],
+    [venue, markedDates, activeCategory, activeRoomType, activeRoomStatus],
   );
 
   return (
@@ -207,9 +414,24 @@ export const StaycationHomeScreen = () => {
         )}
       </ScreenContainer>
 
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
+      {/* Basic Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.8}
+        onPress={() => {
+          setIsOfflineSheetVisible(true);
+        }}>
         <Plus size={ms(30)} color={COLORS.text.inverse} strokeWidth={2} />
       </TouchableOpacity>
+
+      {/* Offline Booking Sheet */}
+      <StaycationOfflineBookingSheet
+        visible={isOfflineSheetVisible}
+        onClose={() => setIsOfflineSheetVisible(false)}
+        onSuccess={refetch}
+        activeCategory={activeCategory}
+        venueId={serviceId || venue?.id || ""}
+      />
     </View>
   );
 };
@@ -257,7 +479,7 @@ const styles = StyleSheet.create({
     fontFamily: "Gilroy-Bold",
     fontSize: fs(14),
     color: COLORS.text.primary,
-    textTransform: "lowercase",
+    textTransform: "capitalize",
   },
   calendarContainer: {
     backgroundColor: COLORS.background,
@@ -280,10 +502,119 @@ const styles = StyleSheet.create({
     marginTop: vs(10),
     marginBottom: vs(5),
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: vs(8),
+  },
   sectionTitle: {
+    fontFamily: "Gilroy-SemiBold",
+    fontSize: fs(14),
+    color: COLORS.text.primary,
+  },
+  roomsFiltersContainer: {
+    gap: vs(12),
+    marginBottom: vs(10),
+  },
+  typesToggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  typesToggleLabel: {
     fontFamily: "Gilroy-Bold",
     fontSize: fs(16),
-    color: COLORS.text.muted,
+    color: COLORS.text.primary,
+  },
+  typesSegmentedControl: {
+    flexDirection: "row",
+    gap: hs(6),
+  },
+  typeSegment: {
+    borderRadius: ms(10),
+    paddingHorizontal: hs(14),
+    paddingVertical: vs(8),
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: hs(50),
+  },
+  typeSegmentActive: {
+    backgroundColor: "#282828",
+  },
+  typeSegmentInactive: {
+    backgroundColor: "#F4F7FC",
+  },
+  typeTextWrapper: {
+    alignItems: "center",
+  },
+  typeSegmentText: {
+    fontSize: fs(12),
+    lineHeight: fs(12 * 1.2),
+  },
+  typeSegmentTextActive: {
+    color: "white",
+  },
+  typeSegmentTextInactive: {
+    color: "#8C8C8C",
+  },
+  statusDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: vs(8),
+  },
+  statusPills: {
+    flexDirection: "row",
+    gap: hs(6),
+  },
+  statusPill: {
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(8),
+    borderRadius: ms(6),
+  },
+  statusPillActive: {
+    backgroundColor: "#F4F7FC",
+    borderWidth: 1,
+    borderColor: "#63A1FD",
+  },
+  statusPillInactive: {
+    backgroundColor: "#F4F7FC",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  statusPillText: {
+    fontSize: fs(14),
+    textTransform: "capitalize",
+  },
+  statusPillTextActive: {
+    color: "#63A1FD",
+  },
+  statusPillTextInactive: {
+    color: COLORS.text.primary,
+  },
+  dateRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+  },
+  todayText: {
+    fontSize: fs(14),
+    color: COLORS.text.primary,
+  },
+  roomsFilledContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: vs(4),
+  },
+  roomsFilledLabel: {
+    fontSize: fs(14),
+    color: COLORS.text.primary,
+  },
+  roomsFilledValue: {
+    fontSize: fs(14),
+    color: COLORS.text.primary,
   },
   listContent: {
     paddingBottom: vs(20),

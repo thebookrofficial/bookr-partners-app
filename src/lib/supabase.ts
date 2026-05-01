@@ -1,24 +1,30 @@
-// src/lib/supabase.ts
 import "react-native-url-polyfill/auto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
-
-// Note: Replace this with however you currently load .env variables in your RN CLI app
-// (e.g., using 'react-native-config' or 'react-native-dotenv')
 import Config from "react-native-config";
 
-const supabaseUrl = Config.SUPABASE_URL as string;
+// 1. Point to your NEW dedicated proxy for the Partner App
+const supabaseUrl = Config.SUPABASE_URL || "https://v2.thebookr.in";
+
+// 2. Strictly use the environment variable. NO hardcoded keys.
 const supabaseAnonKey = Config.SUPABASE_ANON_KEY as string;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Supabase URL or Anon Key is missing. Check your .env file.");
+if (!supabaseAnonKey) {
+  console.warn("⚠️ SUPABASE_ANON_KEY is missing from environment variables! Check your .env file.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey || "MISSING_KEY", {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false, // Not needed for native apps
+    detectSessionInUrl: false,
+  },
+  // 3. Explicitly force headers to ensure they pass through Cloudflare
+  global: {
+    headers: {
+      apikey: supabaseAnonKey || "",
+      Authorization: `Bearer ${supabaseAnonKey || ""}`,
+    },
   },
 });

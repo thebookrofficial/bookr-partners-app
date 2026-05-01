@@ -98,6 +98,8 @@ export const useStaycationHistory = (
           paid_amount,
           vendor_payout,
           room_id,
+          guest_name,
+          guest_phone,
           profiles:user_id ( full_name, phone, avatar_url )
         `,
         )
@@ -162,9 +164,9 @@ export const useStaycationHistory = (
         if (booking.booking_status === "cancelled") {
           statusTag = "Cancelled";
         } else if (booking.paid_amount >= booking.total_amount) {
-          statusTag = "Full";
+          statusTag = "Online";
         } else if (booking.paid_amount > 0) {
-          statusTag = "Advance";
+          statusTag = "Offline";
         }
 
         if (checkOutStr < todayStr && booking.booking_status !== "cancelled") {
@@ -173,8 +175,8 @@ export const useStaycationHistory = (
 
         formattedBookings.push({
           id: booking.id,
-          name: profile?.full_name || "Guest",
-          phone: profile?.phone || "N/A",
+          name: booking.guest_name || profile?.full_name || "Guest",
+          phone: booking.guest_phone || profile?.phone || "N/A",
           avatarUrl: profile?.avatar_url,
           amount: booking.total_amount.toString(),
           status: statusTag,

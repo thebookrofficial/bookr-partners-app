@@ -17,6 +17,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
 import { OfflineBookingSheet } from "../components/OfflineBookingSheet";
 import { useSportsHome } from "../hooks/useSportsHome";
+import { useServiceStore } from "@/store/serviceStore";
 import { Calendar } from "react-native-calendars";
 
 export const SportsHomeScreen = () => {
@@ -24,8 +25,10 @@ export const SportsHomeScreen = () => {
   const route = useRoute<RouteProp<SportsTabParamList, "SportsHome">>();
   const { serviceId } = route.params;
 
+  const { selectedCategories, setServiceCategory } = useServiceStore();
+  const selectedCategory = selectedCategories[serviceId] || "Football";
+
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("Football"); // Initial fallback
 
   const {
     venue,
@@ -62,9 +65,9 @@ export const SportsHomeScreen = () => {
   // Auto-select the first available category if the current one isn't valid for this vendor
   useEffect(() => {
     if (availableCategories.length > 0 && !availableCategories.includes(selectedCategory)) {
-      setSelectedCategory(availableCategories[0]);
+      setServiceCategory(serviceId, availableCategories[0]);
     }
-  }, [availableCategories, selectedCategory]);
+  }, [availableCategories, selectedCategory, serviceId, setServiceCategory]);
 
   const getFormattedDate = (date: Date) => {
     const today = new Date();
@@ -274,7 +277,7 @@ export const SportsHomeScreen = () => {
                 style={styles.dropdownItem}
                 activeOpacity={0.7}
                 onPress={() => {
-                  setSelectedCategory(cat);
+                  setServiceCategory(serviceId, cat);
                   setIsCategoryOpen(false);
                 }}>
                 <Text variant="body2" weight="semiBold">

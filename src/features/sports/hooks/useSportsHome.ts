@@ -32,7 +32,7 @@ export interface BookingData {
   date: string;
   time: string;
   price: string;
-  status: "Online" | "Offline" | "Advance" | "Settlement" | "Full";
+  status: "Online" | "Offline" | "Settlement";
   avatarUrl?: string;
   isOfflineRecord: boolean;
   isDisabled?: boolean;
@@ -85,6 +85,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     setLoading(true);
     try {
       const dbSportType = category.toLowerCase().replace(" ", "_");
+      // console.log("🔍 DEBUG SPORTS: Searching for category:", dbSportType);
 
       const { data: initialVenue, error: initialError } = await supabase
         .from("venues")
@@ -93,6 +94,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         .single();
 
       if (initialError || !initialVenue) throw initialError || new Error("Owner not found");
+      // console.log("✅ DEBUG SPORTS: Found Owner ID:", initialVenue.owner_id);
 
       // Fetch all sports categories owned by this specific vendor
       const { data: allSportsData } = await supabase
@@ -127,6 +129,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         .limit(1)
         .maybeSingle();
 
+      // console.log("📊 DEBUG SPORTS: Matched Venue Result:", matchedVenue);
       if (matchedError) throw matchedError;
 
       if (matchedVenue) {
@@ -138,11 +141,14 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           cover_image_url: matchedVenue.cover_image_url,
         });
 
-        const { data: groundsData } = await supabase
+        const { data: groundsData, error: groundsError } = await supabase
           .from("sports_grounds")
           .select("id, name")
           .eq("venue_id", matchedVenue.id)
           .order("display_order", { ascending: true });
+
+        // console.log("🏟️ DEBUG SPORTS: Grounds Data:", groundsData);
+        if (groundsError) console.error("❌ DEBUG SPORTS: Grounds Fetch Error:", groundsError);
 
         if (groundsData && groundsData.length > 0) {
           setGrounds(groundsData);
@@ -233,6 +239,13 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
       // EXACT SAME DATE STRING GENERATOR FOR BOTH
       const localDateString = getLocalDateString(selectedDate);
 
+      // console.log(
+      //   "📅 DEBUG BOOKINGS: Fetching for Date:",
+      //   localDateString,
+      //   "Ground:",
+      //   activeGroundId,
+      // );
+
       const { data: bookingsData, error } = await supabase
         .from("sports_bookings")
         .select(
@@ -252,6 +265,8 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         .eq("venue_id", currentVenueId)
         .eq("sports_slots.ground_id", activeGroundId)
         .eq("sports_slots.slot_date", localDateString);
+
+      // console.log("📥 DEBUG BOOKINGS: Raw Data Received:", bookingsData?.length, "records");
 
       if (error) throw error;
 
@@ -294,8 +309,8 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
 
           return {
             id: b.id,
-            name: b.profiles?.full_name || b.guest_name || "Guest User",
-            phone: b.profiles?.phone || b.guest_phone || "",
+            name: b.guest_name || b.profiles?.full_name || "Guest User",
+            phone: b.guest_phone || b.profiles?.phone || "",
             date: formattedDate,
             time: `${formatTime(b.sports_slots.start_time)} - ${formatTime(
               b.sports_slots.end_time,
