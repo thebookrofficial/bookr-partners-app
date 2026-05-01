@@ -81,8 +81,13 @@ export type MainStackParamList = {
   EventGuestInvite: { serviceId: string };
   GuestHistory: { bookingId: string; guestId?: string };
   BlockUnblock: { venueId: string; groundId: string };
-  BulkBooking: undefined;
-  BulkBookingDetails: { bookingId: string; type: "multi" | "single" };
+  BulkBooking: { venueId: string; groundId: string };
+  BulkBookingDetails: {
+    bookingId: string;
+    type: "multi" | "single";
+    venueId: string;
+    groundId: string;
+  };
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

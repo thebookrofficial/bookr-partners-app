@@ -50,6 +50,8 @@ export const ViewBulkBooking = ({ bookingId: _bookingId, type }: ViewBulkBooking
   const [historyOpen, setHistoryOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+  const [batchIds, setBatchIds] = useState<string[]>([]);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Payment States
   const [isAddingPayment, setIsAddingPayment] = useState(false);
@@ -90,11 +92,13 @@ export const ViewBulkBooking = ({ bookingId: _bookingId, type }: ViewBulkBooking
       const { data: batchBookings, error: batchErr } = await query;
       if (batchErr) throw batchErr;
 
-      const batchIds = (batchBookings || []).map(b => b.id);
+      const currentBatchIds = (batchBookings || []).map(b => b.id);
+      setBatchIds(currentBatchIds);
+
       const { data: paymentLogs } = await supabase
         .from("offline_payment_logs")
         .select("*")
-        .in("booking_id", batchIds)
+        .in("booking_id", currentBatchIds)
         .order("created_at", { ascending: false });
 
       const slots = (batchBookings || []).map((b: any) => b.sports_slots);
@@ -215,6 +219,60 @@ export const ViewBulkBooking = ({ bookingId: _bookingId, type }: ViewBulkBooking
     } finally {
       setIsSavingPayment(false);
     }
+  };
+
+  const handleCancel = async () => {
+    if (batchIds.length === 0) return;
+
+    Alert.alert("Cancel Booking", "Are you sure you want to cancel this entire bulk booking?", [
+      { text: "No", style: "cancel" },
+      {
+        text: "Yes, Cancel",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setIsCancelling(true);
+
+            // 1. Fetch slot IDs first
+            const { data: bookingData, error: fetchErr } = await supabase
+              .from("sports_bookings")
+              .select("slot_id")
+              .in("id", batchIds);
+
+            if (fetchErr) throw fetchErr;
+
+            // 2. Update booking status
+            const { error: cancelErr } = await supabase
+              .from("sports_bookings")
+              .update({ booking_status: "cancelled" })
+              .in("id", batchIds);
+
+            if (cancelErr) throw cancelErr;
+
+            // 3. Free up slots
+            if (bookingData && bookingData.length > 0) {
+              const slotIds = bookingData.map(b => b.slot_id);
+              const { error: slotErr } = await supabase
+                .from("sports_slots")
+                .update({ status: "available" })
+                .in("id", slotIds);
+
+              if (slotErr) {
+                console.error("❌ ERROR freeing slots:", slotErr);
+              }
+            }
+
+            Alert.alert("Success", "Booking cancelled successfully.");
+            navigation.goBack();
+          } catch (err) {
+            console.error("❌ ERROR cancelling bulk booking:", err);
+            Alert.alert("Error", "Failed to cancel booking.");
+          } finally {
+            setIsCancelling(false);
+          }
+        },
+      },
+    ]);
   };
 
   if (loading || !data) {
@@ -409,9 +467,19 @@ export const ViewBulkBooking = ({ bookingId: _bookingId, type }: ViewBulkBooking
         <ChevronRight size={ms(20)} color="#000" />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-        <Text style={styles.actionText}>Cancel Your Booking</Text>
-        <Trash2 size={ms(20)} color="#000" />
+      <TouchableOpacity
+        style={styles.actionButton}
+        activeOpacity={0.7}
+        onPress={handleCancel}
+        disabled={isCancelling}>
+        {isCancelling ? (
+          <ActivityIndicator color="#000" style={{ marginRight: hs(10) }} />
+        ) : (
+          <>
+            <Text style={styles.actionText}>Cancel Your Booking</Text>
+            <Trash2 size={ms(20)} color="#000" />
+          </>
+        )}
       </TouchableOpacity>
 
       <View style={{ height: vs(40) }} />

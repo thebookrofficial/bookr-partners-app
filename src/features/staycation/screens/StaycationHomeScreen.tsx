@@ -9,6 +9,7 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -23,6 +24,7 @@ import { Calendar } from "react-native-calendars";
 import { StaycationBooking } from "../types/staycation.types";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
+import { supabase } from "@/lib/supabase";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -57,6 +59,59 @@ export const StaycationHomeScreen = () => {
     serviceId,
     activeCategory,
   );
+
+  const handleCancel = async (id: string) => {
+    Alert.alert("Cancel Booking", "Are you sure you want to cancel this booking?", [
+      { text: "No", style: "cancel" },
+      {
+        text: "Yes, Cancel",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            // 1. Fetch booking details to know which dates to free up
+            const { data: booking, error: fetchErr } = await supabase
+              .from("staycation_bookings")
+              .select("venue_id, check_in_date, check_out_date")
+              .eq("id", id)
+              .single();
+
+            if (fetchErr) throw fetchErr;
+
+            // 2. Update booking status
+            const { error: cancelErr } = await supabase
+              .from("staycation_bookings")
+              .update({ booking_status: "cancelled" })
+              .eq("id", id);
+
+            if (cancelErr) throw cancelErr;
+
+            // 3. Free up availability
+            const targetDates: string[] = [];
+            let curr = new Date(booking.check_in_date);
+            const end = new Date(booking.check_out_date);
+            while (curr < end) {
+              targetDates.push(curr.toISOString().split("T")[0]);
+              curr.setDate(curr.getDate() + 1);
+            }
+
+            if (targetDates.length > 0) {
+              await supabase
+                .from("staycation_availability")
+                .update({ is_blocked: false, is_available: true })
+                .eq("venue_id", booking.venue_id)
+                .in("date", targetDates);
+            }
+
+            Alert.alert("Success", "Booking cancelled successfully.");
+            refetch();
+          } catch (err) {
+            console.error("Error cancelling staycation booking:", err);
+            Alert.alert("Error", "Failed to cancel booking.");
+          }
+        },
+      },
+    ]);
+  };
 
   // Automatically adjust layout based on backend property_type
   useEffect(() => {
@@ -108,6 +163,7 @@ export const StaycationHomeScreen = () => {
       <StaycationBookingCard
         bookingId={item.data.id}
         isFarmhouse={activeCategory === "Farmhouse"}
+        onCancelPress={handleCancel}
         {...item.data}
       />
     );

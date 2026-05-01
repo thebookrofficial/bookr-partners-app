@@ -51,18 +51,25 @@ const HOURS = [
 // ==========================================
 // CREATE MODE (Internal Component)
 // ==========================================
-const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
+const CreateBulkBooking = ({
+  type,
+  venueId,
+  groundId,
+}: {
+  type: "multi" | "single";
+  venueId: string;
+  groundId: string;
+}) => {
   const navigation = useNavigation();
 
-  // Extract initial serviceId
-  const parentState = navigation.getParent()?.getState();
-  const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
-  const serviceId =
-    (tabRoute?.params as any)?.serviceId || (tabRoute?.params as any)?.params?.serviceId || "";
-
   const { selectedCategories, setServiceCategory } = useServiceStore();
-  const selectedCategory = selectedCategories[serviceId] || "Football";
+  const selectedCategory = selectedCategories[venueId] || "Football";
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+
+  const [ownerId, setOwnerId] = useState<string | undefined>();
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setOwnerId(data.user?.id));
+  }, []);
 
   const [bookingType, setBookingType] = useState<"multi" | "single">(type);
   const [mobile, setMobile] = useState("");
@@ -140,6 +147,10 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
       return;
     }
     const success = await confirmBulkBooking({
+      ownerId,
+      venueId,
+      groundId,
+      category: selectedCategory,
       mobile,
       name,
       fromDate,
@@ -410,7 +421,7 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
                 style={styles.dropdownItem}
                 activeOpacity={0.7}
                 onPress={() => {
-                  setServiceCategory(serviceId, cat);
+                  setServiceCategory(venueId, cat);
                   setIsCategoryOpen(false);
                 }}>
                 <Text variant="body2" weight="semiBold" style={styles.dropdownItemText}>
@@ -433,12 +444,12 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
 // ==========================================
 export const BulkBookingDetailsScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "BulkBookingDetails">>();
-  const { bookingId, type } = route.params;
+  const { bookingId, type, venueId, groundId } = route.params;
 
   return (
     <ScreenContainer backgroundColor="#FFFFFF" paddingHorizontal={hs(12)}>
       {bookingId === "new" ? (
-        <CreateBulkBooking type={type} />
+        <CreateBulkBooking type={type} venueId={venueId} groundId={groundId} />
       ) : (
         <ViewBulkBooking bookingId={bookingId} type={type} />
       )}

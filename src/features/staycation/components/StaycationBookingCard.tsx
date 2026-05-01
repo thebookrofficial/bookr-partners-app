@@ -27,6 +27,7 @@ import { Phone } from "lucide-react-native";
 interface StaycationBookingCardProps extends Partial<StaycationBooking> {
   bookingId?: string;
   onPress?: () => void;
+  onCancelPress?: (id: string) => void;
   isFarmhouse?: boolean;
 }
 
@@ -62,6 +63,7 @@ export const StaycationBookingCard = ({
   guestCount,
   roomName,
   onPress,
+  onCancelPress,
   isFarmhouse = true,
 }: StaycationBookingCardProps) => {
   const navigation = useNavigation<any>();
@@ -179,11 +181,23 @@ export const StaycationBookingCard = ({
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.callButton} activeOpacity={0.7} onPress={handleCall}>
-          <Text weight="bold" style={styles.callButtonText}>
-            Call
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.actionButtons}>
+          {onCancelPress && displayData.id && (
+            <TouchableOpacity
+              style={styles.cancelButton}
+              activeOpacity={0.7}
+              onPress={() => onCancelPress(displayData.id!)}>
+              <Text weight="bold" style={styles.cancelButtonText}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.callButton} activeOpacity={0.7} onPress={handleCall}>
+            <Text weight="bold" style={styles.callButtonText}>
+              Call
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -370,6 +384,25 @@ const styles = StyleSheet.create({
   },
   roomsGuestText: {
     // Rooms guest text styling
+  },
+  actionButtons: {
+    flexDirection: "row",
+    gap: hs(8),
+    alignItems: "center",
+  },
+  cancelButton: {
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(4),
+    borderRadius: ms(6),
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    fontSize: fs(14),
+    color: COLORS.danger,
+    textAlign: "center",
   },
   callButton: {
     backgroundColor: "black",

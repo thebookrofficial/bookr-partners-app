@@ -11,7 +11,7 @@ import { Plus } from "lucide-react-native";
 import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { MainStackParamList } from "@/navigation/navigation.types";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation, useFocusEffect, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useServiceStore } from "@/store/serviceStore";
 import { supabase } from "@/lib/supabase";
@@ -20,12 +20,12 @@ import { supabase } from "@/lib/supabase";
 type BookingStatus = "Online" | "Offline" | "Settlement";
 
 interface BulkBookingItem {
-  id: string;
+  ids: string[]; // Store all IDs in the batch
   name: string;
   phone: string;
   dateRange: string;
   timeRange: string;
-  status: BookingStatus; // Use the specific union type instead of string
+  status: BookingStatus;
 }
 
 export const BulkBookingScreen = () => {
@@ -34,16 +34,21 @@ export const BulkBookingScreen = () => {
   const [loading, setLoading] = useState(true);
 
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
-
-  // Extract initial serviceId
-  const parentState = navigation.getParent()?.getState();
-  const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
-  const serviceId =
-    (tabRoute?.params as any)?.serviceId || (tabRoute?.params as any)?.params?.serviceId || "";
+  const route = useRoute<RouteProp<MainStackParamList, "BulkBooking">>();
+  const { venueId, groundId } = route.params;
 
   const { selectedCategories, setServiceCategory } = useServiceStore();
-  const selectedCategory = selectedCategories[serviceId] || "Football";
+  const selectedCategory = selectedCategories[venueId] || "Football";
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+
+  // --- ADD THIS DEBUG EFFECT ---
+  // useEffect(() => {
+  //   console.log("=== DEBUG BULK SCREEN ===");
+  //   console.log("Venue ID:", venueId);
+  //   console.log("Ground ID:", groundId);
+  //   console.log("Selected Category:", selectedCategory);
+  //   console.log("=========================");
+  // }, [venueId, groundId, selectedCategory]);
 
   const fetchBulkBookings = useCallback(async () => {
     setLoading(true);
@@ -60,12 +65,15 @@ export const BulkBookingScreen = () => {
           total_amount,
           notes,
           created_at,
+          booking_status,
           profiles (full_name, phone),
           sports_slots (slot_date, start_time, end_time)
         `,
         )
+        .eq("venue_id", venueId)
         .eq("platform_fee", 0)
         .eq("notes", "Bulk Booking Record")
+        .neq("booking_status", "cancelled")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -81,6 +89,7 @@ export const BulkBookingScreen = () => {
         if (!currentBatch) {
           currentBatch = {
             base: item,
+            ids: [item.id],
             slots: [item.sports_slots],
             totalPaid: item.paid_amount,
             totalCost: item.total_amount,
@@ -96,12 +105,14 @@ export const BulkBookingScreen = () => {
           const isSameTransaction = Math.abs(batchTime - itemTime) < 60000;
 
           if (isSameUser && isSameTransaction) {
+            currentBatch.ids.push(item.id);
             currentBatch.slots.push(item.sports_slots);
             currentBatch.totalPaid += item.paid_amount;
             currentBatch.totalCost += item.total_amount;
           } else {
             currentBatch = {
               base: item,
+              ids: [item.id],
               slots: [item.sports_slots],
               totalPaid: item.paid_amount,
               totalCost: item.total_amount,
@@ -113,7 +124,7 @@ export const BulkBookingScreen = () => {
 
       // --- 2. FORMAT INTO SINGLE CARDS ---
       const formattedData: BulkBookingItem[] = groupedBatches.map(batch => {
-        const { base, slots, totalPaid, totalCost } = batch;
+        const { base, ids, slots, totalPaid, totalCost } = batch;
 
         // Calculate Date Range (e.g., "06 May - 12 May")
         const dates = slots.map((s: any) => new Date(s.slot_date).getTime());
@@ -145,7 +156,7 @@ export const BulkBookingScreen = () => {
           totalPaid >= totalCost && totalCost > 0 ? "Online" : "Offline";
 
         return {
-          id: base.id,
+          ids: ids,
           name: base.profiles?.full_name || base.guest_name || "Guest",
           phone: base.profiles?.phone || base.guest_phone || "N/A",
           dateRange: dateRangeStr,
@@ -160,7 +171,7 @@ export const BulkBookingScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [venueId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -188,7 +199,7 @@ export const BulkBookingScreen = () => {
       <View style={styles.listContainer}>
         {bookings.map(item => (
           <BookingCard
-            key={item.id}
+            key={item.ids[0]}
             name={item.name}
             phone={item.phone}
             date={item.dateRange}
@@ -198,8 +209,10 @@ export const BulkBookingScreen = () => {
             hideCallButton={false}
             onPress={() =>
               navigation.navigate("BulkBookingDetails", {
-                bookingId: item.id,
+                bookingId: item.ids[0],
                 type: activeTab === "multiple" ? "multi" : "single",
+                venueId,
+                groundId,
               })
             }
           />
@@ -252,6 +265,8 @@ export const BulkBookingScreen = () => {
           navigation.navigate("BulkBookingDetails", {
             bookingId: "new",
             type: activeTab === "multiple" ? "multi" : "single",
+            venueId,
+            groundId,
           })
         }>
         <Plus size={ms(30)} color={COLORS.text.inverse} />
@@ -272,7 +287,7 @@ export const BulkBookingScreen = () => {
                 style={styles.dropdownItem}
                 activeOpacity={0.7}
                 onPress={() => {
-                  setServiceCategory(serviceId, cat);
+                  setServiceCategory(venueId, cat);
                   setIsCategoryOpen(false);
                 }}>
                 <Text variant="body2" weight="semiBold">

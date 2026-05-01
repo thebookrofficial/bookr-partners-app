@@ -133,7 +133,12 @@ export const SportsEssentialsScreen = () => {
           <EssentialActionRow
             title="Bulk Booking"
             icon={Files}
-            onPress={() => navigation.navigate("BulkBooking")}
+            onPress={() =>
+              navigation.navigate("BulkBooking", {
+                venueId: currentVenueId,
+                groundId: activeGroundId,
+              })
+            }
           />
           <EssentialActionRow
             title="Block / Unblock"
