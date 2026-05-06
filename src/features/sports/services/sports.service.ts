@@ -58,21 +58,16 @@ export const SportsService = {
     return data;
   },
 
+  // Inside getBookings function
   async getBookings(venueId: string, groundId: string, dateStr: string) {
-    const { data, error } = await supabase
-      .from("sports_bookings")
-      .select(
-        `
-        id, total_amount, paid_amount, booking_status, platform_fee, gateway_fee, guest_name, guest_phone, notes, user_id,
-        profiles ( full_name, phone, avatar_url ),
-        sports_slots!inner ( start_time, end_time, ground_id, slot_date )
-      `,
-      )
-      .eq("venue_id", venueId)
-      .eq("sports_slots.ground_id", groundId)
-      .eq("sports_slots.slot_date", dateStr);
+    const { data, error } = await supabase.rpc("fetch_venue_bookings_with_profiles", {
+      p_venue_id: venueId,
+      p_ground_id: groundId,
+      p_date: dateStr,
+    });
+
     if (error) throw error;
-    return data;
+    return data || [];
   },
 
   // --- OFFLINE BOOKING FETCHES & MUTATIONS ---

@@ -146,7 +146,6 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         const displayMins = startMStr === "00" ? "" : `:${startMStr}`;
 
         const booking = slot.sports_bookings?.[0];
-        // CRITICAL FIX: If there is no user_id, it is a manual (offline) booking
         const isManual = booking ? !booking.user_id : false;
 
         const startH = parseInt(startHStr, 10);
@@ -188,6 +187,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         .filter((b: any) => b.booking_status !== "cancelled")
         .map((b: any) => {
           const formatTime = (timeStr: string) => {
+            if (!timeStr) return "";
             const [h, m] = timeStr.split(":");
             const hourInt = parseInt(h, 10);
             const ampm = hourInt >= 12 ? "PM" : "AM";
@@ -196,46 +196,43 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             return `${displayHour}${displayMins} ${ampm}`;
           };
 
-          const slotDate = new Date(b.sports_slots.slot_date);
-          const formattedDate = slotDate.toLocaleDateString("en-GB", {
+          const formattedDate = new Date(b.slot_date).toLocaleDateString("en-GB", {
             weekday: "short",
             day: "numeric",
             month: "short",
             year: "numeric",
           });
 
-          // CRITICAL FIX: Determine Offline vs Online status reliably based on user_id
-          const isOffline = !b.user_id;
+          // DETERMINING OFFLINE VS ONLINE
+          // Rule: If guest_name exists, it's manual/offline.
+          const isOffline = !!b.guest_name && b.guest_name !== "null";
 
-          const [endH, endM] = b.sports_slots.end_time.split(":").map(Number);
-          const slotEndTime = new Date(b.sports_slots.slot_date);
+          // TIME CALCULATIONS
+          const [endH, endM] = b.end_time.split(":").map(Number);
+          const slotEndTime = new Date(b.slot_date);
           slotEndTime.setHours(endH, endM, 0, 0);
-
           const isDisabled = now > slotEndTime;
           const isUnpaid = Number(b.paid_amount || 0) < Number(b.total_amount || 0);
-          const diffMins = (now.getTime() - slotEndTime.getTime()) / (1000 * 60);
-          const isRecentlyPassedPending = isDisabled && isUnpaid && diffMins <= 45;
 
-          // CRITICAL FIX: Ensure guest name/phone fallback logic is robust
-          const guestName = b.guest_name || b.profiles?.full_name || "Guest User";
-          const guestPhone = b.guest_phone || b.profiles?.phone || "";
+          // NAME & PHONE RESOLUTION
+          // If Offline: Use guest_name column.
+          // If Online: Use full_name (joined from profiles via RPC admin privilege).
+          const finalName = isOffline ? b.guest_name : b.full_name || "Guest User";
+          const finalPhone = isOffline ? b.guest_phone || "" : b.phone || "";
 
           return {
             id: b.id,
-            name: guestName,
-            phone: guestPhone,
+            name: finalName,
+            phone: finalPhone,
             date: formattedDate,
-            time: `${formatTime(b.sports_slots.start_time)} - ${formatTime(
-              b.sports_slots.end_time,
-            )}`,
+            time: `${formatTime(b.start_time)} - ${formatTime(b.end_time)}`,
             price: `₹${b.total_amount || 0}`,
             status: isOffline ? "Offline" : "Online",
-            avatarUrl: b.profiles?.avatar_url,
+            avatarUrl: b.avatar_url,
             isOfflineRecord: isOffline,
             isDisabled,
             isPaymentPending: isDisabled && isUnpaid,
-            isRecentlyPassedPending,
-            startTimeRaw: b.sports_slots.start_time,
+            startTimeRaw: b.start_time,
           };
         });
 
