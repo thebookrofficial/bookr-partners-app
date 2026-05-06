@@ -27,9 +27,9 @@ import { COLORS } from "@/constants/theme";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
-import { supabase } from "@/lib/supabase";
 import { Calendar } from "react-native-calendars";
 import { z } from "zod";
+import { SportsService } from "../services/sports.service";
 
 interface OfflineBookingSheetProps {
   isVisible: boolean;
@@ -87,7 +87,6 @@ export const OfflineBookingSheet = ({
 }: OfflineBookingSheetProps) => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 
-  // Form States
   const [currentDate, setCurrentDate] = useState<Date>(initialDate);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [mobile, setMobile] = useState("");
@@ -96,14 +95,9 @@ export const OfflineBookingSheet = ({
   const [advancePaid, setAdvancePaid] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasHistory, setHasHistory] = useState(false);
-
   const [bookedHours, setBookedHours] = useState<string[]>([]);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
-
-  // Pricing State
   const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0 });
-
-  // Hour Selection State
   const [fromTime, setFromTime] = useState("Start Time");
   const [toTime, setToTime] = useState("End Time");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
@@ -143,29 +137,17 @@ export const OfflineBookingSheet = ({
   useEffect(() => {
     const fetchUnavailableSlots = async () => {
       if (!isVisible || !_groundId) return;
-
       setIsFetchingSlots(true);
       try {
         const dateStr = getLocalDateString(currentDate);
-
-        const { data, error } = await supabase
-          .from("sports_slots")
-          .select("start_time")
-          .eq("ground_id", _groundId)
-          .eq("slot_date", dateStr)
-          .neq("status", "available"); // Fetch anything that isn't available
-
-        if (error) throw error;
-
-        // Convert "07:00:00" to "7 AM" for comparison with our HOURS array
-        const formattedBooked = (data || []).map(slot => {
+        const data = await SportsService.getUnavailableSlotsForDate(_groundId, dateStr);
+        const formattedBooked = (data || []).map((slot: any) => {
           const [h] = slot.start_time.split(":");
           const hourInt = parseInt(h, 10);
           const ampm = hourInt >= 12 ? "PM" : "AM";
           const displayHour = hourInt % 12 || 12;
           return `${displayHour} ${ampm}`;
         });
-
         setBookedHours(formattedBooked);
       } catch (err) {
         console.error("Error checking slot availability:", err);
@@ -173,7 +155,6 @@ export const OfflineBookingSheet = ({
         setIsFetchingSlots(false);
       }
     };
-
     fetchUnavailableSlots();
   }, [currentDate, _groundId, isVisible]);
 
@@ -190,105 +171,42 @@ export const OfflineBookingSheet = ({
     }
   }, [initialDate, isVisible]);
 
-  // UPDATED AUTO-FILL & HISTORY CHECK LOGIC
   useEffect(() => {
-    const lookupGuestAndHistory = async () => {
-      // Clean the mobile number to digits only
+    const checkGuest = async () => {
       const cleanMobile = mobile.replace(/[^\d]/g, "");
 
-      // ONLY trigger the database lookup when we have exactly 10 digits (Standard Indian Mobile)
-      if (cleanMobile.length !== 10) {
+      // FIX: Trigger lookup if input is 10 digits OR 12 digits (with 91 prefix)
+      const isValidLength =
+        cleanMobile.length === 10 || (cleanMobile.length === 12 && cleanMobile.startsWith("91"));
+
+      if (!isValidLength) {
         setHasHistory(false);
         return;
       }
 
-      // Generate the variants to match how it might be saved in the database
-      const phoneVariants = [cleanMobile, `+91${cleanMobile}`, `+91 ${cleanMobile}`];
-
-      // Build safe OR query strings for Supabase
-      const phoneOrQuery = phoneVariants.map(v => `phone.eq.${v}`).join(",");
-      const guestPhoneOrQuery = phoneVariants.map(v => `guest_phone.eq.${v}`).join(",");
-
       try {
-        // 1. Try to Resolve Bookr Profile
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("id, full_name")
-          .or(phoneOrQuery)
-          .maybeSingle();
+        const { foundName, hasHistory } = await SportsService.lookupGuestProfile(cleanMobile);
 
-        let foundName = profile?.full_name || "";
-
-        // 2. If no Bookr Profile, lookup latest Manual Guest Name from Sports
-        if (!foundName) {
-          const { data: sportsBooking } = await supabase
-            .from("sports_bookings")
-            .select("guest_name")
-            .or(guestPhoneOrQuery)
-            .not("guest_name", "is", null)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (sportsBooking?.guest_name) {
-            foundName = sportsBooking.guest_name;
-          }
-        }
-
-        // 3. If still nothing, check Dining Bookings
-        if (!foundName) {
-          const { data: diningBooking } = await supabase
-            .from("dining_bookings")
-            .select("guest_name")
-            .or(guestPhoneOrQuery)
-            .not("guest_name", "is", null)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (diningBooking?.guest_name) {
-            foundName = diningBooking.guest_name;
-          }
-        }
-
-        // IMPORTANT: Only set the name if we ACTUALLY found one in the DB!
-        // This prevents erasing the name if the vendor has already started typing it manually.
-        if (foundName) {
-          setName(foundName);
-        }
-
-        // 4. Check for Previous History (For the History Button)
-        const historyOrQuery = guestPhoneOrQuery + (profile?.id ? `,user_id.eq.${profile.id}` : "");
-        const { count, error: historyError } = await supabase
-          .from("sports_bookings")
-          .select("id", { count: "exact", head: true })
-          .or(historyOrQuery);
-
-        setHasHistory(!historyError && !!count && count > 0);
+        // Only update if we actually found something to avoid clearing manual typing
+        if (foundName) setName(foundName);
+        setHasHistory(hasHistory);
       } catch (err) {
-        console.error("Lookup error:", err);
+        console.error("Sheet lookup error:", err);
         setHasHistory(false);
       }
     };
-
-    lookupGuestAndHistory();
+    checkGuest();
   }, [mobile]);
 
-  // FETCH VENUE PRICING
   useEffect(() => {
     const fetchVenuePricing = async () => {
       if (!venueId || !isVisible) return;
       try {
-        const { data } = await supabase
-          .from("venues")
-          .select("price_per_hour, day_price, night_price, min_advance_amount")
-          .eq("id", venueId)
-          .single();
-
+        const data: any = await SportsService.getVenuePricing(venueId);
         if (data) {
           setPricing({
-            day: (data as any).day_price || data.price_per_hour || 0,
-            night: (data as any).night_price || data.price_per_hour || 0,
+            day: data.day_price || data.price_per_hour || 0,
+            night: data.night_price || data.price_per_hour || 0,
             default: data.price_per_hour || 0,
           });
           setAdvancePaid(data.min_advance_amount?.toString() || "");
@@ -300,7 +218,6 @@ export const OfflineBookingSheet = ({
     fetchVenuePricing();
   }, [venueId, isVisible]);
 
-  // AUTO-CALCULATE TOTAL PAYMENT
   useEffect(() => {
     if (
       !fromTime ||
@@ -308,37 +225,24 @@ export const OfflineBookingSheet = ({
       fromTime === "Start Time" ||
       toTime === "End Time" ||
       pricing.default === 0
-    ) {
+    )
       return;
-    }
-
     const startIdx = HOURS.indexOf(fromTime);
     const endIdx = HOURS.indexOf(toTime);
-
     if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) return;
 
     const selectedHours = HOURS.slice(startIdx, endIdx);
     let total = 0;
-
     selectedHours.forEach(hour => {
-      // Day Session: 6 AM to 5 PM
-      // Night Session: 5 PM to 12 AM
       const hIdx = HOURS.indexOf(hour);
       const fivePMIdx = HOURS.indexOf("5 PM");
-
-      if (hIdx < fivePMIdx) {
-        total += pricing.day || pricing.default;
-      } else {
-        total += pricing.night || pricing.default;
-      }
+      total += hIdx < fivePMIdx ? pricing.day || pricing.default : pricing.night || pricing.default;
     });
-
     setTotalPayment(total.toString());
   }, [fromTime, toTime, pricing, HOURS]);
 
   const handleBookNow = async () => {
     const cleanMobile = mobile.replace(/[^\d]/g, "");
-
     const validationResult = offlineBookingSchema.safeParse({
       mobile: cleanMobile,
       name: name.trim(),
@@ -355,80 +259,30 @@ export const OfflineBookingSheet = ({
 
     setIsSubmitting(true);
     try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("phone", cleanMobile)
-        .maybeSingle();
-
+      const { profile } = await SportsService.lookupGuestProfile(cleanMobile);
       const userId = profile?.id || null;
       const formattedDate = getLocalDateString(currentDate);
       const startTime24 = parseTimeTo24Hour(fromTime);
       const endTime24 = parseTimeTo24Hour(toTime);
       const numericTotal = parseFloat(totalPayment);
 
-      const { data: newSlot, error: insertError } = await supabase
-        .from("sports_slots")
-        .insert({
-          venue_id: venueId,
-          ground_id: _groundId,
-          slot_date: formattedDate,
-          start_time: startTime24,
-          end_time: endTime24,
-          price: numericTotal,
-          status: "booked",
-        })
-        .select("id")
-        .maybeSingle();
-
-      let slotId = newSlot?.id;
-
-      if (insertError || !slotId) {
-        const { data: foundSlot } = await supabase
-          .from("sports_slots")
-          .select("id, status")
-          .eq("venue_id", venueId)
-          .eq("ground_id", _groundId)
-          .eq("slot_date", formattedDate)
-          .eq("start_time", startTime24)
-          .eq("end_time", endTime24)
-          .single();
-
-        if (foundSlot?.status !== "available" && !insertError) {
-          throw new Error("This slot is already taken.");
-        }
-        slotId = foundSlot?.id;
-      }
-
-      if (!slotId) throw new Error("Could not resolve Slot ID.");
-
-      const { error: bookingError } = await supabase.from("sports_bookings").insert({
-        user_id: userId,
-        guest_name: name.trim(),
-        guest_phone: cleanMobile,
-        venue_id: venueId,
-        slot_id: slotId,
-        booking_status: "confirmed",
-        subtotal: numericTotal,
-        discount_amount: 0,
-        platform_fee: 0,
-        gateway_fee: 0,
-        total_amount: numericTotal,
-        vendor_payout: numericTotal,
-        notes: `Offline Booking${userId ? " (Bookr User)" : ""}`,
-        paid_amount: parseFloat(advancePaid || "0"),
+      await SportsService.createOfflineBooking({
+        venueId,
+        groundId: _groundId,
+        dateStr: formattedDate,
+        startTime24,
+        endTime24,
+        numericTotal,
+        advancePaid: parseFloat(advancePaid || "0"),
+        userId,
+        guestName: name.trim(),
+        guestPhone: cleanMobile,
       });
-
-      if (bookingError) throw bookingError;
 
       Alert.alert("Success", "Booking Saved!");
       onSuccess();
     } catch (error: any) {
-      console.error("=== SPORTS BOOKING ERROR ===");
-      console.error("Error Code:", error.code);
-      console.error("Error Message:", error.message);
-      console.error("Error Details:", error.details);
-      console.error("=============================");
+      Alert.alert("Booking Failed", error.message || "Something went wrong.");
     } finally {
       setIsSubmitting(false);
     }
@@ -449,7 +303,6 @@ export const OfflineBookingSheet = ({
               Offline Booking
             </Text>
           </View>
-
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.sheetContent}>
@@ -463,7 +316,6 @@ export const OfflineBookingSheet = ({
                 pointerEvents="none"
               />
             </TouchableOpacity>
-
             <TextInput
               variant="filled"
               label={<CustomLabel icon={Phone} text="Mobile No" />}
@@ -472,7 +324,6 @@ export const OfflineBookingSheet = ({
               value={mobile}
               onChangeText={setMobile}
             />
-
             <TextInput
               variant="filled"
               label={<CustomLabel icon={UserIcon} text="Name" />}
@@ -480,7 +331,6 @@ export const OfflineBookingSheet = ({
               value={name}
               onChangeText={setName}
             />
-
             <View style={styles.row}>
               <View style={styles.flex1}>
                 <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("from")}>
@@ -494,7 +344,6 @@ export const OfflineBookingSheet = ({
                   />
                 </TouchableOpacity>
               </View>
-
               <View style={styles.flex1}>
                 <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("to")}>
                   <TextInput
@@ -508,7 +357,6 @@ export const OfflineBookingSheet = ({
                 </TouchableOpacity>
               </View>
             </View>
-
             <View style={styles.row}>
               <View style={styles.flex1}>
                 <TextInput
@@ -535,8 +383,6 @@ export const OfflineBookingSheet = ({
                 />
               </View>
             </View>
-
-            {/* CONDITIONAL HISTORY BUTTON */}
             {hasHistory && (
               <TouchableOpacity
                 style={styles.historyRow}
@@ -552,7 +398,6 @@ export const OfflineBookingSheet = ({
                 <ChevronRight size={ms(20)} color={COLORS.text.primary} />
               </TouchableOpacity>
             )}
-
             <TouchableOpacity
               style={[styles.saveButton, isSubmitting && styles.saveButtonDisabled]}
               activeOpacity={0.8}
@@ -574,7 +419,6 @@ export const OfflineBookingSheet = ({
         </TouchableOpacity>
       </TouchableOpacity>
 
-      {/* FIXED HOUR PICKER MODAL */}
       <Modal visible={!!showHourPicker} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowHourPicker(null)} />
@@ -582,7 +426,6 @@ export const OfflineBookingSheet = ({
             <Text variant="body1" weight="bold" style={styles.pickerHeader}>
               Select {showHourPicker === "from" ? "Start" : "End"} Time
             </Text>
-
             {isFetchingSlots ? (
               <ActivityIndicator color={COLORS.primary} style={{ margin: vs(20) }} />
             ) : (
@@ -596,20 +439,11 @@ export const OfflineBookingSheet = ({
                   let reasonText = "";
 
                   if (showHourPicker === "from") {
-                    // START TIME: Cannot pick a time that is already booked
                     isDisabled = isBooked;
                     if (isBooked) reasonText = "(Booked)";
                   } else {
-                    // END TIME LOGIC
                     const fromIndex = HOURS.indexOf(fromTime);
-
-                    // 1. Cannot be earlier than or equal to Start Time
-                    if (index <= fromIndex) {
-                      isDisabled = true;
-                    }
-
-                    // 2. Cannot skip over a booked slot
-                    // If there's a booked slot between fromTime and this hour, disable it
+                    if (index <= fromIndex) isDisabled = true;
                     const hasBookingInBetween = HOURS.slice(fromIndex, index).some(h =>
                       bookedHours.includes(h),
                     );
@@ -625,7 +459,6 @@ export const OfflineBookingSheet = ({
                       style={[
                         styles.hourItem,
                         isDisabled && styles.hourItemDisabled,
-                        // Highlight current selection
                         (fromTime === hour || toTime === hour) && {
                           backgroundColor: COLORS.surface.primary,
                         },
@@ -634,7 +467,7 @@ export const OfflineBookingSheet = ({
                       onPress={() => {
                         if (showHourPicker === "from") {
                           setFromTime(hour);
-                          setToTime("End Time"); // Reset To-time when From-time changes
+                          setToTime("End Time");
                         } else {
                           setToTime(hour);
                         }
@@ -642,7 +475,7 @@ export const OfflineBookingSheet = ({
                       }}>
                       <Text
                         variant="body1"
-                        weight={fromTime === hour || toTime === hour ? "bold" : "bold"}
+                        weight="bold"
                         color={isDisabled ? COLORS.text.secondary : COLORS.text.primary}>
                         {hour} {reasonText}
                       </Text>
@@ -759,8 +592,5 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border.navBar,
     alignItems: "center",
   },
-  hourItemDisabled: {
-    backgroundColor: COLORS.surface.fallback, // Light grey background
-    opacity: 0.6,
-  },
+  hourItemDisabled: { backgroundColor: COLORS.surface.fallback, opacity: 0.6 },
 });

@@ -105,6 +105,10 @@ export const BookingDetailsScreen = () => {
     );
   }
 
+  // CRITICAL FIX: Ensure guest name/phone fallback logic is robust
+  const guestName = booking.guest_name || booking.profiles?.full_name || "Guest User";
+  const guestPhone = booking.guest_phone || booking.profiles?.phone || "N/A";
+
   // Dynamic Calculations
   const totalAmount = Number(booking.total_amount) || 0;
   const currentPaid = Number(booking.paid_amount) || 0;
@@ -156,17 +160,12 @@ export const BookingDetailsScreen = () => {
   };
 
   const handleCall = () => {
-    // 1. Prioritize the profile phone, then fallback to guest_phone
-    const rawPhoneNumber = booking.profiles?.phone || booking.guest_phone;
-
-    if (!rawPhoneNumber) {
+    if (guestPhone === "N/A") {
       Alert.alert("Error", "No phone number available for this guest.");
       return;
     }
 
-    // 2. REGEX FIX: Remove EVERYTHING except digits and the '+' sign
-    // This removes spaces, hyphens, and hidden characters that break deep links
-    const cleanNumber = rawPhoneNumber.replace(/[^\d+]/g, "");
+    const cleanNumber = guestPhone.replace(/[^\d+]/g, "");
     const url = `tel:${cleanNumber}`;
 
     Linking.openURL(url).catch(err => {
@@ -176,14 +175,12 @@ export const BookingDetailsScreen = () => {
   };
 
   const handleShareWhatsApp = async () => {
-    const guestName = booking.guest_name || booking.profiles?.full_name || "Guest";
     const venueName = booking.venues?.name || "the venue";
     const bookingDate = new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB");
     const bookingTime = `${formatHour(booking.sports_slots.start_time)} to ${formatHour(
       booking.sports_slots.end_time,
     )}`;
 
-    // Construct the text template
     const message =
       `Booking Confirmed! 🎉\n` +
       `Hi ${guestName},\n` +
@@ -199,21 +196,15 @@ export const BookingDetailsScreen = () => {
     try {
       const result = await Share.share({
         message: message,
-        title: "Booking Confirmation", // For email/dialog subjects
+        title: "Booking Confirmation",
       });
 
       if (result.action === Share.sharedAction) {
         if (result.activityType) {
-          // shared with a specific activity type on iOS
-          // eslint-disable-next-line no-console
-          console.log("Shared via:", result.activityType);
-        } else {
           // shared
         }
       } else if (result.action === Share.dismissedAction) {
         // dismissed
-        // eslint-disable-next-line no-console
-        console.log("Share sheet dismissed");
       }
     } catch (error: any) {
       Alert.alert("Error", "Unable to open share sheet.");
@@ -232,15 +223,13 @@ export const BookingDetailsScreen = () => {
           source={{
             uri:
               booking.profiles?.avatar_url ||
-              `https://ui-avatars.com/api/?name=${
-                booking.guest_name || booking.profiles?.full_name || "Guest"
-              }&background=random`,
+              `https://ui-avatars.com/api/?name=${guestName}&background=random`,
           }}
           style={styles.avatar}
         />
 
         <Text variant="h3" weight="bold" style={styles.headerName}>
-          {booking.guest_name || booking.profiles?.full_name || "Guest User"}
+          {guestName}
         </Text>
 
         <Text variant="body2" weight="semiBold" style={styles.categoryText}>
@@ -258,7 +247,7 @@ export const BookingDetailsScreen = () => {
         </View>
         <View style={styles.inputBoxRow}>
           <Text variant="body2" weight="semiBold" style={styles.inputText} onPress={handleCall}>
-            {booking.profiles?.phone || booking.guest_phone || "N/A"}
+            {guestPhone}
           </Text>
 
           <View style={styles.actionButtons}>
@@ -449,7 +438,7 @@ export const BookingDetailsScreen = () => {
         activeOpacity={0.7}
         onPress={() =>
           navigation.navigate("GuestHistory", {
-            guestId: booking.profiles.phone || booking.guest_phone || "unknown",
+            guestId: guestPhone,
             bookingId: booking.id,
           })
         }>
@@ -820,7 +809,6 @@ const styles = StyleSheet.create({
     fontFamily: "Gilroy-SemiBold",
     color: COLORS.text.primary,
   },
-  // Add this for the saving state of the button
   saveButtonDisabled: {
     opacity: 0.7,
   },
