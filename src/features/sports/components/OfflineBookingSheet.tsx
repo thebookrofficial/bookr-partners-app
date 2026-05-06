@@ -259,13 +259,12 @@ export const OfflineBookingSheet = ({
 
     setIsSubmitting(true);
     try {
-      const { profile } = await SportsService.lookupGuestProfile(cleanMobile);
-      const userId = profile?.id || null;
       const formattedDate = getLocalDateString(currentDate);
       const startTime24 = parseTimeTo24Hour(fromTime);
       const endTime24 = parseTimeTo24Hour(toTime);
       const numericTotal = parseFloat(totalPayment);
 
+      // CRITICAL FIX: Removed profile lookup and userId passing
       await SportsService.createOfflineBooking({
         venueId,
         groundId: _groundId,
@@ -274,7 +273,6 @@ export const OfflineBookingSheet = ({
         endTime24,
         numericTotal,
         advancePaid: parseFloat(advancePaid || "0"),
-        userId,
         guestName: name.trim(),
         guestPhone: cleanMobile,
       });

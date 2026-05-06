@@ -171,7 +171,6 @@ export const SportsService = {
     endTime24: string;
     numericTotal: number;
     advancePaid: number;
-    userId: string | null;
     guestName: string;
     guestPhone: string;
   }) {
@@ -211,11 +210,11 @@ export const SportsService = {
 
     if (!slotId) throw new Error("Could not resolve Slot ID.");
 
-    // 2. Insert Booking
+    // 2. Insert Booking - CRITICAL FIX: user_id is now explicitly null for manual bookings
     const { data: booking, error: bookingError } = await supabase
       .from("sports_bookings")
       .insert({
-        user_id: params.userId,
+        user_id: null,
         guest_name: params.guestName,
         guest_phone: params.guestPhone,
         venue_id: params.venueId,
@@ -227,7 +226,7 @@ export const SportsService = {
         gateway_fee: 0,
         total_amount: params.numericTotal,
         vendor_payout: params.numericTotal,
-        notes: `Offline Booking${params.userId ? " (Bookr User)" : ""}`,
+        notes: `Manual Offline Booking`,
         paid_amount: params.advancePaid,
       })
       .select("id")
