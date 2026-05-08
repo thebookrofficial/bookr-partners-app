@@ -82,12 +82,13 @@ export const useSportsHistory = (
         .from("sports_bookings")
         .select(
           `
-          id, guest_name, guest_phone, total_amount, paid_amount,
+          id, guest_name, guest_phone, total_amount, paid_amount, booking_status,
           profiles(full_name, phone),
           sports_slots!inner(slot_date, start_time, end_time)
         `,
         )
         .eq("venue_id", currentVenueId)
+        .neq("booking_status", "cancelled")
         .order("created_at", { ascending: false });
 
       if (error) throw error;

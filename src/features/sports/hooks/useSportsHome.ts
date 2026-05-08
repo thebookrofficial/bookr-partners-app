@@ -146,7 +146,8 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         const displayMins = startMStr === "00" ? "" : `:${startMStr}`;
 
         const booking = slot.sports_bookings?.[0];
-        const isManual = booking ? !booking.user_id : false;
+        const isCancelled = booking?.booking_status === "cancelled";
+        const isManual = booking && !isCancelled ? !booking.user_id : false;
 
         const startH = parseInt(startHStr, 10);
         const startM = parseInt(startMStr, 10);
@@ -184,7 +185,20 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
       const now = new Date();
 
       const formattedBookings: BookingData[] = (bookingsData || [])
-        .filter((b: any) => b.booking_status !== "cancelled")
+        .filter((b: any) => {
+          const bookingStatus = b.booking_status?.toLowerCase();
+          const status = b.status?.toLowerCase();
+          const slotStatus = b.slot_status?.toLowerCase();
+
+          // Robust Cancellation Check:
+          // 1. booking_status explicitly says 'cancelled'
+          // 2. OR status explicitly says 'cancelled'
+          // 3. OR the associated slot is now 'available' (meaning the booking was released)
+          if (bookingStatus === "cancelled" || status === "cancelled") return false;
+          if (slotStatus === "available") return false;
+
+          return true;
+        })
         .map((b: any) => {
           const formatTime = (timeStr: string) => {
             if (!timeStr) return "";
