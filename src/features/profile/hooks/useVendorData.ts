@@ -47,13 +47,6 @@ export const useVendorData = () => {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      // // --- ADD THESE DEBUG LOGS ---
-      // console.log("=== PROFILE DEBUG ===");
-      // console.log("Logged in User ID:", user.id);
-      // console.log("Client Profile Data:", clientData);
-      // console.log("Client Profile Error:", clientError);
-      // console.log("======================");
-
       if (clientError) throw clientError;
 
       if (clientData) {

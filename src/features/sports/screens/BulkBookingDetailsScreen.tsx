@@ -99,6 +99,8 @@ const CreateBulkBooking = ({
   const amountPaid = stagedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remainingAmount = totalPayment - amountPaid;
 
+  const { activeVenueName } = useServiceStore();
+
   useEffect(() => {
     const lookupGuest = async () => {
       const cleanMobile = mobile.replace(/[^\d]/g, "");
@@ -167,7 +169,7 @@ const CreateBulkBooking = ({
     <View style={styles.flex1}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <ServiceHeader
-          title="Elite Strikers Club"
+          title={activeVenueName}
           subtitle="Bulk Booking"
           category={selectedCategory}
           onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}

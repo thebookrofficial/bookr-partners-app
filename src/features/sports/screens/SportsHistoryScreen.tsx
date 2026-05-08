@@ -117,6 +117,7 @@ export const SportsHistoryScreen = () => {
     dateFilter,
     customRange,
   );
+  const { activeVenueName } = useServiceStore();
 
   return (
     <ScreenContainer backgroundColor={COLORS.background}>
@@ -124,7 +125,7 @@ export const SportsHistoryScreen = () => {
         {/* Header */}
         <View style={styles.headerZIndex}>
           <ServiceHeader
-            title="Elite Strikers Club"
+            title={activeVenueName}
             subtitle="History"
             category={selectedCategory}
             onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}

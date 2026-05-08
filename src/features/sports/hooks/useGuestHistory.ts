@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { SportsService } from "../services/sports.service";
 
 export interface HistoryBooking {
   id: string;
@@ -15,23 +16,70 @@ export interface HistoryBooking {
   booking_status: "past" | "upcoming" | "cancelled";
 }
 
-export const useGuestHistory = (phone: string) => {
+export const useGuestHistory = (identifier: string) => {
   const [history, setHistory] = useState<HistoryBooking[]>([]);
   const [stats, setStats] = useState({ past: 0, upcoming: 0, cancelled: 0 });
   const [guestName, setGuestName] = useState<string>("Guest User");
+  const [guestPhone, setGuestPhone] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   const fetchHistory = useCallback(async () => {
+    if (!identifier) return;
     setLoading(true);
     try {
-      // 1. First, find if a profile exists for this phone
+      let phone = identifier;
+      let resolvedGuestName = "";
+
+      // 1. If identifier looks like a UUID, it's likely a bookingId
+      // We need to resolve the guest phone and name from the booking first
+      if (identifier.length === 36 && identifier.includes("-")) {
+        const { data: bookingData } = await supabase
+          .from("sports_bookings")
+          .select(
+            "guest_name, guest_phone, user_id, venue_id, profiles(phone), sports_slots(ground_id, slot_date)",
+          )
+          .eq("id", identifier)
+          .single();
+
+        if (bookingData) {
+          // profiles might be returned as an object or an array depending on schema inference
+          let profilePhone = Array.isArray(bookingData.profiles)
+            ? bookingData.profiles[0]?.phone
+            : (bookingData.profiles as any)?.phone;
+
+          // SECURE FALLBACK: If join failed for an online booking, resolve via RPC
+          if (!profilePhone && bookingData.user_id) {
+            try {
+              const rpcBookings = await SportsService.getBookings(
+                bookingData.venue_id,
+                (bookingData.sports_slots as any).ground_id,
+                (bookingData.sports_slots as any).slot_date,
+              );
+              const matched = rpcBookings.find((b: any) => b.id === identifier);
+              if (matched) {
+                profilePhone = matched.phone;
+                resolvedGuestName = matched.full_name;
+              }
+            } catch (rpcErr) {
+              console.warn("History UUID fallback failed:", rpcErr);
+            }
+          }
+
+          phone = bookingData.guest_phone || profilePhone || identifier;
+          resolvedGuestName = resolvedGuestName || bookingData.guest_name || "";
+        }
+      }
+
+      setGuestPhone(phone);
+
+      // 2. Find if a profile exists for this phone
       const { data: profileData } = await supabase
         .from("profiles")
         .select("id, full_name")
         .eq("phone", phone)
-        .maybeSingle(); // Use maybeSingle to avoid errors if not found
+        .maybeSingle();
 
-      // 2. Build the query for bookings
+      // 3. Build the query for bookings
       const { data, error } = await supabase
         .from("sports_bookings")
         .select(
@@ -56,6 +104,8 @@ export const useGuestHistory = (phone: string) => {
       // 3. Resolve Global Guest Name for Header
       if (profileData?.full_name) {
         setGuestName(profileData.full_name);
+      } else if (resolvedGuestName) {
+        setGuestName(resolvedGuestName);
       } else if (data && data.length > 0) {
         // FALLBACK: Use the guest_name from the most recent booking
         const manualName = data.find(b => b.guest_name)?.guest_name;
@@ -73,7 +123,11 @@ export const useGuestHistory = (phone: string) => {
         const displayName = profileData?.full_name || b.guest_name || "Guest User";
 
         let type: "past" | "upcoming" | "cancelled" = "past";
-        if (b.status === "cancelled") {
+        const isCancelled =
+          b.booking_status?.toLowerCase() === "cancelled" ||
+          b.status?.toLowerCase() === "cancelled";
+
+        if (isCancelled) {
           type = "cancelled";
           cancelledCount++;
         } else if (slotDate > now) {
@@ -104,11 +158,11 @@ export const useGuestHistory = (phone: string) => {
     } finally {
       setLoading(false);
     }
-  }, [phone]);
+  }, [identifier]);
 
   useEffect(() => {
-    if (phone) fetchHistory();
-  }, [phone, fetchHistory]);
+    if (identifier) fetchHistory();
+  }, [identifier, fetchHistory]);
 
-  return { history, stats, guestName, loading, refresh: fetchHistory };
+  return { history, stats, guestName, guestPhone, loading, refresh: fetchHistory };
 };

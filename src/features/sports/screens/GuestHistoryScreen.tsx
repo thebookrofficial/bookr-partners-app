@@ -18,9 +18,10 @@ export const GuestHistoryScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "GuestHistory">>();
   const { guestId: guestIdParam, bookingId } = route.params;
 
-  const guestId = guestIdParam || bookingId;
+  // Use guestIdParam (phone) if available, otherwise fallback to bookingId
+  const identifier = guestIdParam || bookingId;
 
-  const { history, stats, guestName, loading } = useGuestHistory(guestId);
+  const { history, stats, guestName, guestPhone, loading } = useGuestHistory(identifier);
 
   // Formatting helpers
   const formatDisplayDate = (dateStr: string) => {
@@ -81,7 +82,7 @@ export const GuestHistoryScreen = () => {
             {guestName}
           </Text>
           <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
-            {guestId}
+            {guestPhone}
           </Text>
           <Text variant="body2" color={COLORS.text.muted}>
             {history.length} Total Bookings
@@ -131,7 +132,7 @@ export const GuestHistoryScreen = () => {
               <BookingCard
                 key={item.id}
                 name={guestName}
-                subtitle={guestId}
+                subtitle={guestPhone}
                 date={formatDisplayDate(item.slot_date)}
                 time={`${formatTime(item.start_time)} - ${formatTime(item.end_time)}`}
                 price={`₹${item.total_amount}`}

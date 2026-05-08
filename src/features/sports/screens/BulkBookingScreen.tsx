@@ -41,15 +41,6 @@ export const BulkBookingScreen = () => {
   const selectedCategory = selectedCategories[venueId] || "Football";
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
-  // --- ADD THIS DEBUG EFFECT ---
-  // useEffect(() => {
-  //   console.log("=== DEBUG BULK SCREEN ===");
-  //   console.log("Venue ID:", venueId);
-  //   console.log("Ground ID:", groundId);
-  //   console.log("Selected Category:", selectedCategory);
-  //   console.log("=========================");
-  // }, [venueId, groundId, selectedCategory]);
-
   const fetchBulkBookings = useCallback(async () => {
     setLoading(true);
     try {

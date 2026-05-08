@@ -52,6 +52,8 @@ export const SportsEssentialsScreen = () => {
   const [activeGroundId, setActiveGroundId] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
+  const { activeVenueName } = useServiceStore();
+
   useEffect(() => {
     const resolveVenueAndGround = async () => {
       setLoading(true);
@@ -114,7 +116,7 @@ export const SportsEssentialsScreen = () => {
       <View style={styles.headerWrapper}>
         {/* 1. Header with Dropdown */}
         <ServiceHeader
-          title="Elite Strikers Club"
+          title={activeVenueName}
           subtitle="Essentials"
           category={selectedCategory}
           onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
@@ -159,20 +161,8 @@ export const SportsEssentialsScreen = () => {
               }
             }}
           />
-          <EssentialActionRow
-            title="Offers"
-            icon={CalendarDays}
-            onPress={() => {
-              // console.log("Special Days Tapped");
-            }}
-          />
-          <EssentialActionRow
-            title="Update Venue Info"
-            icon={RefreshCw}
-            onPress={() => {
-              // console.log("Update Venue Tapped");
-            }}
-          />
+          <EssentialActionRow title="Offers" icon={CalendarDays} onPress={() => {}} />
+          <EssentialActionRow title="Update Venue Info" icon={RefreshCw} onPress={() => {}} />
         </View>
       )}
 

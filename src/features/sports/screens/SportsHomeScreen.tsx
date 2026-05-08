@@ -50,11 +50,19 @@ export const SportsHomeScreen = () => {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const { activeVenueName, setActiveVenueName } = useServiceStore();
+
   useFocusEffect(
     React.useCallback(() => {
       refresh();
     }, [refresh]),
   );
+
+  useEffect(() => {
+    if (venue?.name) {
+      setActiveVenueName(venue.name);
+    }
+  }, [venue?.name, setActiveVenueName]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -101,7 +109,8 @@ export const SportsHomeScreen = () => {
         refreshing={refreshing}
         onRefresh={onRefresh}>
         <ServiceHeader
-          title={venue?.name || "Loading..."}
+          // title={venue?.name || "Loading..."}
+          title={venue?.name || activeVenueName}
           category={selectedCategory}
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
           // ONLY pass the press handler if there are multiple options

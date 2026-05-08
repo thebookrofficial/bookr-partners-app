@@ -106,8 +106,10 @@ export const BookingDetailsScreen = () => {
   }
 
   // CRITICAL FIX: Ensure guest name/phone fallback logic is robust
-  const guestName = booking.guest_name || booking.profiles?.full_name || "Guest User";
-  const guestPhone = booking.guest_phone || booking.profiles?.phone || "N/A";
+  // If profiles is an array (sometimes happens with Supabase relationships), take the first item
+  const profileData = Array.isArray(booking.profiles) ? booking.profiles[0] : booking.profiles;
+  const guestName = booking.guest_name || profileData?.full_name || "Guest User";
+  const guestPhone = booking.guest_phone || profileData?.phone || "N/A";
 
   // Dynamic Calculations
   const totalAmount = Number(booking.total_amount) || 0;
@@ -222,7 +224,7 @@ export const BookingDetailsScreen = () => {
         <Image
           source={{
             uri:
-              booking.profiles?.avatar_url ||
+              profileData?.avatar_url ||
               `https://ui-avatars.com/api/?name=${guestName}&background=random`,
           }}
           style={styles.avatar}
@@ -438,7 +440,7 @@ export const BookingDetailsScreen = () => {
         activeOpacity={0.7}
         onPress={() =>
           navigation.navigate("GuestHistory", {
-            guestId: guestPhone,
+            guestId: guestPhone === "N/A" ? undefined : guestPhone,
             bookingId: booking.id,
           })
         }>
@@ -468,19 +470,22 @@ export const BookingDetailsScreen = () => {
         <Send size={ms(20)} color={COLORS.text.inverse} />
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.cancelBookingBtn}
-        activeOpacity={0.7}
-        onPress={() => setShowCancelModal(true)}>
-        <Text
-          variant="body1"
-          weight="bold"
-          color={COLORS.text.primary}
-          style={styles.cancelBtnText}>
-          Cancel Booking
-        </Text>
-        <Trash2 size={ms(24)} color={COLORS.text.primary} />
-      </TouchableOpacity>
+      {/* --- CANCEL BUTTON ONLY FOR ACTIVE OFFLINE BOOKINGS --- */}
+      {!profileData && booking.booking_status !== "cancelled" && (
+        <TouchableOpacity
+          style={styles.cancelBookingBtn}
+          activeOpacity={0.7}
+          onPress={() => setShowCancelModal(true)}>
+          <Text
+            variant="body1"
+            weight="bold"
+            color={COLORS.text.primary}
+            style={styles.cancelBtnText}>
+            Cancel Booking
+          </Text>
+          <Trash2 size={ms(24)} color={COLORS.text.primary} />
+        </TouchableOpacity>
+      )}
 
       {/* --- CANCELLATION MODAL --- */}
       <Modal visible={showCancelModal} transparent animationType="fade">

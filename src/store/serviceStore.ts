@@ -1,19 +1,15 @@
-// Copyright (c) 2026 Bookr. All rights reserved.
-// Confidential and Proprietary.
-
 import { create } from "zustand";
 
 interface ServiceState {
-  /**
-   * Mapping of serviceId to selected sub-category name
-   * E.g., { "service-123": "Football" }
-   */
   selectedCategories: Record<string, string>;
+  activeVenueName: string; // NEW
   setServiceCategory: (serviceId: string, category: string) => void;
+  setActiveVenueName: (name: string) => void; // NEW
 }
 
 export const useServiceStore = create<ServiceState>(set => ({
   selectedCategories: {},
+  activeVenueName: "Loading...",
   setServiceCategory: (serviceId, category) =>
     set(state => ({
       selectedCategories: {
@@ -21,4 +17,5 @@ export const useServiceStore = create<ServiceState>(set => ({
         [serviceId]: category,
       },
     })),
+  setActiveVenueName: name => set({ activeVenueName: name }), // NEW
 }));

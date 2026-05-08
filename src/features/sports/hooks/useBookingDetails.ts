@@ -4,16 +4,25 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Alert } from "react-native";
+import { SportsService } from "../services/sports.service";
 
 export interface BookingDetailData {
   id: string;
+  user_id: string | null;
+  venue_id: string;
   total_amount: number;
   paid_amount: number;
-  guest_name: string | null; // Added
-  guest_phone: string | null; // Added
-  slot_id: string; // Added
-  profiles: { full_name: string; phone: string; avatar_url: string };
-  sports_slots: { start_time: string; end_time: string; slot_date: string };
+  booking_status: string;
+  guest_name: string | null;
+  guest_phone: string | null;
+  slot_id: string;
+  profiles: { full_name: string; phone: string; avatar_url: string } | null;
+  sports_slots: {
+    start_time: string;
+    end_time: string;
+    slot_date: string;
+    ground_id: string;
+  };
   venues: { name: string; vertical: string };
 }
 
@@ -35,13 +44,13 @@ export const useBookingDetails = (bookingId: string) => {
     setLoading(true);
     try {
       // 1. Fetch Booking Details
-      const { data: bookingData, error: bookingError } = await supabase
+      const { data: rawData, error: bookingError } = await supabase
         .from("sports_bookings")
         .select(
           `
-          id, total_amount, paid_amount, guest_name, guest_phone, slot_id,
+          id, user_id, venue_id, total_amount, paid_amount, booking_status, guest_name, guest_phone, slot_id,
           profiles ( full_name, phone, avatar_url ),
-          sports_slots ( start_time, end_time, slot_date ),
+          sports_slots ( start_time, end_time, slot_date, ground_id ),
           venues ( name, vertical )
         `,
         )
@@ -49,7 +58,37 @@ export const useBookingDetails = (bookingId: string) => {
         .single();
 
       if (bookingError) throw bookingError;
-      setBooking(bookingData as any);
+
+      let bookingData = rawData as any;
+
+      // SECURE FALLBACK: If profiles join failed for an online booking, use RPC to resolve
+      // profiles might be returned as an object or an array depending on schema inference
+      const profileData = Array.isArray(bookingData.profiles)
+        ? bookingData.profiles[0]
+        : bookingData.profiles;
+
+      if (!profileData && bookingData.user_id) {
+        try {
+          const rpcBookings = await SportsService.getBookings(
+            bookingData.venue_id,
+            bookingData.sports_slots.ground_id,
+            bookingData.sports_slots.slot_date,
+          );
+
+          const matched = rpcBookings.find((b: any) => b.id === bookingId);
+          if (matched && matched.full_name) {
+            bookingData.profiles = {
+              full_name: matched.full_name,
+              phone: matched.phone || "",
+              avatar_url: matched.avatar_url || "",
+            };
+          }
+        } catch (rpcErr) {
+          console.warn("Secure fallback lookup failed:", rpcErr);
+        }
+      }
+
+      setBooking(bookingData);
 
       // 2. Fetch Payment Logs Ledger
       const { data: logsData, error: logsError } = await supabase
@@ -97,23 +136,9 @@ export const useBookingDetails = (bookingId: string) => {
           mode: dbPaymentMode, // <-- Send the mapped value here
           loggedBy: userId,
         },
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
-      if (error) {
-        let errorMessage = "Failed to log payment via Edge Function.";
-        if (error instanceof Error) errorMessage = error.message;
-
-        if (error.context && error.context.json) {
-          try {
-            const parsedError = await error.context.json();
-            if (parsedError.error) errorMessage = parsedError.error;
-          } catch (e) {}
-        }
-        throw new Error(errorMessage);
-      }
+      if (error) throw error;
 
       Alert.alert("Success", "Payment logged successfully.");
       await fetchDetails();
@@ -158,8 +183,8 @@ export const useBookingDetails = (bookingId: string) => {
   };
 
   useEffect(() => {
-    if (bookingId) fetchDetails();
-  }, [bookingId, fetchDetails]);
+    fetchDetails();
+  }, [fetchDetails]);
 
   return {
     booking,

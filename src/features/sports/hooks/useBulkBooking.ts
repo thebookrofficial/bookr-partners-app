@@ -61,11 +61,6 @@ export const useBulkBooking = () => {
 
       const { venueId, groundId } = params;
 
-      // console.log("=== DEBUG BULK BOOKING ===");
-      // console.log("Using provided Venue ID:", venueId);
-      // console.log("Using provided Ground ID:", groundId);
-      // console.log("==========================");
-
       if (!venueId || !groundId) throw new Error("Could not resolve Venue or Ground ID.");
 
       const cleanMobile = params.mobile.replace(/[^\d]/g, "");
@@ -111,7 +106,6 @@ export const useBulkBooking = () => {
 
           if (existingSlot) {
             if (existingSlot.status !== "available") {
-              // console.log(`Slot ${d} ${hour} is already taken or ghosted.`);
               continue;
             }
             await supabase.from("sports_slots").update({ status: "booked" }).eq("id", slotId);
