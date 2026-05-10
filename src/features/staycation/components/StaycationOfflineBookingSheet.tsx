@@ -15,22 +15,11 @@ import {
   Share,
 } from "react-native";
 import { Text } from "@/components/ui";
-import {
-  User,
-  Phone,
-  Calendar,
-  ChevronDown,
-  FileText,
-  ChevronRight,
-  Wallet,
-} from "lucide-react-native";
+import { User, Phone, Calendar, ChevronDown, Wallet } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { supabase } from "@/lib/supabase";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { MainStackParamList } from "@/navigation/navigation.types";
 import { useCreateStaycationOfflineBooking } from "../hooks/useCreateStaycationOfflineBooking";
 
 interface StaycationOfflineBookingSheetProps {
@@ -49,7 +38,6 @@ export const StaycationOfflineBookingSheet = ({
   venueId,
 }: StaycationOfflineBookingSheetProps) => {
   const isFarmhouse = activeCategory === "Farmhouse";
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { createBooking, isLoading } = useCreateStaycationOfflineBooking();
 
   const [bookingFor, setBookingFor] = useState(isFarmhouse ? "Farmhouse" : "Cottages");
@@ -74,14 +62,11 @@ export const StaycationOfflineBookingSheet = ({
     title: string;
   } | null>(null);
 
-  const [hasHistory, setHasHistory] = useState(false);
-
   useEffect(() => {
     const lookupGuest = async () => {
       const cleanMobile = phone.replace(/[^\d]/g, "");
 
       if (cleanMobile.length !== 10) {
-        setHasHistory(false);
         return;
       }
 
@@ -131,14 +116,6 @@ export const StaycationOfflineBookingSheet = ({
         if (foundName) {
           setName(foundName);
         }
-
-        const historyOrQuery = guestPhoneOrQuery + (profile?.id ? `,user_id.eq.${profile.id}` : "");
-        const { count, error: historyError } = await supabase
-          .from("staycation_bookings")
-          .select("id", { count: "exact", head: true })
-          .or(historyOrQuery);
-
-        setHasHistory(!historyError && !!count && count > 0);
       } catch (err) {
         console.error("Lookup error:", err);
       }
@@ -516,25 +493,6 @@ Thank you for booking with Bookr!`;
                 </View>
               </View>
 
-              {/* Previous History Button */}
-              {hasHistory && (
-                <TouchableOpacity
-                  style={styles.historyButton}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    onClose();
-                    navigation.navigate("GuestHistory", { guestId: phone, bookingId: "" });
-                  }}>
-                  <View style={styles.historyLeft}>
-                    <FileText size={ms(20)} color={COLORS.text.primary} />
-                    <Text weight="semiBold" style={styles.historyText}>
-                      Previous History
-                    </Text>
-                  </View>
-                  <ChevronRight size={ms(18)} color={COLORS.text.primary} />
-                </TouchableOpacity>
-              )}
-
               {/* Submit Button */}
               <TouchableOpacity
                 style={styles.bookNowButton}
@@ -651,19 +609,6 @@ const styles = StyleSheet.create({
   mutedText: { color: "#8C8C8C" },
   guestCountRight: { flexDirection: "row", alignItems: "center", gap: hs(6) },
   guestCountNum: { fontSize: fs(14), color: COLORS.text.primary },
-  historyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#CBDFFE",
-    borderRadius: ms(10),
-    paddingHorizontal: hs(12),
-    paddingVertical: vs(12),
-    marginTop: vs(8),
-  },
-  historyLeft: { flexDirection: "row", alignItems: "center", gap: hs(8) },
-  historyText: { fontSize: fs(14), color: COLORS.text.primary },
   bookNowButton: {
     backgroundColor: "#000000",
     borderRadius: ms(10),
