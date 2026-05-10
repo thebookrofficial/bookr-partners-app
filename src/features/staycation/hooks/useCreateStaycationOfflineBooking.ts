@@ -118,48 +118,41 @@ export const useCreateStaycationOfflineBooking = () => {
         }
 
         if (targetDates.length > 0) {
-          const { data: rooms } = await supabase
-            .from("staycation_rooms")
-            .select("id")
-            .eq("venue_id", payload.venueId);
+          // Determine if we should block specific rooms or the whole property
+          let targetRoomIds: (string | null)[] = [null];
 
-          const roomIds = rooms && rooms.length > 0 ? rooms.map(r => r.id) : [null];
-
-          const { data: existingAvail } = await supabase
-            .from("staycation_availability")
-            .select("id, room_id, date")
-            .eq("venue_id", payload.venueId)
-            .in("date", targetDates);
-
-          const existingMap = new Set(
-            existingAvail?.map(ea => `${ea.room_id || "null"}_${ea.date}`) || [],
-          );
-
-          const toInsert = [];
-          for (const roomId of roomIds) {
-            for (const date of targetDates) {
-              if (!existingMap.has(`${roomId || "null"}_${date}`)) {
-                toInsert.push({
-                  venue_id: payload.venueId,
-                  room_id: roomId,
-                  date: date,
-                  is_available: false,
-                  is_blocked: true,
-                });
-              }
+          if (bookingTypeValue === "per_room") {
+            const { data: rooms } = await supabase
+              .from("staycation_rooms")
+              .select("id")
+              .eq("venue_id", payload.venueId);
+            if (rooms && rooms.length > 0) {
+              targetRoomIds = rooms.map(r => r.id);
             }
           }
 
-          if (toInsert.length > 0) {
-            await supabase.from("staycation_availability").insert(toInsert);
+          // Use an UPSERT to handle both inserting new blocks and updating existing availability
+          const upsertData = [];
+          for (const roomId of targetRoomIds) {
+            for (const date of targetDates) {
+              upsertData.push({
+                venue_id: payload.venueId,
+                room_id: roomId,
+                date: date,
+                is_available: false,
+                is_blocked: true,
+              });
+            }
           }
 
-          if (existingAvail && existingAvail.length > 0) {
-            const existingIds = existingAvail.map(ea => ea.id);
-            await supabase
+          if (upsertData.length > 0) {
+            const { error: upsertErr } = await supabase
               .from("staycation_availability")
-              .update({ is_blocked: true, is_available: false })
-              .in("id", existingIds);
+              .upsert(upsertData, {
+                onConflict: "venue_id, room_id, date",
+              });
+
+            if (upsertErr) console.error("Upsert Availability Error:", upsertErr);
           }
         }
       } catch (avErr) {

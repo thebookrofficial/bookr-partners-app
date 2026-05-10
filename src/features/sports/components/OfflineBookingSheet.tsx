@@ -185,11 +185,13 @@ export const OfflineBookingSheet = ({
       }
 
       try {
-        const { foundName, hasHistory } = await SportsService.lookupGuestProfile(cleanMobile);
+        const { foundName, hasHistory: profileHasHistory } = await SportsService.lookupGuestProfile(
+          cleanMobile,
+        );
 
         // Only update if we actually found something to avoid clearing manual typing
         if (foundName) setName(foundName);
-        setHasHistory(hasHistory);
+        setHasHistory(profileHasHistory);
       } catch (err) {
         console.error("Sheet lookup error:", err);
         setHasHistory(false);

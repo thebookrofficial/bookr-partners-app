@@ -79,6 +79,8 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
           phone: bookingData.guest_phone || profile?.phone || "N/A",
           avatarUrl: profile?.avatar_url,
           amount: totalAmount.toString(),
+          paidAmount: paidAmount,
+          totalAmount: totalAmount,
           status: statusTag,
           checkIn: bookingData.check_in_date,
           checkOut: bookingData.check_out_date,

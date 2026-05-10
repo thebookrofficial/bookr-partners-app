@@ -3,18 +3,34 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { SportsService } from "../services/sports.service";
 
 export interface HistoryBooking {
   id: string;
-  ground_name: string;
-  slot_date: string;
-  start_time: string;
-  end_time: string;
+  vertical: "sports" | "staycation";
+  venue_name: string;
+  raw_date: string;
+  display_date: string;
+  display_time: string;
   total_amount: number;
-  status: "Online" | "Offline";
+  status: string;
   booking_status: "past" | "upcoming" | "cancelled";
 }
+
+// Helpers for unified formatting
+const formatDisplayDate = (dateStr: string) => {
+  return new Date(dateStr).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const formatTime = (timeStr: string) => {
+  const [h] = timeStr.split(":");
+  const hourInt = parseInt(h, 10);
+  return `${hourInt % 12 || 12} ${hourInt >= 12 ? "Pm" : "Am"}`;
+};
 
 export const useGuestHistory = (identifier: string) => {
   const [history, setHistory] = useState<HistoryBooking[]>([]);
@@ -28,105 +44,92 @@ export const useGuestHistory = (identifier: string) => {
     setLoading(true);
     try {
       let phone = identifier;
-      let resolvedGuestName = "";
+      let profileId = "00000000-0000-0000-0000-000000000000";
 
-      // 1. If identifier looks like a UUID, it's likely a bookingId
-      // We need to resolve the guest phone and name from the booking first
+      // 1. Resolve UUID back to phone/user_id
       if (identifier.length === 36 && identifier.includes("-")) {
-        const { data: bookingData } = await supabase
+        const { data: sportsBooking } = await supabase
           .from("sports_bookings")
-          .select(
-            "guest_name, guest_phone, user_id, venue_id, profiles(phone), sports_slots(ground_id, slot_date)",
-          )
+          .select("guest_phone, user_id, profiles(phone)")
           .eq("id", identifier)
-          .single();
+          .maybeSingle();
 
-        if (bookingData) {
-          // profiles might be returned as an object or an array depending on schema inference
-          let profilePhone = Array.isArray(bookingData.profiles)
-            ? bookingData.profiles[0]?.phone
-            : (bookingData.profiles as any)?.phone;
+        if (sportsBooking) {
+          const pPhone = Array.isArray(sportsBooking.profiles)
+            ? sportsBooking.profiles[0]?.phone
+            : (sportsBooking.profiles as any)?.phone;
+          phone = sportsBooking.guest_phone || pPhone || identifier;
+          profileId = sportsBooking.user_id || profileId;
+        } else {
+          const { data: stayBooking } = await supabase
+            .from("staycation_bookings")
+            .select("guest_phone, user_id, profiles(phone)")
+            .eq("id", identifier)
+            .maybeSingle();
 
-          // SECURE FALLBACK: If join failed for an online booking, resolve via RPC
-          if (!profilePhone && bookingData.user_id) {
-            try {
-              const rpcBookings = await SportsService.getBookings(
-                bookingData.venue_id,
-                (bookingData.sports_slots as any).ground_id,
-                (bookingData.sports_slots as any).slot_date,
-              );
-              const matched = rpcBookings.find((b: any) => b.id === identifier);
-              if (matched) {
-                profilePhone = matched.phone;
-                resolvedGuestName = matched.full_name;
-              }
-            } catch (rpcErr) {
-              console.warn("History UUID fallback failed:", rpcErr);
-            }
+          if (stayBooking) {
+            const pPhone = Array.isArray(stayBooking.profiles)
+              ? stayBooking.profiles[0]?.phone
+              : (stayBooking.profiles as any)?.phone;
+            phone = stayBooking.guest_phone || pPhone || identifier;
+            profileId = stayBooking.user_id || profileId;
           }
-
-          phone = bookingData.guest_phone || profilePhone || identifier;
-          resolvedGuestName = resolvedGuestName || bookingData.guest_name || "";
         }
       }
 
       setGuestPhone(phone);
 
-      // 2. Find if a profile exists for this phone
+      // 2. Resolve Profile Data
+      let finalProfileId = profileId;
       const { data: profileData } = await supabase
         .from("profiles")
         .select("id, full_name")
         .eq("phone", phone)
         .maybeSingle();
 
-      // 3. Build the query for bookings
-      const { data, error } = await supabase
-        .from("sports_bookings")
-        .select(
-          `
-          id, guest_name, guest_phone, total_amount, platform_fee, 
-          gateway_fee, booking_status,
-          sports_slots!inner (
-            slot_date, start_time, end_time,
-            sports_grounds ( name )
-          )
-        `,
-        )
-        .or(
-          `guest_phone.eq.${phone},user_id.eq.${
-            profileData?.id || "00000000-0000-0000-0000-000000000000"
-          }`,
-        )
-        .order("sports_slots(slot_date)", { ascending: false });
-
-      if (error) throw error;
-
-      // 3. Resolve Global Guest Name for Header
-      if (profileData?.full_name) {
+      if (profileData) {
+        finalProfileId = profileData.id;
         setGuestName(profileData.full_name);
-      } else if (resolvedGuestName) {
-        setGuestName(resolvedGuestName);
-      } else if (data && data.length > 0) {
-        // FALLBACK: Use the guest_name from the most recent booking
-        const manualName = data.find(b => b.guest_name)?.guest_name;
-        if (manualName) setGuestName(manualName);
       }
+
+      // 3. Fetch BOTH Verticals in Parallel
+      const [sportsRes, staycationRes] = await Promise.all([
+        supabase
+          .from("sports_bookings")
+          .select(
+            `
+            id, guest_name, total_amount, platform_fee, gateway_fee, booking_status,
+            sports_slots!inner ( slot_date, start_time, end_time, sports_grounds ( name ) )
+          `,
+          )
+          .or(`guest_phone.eq.${phone},user_id.eq.${finalProfileId}`),
+
+        supabase
+          .from("staycation_bookings")
+          .select(
+            `
+            id, guest_name, total_amount, platform_fee, gateway_fee, booking_status, check_in_date, check_out_date,
+            venues ( name )
+          `,
+          )
+          .or(`guest_phone.eq.${phone},user_id.eq.${finalProfileId}`),
+      ]);
 
       const now = new Date();
       let pastCount = 0,
         upcomingCount = 0,
         cancelledCount = 0;
+      const allBookings: HistoryBooking[] = [];
 
-      const formatted: HistoryBooking[] = (data || []).map((b: any) => {
+      // Process Sports Bookings
+      (sportsRes.data || []).forEach((b: any) => {
+        if (!profileData?.full_name && b.guest_name) setGuestName(b.guest_name);
+
         const slotDate = new Date(b.sports_slots.slot_date);
         const isOffline = b.platform_fee === 0 && b.gateway_fee === 0;
-        const displayName = profileData?.full_name || b.guest_name || "Guest User";
+        const isCancelled = b.booking_status?.toLowerCase() === "cancelled";
 
         let type: "past" | "upcoming" | "cancelled" = "past";
-        const isCancelled =
-          b.booking_status?.toLowerCase() === "cancelled" ||
-          b.status?.toLowerCase() === "cancelled";
-
         if (isCancelled) {
           type = "cancelled";
           cancelledCount++;
@@ -137,21 +140,61 @@ export const useGuestHistory = (identifier: string) => {
           pastCount++;
         }
 
-        return {
+        allBookings.push({
           id: b.id,
-          display_name: displayName,
-          display_phone: b.profiles?.phone || b.guest_phone || phone,
-          ground_name: b.sports_slots.sports_grounds?.name || "Ground",
-          slot_date: b.sports_slots.slot_date,
-          start_time: b.sports_slots.start_time,
-          end_time: b.sports_slots.end_time,
+          vertical: "sports",
+          venue_name: b.sports_slots.sports_grounds?.name || "Sports Ground",
+          raw_date: b.sports_slots.slot_date,
+          display_date: formatDisplayDate(b.sports_slots.slot_date),
+          display_time: `${formatTime(b.sports_slots.start_time)} - ${formatTime(
+            b.sports_slots.end_time,
+          )}`,
           total_amount: b.total_amount,
           status: isOffline ? "Offline" : "Online",
           booking_status: type,
-        };
+        });
       });
 
-      setHistory(formatted);
+      // Process Staycation Bookings
+      (staycationRes.data || []).forEach((b: any) => {
+        if (!profileData?.full_name && b.guest_name) setGuestName(b.guest_name);
+
+        const slotDate = new Date(b.check_in_date);
+        const isOnline = (parseFloat(b.platform_fee) || 0) > 0;
+        const isCancelled = b.booking_status?.toLowerCase() === "cancelled";
+
+        let type: "past" | "upcoming" | "cancelled" = "past";
+        if (isCancelled) {
+          type = "cancelled";
+          cancelledCount++;
+        } else if (slotDate > now) {
+          type = "upcoming";
+          upcomingCount++;
+        } else {
+          pastCount++;
+        }
+
+        const venueObj = Array.isArray(b.venues) ? b.venues[0] : b.venues;
+
+        allBookings.push({
+          id: b.id,
+          vertical: "staycation",
+          venue_name: venueObj?.name || "Staycation Venue",
+          raw_date: b.check_in_date,
+          display_date: `${formatDisplayDate(b.check_in_date)} - ${formatDisplayDate(
+            b.check_out_date,
+          )}`,
+          display_time: `Staycation`,
+          total_amount: b.total_amount,
+          status: isOnline ? "Online" : "Offline",
+          booking_status: type,
+        });
+      });
+
+      // Sort heavily by date descending
+      allBookings.sort((a, b) => new Date(b.raw_date).getTime() - new Date(a.raw_date).getTime());
+
+      setHistory(allBookings);
       setStats({ past: pastCount, upcoming: upcomingCount, cancelled: cancelledCount });
     } catch (err) {
       console.error("History fetch error:", err);
