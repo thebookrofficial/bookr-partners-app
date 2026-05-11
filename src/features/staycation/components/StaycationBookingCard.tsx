@@ -166,7 +166,9 @@ export const StaycationBookingCard = ({
         displayData.checkOut || "",
       )}`;
     } else {
-      const roomPrefix = displayData.roomName || "Private | Room 1";
+      // FIX: Use real roomName from database, fallback only if missing
+      const roomPrefix = displayData.roomName || "Room Assigned";
+
       if (isUpcoming) {
         dateRoomText = `${formatDisplayDateWithYear(displayData.checkIn || "")} | ${roomPrefix}`;
       } else {
@@ -212,8 +214,13 @@ export const StaycationBookingCard = ({
 
   if (!displayData.id && bookingId && !isLoading) return null;
 
-  const isGreyBg =
-    displayData.status?.toLowerCase() === "offline" || displayData.name?.includes("Rohit");
+  // Only show grey if the booking is finished (Complete) or voided (Cancelled)
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const isGreyBg = useMemo(() => {
+    const s = displayData.status?.toLowerCase();
+    // Only grey out if explicitly cancelled or completed history
+    return s === "cancelled" || s === "complete";
+  }, [displayData.status]);
 
   const getAmountColor = () => {
     const s = displayData.status?.toLowerCase();

@@ -7,6 +7,7 @@ import { useAuthStore } from "../../../store";
 
 interface CreateOfflineBookingPayload {
   venueId: string;
+  roomId?: string | null;
   guestName: string;
   guestPhone: string;
   checkInDate: Date;
@@ -81,6 +82,7 @@ export const useCreateStaycationOfflineBooking = () => {
       const { error: insertError } = await supabase.from("staycation_bookings").insert({
         user_id: userId,
         venue_id: payload.venueId,
+        room_id: payload.roomId || null,
         booking_type: bookingTypeValue,
         check_in_date: checkInStr,
         check_out_date: checkOutStr,

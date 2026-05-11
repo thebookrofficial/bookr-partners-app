@@ -70,6 +70,8 @@ export const useEventDashboard = (serviceId: string) => {
         if (!event) {
           console.warn("EventDashboard: No event found for ID:", serviceId);
           setDashboardData(null);
+          setLoading(false);
+          setRefreshing(false);
           return;
         }
 

@@ -20,6 +20,7 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { StaycationBooking } from "../types/staycation.types";
 import { useStaycationResort } from "../hooks/useStaycationResort";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -27,9 +28,15 @@ interface StaycationResortContentProps {
   initialVenueId?: string;
 }
 
-type ListEntry = { type: "header"; title: string } | { type: "booking"; data: StaycationBooking };
+type ListEntry =
+  | { type: "header"; title: string }
+  | { type: "booking"; data: StaycationBooking; sectionTitle: string };
 
 export const StaycationResortContent = ({ initialVenueId }: StaycationResortContentProps) => {
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // PASS SELECTED DATE TO HOOK
   const {
     isLoading,
     groupedBookings,
@@ -40,11 +47,18 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
     rooms,
     roomsFilled,
     cancelBooking,
-  } = useStaycationResort(initialVenueId);
+  } = useStaycationResort(initialVenueId, selectedDate);
 
   const [activeRoomType, setActiveRoomType] = useState<string>("All");
   const [activeRoomStatus, setActiveRoomStatus] = useState<"Check Outs" | "Bookings">("Check Outs");
   const [isOfflineSheetVisible, setIsOfflineSheetVisible] = useState(false);
+
+  const onDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    setShowDatePicker(false);
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
 
   const handleCancel = (id: string) => {
     Alert.alert("Cancel Booking", "Are you sure you want to cancel this booking?", [
@@ -76,23 +90,31 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
     groupedBookings.forEach(section => {
       let filteredBookings = section.data;
 
-      // Apply room type filter
       if (activeRoomType !== "All") {
         filteredBookings = filteredBookings.filter(b => b.roomName?.includes(activeRoomType));
       }
 
-      // Apply status filter
-      const sectionsToShow =
-        activeRoomStatus === "Check Outs"
-          ? ["Check outs", "Upcoming Bookings"]
-          : ["Today's Bookings", "Upcoming Bookings"];
+      // Determine which sections to show based on the active tab (Today vs Upcoming)
+      // "Check Outs" status represents the "Today" tab
+      // "Bookings" status represents the "Upcoming" tab
+      const isTargetSection =
+        section.title.includes("Today") || section.title.includes("Bookings for");
+      const isCheckOutSection = section.title.toLowerCase().includes("check out");
+      const isUpcomingSection = section.title.includes("Upcoming");
 
-      if (!sectionsToShow.includes(section.title)) return;
+      let shouldShow = false;
+      if (activeRoomStatus === "Check Outs") {
+        // Today tab: Show Check-outs and Today's Bookings (Check-ins)
+        shouldShow = isCheckOutSection || isTargetSection;
+      } else {
+        // Upcoming tab: Show only Upcoming Bookings
+        shouldShow = isUpcomingSection;
+      }
 
-      if (filteredBookings.length > 0) {
+      if (shouldShow && filteredBookings.length > 0) {
         data.push({ type: "header", title: section.title });
         filteredBookings.forEach(b => {
-          data.push({ type: "booking", data: b });
+          data.push({ type: "booking", data: b, sectionTitle: section.title });
         });
       }
     });
@@ -102,37 +124,45 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
   const renderItem = ({ item }: { item: ListEntry }) => {
     if (item.type === "header") {
+      // Map backend titles to Figma design titles
+      let displayTitle = item.title;
+      if (item.title.toLowerCase().includes("check out")) {
+        displayTitle = "Check-Out";
+      } else if (item.title.includes("Today") || item.title.includes("Bookings for")) {
+        displayTitle = "Check-In";
+      }
+
       return (
         <View style={[styles.sectionHeader, { marginTop: vs(10) }]}>
           <View style={styles.headerRow}>
-            <Text style={styles.sectionTitle}>{item.title}</Text>
+            <Text style={styles.sectionTitle}>{displayTitle}</Text>
           </View>
         </View>
       );
     }
 
-    const isUpcomingSection =
-      item.type === "booking" &&
-      flatListData.some(
-        (e, idx) =>
-          e.type === "header" &&
-          e.title === "Upcoming Bookings" &&
-          flatListData.indexOf(item) > idx,
-      );
+    const selectedDateStr = selectedDate.toISOString().split("T")[0];
+    const isCheckOutSection = item.sectionTitle.toLowerCase().includes("check out");
+    const isUpcoming = item.data.checkIn !== selectedDateStr || isCheckOutSection;
 
     return (
       <StaycationBookingCard
         bookingId={item.data.id}
         isFarmhouse={false}
-        isUpcoming={isUpcomingSection}
+        isUpcoming={isUpcoming}
         onCancelPress={handleCancel}
         {...item.data}
+        checkIn={isCheckOutSection ? item.data.checkOut : item.data.checkIn}
       />
     );
   };
 
-  const listHeader = useMemo(
-    () => (
+  const listHeader = useMemo(() => {
+    // Determine label for the date picker
+    const isToday = new Date().toDateString() === selectedDate.toDateString();
+    const dateLabel = isToday ? "(Today)" : "";
+
+    return (
       <View style={styles.headerContainer}>
         <StaycationHeader
           title={activeVenue?.name || "Staycation Venue"}
@@ -225,17 +255,20 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
               })}
             </View>
 
-            <View style={styles.dateRight}>
+            <TouchableOpacity
+              style={styles.dateRight}
+              activeOpacity={0.7}
+              onPress={() => setShowDatePicker(true)}>
               <Text weight="semiBold" style={styles.todayText}>
-                {new Date().toLocaleDateString("en-GB", {
+                {selectedDate.toLocaleDateString("en-GB", {
                   day: "2-digit",
                   month: "short",
                   year: "numeric",
                 })}{" "}
-                (Today)
+                {dateLabel}
               </Text>
               <CalendarIcon size={ms(16)} color={COLORS.text.primary} />
-            </View>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.roomsFilledContainer}>
@@ -247,18 +280,28 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
             </Text>
           </View>
         </View>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="default"
+            onChange={onDateChange}
+          />
+        )}
       </View>
-    ),
-    [
-      venues,
-      activeVenue,
-      activeRoomType,
-      activeRoomStatus,
-      roomTypeOptions,
-      roomsFilled,
-      setActiveVenueId,
-    ],
-  );
+    );
+  }, [
+    venues,
+    activeVenue,
+    activeRoomType,
+    activeRoomStatus,
+    roomTypeOptions,
+    roomsFilled,
+    selectedDate,
+    showDatePicker,
+    setActiveVenueId,
+  ]);
 
   return (
     <View style={styles.root}>
@@ -306,47 +349,28 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
   );
 };
 
+// ... keep your existing styles ...
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  headerContainer: {
-    paddingTop: vs(10),
-  },
+  root: { flex: 1, backgroundColor: COLORS.background },
+  headerContainer: { paddingTop: vs(10) },
   bookingsTabsRow: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: vs(15),
-    gap: hs(240),
+    gap: hs(10),
     minHeight: vs(40),
   },
-  bookingsHeaderText: {
-    fontSize: fs(16),
-    color: COLORS.text.primary,
-  },
-  typeTabs: {
-    flex: 1,
-    marginVertical: 0,
-  },
-  roomsFiltersContainer: {
-    gap: vs(12),
-    marginBottom: vs(10),
-  },
+  bookingsHeaderText: { fontSize: fs(16), color: COLORS.text.primary, marginRight: hs(10) },
+  typeTabs: { flex: 1, marginVertical: 0 },
+  roomsFiltersContainer: { gap: vs(12), marginBottom: vs(10) },
   typesToggleContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: vs(4),
   },
-  typesToggleLabel: {
-    fontSize: fs(16),
-    color: COLORS.text.primary,
-  },
-  typesSegmentedControl: {
-    flexDirection: "row",
-    gap: hs(6),
-  },
+  typesToggleLabel: { fontSize: fs(16), color: COLORS.text.primary },
+  typesSegmentedControl: { flexDirection: "row", gap: hs(6) },
   typeSegment: {
     borderRadius: ms(10),
     paddingHorizontal: hs(14),
@@ -355,69 +379,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minWidth: hs(50),
   },
-  typeSegmentActive: {
-    backgroundColor: "#282828",
-  },
-  typeSegmentInactive: {
-    backgroundColor: "#F4F7FC",
-  },
-  typeTextWrapper: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  typeSegmentText: {
-    fontSize: fs(12),
-  },
-  typeSegmentTextActive: {
-    color: "white",
-  },
-  typeSegmentTextInactive: {
-    color: "#8C8C8C",
-  },
+  typeSegmentActive: { backgroundColor: "#282828" },
+  typeSegmentInactive: { backgroundColor: "#F4F7FC" },
+  typeTextWrapper: { alignItems: "center", justifyContent: "center" },
+  typeSegmentText: { fontSize: fs(12) },
+  typeSegmentTextActive: { color: "white" },
+  typeSegmentTextInactive: { color: "#8C8C8C" },
   statusDateRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: vs(8),
   },
-  statusPills: {
-    flexDirection: "row",
-    gap: hs(6),
-  },
-  statusPill: {
-    paddingHorizontal: hs(14),
-    paddingVertical: vs(8),
-    borderRadius: ms(6),
-  },
-  statusPillActive: {
-    backgroundColor: "#F4F7FC",
-    borderWidth: 1,
-    borderColor: "#63A1FD",
-  },
-  statusPillInactive: {
-    backgroundColor: "#F4F7FC",
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  statusPillText: {
-    fontSize: fs(14),
-    textTransform: "capitalize",
-  },
-  statusPillTextActive: {
-    color: "#63A1FD",
-  },
-  statusPillTextInactive: {
-    color: COLORS.text.primary,
-  },
+  statusPills: { flexDirection: "row", gap: hs(6) },
+  statusPill: { paddingHorizontal: hs(14), paddingVertical: vs(8), borderRadius: ms(6) },
+  statusPillActive: { backgroundColor: "#F4F7FC", borderWidth: 1, borderColor: "#63A1FD" },
+  statusPillInactive: { backgroundColor: "#F4F7FC", borderWidth: 1, borderColor: "transparent" },
+  statusPillText: { fontSize: fs(14), textTransform: "capitalize" },
+  statusPillTextActive: { color: "#63A1FD" },
+  statusPillTextInactive: { color: COLORS.text.primary },
   dateRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: hs(6),
+    backgroundColor: "#F4F7FC",
+    padding: ms(8),
+    borderRadius: ms(8),
   },
-  todayText: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
+  todayText: { fontSize: fs(14), color: COLORS.text.primary },
   roomsFilledContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -425,18 +414,9 @@ const styles = StyleSheet.create({
     marginTop: vs(4),
     paddingHorizontal: hs(4),
   },
-  roomsFilledLabel: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
-  roomsFilledValue: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
-  sectionHeader: {
-    marginTop: vs(10),
-    marginBottom: vs(5),
-  },
+  roomsFilledLabel: { fontSize: fs(14), color: COLORS.text.primary },
+  roomsFilledValue: { fontSize: fs(14), color: COLORS.text.primary },
+  sectionHeader: { marginTop: vs(10), marginBottom: vs(5) },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -449,28 +429,13 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
     textTransform: "capitalize",
   },
-  listContent: {
-    paddingBottom: vs(20),
-  },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: vs(100),
-  },
-  emptyContainer: {
-    padding: ms(32),
-    alignItems: "center",
-    marginTop: vs(20),
-  },
-  emptyText: {
-    color: COLORS.text.muted,
-    fontFamily: "Gilroy-Medium",
-    textAlign: "center",
-  },
+  listContent: { paddingBottom: vs(20) },
+  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center", marginTop: vs(100) },
+  emptyContainer: { padding: ms(32), alignItems: "center", marginTop: vs(20) },
+  emptyText: { color: COLORS.text.muted, fontFamily: "Gilroy-Medium", textAlign: "center" },
   fab: {
     position: "absolute",
-    right: hs(0),
+    right: hs(16),
     bottom: vs(65),
     width: ms(60),
     height: ms(60),
@@ -478,6 +443,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#63A1FD",
     justifyContent: "center",
     alignItems: "center",
-    boxShadow: "0px 5px 5px rgba(0, 0, 0, 0.16)",
+    elevation: 5,
   },
 });

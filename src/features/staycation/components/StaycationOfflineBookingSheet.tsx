@@ -62,6 +62,34 @@ export const StaycationOfflineBookingSheet = ({
     title: string;
   } | null>(null);
 
+  const [availableRooms, setAvailableRooms] = useState<{ id: string; name: string }[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible && !isFarmhouse && venueId) {
+      const fetchVenueRooms = async () => {
+        const { data } = await supabase
+          .from("staycation_rooms")
+          .select("id, room_name, room_number")
+          .eq("venue_id", venueId)
+          .eq("is_active", true);
+
+        if (data) {
+          const mapped = data.map(r => ({
+            id: r.id,
+            name: `${r.room_name} (${r.room_number})`,
+          }));
+          setAvailableRooms(mapped);
+          if (mapped.length > 0) {
+            setRoomType(mapped[0].name);
+            setSelectedRoomId(mapped[0].id);
+          }
+        }
+      };
+      fetchVenueRooms();
+    }
+  }, [visible, isFarmhouse, venueId]);
+
   useEffect(() => {
     const lookupGuest = async () => {
       const cleanMobile = phone.replace(/[^\d]/g, "");
@@ -136,7 +164,14 @@ export const StaycationOfflineBookingSheet = ({
   const handleDropdownSelect = (option: string) => {
     if (!activeDropdown) return;
     if (activeDropdown.type === "bookingFor") setBookingFor(option);
-    if (activeDropdown.type === "roomType") setRoomType(option);
+
+    // UPDATED: If selecting a room, find its ID from our state
+    if (activeDropdown.type === "roomType") {
+      setRoomType(option);
+      const roomObj = availableRooms.find(r => r.name === option);
+      if (roomObj) setSelectedRoomId(roomObj.id);
+    }
+
     if (activeDropdown.type === "guestCount") setGuestCount(option);
     if (activeDropdown.type === "groupType") setGroupType(option);
     setActiveDropdown(null);
@@ -170,6 +205,7 @@ export const StaycationOfflineBookingSheet = ({
       advancePaid: parseFloat(advancePaid) || 0,
       bookingType: bookingFor.toLowerCase(),
       roomType: isFarmhouse ? undefined : roomType,
+      roomId: isFarmhouse ? undefined : selectedRoomId,
       groupType: isFarmhouse ? groupType : undefined,
     });
 
@@ -322,7 +358,7 @@ Thank you for booking with Bookr!`;
                     onPress={() =>
                       setActiveDropdown({
                         type: "roomType",
-                        options: ["Private Room", "Deluxe Room"],
+                        options: availableRooms.map(r => r.name),
                         title: "Select Room Type",
                       })
                     }>

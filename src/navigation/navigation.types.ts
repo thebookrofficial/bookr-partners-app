@@ -79,6 +79,7 @@ export type MainStackParamList = {
   DineOffers: { serviceId: string };
   EventOffers: { serviceId: string };
   EventGuestInvite: { serviceId: string };
+  EventEntryDetails: { entryId: string };
   GuestHistory: { bookingId: string; guestId?: string };
   BlockUnblock: { venueId: string; groundId: string };
   BulkBooking: { venueId: string; groundId: string };
