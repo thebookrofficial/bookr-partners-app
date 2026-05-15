@@ -15,10 +15,10 @@ export type AuthStackParamList = {
 
 // 2. Define the Bottom Tab screens for Sports
 export type SportsTabParamList = {
-  SportsHome: { serviceId: string };
-  SportsHistory: { serviceId: string };
-  SportsDashboard: { serviceId: string };
-  SportsEssentials: { serviceId: string };
+  SportsHome: { serviceId: string; category?: string };
+  SportsHistory: { serviceId: string; category?: string };
+  SportsDashboard: { serviceId: string; category?: string };
+  SportsEssentials: { serviceId: string; category?: string };
   SportsProfile: undefined;
   BlockUnblock: { venueId: string; groundId: string };
 };

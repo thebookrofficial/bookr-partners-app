@@ -5,25 +5,19 @@ import { supabase } from "@/lib/supabase";
 
 export const SportsService = {
   // --- HOME SCREEN FETCHES ---
-  async getVenueDetails(initialVenueId: string, dbSportType: string) {
-    const { data: initialVenue, error: initialError } = await supabase
+  // --- HOME SCREEN FETCHES ---
+  async getVenueDetails(initialVenueId: string, _dbSportType: string) {
+    // CRITICAL FIX: We no longer try to "find" a venue based on the category string.
+    // We strictly load the exact Venue ID that the user clicked on the dashboard!
+    const { data: venue, error } = await supabase
       .from("venues")
-      .select("owner_id")
+      .select(`id, name, vertical, cover_image_url, owner_id, sports_venues ( sports_type )`)
       .eq("id", initialVenueId)
       .single();
 
-    if (initialError || !initialVenue) throw initialError || new Error("Owner not found");
+    if (error || !venue) throw error || new Error("Venue not found");
 
-    const { data: matchedVenue, error: matchedError } = await supabase
-      .from("venues")
-      .select(`id, name, vertical, cover_image_url, sports_venues!inner ( sports_type )`)
-      .eq("owner_id", initialVenue.owner_id)
-      .eq("sports_venues.sports_type", dbSportType)
-      .limit(1)
-      .maybeSingle();
-
-    if (matchedError) throw matchedError;
-    return { initialVenue, matchedVenue };
+    return { initialVenue: venue, matchedVenue: venue };
   },
 
   async getAllVendorSportsCategories(ownerId: string) {
@@ -58,16 +52,53 @@ export const SportsService = {
     return data;
   },
 
-  // Inside getBookings function
+  // CRITICAL FIX: Replaced RPC with a robust Supabase relational query
   async getBookings(venueId: string, groundId: string, dateStr: string) {
-    const { data, error } = await supabase.rpc("fetch_venue_bookings_with_profiles", {
-      p_venue_id: venueId,
-      p_ground_id: groundId,
-      p_date: dateStr,
-    });
+    const { data, error } = await supabase
+      .from("sports_bookings")
+      .select(
+        `
+        id, user_id, venue_id, slot_id, booking_status, subtotal, discount_amount, platform_fee, gateway_fee, total_amount, vendor_payout, paid_amount, guest_name, guest_phone, notes, created_at,
+        profiles ( full_name, phone, avatar_url ),
+        sports_slots!inner ( id, start_time, end_time, slot_date, status, ground_id )
+      `,
+      )
+      .eq("venue_id", venueId)
+      .eq("sports_slots.ground_id", groundId)
+      .eq("sports_slots.slot_date", dateStr);
 
     if (error) throw error;
-    return data || [];
+
+    return (data || [])
+      .filter((b: any) => {
+        const bookingStatus = (b.booking_status || "").toLowerCase().trim();
+        const slot = Array.isArray(b.sports_slots) ? b.sports_slots[0] : b.sports_slots;
+        const slotStatus = (slot?.status || "").toLowerCase().trim();
+
+        // Exclude cancelled/refunded bookings
+        if (bookingStatus === "cancelled" || bookingStatus === "refunded") return false;
+
+        // The Magic Bullet: If the slot was released (available), this booking is dead. Remove it.
+        if (slotStatus === "available") return false;
+
+        return true;
+      })
+      .map((b: any) => {
+        // Flatten the relationships to match what `useSportsHome.ts` expects
+        const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
+        const slot = Array.isArray(b.sports_slots) ? b.sports_slots[0] : b.sports_slots;
+
+        return {
+          ...b,
+          full_name: profile?.full_name,
+          phone: profile?.phone,
+          avatar_url: profile?.avatar_url,
+          start_time: slot?.start_time,
+          end_time: slot?.end_time,
+          slot_date: slot?.slot_date,
+          slot_status: slot?.status,
+        };
+      });
   },
 
   // --- OFFLINE BOOKING FETCHES & MUTATIONS ---
@@ -110,7 +141,6 @@ export const SportsService = {
     ];
 
     try {
-      // 1. Parallel Lookup
       const [profileResult, manualBookingResult] = await Promise.all([
         supabase.rpc("lookup_user_by_phone", { search_phones: phoneVariants }).maybeSingle(),
         supabase
@@ -123,7 +153,6 @@ export const SportsService = {
           .maybeSingle(),
       ]);
 
-      // TYPE FIX: Explicitly cast the responses so TypeScript knows what fields exist
       const profile = profileResult.data as { id: string; full_name: string; phone: string } | null;
       const manualBooking = manualBookingResult.data as {
         guest_name: string;
@@ -131,10 +160,7 @@ export const SportsService = {
         user_id: string;
       } | null;
 
-      // Priority: 1. Profiles table, 2. Previous guest_name column
       let foundName = profile?.full_name || manualBooking?.guest_name || "";
-
-      // 2. Comprehensive History Check
       let historyCount = 0;
 
       if (profile?.id) {
@@ -152,11 +178,7 @@ export const SportsService = {
 
       historyCount += guestCount || 0;
 
-      return {
-        profile,
-        foundName,
-        hasHistory: historyCount > 0,
-      };
+      return { profile, foundName, hasHistory: historyCount > 0 };
     } catch (err) {
       console.error("Critical Lookup Failure:", err);
       return { profile: null, foundName: "", hasHistory: false };
@@ -174,7 +196,6 @@ export const SportsService = {
     guestName: string;
     guestPhone: string;
   }) {
-    // 1. Check/Insert Slot
     const { data: newSlot, error: insertError } = await supabase
       .from("sports_slots")
       .insert({
@@ -191,6 +212,7 @@ export const SportsService = {
 
     let slotId = newSlot?.id;
 
+    // If insertion failed (e.g., slot already exists), fetch the existing slot
     if (insertError || !slotId) {
       const { data: foundSlot } = await supabase
         .from("sports_slots")
@@ -202,15 +224,15 @@ export const SportsService = {
         .eq("end_time", params.endTime24)
         .single();
 
-      if (foundSlot?.status !== "available" && !insertError) {
-        throw new Error("This slot is already taken.");
+      // CRITICAL FIX: Removed the buggy `&& !insertError` check
+      if (foundSlot && foundSlot.status !== "available") {
+        throw new Error("This slot is already taken or blocked.");
       }
       slotId = foundSlot?.id;
     }
 
     if (!slotId) throw new Error("Could not resolve Slot ID.");
 
-    // 2. Insert Booking - CRITICAL FIX: user_id is now explicitly null for manual bookings
     const { data: booking, error: bookingError } = await supabase
       .from("sports_bookings")
       .insert({

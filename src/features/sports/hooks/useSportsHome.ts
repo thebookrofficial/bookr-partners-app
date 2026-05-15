@@ -75,6 +75,13 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
   const [bookings, setBookings] = useState<BookingData[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
 
+  // Auto-select the first available category if the current one isn't valid for this vendor
+  useEffect(() => {
+    if (availableCategories.length > 0 && !availableCategories.includes(category)) {
+      // NOTE: This might be where the forced override is happening!
+    }
+  }, [availableCategories, category, initialVenueId]);
+
   const fetchVenueDetails = useCallback(async () => {
     setLoading(true);
     try {
@@ -145,9 +152,12 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         const displayHour = hourInt % 12 || 12;
         const displayMins = startMStr === "00" ? "" : `:${startMStr}`;
 
-        const booking = slot.sports_bookings?.[0];
-        const isCancelled = booking?.booking_status === "cancelled";
-        const isManual = booking && !isCancelled ? !booking.user_id : false;
+        // Ensure we don't mark slot as manual if the ONLY booking inside it is cancelled
+        const validBooking = slot.sports_bookings?.find((b: any) => {
+          const bStatus = (b.booking_status || "").toLowerCase().trim();
+          return bStatus !== "cancelled" && bStatus !== "refunded";
+        });
+        const isManual = validBooking ? !validBooking.user_id : false;
 
         const startH = parseInt(startHStr, 10);
         const startM = parseInt(startMStr, 10);
@@ -186,16 +196,21 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
 
       const formattedBookings: BookingData[] = (bookingsData || [])
         .filter((b: any) => {
-          const bookingStatus = b.booking_status?.toLowerCase();
-          const status = b.status?.toLowerCase();
-          const slotStatus = b.slot_status?.toLowerCase();
+          const bookingStat = b.booking_status?.toLowerCase().trim();
+          const oldStat = b.status?.toLowerCase().trim();
+          const sltStat = b.slot_status?.toLowerCase().trim();
 
-          // Robust Cancellation Check:
-          // 1. booking_status explicitly says 'cancelled'
-          // 2. OR status explicitly says 'cancelled'
-          // 3. OR the associated slot is now 'available' (meaning the booking was released)
-          if (bookingStatus === "cancelled" || status === "cancelled") return false;
-          if (slotStatus === "available") return false;
+          const isCancelledOrRefunded = [bookingStat, oldStat].some(
+            val => val === "cancelled" || val === "refunded",
+          );
+
+          if (isCancelledOrRefunded) {
+            return false;
+          }
+
+          if (sltStat === "available") {
+            return false;
+          }
 
           return true;
         })
@@ -218,7 +233,6 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           });
 
           // DETERMINING OFFLINE VS ONLINE
-          // Rule: If guest_name exists, it's manual/offline.
           const isOffline = !!b.guest_name && b.guest_name !== "null";
 
           // TIME CALCULATIONS
@@ -228,9 +242,6 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           const isDisabled = now > slotEndTime;
           const isUnpaid = Number(b.paid_amount || 0) < Number(b.total_amount || 0);
 
-          // NAME & PHONE RESOLUTION
-          // If Offline: Use guest_name column.
-          // If Online: Use full_name (joined from profiles via RPC admin privilege).
           const finalName = isOffline ? b.guest_name : b.full_name || "Guest User";
           const finalPhone = isOffline ? b.guest_phone || "" : b.phone || "";
 
@@ -250,16 +261,21 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           };
         });
 
-      const sortedBookings = [...formattedBookings].sort((a: any, b: any) => {
-        const aPriority = !a.isDisabled || a.isRecentlyPassedPending ? 0 : 1;
-        const bPriority = !b.isDisabled || b.isRecentlyPassedPending ? 0 : 1;
-        if (aPriority !== bPriority) return aPriority - bPriority;
-        if (a.isRecentlyPassedPending && !b.isRecentlyPassedPending) return -1;
-        if (!a.isRecentlyPassedPending && b.isRecentlyPassedPending) return 1;
-        return a.startTimeRaw.localeCompare(b.startTimeRaw);
+      // Sort: Upcoming bookings first, Passed (isDisabled) bookings at the bottom.
+      // Maintain chronological order within each group.
+      const sortedBookings = [...formattedBookings].sort((a, b) => {
+        if (a.isDisabled !== b.isDisabled) {
+          return a.isDisabled ? 1 : -1; // non-disabled (upcoming) first
+        }
+        return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
       });
 
-      setBookings(sortedBookings);
+      // Deduplicate ghost bookings by slot time
+      const uniqueBookings = Array.from(
+        new Map(sortedBookings.map(b => [b.startTimeRaw, b])).values(),
+      );
+
+      setBookings(uniqueBookings); // <-- Use uniqueBookings here, not sortedBookings
     } catch (error) {
       console.error("Error fetching bookings:", error);
     } finally {

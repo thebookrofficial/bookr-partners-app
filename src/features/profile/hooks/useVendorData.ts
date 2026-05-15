@@ -18,6 +18,7 @@ interface Venue {
   status: "draft" | "pending_approval" | "active" | "inactive" | "suspended";
   avg_rating: number;
   total_reviews: number;
+  sports_venues?: { sports_type: string }[];
 }
 
 export const useVendorData = () => {
@@ -55,7 +56,7 @@ export const useVendorData = () => {
         // 3. Fetch Venues (Blueprint Table 6.1)
         const { data: venuesData, error: venuesError } = await supabase
           .from("venues")
-          .select("*")
+          .select("*, sports_venues(sports_type)")
           .eq("owner_id", clientData.id)
           .is("deleted_at", null);
 

@@ -39,20 +39,35 @@ export const SportsDashboardScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, any>>();
 
-  // Extract initial serviceId
+  // Extract initial serviceId and category
   let serviceId = route.params?.serviceId;
+  let routeCategory = route.params?.category;
+
   if (!serviceId) {
     const parentState = navigation.getParent()?.getState();
     const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
-    serviceId =
-      (tabRoute?.params as any)?.serviceId || (tabRoute?.params as any)?.params?.serviceId || "";
+    const params = (tabRoute?.params as any) || {};
+    serviceId = params.serviceId || params.params?.serviceId || "";
+    routeCategory = routeCategory || params.category || params.params?.category;
   }
 
   const [timeFilter, setTimeFilter] = useState("Today");
   const [groundFilter, setGroundFilter] = useState("Overall");
 
   const { selectedCategories, setServiceCategory } = useServiceStore();
-  const selectedCategory = selectedCategories[serviceId] || "Football";
+
+  const lastRouteCategory = React.useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (routeCategory && routeCategory !== lastRouteCategory.current) {
+      lastRouteCategory.current = routeCategory;
+      if (selectedCategories[serviceId] !== routeCategory) {
+        setServiceCategory(serviceId, routeCategory);
+      }
+    }
+  }, [routeCategory, serviceId, setServiceCategory, selectedCategories]);
+
+  const selectedCategory = selectedCategories[serviceId] || routeCategory || "Football";
 
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
@@ -74,27 +89,37 @@ export const SportsDashboardScreen = () => {
       try {
         const CATEGORY_DB_MAP: Record<string, string> = {
           Football: "football",
-          "Box Cricket": "cricket",
+          "Box Cricket": "box_cricket",
           Pickleball: "pickleball",
         };
         const dbSportType = CATEGORY_DB_MAP[selectedCategory] || selectedCategory;
 
         const { data: initialVenue } = await supabase
           .from("venues")
-          .select("owner_id")
+          .select("id, owner_id, sports_venues(sports_type)")
           .eq("id", serviceId)
           .single();
         if (!initialVenue) return;
 
-        const { data: matchedVenue } = await supabase
-          .from("venues")
-          .select("id, sports_venues!inner(sports_type)")
-          .eq("owner_id", initialVenue.owner_id)
-          .eq("sports_venues.sports_type", dbSportType)
-          .limit(1)
-          .maybeSingle();
+        // Check if the initial venue itself matches the sport type
+        const initialSportType = initialVenue.sports_venues?.[0]?.sports_type;
+        let finalVenueId = "";
 
-        setCurrentVenueId(matchedVenue ? matchedVenue.id : "");
+        if (initialSportType === dbSportType) {
+          finalVenueId = initialVenue.id;
+        } else {
+          const { data: matchedVenue } = await supabase
+            .from("venues")
+            .select("id, sports_venues!inner(sports_type)")
+            .eq("owner_id", initialVenue.owner_id)
+            .eq("sports_venues.sports_type", dbSportType)
+            .limit(1)
+            .maybeSingle();
+
+          if (matchedVenue) finalVenueId = matchedVenue.id;
+        }
+
+        setCurrentVenueId(finalVenueId);
       } catch (err) {
         console.error("Dashboard resolution error:", err);
       } finally {

@@ -61,8 +61,7 @@ export const useBookingDetails = (bookingId: string) => {
 
       let bookingData = rawData as any;
 
-      // SECURE FALLBACK: If profiles join failed for an online booking, use RPC to resolve
-      // profiles might be returned as an object or an array depending on schema inference
+      // SECURE FALLBACK
       const profileData = Array.isArray(bookingData.profiles)
         ? bookingData.profiles[0]
         : bookingData.profiles;
@@ -125,7 +124,6 @@ export const useBookingDetails = (bookingId: string) => {
         throw new Error("You must be logged in to log a payment. Please log out and back in.");
       }
 
-      // 2. Map "online" from the UI to "upi" for the database ENUM
       const dbPaymentMode = mode === "online" ? "upi" : mode;
 
       const { error } = await supabase.functions.invoke("log-offline-payment", {
@@ -133,7 +131,7 @@ export const useBookingDetails = (bookingId: string) => {
           bookingId: bookingId,
           vertical: "sports",
           amount: amount,
-          mode: dbPaymentMode, // <-- Send the mapped value here
+          mode: dbPaymentMode,
           loggedBy: userId,
         },
       });
@@ -155,21 +153,28 @@ export const useBookingDetails = (bookingId: string) => {
     if (!booking) return false;
     setIsSaving(true);
     try {
-      // 1. Update booking status
+      // 1. Update booking status (Added .select().single() to catch silent failures)
       const { error: bookingError } = await supabase
         .from("sports_bookings")
         .update({ booking_status: "cancelled" })
-        .eq("id", bookingId);
+        .eq("id", bookingId)
+        .select()
+        .single();
 
-      if (bookingError) throw bookingError;
+      if (bookingError) {
+        console.error("Booking Error:", bookingError);
+        throw new Error("You do not have permission to cancel this booking (RLS Blocked).");
+      }
 
       // 2. Update slot status to available
       const { error: slotError } = await supabase
         .from("sports_slots")
         .update({ status: "available" })
-        .eq("id", booking.slot_id);
+        .eq("id", booking.slot_id)
+        .select()
+        .maybeSingle();
 
-      if (slotError) throw slotError;
+      if (slotError) console.warn("Slot update issue:", slotError);
 
       Alert.alert("Success", "Booking cancelled successfully.");
       await fetchDetails();

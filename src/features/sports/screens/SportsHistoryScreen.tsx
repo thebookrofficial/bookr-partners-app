@@ -90,17 +90,32 @@ export const SportsHistoryScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, any>>();
 
-  // Extract initial serviceId gracefully
+  // Extract initial serviceId and category gracefully
   let serviceId = route.params?.serviceId;
+  let routeCategory = route.params?.category;
+
   if (!serviceId) {
     const parentState = navigation.getParent()?.getState();
     const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
-    serviceId =
-      (tabRoute?.params as any)?.serviceId || (tabRoute?.params as any)?.params?.serviceId || "";
+    const params = (tabRoute?.params as any) || {};
+    serviceId = params.serviceId || params.params?.serviceId || "";
+    routeCategory = routeCategory || params.category || params.params?.category;
   }
 
   const { selectedCategories, setServiceCategory } = useServiceStore();
-  const selectedCategory = selectedCategories[serviceId] || "Football";
+
+  const lastRouteCategory = React.useRef<string | undefined>(undefined);
+
+  React.useEffect(() => {
+    if (routeCategory && routeCategory !== lastRouteCategory.current) {
+      lastRouteCategory.current = routeCategory;
+      if (selectedCategories[serviceId] !== routeCategory) {
+        setServiceCategory(serviceId, routeCategory);
+      }
+    }
+  }, [routeCategory, serviceId, setServiceCategory, selectedCategories]);
+
+  const selectedCategory = selectedCategories[serviceId] || routeCategory || "Football";
 
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
