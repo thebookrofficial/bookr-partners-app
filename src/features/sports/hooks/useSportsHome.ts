@@ -78,7 +78,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
   // Auto-select the first available category if the current one isn't valid for this vendor
   useEffect(() => {
     if (availableCategories.length > 0 && !availableCategories.includes(category)) {
-      // NOTE: This might be where the forced override is happening!
+      // NOTE: Handled in the UI layer now
     }
   }, [availableCategories, category, initialVenueId]);
 
@@ -251,7 +251,8 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             phone: finalPhone,
             date: formattedDate,
             time: `${formatTime(b.start_time)} - ${formatTime(b.end_time)}`,
-            price: `₹${b.total_amount || 0}`,
+            // CRITICAL FIX: Changed total_amount to paid_amount
+            price: `₹${b.paid_amount || 0}`,
             status: isOffline ? "Offline" : "Online",
             avatarUrl: b.avatar_url,
             isOfflineRecord: isOffline,
@@ -275,7 +276,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         new Map(sortedBookings.map(b => [b.startTimeRaw, b])).values(),
       );
 
-      setBookings(uniqueBookings); // <-- Use uniqueBookings here, not sortedBookings
+      setBookings(uniqueBookings);
     } catch (error) {
       console.error("Error fetching bookings:", error);
     } finally {
