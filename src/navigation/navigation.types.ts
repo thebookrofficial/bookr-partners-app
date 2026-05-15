@@ -80,7 +80,11 @@ export type MainStackParamList = {
   EventOffers: { serviceId: string };
   EventGuestInvite: { serviceId: string };
   EventEntryDetails: { entryId: string };
-  GuestHistory: { bookingId: string; guestId?: string };
+  GuestHistory: {
+    bookingId: string;
+    guestId?: string;
+    vertical: "sports" | "staycation" | "dining" | "events";
+  };
   BlockUnblock: { venueId: string; groundId: string };
   BulkBooking: { venueId: string; groundId: string };
   BulkBookingDetails: {

@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 export interface HistoryBooking {
   id: string;
-  vertical: "sports" | "staycation";
+  vertical: "sports" | "staycation" | "dining" | "events";
   venue_name: string;
   raw_date: string;
   display_date: string;
@@ -16,7 +16,6 @@ export interface HistoryBooking {
   booking_status: "past" | "upcoming" | "cancelled";
 }
 
-// Helpers for unified formatting
 const formatDisplayDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString("en-GB", {
     weekday: "short",
@@ -27,12 +26,13 @@ const formatDisplayDate = (dateStr: string) => {
 };
 
 const formatTime = (timeStr: string) => {
+  if (!timeStr) return "";
   const [h] = timeStr.split(":");
   const hourInt = parseInt(h, 10);
-  return `${hourInt % 12 || 12} ${hourInt >= 12 ? "Pm" : "Am"}`;
+  return `${hourInt % 12 || 12} ${hourInt >= 12 ? "PM" : "AM"}`;
 };
 
-export const useGuestHistory = (identifier: string) => {
+export const useGuestHistory = (identifier: string, vertical: string) => {
   const [history, setHistory] = useState<HistoryBooking[]>([]);
   const [stats, setStats] = useState({ past: 0, upcoming: 0, cancelled: 0 });
   const [guestName, setGuestName] = useState<string>("Guest User");
@@ -40,172 +40,142 @@ export const useGuestHistory = (identifier: string) => {
   const [loading, setLoading] = useState(true);
 
   const fetchHistory = useCallback(async () => {
-    if (!identifier) return;
-    setLoading(true);
-    try {
-      let phone = identifier;
-      let profileId = "00000000-0000-0000-0000-000000000000";
+    if (!identifier || !vertical) {
+      setLoading(false);
+      return;
+    }
 
-      // 1. Resolve UUID back to phone/user_id
+    setLoading(true);
+
+    try {
+      let resolvedPhone = identifier;
+      let userId = "";
+
+      // 1. Resolve UUID
       if (identifier.length === 36 && identifier.includes("-")) {
-        const { data: sportsBooking } = await supabase
-          .from("sports_bookings")
-          .select("guest_phone, user_id, profiles(phone)")
+        const table = vertical === "staycation" ? "staycation_bookings" : "sports_bookings";
+        const { data: booking } = await supabase
+          .from(table)
+          .select("guest_phone, user_id, profiles(phone, full_name)")
           .eq("id", identifier)
           .maybeSingle();
 
-        if (sportsBooking) {
-          const pPhone = Array.isArray(sportsBooking.profiles)
-            ? sportsBooking.profiles[0]?.phone
-            : (sportsBooking.profiles as any)?.phone;
-          phone = sportsBooking.guest_phone || pPhone || identifier;
-          profileId = sportsBooking.user_id || profileId;
-        } else {
-          const { data: stayBooking } = await supabase
-            .from("staycation_bookings")
-            .select("guest_phone, user_id, profiles(phone)")
-            .eq("id", identifier)
-            .maybeSingle();
-
-          if (stayBooking) {
-            const pPhone = Array.isArray(stayBooking.profiles)
-              ? stayBooking.profiles[0]?.phone
-              : (stayBooking.profiles as any)?.phone;
-            phone = stayBooking.guest_phone || pPhone || identifier;
-            profileId = stayBooking.user_id || profileId;
-          }
+        if (booking) {
+          const profile = Array.isArray(booking.profiles) ? booking.profiles[0] : booking.profiles;
+          resolvedPhone = booking.guest_phone || profile?.phone || identifier;
+          userId = booking.user_id || "";
+          if (profile?.full_name) setGuestName(profile.full_name);
         }
       }
 
-      setGuestPhone(phone);
+      setGuestPhone(resolvedPhone);
 
-      // 2. Resolve Profile Data
-      let finalProfileId = profileId;
+      // 2. Resolve Profile Name
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("id, full_name")
-        .eq("phone", phone)
+        .select("full_name")
+        .eq("phone", resolvedPhone)
         .maybeSingle();
 
-      if (profileData) {
-        finalProfileId = profileData.id;
+      if (profileData?.full_name) {
         setGuestName(profileData.full_name);
       }
 
-      // 3. Fetch BOTH Verticals in Parallel
-      const [sportsRes, staycationRes] = await Promise.all([
-        supabase
-          .from("sports_bookings")
-          .select(
-            `
+      // 3. Prepare Base Query
+      let query;
+      if (vertical === "sports") {
+        query = supabase.from("sports_bookings").select(`
             id, guest_name, total_amount, platform_fee, gateway_fee, booking_status,
             sports_slots!inner ( slot_date, start_time, end_time, sports_grounds ( name ) )
-          `,
-          )
-          .or(`guest_phone.eq.${phone},user_id.eq.${finalProfileId}`),
-
-        supabase
-          .from("staycation_bookings")
-          .select(
-            `
+          `);
+      } else {
+        query = supabase.from("staycation_bookings").select(`
             id, guest_name, total_amount, platform_fee, gateway_fee, booking_status, check_in_date, check_out_date,
             venues ( name )
-          `,
-          )
-          .or(`guest_phone.eq.${phone},user_id.eq.${finalProfileId}`),
-      ]);
+          `);
+      }
+
+      // 4. Execute Main Fetch
+      let results;
+      if (userId) {
+        const { data } = await query.or(`guest_phone.eq.${resolvedPhone},user_id.eq.${userId}`);
+        results = data;
+      } else {
+        const { data } = await query.eq("guest_phone", resolvedPhone);
+        results = data;
+      }
 
       const now = new Date();
       let pastCount = 0,
         upcomingCount = 0,
         cancelledCount = 0;
-      const allBookings: HistoryBooking[] = [];
+      const filteredBookings: HistoryBooking[] = [];
 
-      // Process Sports Bookings
-      (sportsRes.data || []).forEach((b: any) => {
-        if (!profileData?.full_name && b.guest_name) setGuestName(b.guest_name);
-
-        const slotDate = new Date(b.sports_slots.slot_date);
-        const isOffline = b.platform_fee === 0 && b.gateway_fee === 0;
+      (results || []).forEach((b: any) => {
         const isCancelled = b.booking_status?.toLowerCase() === "cancelled";
+        let rawDate, displayDate, displayTime, vName, isOnline;
 
-        let type: "past" | "upcoming" | "cancelled" = "past";
-        if (isCancelled) {
-          type = "cancelled";
-          cancelledCount++;
-        } else if (slotDate > now) {
-          type = "upcoming";
-          upcomingCount++;
-        } else {
-          pastCount++;
-        }
-
-        allBookings.push({
-          id: b.id,
-          vertical: "sports",
-          venue_name: b.sports_slots.sports_grounds?.name || "Sports Ground",
-          raw_date: b.sports_slots.slot_date,
-          display_date: formatDisplayDate(b.sports_slots.slot_date),
-          display_time: `${formatTime(b.sports_slots.start_time)} - ${formatTime(
+        if (vertical === "sports") {
+          rawDate = b.sports_slots.slot_date;
+          displayDate = formatDisplayDate(rawDate);
+          displayTime = `${formatTime(b.sports_slots.start_time)} - ${formatTime(
             b.sports_slots.end_time,
-          )}`,
-          total_amount: b.total_amount,
-          status: isOffline ? "Offline" : "Online",
-          booking_status: type,
-        });
-      });
+          )}`;
+          vName = b.sports_slots.sports_grounds?.name || "Sports Ground";
+          isOnline = b.platform_fee > 0;
+        } else {
+          rawDate = b.check_in_date;
+          displayDate = `${formatDisplayDate(b.check_in_date)} - ${formatDisplayDate(
+            b.check_out_date,
+          )}`;
+          displayTime = "Staycation";
+          vName = b.venues?.name || "Staycation Venue";
+          isOnline = parseFloat(b.platform_fee) > 0;
+        }
 
-      // Process Staycation Bookings
-      (staycationRes.data || []).forEach((b: any) => {
-        if (!profileData?.full_name && b.guest_name) setGuestName(b.guest_name);
-
-        const slotDate = new Date(b.check_in_date);
-        const isOnline = (parseFloat(b.platform_fee) || 0) > 0;
-        const isCancelled = b.booking_status?.toLowerCase() === "cancelled";
-
+        const bookingDate = new Date(rawDate);
         let type: "past" | "upcoming" | "cancelled" = "past";
+
         if (isCancelled) {
           type = "cancelled";
           cancelledCount++;
-        } else if (slotDate > now) {
+        } else if (bookingDate > now) {
           type = "upcoming";
           upcomingCount++;
         } else {
+          type = "past";
           pastCount++;
         }
 
-        const venueObj = Array.isArray(b.venues) ? b.venues[0] : b.venues;
-
-        allBookings.push({
+        filteredBookings.push({
           id: b.id,
-          vertical: "staycation",
-          venue_name: venueObj?.name || "Staycation Venue",
-          raw_date: b.check_in_date,
-          display_date: `${formatDisplayDate(b.check_in_date)} - ${formatDisplayDate(
-            b.check_out_date,
-          )}`,
-          display_time: `Staycation`,
+          vertical: vertical as any,
+          venue_name: vName,
+          raw_date: rawDate,
+          display_date: displayDate,
+          display_time: displayTime,
           total_amount: b.total_amount,
           status: isOnline ? "Online" : "Offline",
           booking_status: type,
         });
       });
 
-      // Sort heavily by date descending
-      allBookings.sort((a, b) => new Date(b.raw_date).getTime() - new Date(a.raw_date).getTime());
+      filteredBookings.sort(
+        (a, b) => new Date(b.raw_date).getTime() - new Date(a.raw_date).getTime(),
+      );
 
-      setHistory(allBookings);
+      setHistory(filteredBookings);
       setStats({ past: pastCount, upcoming: upcomingCount, cancelled: cancelledCount });
     } catch (err) {
-      console.error("History fetch error:", err);
+      // Error handling
     } finally {
       setLoading(false);
     }
-  }, [identifier]);
+  }, [identifier, vertical]);
 
   useEffect(() => {
-    if (identifier) fetchHistory();
-  }, [identifier, fetchHistory]);
+    fetchHistory();
+  }, [fetchHistory]);
 
   return { history, stats, guestName, guestPhone, loading, refresh: fetchHistory };
 };

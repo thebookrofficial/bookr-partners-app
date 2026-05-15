@@ -257,4 +257,45 @@ export const SportsService = {
     if (bookingError) throw bookingError;
     return booking.id;
   },
+
+  // Add this method inside the SportsService object
+  async extendBookingDuration(params: {
+    slotId: string;
+    bookingId: string;
+    newEndTime24: string;
+    extraAmount: number;
+  }) {
+    // 1. Update the slot end time
+    const { error: slotError } = await supabase
+      .from("sports_slots")
+      .update({ end_time: params.newEndTime24 })
+      .eq("id", params.slotId);
+
+    if (slotError) throw slotError;
+
+    // 2. Update the booking total amount
+    // We fetch current values first to ensure accuracy
+    const { data: currentBooking, error: fetchError } = await supabase
+      .from("sports_bookings")
+      .select("total_amount, vendor_payout")
+      .eq("id", params.bookingId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const newTotal = Number(currentBooking.total_amount) + params.extraAmount;
+    const newPayout = Number(currentBooking.vendor_payout) + params.extraAmount;
+
+    const { error: bookingError } = await supabase
+      .from("sports_bookings")
+      .update({
+        total_amount: newTotal,
+        vendor_payout: newPayout,
+      })
+      .eq("id", params.bookingId);
+
+    if (bookingError) throw bookingError;
+
+    return true;
+  },
 };

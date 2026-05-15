@@ -389,7 +389,11 @@ export const OfflineBookingSheet = ({
                 activeOpacity={0.7}
                 onPress={() => {
                   onClose();
-                  navigation.navigate("GuestHistory", { guestId: mobile, bookingId: "" });
+                  navigation.navigate("GuestHistory", {
+                    guestId: mobile,
+                    bookingId: "",
+                    vertical: "sports", // <---- ADD THIS LINE
+                  });
                 }}>
                 <FileText size={ms(20)} color={COLORS.text.primary} />
                 <Text variant="body2" weight="semiBold" style={styles.historyText}>

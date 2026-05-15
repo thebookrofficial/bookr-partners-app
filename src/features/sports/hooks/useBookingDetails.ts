@@ -16,6 +16,7 @@ export interface BookingDetailData {
   guest_name: string | null;
   guest_phone: string | null;
   slot_id: string;
+  created_at: string;
   profiles: { full_name: string; phone: string; avatar_url: string } | null;
   sports_slots: {
     start_time: string;
@@ -29,9 +30,10 @@ export interface BookingDetailData {
 export interface PaymentLog {
   id: string;
   amount: number;
-  payment_mode: "cash" | "online";
+  payment_mode: "cash" | "online" | "upi" | "card" | "bank_transfer" | "other";
   note: string;
   created_at: string;
+  isInitial?: boolean; // Flag to identify our synthetic log
 }
 
 export const useBookingDetails = (bookingId: string) => {
@@ -43,12 +45,12 @@ export const useBookingDetails = (bookingId: string) => {
   const fetchDetails = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Fetch Booking Details
+      // 1. Fetch Booking Details (Added created_at)
       const { data: rawData, error: bookingError } = await supabase
         .from("sports_bookings")
         .select(
           `
-          id, user_id, venue_id, total_amount, paid_amount, booking_status, guest_name, guest_phone, slot_id,
+          id, user_id, venue_id, total_amount, paid_amount, booking_status, guest_name, guest_phone, slot_id, created_at,
           profiles ( full_name, phone, avatar_url ),
           sports_slots ( start_time, end_time, slot_date, ground_id ),
           venues ( name, vertical )
@@ -97,11 +99,35 @@ export const useBookingDetails = (bookingId: string) => {
         .eq("booking_vertical", "sports")
         .order("created_at", { ascending: true });
 
+      let fetchedLogs = (logsData as PaymentLog[]) || [];
+
       if (logsError && logsError.code !== "PGRST116") {
         console.warn("Could not fetch payment logs:", logsError);
-      } else {
-        setPaymentLogs(logsData || []);
       }
+
+      // 3. Reconstruct Initial Advance Payment
+      const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
+      const totalPaidAmount = Number(bookingData.paid_amount) || 0;
+
+      // If the total paid on the booking is greater than what's in the logs,
+      // the difference is the initial advance payment.
+      if (totalPaidAmount > totalLoggedAmount) {
+        const initialAmount = totalPaidAmount - totalLoggedAmount;
+        const initialLog: PaymentLog = {
+          id: `initial-${bookingData.id}`,
+          amount: initialAmount,
+          // Assume Online/UPI if user_id exists (app booking), otherwise Cash for manual
+          payment_mode: bookingData.user_id ? "online" : "cash",
+          note: "Initial Advance Payment",
+          created_at: bookingData.created_at,
+          isInitial: true,
+        };
+
+        // Unshift to put it at the very top of the list (earliest date)
+        fetchedLogs.unshift(initialLog);
+      }
+
+      setPaymentLogs(fetchedLogs);
     } catch (error: any) {
       Alert.alert("Error", "Could not fetch booking details.");
       console.error(error);
@@ -153,7 +179,6 @@ export const useBookingDetails = (bookingId: string) => {
     if (!booking) return false;
     setIsSaving(true);
     try {
-      // 1. Update booking status (Added .select().single() to catch silent failures)
       const { error: bookingError } = await supabase
         .from("sports_bookings")
         .update({ booking_status: "cancelled" })
@@ -166,7 +191,6 @@ export const useBookingDetails = (bookingId: string) => {
         throw new Error("You do not have permission to cancel this booking (RLS Blocked).");
       }
 
-      // 2. Update slot status to available
       const { error: slotError } = await supabase
         .from("sports_slots")
         .update({ status: "available" })
@@ -187,6 +211,38 @@ export const useBookingDetails = (bookingId: string) => {
     }
   };
 
+  // Add this inside the useBookingDetails hook
+  const extendBooking = async (additionalMinutes: number, additionalCost: number) => {
+    if (!booking) return false;
+    setIsSaving(true);
+    try {
+      const [h, m, s] = booking.sports_slots.end_time.split(":").map(Number);
+      let date = new Date();
+      date.setHours(h, m + additionalMinutes, s);
+
+      const newEndTime24 = `${date.getHours().toString().padStart(2, "0")}:${date
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}:00`;
+
+      await SportsService.extendBookingDuration({
+        slotId: booking.slot_id,
+        bookingId: booking.id,
+        newEndTime24,
+        extraAmount: additionalCost,
+      });
+
+      Alert.alert("Success", "Booking extended successfully.");
+      await fetchDetails();
+      return true;
+    } catch (error: any) {
+      Alert.alert("Extension Failed", error.message);
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   useEffect(() => {
     fetchDetails();
   }, [fetchDetails]);
@@ -198,6 +254,7 @@ export const useBookingDetails = (bookingId: string) => {
     isSaving,
     logPayment,
     cancelBooking,
+    extendBooking,
     refresh: fetchDetails,
   };
 };

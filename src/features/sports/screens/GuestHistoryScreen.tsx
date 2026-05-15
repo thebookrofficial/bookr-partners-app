@@ -16,15 +16,17 @@ import { useGuestHistory, HistoryBooking } from "../hooks/useGuestHistory";
 export const GuestHistoryScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<MainStackParamList, "GuestHistory">>();
-  const { guestId: guestIdParam, bookingId } = route.params;
+
+  // CRITICAL FIX 1: Extract vertical from route.params
+  const { guestId: guestIdParam, bookingId, vertical } = route.params;
 
   const identifier = guestIdParam || bookingId;
-  const { history, stats, guestName, guestPhone, loading } = useGuestHistory(identifier);
 
-  // Tab State added!
+  // CRITICAL FIX 2: Pass vertical into the hook
+  const { history, stats, guestName, guestPhone, loading } = useGuestHistory(identifier, vertical);
+
   const [activeTab, setActiveTab] = useState<"past" | "upcoming" | "cancelled">("past");
 
-  // Filter history based on active tab
   const filteredHistory = history.filter(h => h.booking_status === activeTab);
 
   const groupedHistory = filteredHistory.reduce(
