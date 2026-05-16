@@ -14,12 +14,22 @@ import {
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, TextInput } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
-import { Plus, Minus, ChevronDown, Phone, User, Calendar, Clock } from "lucide-react-native";
+import {
+  Plus,
+  Minus,
+  ChevronDown,
+  Phone,
+  User,
+  Calendar,
+  Clock,
+  MapPin,
+} from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { useBulkBooking } from "../hooks/useBulkBooking";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useServiceStore } from "@/store/serviceStore";
 import { supabase } from "@/lib/supabase";
 
 // IMPORT THE NEW VIEW COMPONENT
@@ -50,8 +60,47 @@ const HOURS = [
 // ==========================================
 // CREATE MODE (Internal Component)
 // ==========================================
-const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
+const CreateBulkBooking = ({
+  type,
+  venueId,
+  groundId: initialGroundId,
+}: {
+  type: "multi" | "single";
+  venueId: string;
+  groundId: string;
+}) => {
   const navigation = useNavigation();
+
+  const { selectedCategories, setServiceCategory } = useServiceStore();
+  const selectedCategory = selectedCategories[venueId] || "Football";
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+
+  const [ownerId, setOwnerId] = useState<string | undefined>();
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setOwnerId(data.user?.id));
+  }, []);
+
+  // NEW: State for Grounds inside the form
+  const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
+  const [selectedGroundId, setSelectedGroundId] = useState<string>(initialGroundId || "");
+  const [showGroundPicker, setShowGroundPicker] = useState(false);
+
+  useEffect(() => {
+    const fetchGrounds = async () => {
+      const { data } = await supabase
+        .from("sports_grounds")
+        .select("id, name")
+        .eq("venue_id", venueId)
+        .order("display_order", { ascending: true });
+
+      if (data && data.length > 0) {
+        setGrounds(data);
+        if (!selectedGroundId) setSelectedGroundId(data[0].id);
+      }
+    };
+    fetchGrounds();
+  }, [selectedGroundId, venueId]);
+
   const [bookingType, setBookingType] = useState<"multi" | "single">(type);
   const [mobile, setMobile] = useState("");
   const [name, setName] = useState("");
@@ -79,6 +128,8 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
   const totalPayment = totalSlots * pricePerHour;
   const amountPaid = stagedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remainingAmount = totalPayment - amountPaid;
+
+  const { activeVenueName } = useServiceStore();
 
   useEffect(() => {
     const lookupGuest = async () => {
@@ -123,11 +174,15 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
   };
 
   const onConfirm = async () => {
-    if (!mobile || !name || totalSlots <= 0) {
-      Alert.alert("Missing Info", "Please ensure dates, times, and guest info are valid.");
+    if (!mobile || !name || totalSlots <= 0 || !selectedGroundId) {
+      Alert.alert("Missing Info", "Please ensure dates, times, ground, and guest info are valid.");
       return;
     }
     const success = await confirmBulkBooking({
+      ownerId,
+      venueId,
+      groundId: selectedGroundId, // Pass the selected ground to the hook
+      category: selectedCategory,
       mobile,
       name,
       fromDate,
@@ -140,13 +195,17 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
     if (success) navigation.goBack();
   };
 
+  // Helper to display current ground name
+  const currentGroundName = grounds.find(g => g.id === selectedGroundId)?.name || "Select Ground";
+
   return (
     <View style={styles.flex1}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <ServiceHeader
-          title="Elite Strikers Club"
+          title={activeVenueName}
           subtitle="Bulk Booking"
-          rightComponent={<Text style={[styles.bisonText, styles.headerBadgeText]}>FOOTBALL</Text>}
+          category={selectedCategory}
+          onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
         />
 
         <View style={styles.tabBar}>
@@ -214,6 +273,22 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
             style={styles.inputFill}
           />
         </View>
+
+        {/* --- NEW GROUND SELECTION FIELD --- */}
+        {grounds.length > 0 && (
+          <View style={styles.fieldGroup}>
+            <View style={styles.labelRow}>
+              <MapPin size={ms(18)} color="#63A1FD" />
+              <Text style={styles.labelBold}>Select Ground</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.inputBoxFillRow}
+              onPress={() => setShowGroundPicker(true)}>
+              <Text style={[styles.inputText, styles.flex1]}>{currentGroundName}</Text>
+              <ChevronDown size={ms(16)} color="#000" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
@@ -361,14 +436,15 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
         />
       )}
 
+      {/* --- TIME PICKER MODAL --- */}
       <Modal visible={!!showHourPicker} transparent animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowHourPicker(null)}>
-          <View style={styles.hourPickerContainer}>
+          <View style={styles.pickerContainer}>
             <ScrollView showsVerticalScrollIndicator={false}>
               {HOURS.map(hour => (
                 <TouchableOpacity
                   key={hour}
-                  style={styles.hourItem}
+                  style={styles.pickerItem}
                   onPress={() => {
                     if (showHourPicker === "from") setFromTime(hour);
                     else setToTime(hour);
@@ -381,6 +457,59 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* --- NEW GROUND PICKER MODAL --- */}
+      <Modal visible={showGroundPicker} transparent animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowGroundPicker(false)}>
+          <View style={styles.pickerContainer}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {grounds.map(g => (
+                <TouchableOpacity
+                  key={g.id}
+                  style={styles.pickerItem}
+                  onPress={() => {
+                    setSelectedGroundId(g.id);
+                    setShowGroundPicker(false);
+                  }}>
+                  <Text style={[styles.inputText, selectedGroundId === g.id && styles.textPrimary]}>
+                    {g.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* --- FIXED OVERLAY DROPDOWN --- */}
+      {isCategoryOpen && (
+        <View style={styles.dropdownOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setIsCategoryOpen(false)}
+          />
+          <View style={styles.dropdownMenu}>
+            {["Football", "Box Cricket", "Pickleball"].map(cat => (
+              <TouchableOpacity
+                key={cat}
+                style={styles.dropdownItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setServiceCategory(venueId, cat);
+                  setIsCategoryOpen(false);
+                }}>
+                <Text variant="body2" weight="semiBold" style={styles.dropdownItemText}>
+                  {cat}
+                </Text>
+                <View style={styles.radioOuter}>
+                  {selectedCategory === cat && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -390,12 +519,12 @@ const CreateBulkBooking = ({ type }: { type: "multi" | "single" }) => {
 // ==========================================
 export const BulkBookingDetailsScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "BulkBookingDetails">>();
-  const { bookingId, type } = route.params;
+  const { bookingId, type, venueId, groundId } = route.params;
 
   return (
     <ScreenContainer backgroundColor="#FFFFFF" paddingHorizontal={hs(12)}>
       {bookingId === "new" ? (
-        <CreateBulkBooking type={type} />
+        <CreateBulkBooking type={type} venueId={venueId} groundId={groundId} />
       ) : (
         <ViewBulkBooking bookingId={bookingId} type={type} />
       )}
@@ -429,6 +558,7 @@ const styles = StyleSheet.create({
   addText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#00B562" },
   textDanger: { color: "#E55959" },
   textSuccessFlex: { color: "#00B562", flex: 1 },
+  textPrimary: { color: "#63A1FD" },
 
   /* --- CREATE LAYOUT --- */
   tabBar: { flexDirection: "row", alignItems: "center", marginBottom: vs(15), gap: hs(10) },
@@ -516,17 +646,65 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  hourPickerContainer: {
+  pickerContainer: {
     width: "80%",
     backgroundColor: "#FFF",
     borderRadius: ms(10),
     maxHeight: "50%",
     padding: ms(10),
   },
-  hourItem: {
+  pickerItem: {
     padding: ms(15),
     borderBottomWidth: 1,
     borderBottomColor: "#EEE",
     alignItems: "center",
+  },
+
+  /* --- FIXED OVERLAY DROPDOWN STYLES --- */
+  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
+  dropdownMenu: {
+    position: "absolute",
+    top: vs(55),
+    right: hs(12),
+    backgroundColor: "#FFF",
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: "#EEE",
+    width: hs(180),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    padding: hs(6),
+    gap: vs(6),
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(8),
+    borderWidth: 1,
+    borderColor: "#EEE",
+    borderRadius: ms(8),
+  },
+  dropdownItemText: {
+    color: "#000",
+  },
+  radioOuter: {
+    width: ms(20),
+    height: ms(20),
+    borderRadius: ms(10),
+    borderWidth: 2,
+    borderColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioInner: {
+    width: ms(10),
+    height: ms(10),
+    borderRadius: ms(5),
+    backgroundColor: "#000",
   },
 });

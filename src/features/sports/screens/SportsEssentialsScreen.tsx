@@ -16,6 +16,8 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
 import { supabase } from "@/lib/supabase";
 
+import { useServiceStore } from "@/store/serviceStore";
+
 const EssentialActionRow = ({ title, icon: Icon, onPress }: any) => (
   <TouchableOpacity style={styles.actionRow} onPress={onPress} activeOpacity={0.7}>
     <Icon size={ms(20)} color={COLORS.primary} />
@@ -30,23 +32,42 @@ export const SportsEssentialsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, "SportsEssentials">>();
 
-  // Extract initial serviceId
+  // Extract initial serviceId and category
   let venueId = route.params?.serviceId;
+  let routeCategory = route.params?.category;
+
   if (!venueId) {
     const parentState = navigation.getParent()?.getState();
     const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
     const tabParams = tabRoute?.params as any;
     venueId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+    routeCategory = routeCategory || tabParams?.category || tabParams?.params?.category;
   }
 
   // --- UI STATES ---
+  const { selectedCategories, setServiceCategory } = useServiceStore();
+
+  const lastRouteCategory = React.useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (routeCategory && routeCategory !== lastRouteCategory.current) {
+      lastRouteCategory.current = routeCategory;
+      if (selectedCategories[venueId] !== routeCategory) {
+        setServiceCategory(venueId, routeCategory);
+      }
+    }
+  }, [routeCategory, venueId, setServiceCategory, selectedCategories]);
+
+  const selectedCategory = selectedCategories[venueId] || routeCategory || "Football";
+
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("Football");
 
   // --- DYNAMIC VENUE STATES ---
   const [currentVenueId, setCurrentVenueId] = useState<string>("");
   const [activeGroundId, setActiveGroundId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+
+  const { activeVenueName } = useServiceStore();
 
   useEffect(() => {
     const resolveVenueAndGround = async () => {
@@ -63,28 +84,38 @@ export const SportsEssentialsScreen = () => {
         // Find Owner
         const { data: initialVenue } = await supabase
           .from("venues")
-          .select("owner_id")
+          .select("id, owner_id, sports_venues(sports_type)")
           .eq("id", venueId)
           .single();
         if (!initialVenue) return;
 
-        // Find Venue for Owner + Category
-        const { data: matchedVenue } = await supabase
-          .from("venues")
-          .select("id, sports_venues!inner(sports_type)")
-          .eq("owner_id", initialVenue.owner_id)
-          .eq("sports_venues.sports_type", dbSportType)
-          .limit(1)
-          .maybeSingle();
+        // Check if the initial venue itself matches the sport type
+        const initialSportType = initialVenue.sports_venues?.[0]?.sports_type;
+        let finalVenueId = "";
 
-        if (matchedVenue) {
-          setCurrentVenueId(matchedVenue.id);
+        if (initialSportType === dbSportType) {
+          finalVenueId = initialVenue.id;
+        } else {
+          // Find Venue for Owner + Category
+          const { data: matchedVenue } = await supabase
+            .from("venues")
+            .select("id, sports_venues!inner(sports_type)")
+            .eq("owner_id", initialVenue.owner_id)
+            .eq("sports_venues.sports_type", dbSportType)
+            .limit(1)
+            .maybeSingle();
+
+          if (matchedVenue) finalVenueId = matchedVenue.id;
+        }
+
+        if (finalVenueId) {
+          setCurrentVenueId(finalVenueId);
 
           // Find First Ground for this matched Venue
           const { data: groundData } = await supabase
             .from("sports_grounds")
             .select("id")
-            .eq("venue_id", matchedVenue.id)
+            .eq("venue_id", finalVenueId)
             .order("display_order", { ascending: true })
             .limit(1)
             .maybeSingle();
@@ -110,7 +141,7 @@ export const SportsEssentialsScreen = () => {
       <View style={styles.headerWrapper}>
         {/* 1. Header with Dropdown */}
         <ServiceHeader
-          title="Elite Strikers Club"
+          title={activeVenueName}
           subtitle="Essentials"
           category={selectedCategory}
           onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
@@ -129,7 +160,12 @@ export const SportsEssentialsScreen = () => {
           <EssentialActionRow
             title="Bulk Booking"
             icon={Files}
-            onPress={() => navigation.navigate("BulkBooking")}
+            onPress={() =>
+              navigation.navigate("BulkBooking", {
+                venueId: currentVenueId,
+                groundId: activeGroundId,
+              })
+            }
           />
           <EssentialActionRow
             title="Block / Unblock"
@@ -150,20 +186,8 @@ export const SportsEssentialsScreen = () => {
               }
             }}
           />
-          <EssentialActionRow
-            title="Offers"
-            icon={CalendarDays}
-            onPress={() => {
-              // console.log("Special Days Tapped");
-            }}
-          />
-          <EssentialActionRow
-            title="Update Venue Info"
-            icon={RefreshCw}
-            onPress={() => {
-              // console.log("Update Venue Tapped");
-            }}
-          />
+          <EssentialActionRow title="Offers" icon={CalendarDays} onPress={() => {}} />
+          <EssentialActionRow title="Update Venue Info" icon={RefreshCw} onPress={() => {}} />
         </View>
       )}
 
@@ -185,7 +209,7 @@ export const SportsEssentialsScreen = () => {
                 style={styles.dropdownItem}
                 activeOpacity={0.7}
                 onPress={() => {
-                  setSelectedCategory(cat);
+                  setServiceCategory(venueId, cat);
                   setIsCategoryOpen(false);
                 }}>
                 <Text variant="body2" weight="semiBold">

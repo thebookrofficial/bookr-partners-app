@@ -6,9 +6,10 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Linking,
+  Share,
   Alert,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Avatar, TextInput } from "@/components/ui";
@@ -19,9 +20,7 @@ import {
   User,
   ClipboardList,
   Plus,
-  ChevronRight,
   Share2,
-  FileText,
   Trash2,
   ChevronDown,
   Minus,
@@ -30,6 +29,7 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useStaycationBookingDetails } from "../hooks/useStaycationBookingDetails";
+import { supabase } from "@/lib/supabase"; // <-- Add this for inline fetch
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -46,7 +46,6 @@ const InfoBlock = ({ label, value, icon: Icon, isSelection, valueColor }: any) =
   </View>
 );
 
-// Helper to format Date for UI
 const formatDate = (dateStr: string | undefined) => {
   if (!dateStr) return "N/A";
   const date = new Date(dateStr);
@@ -58,10 +57,8 @@ const formatDate = (dateStr: string | undefined) => {
 export const StaycationBookingDetailsScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  // We grab the booking ID from the route params to fetch fresh data
   const { booking: initialBooking, isFromHistory } = route.params || {};
 
-  // Initialize the custom hook
   const { isLoading, isUpdating, bookingDetails, updatePayment, cancelBooking } =
     useStaycationBookingDetails(initialBooking?.id);
 
@@ -71,7 +68,7 @@ export const StaycationBookingDetailsScreen = () => {
 
   const handleCall = () => {
     const phone = bookingDetails?.profiles?.phone || initialBooking?.phone;
-    if (!phone) {
+    if (!phone || phone === "N/A") {
       Alert.alert("No Phone Number", "This user hasn't provided a phone number.");
       return;
     }
@@ -97,7 +94,7 @@ export const StaycationBookingDetailsScreen = () => {
         onPress: async () => {
           const success = await cancelBooking();
           if (success) {
-            Alert.alert("Success", "Booking cancelled successfully.");
+            navigation.goBack();
           }
         },
       },
@@ -112,14 +109,11 @@ export const StaycationBookingDetailsScreen = () => {
     );
   }
 
-  // Map fresh Supabase data to the UI variables
   const totalPayment =
     parseFloat(bookingDetails?.total_amount) || parseFloat(initialBooking?.amount) || 0;
   const amountPaid = parseFloat(bookingDetails?.paid_amount) || 0;
   const remainingAmount = Math.max(0, totalPayment - amountPaid);
 
-  // Differentiate Manual vs Online:
-  // Use booking_type or platform_fee as indicator.
   const isOnline =
     bookingDetails?.booking_type === "online" ||
     (parseFloat(bookingDetails?.platform_fee) || 0) > 0;
@@ -127,8 +121,16 @@ export const StaycationBookingDetailsScreen = () => {
   const bookingType = isOnline ? "Online" : "Manual";
 
   const bookingData = {
-    name: bookingDetails?.profiles?.full_name || initialBooking?.name || "Guest",
-    phone: bookingDetails?.profiles?.phone || initialBooking?.phone || "N/A",
+    name:
+      bookingDetails?.guest_name ||
+      bookingDetails?.profiles?.full_name ||
+      initialBooking?.name ||
+      "Guest",
+    phone:
+      bookingDetails?.guest_phone ||
+      bookingDetails?.profiles?.phone ||
+      initialBooking?.phone ||
+      "N/A",
     avatarUrl: bookingDetails?.profiles?.avatar_url || initialBooking?.avatarUrl,
     checkIn: formatDate(bookingDetails?.check_in_date || initialBooking?.checkIn),
     checkOut: formatDate(bookingDetails?.check_out_date || initialBooking?.checkOut),
@@ -137,6 +139,46 @@ export const StaycationBookingDetailsScreen = () => {
     totalPayment: totalPayment.toString(),
     remainingAmount: remainingAmount.toString(),
     amountPaid: amountPaid.toString(),
+  };
+
+  // Native Share Handler with Dynamic Data
+  const handleWhatsAppShare = async () => {
+    let venueName = "our venue";
+
+    // 1. Dynamically fetch the venue name from the database using the booking ID
+    if (bookingDetails?.id) {
+      try {
+        const { data } = await supabase
+          .from("staycation_bookings")
+          .select("venues(name)")
+          .eq("id", bookingDetails.id)
+          .single();
+        const vName = (data?.venues as any)?.name;
+        if (vName) venueName = vName;
+      } catch (e) {
+        console.warn("Could not fetch venue name for Sharing");
+      }
+    }
+
+    // 2. Build the dynamic template string using the screen's data
+    const shareMessage = `Booking Confirmed! 🎉
+Hi ${bookingData.name},
+Your slot at ${venueName} is locked in via Bookr.
+Date: ${bookingData.checkIn} to ${bookingData.checkOut}
+Payment Summary:
+Total: ₹${bookingData.totalPayment}
+Paid: ₹${bookingData.amountPaid}
+Due at Venue: ₹${bookingData.remainingAmount}
+Thank you for booking with Bookr!`;
+
+    // 3. Trigger Native Share
+    try {
+      await Share.share({
+        message: shareMessage,
+      });
+    } catch (error) {
+      Alert.alert("Error", "Could not open the share menu.");
+    }
   };
 
   return (
@@ -265,34 +307,16 @@ export const StaycationBookingDetailsScreen = () => {
           )}
         </View>
 
-        {/* Conditional Payment History Button (Figma) */}
-        {isFromHistory && (
-          <TouchableOpacity style={styles.historyBtn}>
-            <View style={styles.historyContent}>
-              <Clock size={ms(20)} color="#e55959" />
-              <Text style={[styles.historyText, styles.currentHistoryText]}>
-                Current Booking Payment History
-              </Text>
-            </View>
-            <ChevronRight size={ms(18)} color="black" />
-          </TouchableOpacity>
-        )}
-
-        {/* Action Buttons */}
-        <TouchableOpacity style={styles.whatsappBtn}>
+        {/* WhatsApp Share Button */}
+        <TouchableOpacity
+          style={styles.whatsappBtn}
+          onPress={handleWhatsAppShare}
+          activeOpacity={0.8}>
           <View style={styles.whatsappContent}>
             <Share2 size={ms(20)} color="white" />
             <Text style={styles.whatsappText}>Share confirmation</Text>
           </View>
           <Share2 size={ms(18)} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.historyBtn}>
-          <View style={styles.historyContent}>
-            <FileText size={ms(20)} color="black" />
-            <Text style={styles.historyText}>Previous History</Text>
-          </View>
-          <ChevronRight size={ms(18)} color="black" />
         </TouchableOpacity>
 
         {!isFromHistory && !isOnline && !isCancelled && (
@@ -314,50 +338,22 @@ export const StaycationBookingDetailsScreen = () => {
   );
 };
 
+// ... keep existing styles below ...
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  root: { flex: 1, backgroundColor: COLORS.background },
   loaderContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.background,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: vs(10),
-    marginBottom: vs(20),
-  },
-  backBtn: {
-    marginRight: hs(12),
-  },
-  profileRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(10),
-  },
-  profileName: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(22),
-    color: "black",
-  },
-  section: {
-    marginBottom: vs(20),
-  },
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(6),
-    marginBottom: vs(4),
-  },
-  labelText: {
-    fontFamily: "Gilroy-Medium",
-    fontSize: fs(14),
-    color: "black",
-  },
+  header: { flexDirection: "row", alignItems: "center", marginTop: vs(10), marginBottom: vs(20) },
+  backBtn: { marginRight: hs(12) },
+  profileRow: { flexDirection: "row", alignItems: "center", gap: hs(10) },
+  profileName: { fontFamily: "Gilroy-Bold", fontSize: fs(22), color: "black" },
+  section: { marginBottom: vs(20) },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6), marginBottom: vs(4) },
+  labelText: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: "black" },
   phoneBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -377,29 +373,16 @@ const styles = StyleSheet.create({
     paddingVertical: vs(12),
     width: "100%",
   },
-  valueText: {
-    fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(14),
-    color: "black",
-  },
+  valueText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "black" },
   callBtn: {
     backgroundColor: "black",
     paddingHorizontal: hs(14),
     paddingVertical: vs(6),
     borderRadius: ms(6),
   },
-  callBtnText: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(14),
-    color: "white",
-  },
-  row: {
-    flexDirection: "row",
-    marginBottom: vs(20),
-  },
-  infoBlock: {
-    flex: 1,
-  },
+  callBtnText: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: "white" },
+  row: { flexDirection: "row", marginBottom: vs(20) },
+  infoBlock: { flex: 1 },
   paymentCard: {
     borderWidth: 1,
     borderColor: "#cbdffe",
@@ -408,9 +391,7 @@ const styles = StyleSheet.create({
     gap: vs(10),
     marginBottom: vs(20),
   },
-  paymentItem: {
-    width: "100%",
-  },
+  paymentItem: { width: "100%" },
   paymentLabel: {
     fontFamily: "Gilroy-Bold",
     fontSize: fs(14),
@@ -423,43 +404,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: hs(10),
     paddingVertical: vs(12),
   },
-  amountPaidBox: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  paymentValue: {
-    fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(14),
-    color: "black",
-  },
-  splitBox: {
-    flexDirection: "row",
-    gap: hs(10),
-    marginTop: vs(10),
-  },
-  splitInput: {
-    flex: 1,
-  },
-  addBtnRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(4),
-  },
-  addText: {
-    fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(14),
-    color: "#00b562",
-  },
-  amountPaidText: {
-    color: "#00b562",
-  },
-  remainingAmountText: {
-    color: "#e55959",
-  },
-  currentHistoryText: {
-    color: "#e55959",
-  },
+  amountPaidBox: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  paymentValue: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "black" },
+  splitBox: { flexDirection: "row", gap: hs(10), marginTop: vs(10) },
+  splitInput: { flex: 1 },
+  addBtnRow: { flexDirection: "row", alignItems: "center", gap: hs(4) },
+  addText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#00b562" },
+  amountPaidText: { color: "#00b562" },
+  remainingAmountText: { color: "#e55959" },
   savePaymentBtn: {
     backgroundColor: "#63a1fd",
     paddingVertical: vs(12),
@@ -467,11 +419,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: vs(12),
   },
-  savePaymentText: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(16),
-    color: "white",
-  },
+  savePaymentText: { fontFamily: "Gilroy-Bold", fontSize: fs(16), color: "white" },
   whatsappBtn: {
     backgroundColor: "#25d366",
     flexDirection: "row",
@@ -481,36 +429,8 @@ const styles = StyleSheet.create({
     borderRadius: ms(10),
     marginBottom: vs(10),
   },
-  whatsappContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(6),
-  },
-  whatsappText: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(14),
-    color: "white",
-  },
-  historyBtn: {
-    borderWidth: 1,
-    borderColor: "#cbdffe",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: hs(10),
-    borderRadius: ms(10),
-    marginBottom: vs(10),
-  },
-  historyContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(6),
-  },
-  historyText: {
-    fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(14),
-    color: "black",
-  },
+  whatsappContent: { flexDirection: "row", alignItems: "center", gap: hs(6) },
+  whatsappText: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: "white" },
   cancelBtn: {
     borderWidth: 1,
     borderColor: "#cbdffe",
@@ -520,13 +440,6 @@ const styles = StyleSheet.create({
     padding: hs(10),
     borderRadius: ms(10),
   },
-  cancelContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  cancelText: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(14),
-    color: "black",
-  },
+  cancelContent: { flexDirection: "row", alignItems: "center" },
+  cancelText: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: "black" },
 });

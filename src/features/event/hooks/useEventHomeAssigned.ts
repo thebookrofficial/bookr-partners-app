@@ -26,7 +26,11 @@ export const useEventHomeAssigned = (eventId: string) => {
 
   const fetchEventData = useCallback(
     async (actionType: "initial" | "refresh" | "silent" = "initial") => {
-      if (!eventId) return;
+      if (!eventId) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
       if (actionType === "initial") setLoading(true);
       if (actionType === "refresh") setRefreshing(true);
       try {
@@ -34,9 +38,15 @@ export const useEventHomeAssigned = (eventId: string) => {
           .from("events")
           .select("*")
           .eq("id", eventId)
-          .single();
+          .maybeSingle();
 
         if (eventError) throw eventError;
+        if (!event) {
+          console.warn(`No assigned event found with ID: ${eventId}`);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
         setEventData(event);
 
         let categoryMap: Record<string, string> = {};

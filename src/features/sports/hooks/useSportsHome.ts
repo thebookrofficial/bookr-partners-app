@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { SportsService } from "../services/sports.service";
 
 interface VenueData {
   id: string;
@@ -32,7 +33,7 @@ export interface BookingData {
   date: string;
   time: string;
   price: string;
-  status: "Online" | "Offline" | "Advance" | "Settlement" | "Full";
+  status: "Online" | "Offline" | "Settlement";
   avatarUrl?: string;
   isOfflineRecord: boolean;
   isDisabled?: boolean;
@@ -40,7 +41,6 @@ export interface BookingData {
   startTimeRaw?: string;
 }
 
-// Helper to guarantee timezone-safe local date strings!
 const getLocalDateString = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -73,61 +73,38 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-
   const [slots, setSlots] = useState<SlotData[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
-
   const [bookings, setBookings] = useState<BookingData[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
 
-  // 1. SMART FETCH: Finds the venue matching the selected category
+  // Auto-select the first available category if the current one isn't valid for this vendor
+  useEffect(() => {
+    if (availableCategories.length > 0 && !availableCategories.includes(category)) {
+      // NOTE: Handled in the UI layer now
+    }
+  }, [availableCategories, category, initialVenueId]);
+
   const fetchVenueDetails = useCallback(async () => {
     setLoading(true);
     try {
       const dbSportType = category.toLowerCase().replace(" ", "_");
 
-      const { data: initialVenue, error: initialError } = await supabase
-        .from("venues")
-        .select("owner_id")
-        .eq("id", initialVenueId)
-        .single();
+      const { initialVenue, matchedVenue } = await SportsService.getVenueDetails(
+        initialVenueId,
+        dbSportType,
+      );
 
-      if (initialError || !initialVenue) throw initialError || new Error("Owner not found");
-
-      // Fetch all sports categories owned by this specific vendor
-      const { data: allSportsData } = await supabase
-        .from("venues")
-        .select(`sports_venues!inner ( sports_type )`)
-        .eq("owner_id", initialVenue.owner_id);
-
+      const allSportsData = await SportsService.getAllVendorSportsCategories(initialVenue.owner_id);
       if (allSportsData) {
         const uniqueTypes = new Set<string>();
         allSportsData.forEach((v: any) => {
           const sv = v.sports_venues;
-          if (Array.isArray(sv)) {
-            sv.forEach((s: any) => uniqueTypes.add(s.sports_type));
-          } else if (sv) {
-            uniqueTypes.add(sv.sports_type);
-          }
+          if (Array.isArray(sv)) sv.forEach((s: any) => uniqueTypes.add(s.sports_type));
+          else if (sv) uniqueTypes.add(sv.sports_type);
         });
-        const categoriesArray = Array.from(uniqueTypes).map(formatCategoryName);
-        setAvailableCategories(categoriesArray);
+        setAvailableCategories(Array.from(uniqueTypes).map(formatCategoryName));
       }
-
-      const { data: matchedVenue, error: matchedError } = await supabase
-        .from("venues")
-        .select(
-          `
-          id, name, vertical, cover_image_url,
-          sports_venues!inner ( sports_type )
-        `,
-        )
-        .eq("owner_id", initialVenue.owner_id)
-        .eq("sports_venues.sports_type", dbSportType)
-        .limit(1)
-        .maybeSingle();
-
-      if (matchedError) throw matchedError;
 
       if (matchedVenue) {
         setCurrentVenueId(matchedVenue.id);
@@ -138,12 +115,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           cover_image_url: matchedVenue.cover_image_url,
         });
 
-        const { data: groundsData } = await supabase
-          .from("sports_grounds")
-          .select("id, name")
-          .eq("venue_id", matchedVenue.id)
-          .order("display_order", { ascending: true });
-
+        const groundsData = await SportsService.getGrounds(matchedVenue.id);
         if (groundsData && groundsData.length > 0) {
           setGrounds(groundsData);
           setActiveGroundId(groundsData[0].id);
@@ -165,40 +137,30 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     }
   }, [initialVenueId, category]);
 
-  // 2. Fetch Slots using SAFE Local Date
   const fetchSlots = useCallback(async () => {
     if (!activeGroundId || !currentVenueId) return;
-
     setSlotsLoading(true);
     try {
-      // EXACT SAME DATE STRING GENERATOR FOR BOTH
       const localDateString = getLocalDateString(selectedDate);
+      const slotsData = await SportsService.getSlots(
+        currentVenueId,
+        activeGroundId,
+        localDateString,
+      );
 
-      const { data: slotsData, error } = await supabase
-        .from("sports_slots")
-        .select(
-          `id, 
-          start_time, 
-          end_time, 
-          status, 
-          sports_bookings ( platform_fee, gateway_fee )`,
-        )
-        .eq("venue_id", currentVenueId)
-        .eq("ground_id", activeGroundId)
-        .eq("slot_date", localDateString) // <--- SAFE DATE
-        .order("start_time", { ascending: true });
-
-      if (error) throw error;
-
-      const formattedSlots: SlotData[] = (slotsData || []).map(slot => {
+      const formattedSlots: SlotData[] = (slotsData || []).map((slot: any) => {
         const [startHStr, startMStr] = slot.start_time.split(":");
         const hourInt = parseInt(startHStr, 10);
         const ampm = hourInt >= 12 ? "PM" : "AM";
         const displayHour = hourInt % 12 || 12;
         const displayMins = startMStr === "00" ? "" : `:${startMStr}`;
 
-        const booking = slot.sports_bookings?.[0];
-        const isManual = booking ? booking.platform_fee === 0 && booking.gateway_fee === 0 : false;
+        // Ensure we don't mark slot as manual if the ONLY booking inside it is cancelled
+        const validBooking = slot.sports_bookings?.find((b: any) => {
+          const bStatus = (b.booking_status || "").toLowerCase().trim();
+          return bStatus !== "cancelled" && bStatus !== "refunded";
+        });
+        const isManual = validBooking ? !validBooking.user_id : false;
 
         const startH = parseInt(startHStr, 10);
         const startM = parseInt(startMStr, 10);
@@ -215,7 +177,6 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           isManualBooking: isManual,
         };
       });
-
       setSlots(formattedSlots);
     } catch (error) {
       console.error("Error fetching slots:", error);
@@ -224,43 +185,41 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     }
   }, [currentVenueId, activeGroundId, selectedDate]);
 
-  // 3. Fetch Bookings using SAFE Local Date
   const fetchBookings = useCallback(async () => {
     if (!activeGroundId || !currentVenueId) return;
-
     setBookingsLoading(true);
     try {
-      // EXACT SAME DATE STRING GENERATOR FOR BOTH
       const localDateString = getLocalDateString(selectedDate);
-
-      const { data: bookingsData, error } = await supabase
-        .from("sports_bookings")
-        .select(
-          `
-          id,
-          total_amount,
-          paid_amount,
-          booking_status,
-          platform_fee,
-          gateway_fee,
-          guest_name,
-          guest_phone,
-          profiles ( full_name, phone, avatar_url ),
-          sports_slots!inner ( start_time, end_time, ground_id, slot_date )
-        `,
-        )
-        .eq("venue_id", currentVenueId)
-        .eq("sports_slots.ground_id", activeGroundId)
-        .eq("sports_slots.slot_date", localDateString);
-
-      if (error) throw error;
-
+      const bookingsData = await SportsService.getBookings(
+        currentVenueId,
+        activeGroundId,
+        localDateString,
+      );
       const now = new Date();
 
       const formattedBookings: BookingData[] = (bookingsData || [])
-        .filter((b: any) => b.booking_status !== "cancelled")
+        .filter((b: any) => {
+          const bookingStat = b.booking_status?.toLowerCase().trim();
+          const oldStat = b.status?.toLowerCase().trim();
+          const sltStat = b.slot_status?.toLowerCase().trim();
+
+          const isCancelledOrRefunded = [bookingStat, oldStat].some(
+            val => val === "cancelled" || val === "refunded",
+          );
+
+          if (isCancelledOrRefunded) {
+            return false;
+          }
+
+          if (sltStat === "available") {
+            return false;
+          }
+
+          return true;
+        })
         .map((b: any) => {
           const formatTime = (timeStr: string) => {
+            if (!timeStr) return "";
             const [h, m] = timeStr.split(":");
             const hourInt = parseInt(h, 10);
             const ampm = hourInt >= 12 ? "PM" : "AM";
@@ -269,67 +228,58 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             return `${displayHour}${displayMins} ${ampm}`;
           };
 
-          const slotDate = new Date(b.sports_slots.slot_date);
-          const formattedDate = slotDate.toLocaleDateString("en-GB", {
+          const formattedDate = new Date(b.slot_date).toLocaleDateString("en-GB", {
             weekday: "short",
             day: "numeric",
             month: "short",
             year: "numeric",
           });
 
-          const isOffline = b.platform_fee === 0 && b.gateway_fee === 0;
+          // DETERMINING OFFLINE VS ONLINE
+          const isOffline = !!b.guest_name && b.guest_name !== "null";
 
-          // Calculate if slot has passed
-          const [endH, endM] = b.sports_slots.end_time.split(":").map(Number);
-          const slotEndTime = new Date(b.sports_slots.slot_date);
+          // TIME CALCULATIONS
+          const [endH, endM] = b.end_time.split(":").map(Number);
+          const slotEndTime = new Date(b.slot_date);
           slotEndTime.setHours(endH, endM, 0, 0);
-
           const isDisabled = now > slotEndTime;
           const isUnpaid = Number(b.paid_amount || 0) < Number(b.total_amount || 0);
 
-          // Keep at top for 45 mins if payment pending
-          const diffMs = now.getTime() - slotEndTime.getTime();
-          const diffMins = diffMs / (1000 * 60);
-          const isRecentlyPassedPending = isDisabled && isUnpaid && diffMins <= 45;
+          const finalName = isOffline ? b.guest_name : b.full_name || "Guest User";
+          const finalPhone = isOffline ? b.guest_phone || "" : b.phone || "";
 
           return {
             id: b.id,
-            name: b.profiles?.full_name || b.guest_name || "Guest User",
-            phone: b.profiles?.phone || b.guest_phone || "",
+            name: finalName,
+            phone: finalPhone,
             date: formattedDate,
-            time: `${formatTime(b.sports_slots.start_time)} - ${formatTime(
-              b.sports_slots.end_time,
-            )}`,
-            price: `₹${b.total_amount || 0}`,
+            time: `${formatTime(b.start_time)} - ${formatTime(b.end_time)}`,
+            // CRITICAL FIX: Changed total_amount to paid_amount
+            price: `₹${b.paid_amount || 0}`,
             status: isOffline ? "Offline" : "Online",
-            avatarUrl: b.profiles?.avatar_url,
+            avatarUrl: b.avatar_url,
             isOfflineRecord: isOffline,
-            isDisabled: isDisabled,
-            // Only show "Payment Pending" status once the slot has passed
+            isDisabled,
             isPaymentPending: isDisabled && isUnpaid,
-            // Internal fields for sorting
-            isRecentlyPassedPending,
-            startTimeRaw: b.sports_slots.start_time,
+            startTimeRaw: b.start_time,
           };
         });
 
-      // Sort logic
-      // Priority 1: !isDisabled OR isRecentlyPassedPending
-      // Priority 2: everything else (isDisabled and not recently passed pending)
-      const sortedBookings = [...formattedBookings].sort((a: any, b: any) => {
-        const aPriority = !a.isDisabled || a.isRecentlyPassedPending ? 0 : 1;
-        const bPriority = !b.isDisabled || b.isRecentlyPassedPending ? 0 : 1;
-
-        if (aPriority !== bPriority) return aPriority - bPriority;
-
-        // Recently passed pending bookings should be at the VERY top (priority within Priority 0)
-        if (a.isRecentlyPassedPending && !b.isRecentlyPassedPending) return -1;
-        if (!a.isRecentlyPassedPending && b.isRecentlyPassedPending) return 1;
-
-        return a.startTimeRaw.localeCompare(b.startTimeRaw);
+      // Sort: Upcoming bookings first, Passed (isDisabled) bookings at the bottom.
+      // Maintain chronological order within each group.
+      const sortedBookings = [...formattedBookings].sort((a, b) => {
+        if (a.isDisabled !== b.isDisabled) {
+          return a.isDisabled ? 1 : -1; // non-disabled (upcoming) first
+        }
+        return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
       });
 
-      setBookings(sortedBookings);
+      // Deduplicate ghost bookings by slot time
+      const uniqueBookings = Array.from(
+        new Map(sortedBookings.map(b => [b.startTimeRaw, b])).values(),
+      );
+
+      setBookings(uniqueBookings);
     } catch (error) {
       console.error("Error fetching bookings:", error);
     } finally {
@@ -346,12 +296,12 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     fetchBookings();
   }, [fetchSlots, fetchBookings]);
 
-  // Real-time listener for bookings
+  // Real-time listener for BOTH bookings AND slots
   useEffect(() => {
     if (!currentVenueId) return;
 
     const channel = supabase
-      .channel(`sports_bookings_${currentVenueId}`)
+      .channel(`sports_sync_${currentVenueId}`)
       .on(
         "postgres_changes",
         {
@@ -361,8 +311,19 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           filter: `venue_id=eq.${currentVenueId}`,
         },
         () => {
-          fetchSlots();
           fetchBookings();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "sports_slots",
+          filter: `venue_id=eq.${currentVenueId}`,
+        },
+        () => {
+          fetchSlots();
         },
       )
       .subscribe();

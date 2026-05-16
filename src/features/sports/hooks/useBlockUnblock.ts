@@ -6,19 +6,20 @@ import { supabase } from "@/lib/supabase";
 import { Alert } from "react-native";
 
 export interface BlockedEntry {
-  id: string; // First slot ID in the range for reference
+  id: string;
   startDate: string;
   endDate: string;
   startTime: string;
   endTime: string;
   isAllDay: boolean;
-  slotIds: string[]; // All slot IDs included in this block
+  slotIds: string[];
 }
 
 export const useBlockUnblock = (venueId: string, groundId: string) => {
   const [activeBlocks, setActiveBlocks] = useState<BlockedEntry[]>([]);
   const [pastBlocks, setPastBlocks] = useState<BlockedEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false); // FIXED: Added missing state
 
   const fetchBlocks = useCallback(
     async (isInitialLoad = false) => {
@@ -40,7 +41,6 @@ export const useBlockUnblock = (venueId: string, groundId: string) => {
 
         if (error) throw error;
 
-        // --- STEP 1: Merge consecutive hours on the SAME day ---
         const dailyGroups: Record<string, BlockedEntry[]> = {};
 
         (data || []).forEach(slot => {
@@ -51,12 +51,10 @@ export const useBlockUnblock = (venueId: string, groundId: string) => {
           const dayBlocks = dailyGroups[slot.slot_date];
           const lastBlock = dayBlocks.length > 0 ? dayBlocks[dayBlocks.length - 1] : null;
 
-          // If this slot starts exactly when the last slot ended, merge them!
           if (lastBlock && lastBlock.endTime === slot.start_time) {
             lastBlock.endTime = slot.end_time;
             lastBlock.slotIds.push(slot.id);
           } else {
-            // Otherwise, start a new block for this day
             dayBlocks.push({
               id: slot.id,
               startDate: slot.slot_date,
@@ -69,7 +67,6 @@ export const useBlockUnblock = (venueId: string, groundId: string) => {
           }
         });
 
-        // Flatten into a single array sorted by date
         const flattenedDailyBlocks: BlockedEntry[] = [];
         Object.keys(dailyGroups)
           .sort()
@@ -77,7 +74,6 @@ export const useBlockUnblock = (venueId: string, groundId: string) => {
             flattenedDailyBlocks.push(...dailyGroups[date]);
           });
 
-        // --- STEP 2: Merge identical time blocks across CONSECUTIVE days ---
         const finalBlocks: BlockedEntry[] = [];
         let currentRangeBlock: BlockedEntry | null = null;
 
@@ -94,7 +90,6 @@ export const useBlockUnblock = (venueId: string, groundId: string) => {
             const diffTime = Math.abs(currDateObj.getTime() - prevDateObj.getTime());
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-            // If it's the exact same time block and the very next day, stretch the date range
             if (isSameTime && diffDays === 1) {
               currentRangeBlock.endDate = block.startDate;
               currentRangeBlock.slotIds.push(...block.slotIds);
@@ -109,7 +104,6 @@ export const useBlockUnblock = (venueId: string, groundId: string) => {
           finalBlocks.push(currentRangeBlock);
         }
 
-        // --- STEP 3: Sort into Active vs Past ---
         const active: BlockedEntry[] = [];
         const past: BlockedEntry[] = [];
         const todayDateObj = new Date();
@@ -144,45 +138,31 @@ export const useBlockUnblock = (venueId: string, groundId: string) => {
     isAllDay: boolean,
   ) => {
     try {
-      let totalUpdated = 0;
+      setIsSubmitting(true);
 
-      for (const date of dates) {
-        let query = supabase
-          .from("sports_slots")
-          .update({ status: "blocked", blocked_reason: "Manual Block" })
-          .eq("venue_id", venueId)
-          .eq("ground_id", groundId)
-          .eq("slot_date", date);
+      // Simple direct update on existing rows
+      let query = supabase
+        .from("sports_slots")
+        .update({ status: "blocked", blocked_reason: "Manual Block" })
+        .eq("venue_id", venueId)
+        .eq("ground_id", groundId)
+        .in("slot_date", dates); // Handles all selected dates at once
 
-        if (!isAllDay && fromTime && toTime) {
-          query = query.gte("start_time", fromTime);
-          if (toTime !== "00:00:00") {
-            query = query.lt("start_time", toTime);
-          }
-        }
-
-        const { data, error } = await query.select("id");
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          totalUpdated += data.length;
-        }
+      if (!isAllDay && fromTime && toTime) {
+        query = query.gte("start_time", fromTime).lt("start_time", toTime);
       }
 
-      if (totalUpdated === 0) {
-        Alert.alert(
-          "No Slots Found",
-          "The system couldn't find any generated slots to block for these dates/times. If you picked a date far in the future, the slots may not exist in the database yet!",
-        );
-        return false;
-      }
+      const { error } = await query;
+      if (error) throw error;
 
-      Alert.alert("Success", "Slots blocked successfully.");
+      Alert.alert("Success", "Slots blocked.");
       await fetchBlocks(false);
       return true;
     } catch (err: any) {
       Alert.alert("Error", err.message);
       return false;
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -206,5 +186,13 @@ export const useBlockUnblock = (venueId: string, groundId: string) => {
     fetchBlocks(true);
   }, [fetchBlocks]);
 
-  return { activeBlocks, pastBlocks, loading, blockSlots, unblockSlots, refresh: fetchBlocks };
+  return {
+    activeBlocks,
+    pastBlocks,
+    loading,
+    isSubmitting,
+    blockSlots,
+    unblockSlots,
+    refresh: fetchBlocks,
+  };
 };

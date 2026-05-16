@@ -6,6 +6,10 @@ import { supabase } from "@/lib/supabase";
 import { Alert } from "react-native";
 
 interface BulkBookingParams {
+  ownerId: string | undefined; // Added to securely identify the vendor
+  venueId: string;
+  groundId: string;
+  category: string; // Added to find the right sports venue
   mobile: string;
   name: string;
   fromDate: Date;
@@ -53,15 +57,11 @@ export const useBulkBooking = () => {
   const confirmBulkBooking = async (params: BulkBookingParams) => {
     setIsSubmitting(true);
     try {
-      const { data: venue } = await supabase.from("venues").select("id").limit(1).maybeSingle();
-      const { data: ground } = await supabase
-        .from("sports_grounds")
-        .select("id")
-        .eq("venue_id", venue?.id)
-        .limit(1)
-        .maybeSingle();
+      if (!params.ownerId) throw new Error("Authentication error: Could not identify vendor.");
 
-      if (!venue?.id || !ground?.id) throw new Error("Could not resolve Venue or Ground ID.");
+      const { venueId, groundId } = params;
+
+      if (!venueId || !groundId) throw new Error("Could not resolve Venue or Ground ID.");
 
       const cleanMobile = params.mobile.replace(/[^\d]/g, "");
       const { data: profile } = await supabase
@@ -96,8 +96,8 @@ export const useBulkBooking = () => {
           const { data: existingSlot } = await supabase
             .from("sports_slots")
             .select("id, status")
-            .eq("venue_id", venue.id)
-            .eq("ground_id", ground.id)
+            .eq("venue_id", venueId)
+            .eq("ground_id", groundId)
             .eq("slot_date", d)
             .eq("start_time", startTime24)
             .maybeSingle();
@@ -106,7 +106,6 @@ export const useBulkBooking = () => {
 
           if (existingSlot) {
             if (existingSlot.status !== "available") {
-              // console.log(`Slot ${d} ${hour} is already taken or ghosted.`);
               continue;
             }
             await supabase.from("sports_slots").update({ status: "booked" }).eq("id", slotId);
@@ -114,8 +113,8 @@ export const useBulkBooking = () => {
             const { data: newSlot, error: insErr } = await supabase
               .from("sports_slots")
               .insert({
-                venue_id: venue.id,
-                ground_id: ground.id,
+                venue_id: venueId,
+                ground_id: groundId,
                 slot_date: d,
                 start_time: startTime24,
                 end_time: endTime24,
@@ -139,7 +138,7 @@ export const useBulkBooking = () => {
               user_id: profile?.id || null,
               guest_name: profile ? null : params.name,
               guest_phone: profile ? null : cleanMobile,
-              venue_id: venue.id,
+              venue_id: venueId,
               slot_id: slotId,
               booking_status: "confirmed",
 

@@ -9,6 +9,7 @@ import { ServiceHeader } from "../components/ServiceHeader";
 import { Search, ChevronDown, SlidersHorizontal, Phone, Clock } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
+import { useServiceStore } from "@/store/serviceStore";
 import { useSportsHistory } from "../hooks/useSportsHistory";
 import { FilterBottomSheet, DateFilterOption } from "../components/FilterBottomSheet";
 
@@ -89,17 +90,34 @@ export const SportsHistoryScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, any>>();
 
-  // Extract initial serviceId gracefully
+  // Extract initial serviceId and category gracefully
   let serviceId = route.params?.serviceId;
+  let routeCategory = route.params?.category;
+
   if (!serviceId) {
     const parentState = navigation.getParent()?.getState();
     const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
-    serviceId =
-      (tabRoute?.params as any)?.serviceId || (tabRoute?.params as any)?.params?.serviceId || "";
+    const params = (tabRoute?.params as any) || {};
+    serviceId = params.serviceId || params.params?.serviceId || "";
+    routeCategory = routeCategory || params.category || params.params?.category;
   }
 
+  const { selectedCategories, setServiceCategory } = useServiceStore();
+
+  const lastRouteCategory = React.useRef<string | undefined>(undefined);
+
+  React.useEffect(() => {
+    if (routeCategory && routeCategory !== lastRouteCategory.current) {
+      lastRouteCategory.current = routeCategory;
+      if (selectedCategories[serviceId] !== routeCategory) {
+        setServiceCategory(serviceId, routeCategory);
+      }
+    }
+  }, [routeCategory, serviceId, setServiceCategory, selectedCategories]);
+
+  const selectedCategory = selectedCategories[serviceId] || routeCategory || "Football";
+
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("Football");
   const [searchQuery, setSearchQuery] = useState("");
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -114,6 +132,7 @@ export const SportsHistoryScreen = () => {
     dateFilter,
     customRange,
   );
+  const { activeVenueName } = useServiceStore();
 
   return (
     <ScreenContainer backgroundColor={COLORS.background}>
@@ -121,7 +140,7 @@ export const SportsHistoryScreen = () => {
         {/* Header */}
         <View style={styles.headerZIndex}>
           <ServiceHeader
-            title="Elite Strikers Club"
+            title={activeVenueName}
             subtitle="History"
             category={selectedCategory}
             onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
@@ -209,7 +228,7 @@ export const SportsHistoryScreen = () => {
                 style={styles.dropdownItem}
                 activeOpacity={0.7}
                 onPress={() => {
-                  setSelectedCategory(cat);
+                  setServiceCategory(serviceId, cat);
                   setIsCategoryOpen(false);
                 }}>
                 <Text variant="body2" weight="semiBold">

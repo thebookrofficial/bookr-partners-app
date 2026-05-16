@@ -6,8 +6,7 @@ import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-nat
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Avatar, PillTabs } from "@/components/ui";
 import { ServiceCard } from "../components/ServiceCard";
-import { StaffCard } from "../components/StaffCard";
-import { ArrowLeft, Bell, Settings, Contact, Plus } from "lucide-react-native";
+import { Bell, Settings } from "lucide-react-native";
 import { vs, hs, ms } from "@/utils/responsive.utils";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -22,19 +21,37 @@ export const VendorProfileScreen = () => {
   const { user, clientProfile } = useAuthStore();
   const { loading, venues, refresh } = useVendorData();
 
-  // Set initial tab based on Blueprint standardized naming [cite: 237]
   const [activeTab, setActiveTab] = useState(STRINGS.profile.tabs[0]);
 
-  /**
-   * Filter venues based on the selected PillTab.
-   * Standardizes comparison between UI labels and DB vertical_type enums.
-   */
+  const availableTabs = useMemo(() => {
+    const allTabs = STRINGS.profile.tabs;
+    if (venues.length === 0) return [allTabs[0]];
+
+    const activeVerticals = new Set(venues.map(v => v.vertical.toLowerCase()));
+
+    return allTabs.filter((tab, index) => {
+      if (index === 0) return true;
+
+      const tabKey = tab.toLowerCase();
+      return (
+        activeVerticals.has(tabKey) ||
+        activeVerticals.has(tabKey.replace(/s$/, "")) ||
+        (tabKey === "dining" && activeVerticals.has("dining"))
+      );
+    });
+  }, [venues]);
+
+  React.useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0]);
+    }
+  }, [availableTabs, activeTab]);
+
   const filteredVenues = useMemo(() => {
     if (activeTab === "All Venues" || activeTab === "All Services") return venues;
 
     return venues.filter(venue => {
       const tabKey = activeTab.toLowerCase();
-      // Logic to handle plural UI tabs vs singular DB enum values (e.g., 'Sports' -> 'sports')
       return (
         venue.vertical.toLowerCase() === tabKey ||
         venue.vertical.toLowerCase() === tabKey.replace(/s$/, "")
@@ -49,20 +66,8 @@ export const VendorProfileScreen = () => {
       paddingHorizontal={hs(12)}
       refreshing={loading}
       onRefresh={refresh}>
-      {/* 1. App Bar - Branding & Global Actions */}
       <View style={styles.appBar}>
         <View style={styles.appBarLeft}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => {
-              if (navigation.canGoBack()) {
-                navigation.goBack();
-              } else {
-                navigation.navigate("Dashboard");
-              }
-            }}>
-            <ArrowLeft size={ms(20)} color={COLORS.text.primary} />
-          </TouchableOpacity>
           <Text variant="h3" weight="bold">
             {STRINGS.profile.title}
           </Text>
@@ -77,7 +82,6 @@ export const VendorProfileScreen = () => {
         </View>
       </View>
 
-      {/* 2. Vendor Identity Header - Aligned with client_profiles  */}
       <View style={styles.headerContainer}>
         <TouchableOpacity
           style={styles.editBadge}
@@ -104,14 +108,13 @@ export const VendorProfileScreen = () => {
         </View>
       </View>
 
-      {/* 3. Venue Management Section  */}
       <View style={styles.sectionHeader}>
         <Text variant="body1" weight="bold" style={styles.sectionTitle}>
           {STRINGS.profile.ourServices}
         </Text>
       </View>
 
-      <PillTabs tabs={STRINGS.profile.tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      <PillTabs tabs={availableTabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <View style={styles.servicesList}>
         {loading ? (
@@ -129,9 +132,24 @@ export const VendorProfileScreen = () => {
               }
               onPress={() => {
                 if (venue.vertical === "sports") {
+                  // CRITICAL FIX: Handle Supabase returning an object instead of an array
+                  const sportsData: any = venue.sports_venues;
+                  const sportsType = Array.isArray(sportsData)
+                    ? sportsData[0]?.sports_type
+                    : sportsData?.sports_type;
+
+                  const categoryMap: Record<string, string> = {
+                    football: "Football",
+                    box_cricket: "Box Cricket",
+                    pickleball: "Pickleball",
+                    cricket: "Cricket",
+                  };
+
+                  const category = sportsType ? categoryMap[sportsType] || sportsType : undefined;
+
                   navigation.navigate("SportsServiceTabs", {
                     screen: "SportsHome",
-                    params: { serviceId: venue.id },
+                    params: { serviceId: venue.id, category },
                   });
                 } else if (venue.vertical === "dining") {
                   navigation.navigate("DineServiceTabs", {
@@ -162,24 +180,6 @@ export const VendorProfileScreen = () => {
           </View>
         )}
       </View>
-
-      {/* 4. Staff Management Section [cite: 58] */}
-      <View style={styles.sectionHeader}>
-        <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-          {STRINGS.profile.yourStaff}
-        </Text>
-      </View>
-      <TouchableOpacity style={styles.actionRowBtn} onPress={() => navigation.navigate("AddStaff")}>
-        <Contact size={ms(24)} color={COLORS.primary} />
-        <Text variant="body2" weight="bold">
-          {STRINGS.profile.addStaff}
-        </Text>
-        <Plus size={ms(17)} color={COLORS.text.primary} style={styles.plusSign} />
-      </TouchableOpacity>
-
-      {/* Note: In Phase 7, we will map these from the database as well */}
-      <StaffCard name="Talia Mar" role="Restaurant" type="Manager" />
-      <StaffCard name="Rohit Sharma" role="Turf" type="Employee" />
 
       <View style={{ height: vs(40) }} />
     </ScreenContainer>

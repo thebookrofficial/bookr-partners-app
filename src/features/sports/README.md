@@ -9,7 +9,7 @@ The `sports/` module is designed to handle the unique requirements of sports ser
 ## Core Screens
 
 - **`SportsHomeScreen`**: The primary operational dashboard. Displays date selection, ground switching, a visual `TimeSlotGrid`, and real-time booking lists.
-- **`SportsHistoryScreen`**: Comprehensive transaction and booking history, grouped by month with automated settlement status tracking (Full/Online/Offline).
+- **`SportsHistoryScreen`**: Comprehensive transaction and booking history, grouped by month with automated settlement status tracking (Online/Offline).
 - **`SportsDashboardScreen`**: Analytics and insights for the sports venue, providing a high-level overview of performance metrics.
 - **`SportsEssentialsScreen`**: Administrative hub for advanced actions like Bulk Bookings, Slot Blocking, and Venue Updates.
 - **`BookingDetailsScreen`**: Deep-dive into specific bookings with split-payment management (Cash/Online) and quick communication actions.
@@ -19,7 +19,7 @@ The `sports/` module is designed to handle the unique requirements of sports ser
 
 ## Key Components
 
-- **`BookingCard`**: Versatile card for booking summaries with status-based styling (Online, Offline, Advance).
+- **`BookingCard`**: Versatile card for booking summaries with status-based styling (Online, Offline).
 - **`TimeSlotGrid`**: Interactive grid for hourly availability, color-coded by status (Available, Online, Manual, Blocked).
 - **`OfflineBookingSheet`**: Bottom-sheet modal for rapid manual entry of single bookings with integrated payment logging.
 - **`ViewBulkBooking`**: Comprehensive view for managing batches of bookings created via the Bulk Booking flow.

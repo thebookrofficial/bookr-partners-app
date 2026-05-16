@@ -14,7 +14,7 @@ import {
   StaycationTabParamList,
   EventTabParamList,
 } from "./navigation.types";
-import { View, StyleSheet, ActivityIndicator } from "react-native";
+import { View, StyleSheet, ActivityIndicator, Text as RNText } from "react-native";
 import {
   CalendarCheck,
   FileText,
@@ -58,10 +58,10 @@ import { EventOffersScreen } from "@/features/event/screens/EventOffersScreen";
 import { EventGuestInviteScreen } from "@/features/event/screens/EventGuestInviteScreen";
 import { EventDashboardScreen } from "@/features/event/screens/EventDashboardScreen";
 import { EventScanScreen } from "@/features/event/screens/EventScanScreen";
+import { EventEntryDetailsScreen } from "@/features/event/screens/EventEntryDetailsScreen";
 import { LegalViewScreen } from "@/features/settings/screens/LegalViewScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
-import { Text } from "@/components/ui";
 
 import { COLORS } from "@/constants/theme";
 import { vs, ms, fs, hs } from "@/utils/responsive.utils";
@@ -72,9 +72,7 @@ import { useAuthStore } from "@/store";
 
 const PlaceholderScreen = ({ title }: { title: string }) => (
   <View style={styles.placeholderContainer}>
-    <Text variant="h2" weight="bold">
-      {title}
-    </Text>
+    <RNText style={styles.placeholderText}>{title}</RNText>
   </View>
 );
 
@@ -316,6 +314,7 @@ const MainNavigator = () => (
     <MainStack.Screen name="DineOffers" component={DineOffersScreen} />
     <MainStack.Screen name="EventOffers" component={EventOffersScreen} />
     <MainStack.Screen name="EventGuestInvite" component={EventGuestInviteScreen} />
+    <MainStack.Screen name="EventEntryDetails" component={EventEntryDetailsScreen} />
     <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />
     <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
     <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />
@@ -368,6 +367,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.background,
+  },
+  placeholderText: {
+    fontSize: fs(24),
+    fontWeight: "bold",
+    color: COLORS.text.primary,
   },
   scanButton: {
     width: ms(56),

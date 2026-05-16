@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -16,35 +16,29 @@ import { useGuestHistory, HistoryBooking } from "../hooks/useGuestHistory";
 export const GuestHistoryScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<MainStackParamList, "GuestHistory">>();
-  const { guestId: guestIdParam, bookingId } = route.params;
 
-  const guestId = guestIdParam || bookingId;
+  // CRITICAL FIX 1: Extract vertical from route.params
+  const { guestId: guestIdParam, bookingId, vertical } = route.params;
 
-  const { history, stats, guestName, loading } = useGuestHistory(guestId);
+  const identifier = guestIdParam || bookingId;
 
-  // Formatting helpers
-  const formatDisplayDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
+  // CRITICAL FIX 2: Pass vertical into the hook
+  const { history, stats, guestName, guestPhone, loading } = useGuestHistory(identifier, vertical);
 
-  const formatTime = (timeStr: string) => {
-    const [h] = timeStr.split(":");
-    const hourInt = parseInt(h, 10);
-    return `${hourInt % 12 || 12} ${hourInt >= 12 ? "Pm" : "Am"}`;
-  };
+  const [activeTab, setActiveTab] = useState<"past" | "upcoming" | "cancelled">("past");
 
-  const groupedHistory = history.reduce((acc: { [key: string]: HistoryBooking[] }, item) => {
-    const date = new Date(item.slot_date);
-    const monthYear = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
-    if (!acc[monthYear]) acc[monthYear] = [];
-    acc[monthYear].push(item);
-    return acc;
-  }, {});
+  const filteredHistory = history.filter(h => h.booking_status === activeTab);
+
+  const groupedHistory = filteredHistory.reduce(
+    (acc: { [key: string]: HistoryBooking[] }, item) => {
+      const date = new Date(item.raw_date);
+      const monthYear = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+      if (!acc[monthYear]) acc[monthYear] = [];
+      acc[monthYear].push(item);
+      return acc;
+    },
+    {},
+  );
 
   if (loading) {
     return (
@@ -72,16 +66,12 @@ export const GuestHistoryScreen = () => {
 
       {/* 2. Profile Overview */}
       <View style={styles.profileSection}>
-        {/* <Image
-          source={require("@/assets/images/placeholder-user.png")} // Replace with actual avatar logic
-          style={styles.largeAvatar}
-        /> */}
         <View style={styles.profileInfo}>
           <Text variant="h2" weight="bold">
             {guestName}
           </Text>
           <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
-            {guestId}
+            {guestPhone}
           </Text>
           <Text variant="body2" color={COLORS.text.muted}>
             {history.length} Total Bookings
@@ -91,27 +81,51 @@ export const GuestHistoryScreen = () => {
 
       {/* 3. Stats Tabs */}
       <View style={styles.statsTabsContainer}>
-        <TouchableOpacity style={[styles.statTab, styles.statTabActive]}>
-          <Text variant="body1" weight="bold" color={COLORS.text.inverse}>
+        <TouchableOpacity
+          style={[styles.statTab, activeTab === "past" && styles.statTabActive]}
+          onPress={() => setActiveTab("past")}>
+          <Text
+            variant="body1"
+            weight="bold"
+            color={activeTab === "past" ? COLORS.text.inverse : COLORS.text.primary}>
             {stats.past}
           </Text>
-          <Text variant="caption" weight="semiBold" color={COLORS.text.inverse}>
+          <Text
+            variant="caption"
+            weight="semiBold"
+            color={activeTab === "past" ? COLORS.text.inverse : COLORS.text.muted}>
             Past Booking
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.statTab}>
-          <Text variant="body1" weight="bold">
+        <TouchableOpacity
+          style={[styles.statTab, activeTab === "upcoming" && styles.statTabActive]}
+          onPress={() => setActiveTab("upcoming")}>
+          <Text
+            variant="body1"
+            weight="bold"
+            color={activeTab === "upcoming" ? COLORS.text.inverse : COLORS.text.primary}>
             {stats.upcoming}
           </Text>
-          <Text variant="caption" weight="semiBold" color={COLORS.text.muted}>
+          <Text
+            variant="caption"
+            weight="semiBold"
+            color={activeTab === "upcoming" ? COLORS.text.inverse : COLORS.text.muted}>
             Upcoming
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.statTab}>
-          <Text variant="body1" weight="bold">
+        <TouchableOpacity
+          style={[styles.statTab, activeTab === "cancelled" && styles.statTabActive]}
+          onPress={() => setActiveTab("cancelled")}>
+          <Text
+            variant="body1"
+            weight="bold"
+            color={activeTab === "cancelled" ? COLORS.text.inverse : COLORS.danger}>
             {stats.cancelled}
           </Text>
-          <Text variant="caption" weight="semiBold" color={COLORS.danger}>
+          <Text
+            variant="caption"
+            weight="semiBold"
+            color={activeTab === "cancelled" ? COLORS.text.inverse : COLORS.danger}>
             Cancelled
           </Text>
         </TouchableOpacity>
@@ -120,7 +134,7 @@ export const GuestHistoryScreen = () => {
       {/* 4. Bookings List */}
       <View style={styles.listSection}>
         <Text variant="body2" weight="bold" style={styles.sectionLabel}>
-          PAST BOOKINGS
+          {activeTab.toUpperCase()} BOOKINGS
         </Text>
         {Object.keys(groupedHistory).map(month => (
           <React.Fragment key={month}>
@@ -130,13 +144,13 @@ export const GuestHistoryScreen = () => {
             {groupedHistory[month].map(item => (
               <BookingCard
                 key={item.id}
-                name={guestName}
-                subtitle={guestId}
-                date={formatDisplayDate(item.slot_date)}
-                time={`${formatTime(item.start_time)} - ${formatTime(item.end_time)}`}
+                name={item.venue_name}
+                subtitle={item.vertical === "staycation" ? "Staycation Booking" : "Sports Booking"}
+                date={item.display_date}
+                time={item.display_time}
                 price={`₹${item.total_amount}`}
-                // CHANGE THIS: Use item.status instead of the ternary logic
-                status={item.status}
+                // Use 'as any' to bypass the strict prop type constraint
+                status={(item.booking_status === "cancelled" ? "Cancelled" : item.status) as any}
                 hideCallButton={true}
               />
             ))}
@@ -160,7 +174,6 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, fontSize: fs(22) },
   headerActions: { flexDirection: "row", alignItems: "center" },
   profileSection: { alignItems: "center", marginBottom: vs(30) },
-  largeAvatar: { width: ms(120), height: ms(120), borderRadius: ms(60), marginBottom: vs(12) },
   profileInfo: { alignItems: "center", gap: vs(2) },
   statsTabsContainer: { flexDirection: "row", gap: hs(12), marginBottom: vs(24) },
   statTab: {

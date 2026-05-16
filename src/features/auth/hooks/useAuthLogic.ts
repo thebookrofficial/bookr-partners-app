@@ -64,6 +64,7 @@ export const useAuthLogic = () => {
           });
           if (error) throw error;
         } else {
+          console.error("Google Sign-In Success but No ID Token. Check webClientId in .env");
           throw new Error("No ID token present!");
         }
       } else {

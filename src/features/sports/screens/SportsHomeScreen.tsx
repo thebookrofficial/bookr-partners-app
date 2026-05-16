@@ -14,18 +14,42 @@ import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { RouteProp, useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
+import { MainStackParamList } from "@/navigation/navigation.types";
 import { OfflineBookingSheet } from "../components/OfflineBookingSheet";
 import { useSportsHome } from "../hooks/useSportsHome";
+import { useServiceStore } from "@/store/serviceStore";
 import { Calendar } from "react-native-calendars";
 
 export const SportsHomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
-  const route = useRoute<RouteProp<SportsTabParamList, "SportsHome">>();
-  const { serviceId } = route.params;
+  const route = useRoute<RouteProp<any, any>>();
+  let serviceId = route.params?.serviceId;
+  let initialCategory = route.params?.category;
 
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("Football"); // Initial fallback
+  if (!serviceId) {
+    const parentState = navigation.getParent()?.getState();
+    const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
+    const params = (tabRoute?.params as any) || {};
+    serviceId = params.serviceId || params.params?.serviceId || "";
+    initialCategory = initialCategory || params.category || params.params?.category;
+  }
+
+  const { selectedCategories, setServiceCategory } = useServiceStore();
+  const lastInitialCategory = React.useRef<string | undefined>(undefined);
+
+  // CRITICAL FIX: Put initialCategory FIRST.
+  // Prioritize the route parameter (what was clicked), THEN the stored value, THEN fallback to Football.
+  const selectedCategory = initialCategory || selectedCategories[serviceId] || "Football";
+
+  // Force the store to update ONLY if we came in via a NEW specific category navigation
+  useEffect(() => {
+    if (initialCategory && initialCategory !== lastInitialCategory.current) {
+      lastInitialCategory.current = initialCategory;
+      if (selectedCategories[serviceId] !== initialCategory) {
+        setServiceCategory(serviceId, initialCategory);
+      }
+    }
+  }, [initialCategory, selectedCategories, serviceId, setServiceCategory]);
 
   const {
     venue,
@@ -47,11 +71,19 @@ export const SportsHomeScreen = () => {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const { activeVenueName, setActiveVenueName } = useServiceStore();
+
   useFocusEffect(
     React.useCallback(() => {
       refresh();
     }, [refresh]),
   );
+
+  useEffect(() => {
+    if (venue?.name) {
+      setActiveVenueName(venue.name);
+    }
+  }, [venue?.name, setActiveVenueName]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -62,9 +94,9 @@ export const SportsHomeScreen = () => {
   // Auto-select the first available category if the current one isn't valid for this vendor
   useEffect(() => {
     if (availableCategories.length > 0 && !availableCategories.includes(selectedCategory)) {
-      setSelectedCategory(availableCategories[0]);
+      setServiceCategory(serviceId, availableCategories[0]);
     }
-  }, [availableCategories, selectedCategory]);
+  }, [availableCategories, selectedCategory, serviceId, setServiceCategory]);
 
   const getFormattedDate = (date: Date) => {
     const today = new Date();
@@ -97,14 +129,11 @@ export const SportsHomeScreen = () => {
         paddingHorizontal={hs(12)}
         refreshing={refreshing}
         onRefresh={onRefresh}>
+        {/* Dropdown action removed, now it functions as a static label */}
         <ServiceHeader
-          title={venue?.name || "Loading..."}
+          title={venue?.name || activeVenueName}
           category={selectedCategory}
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
-          // ONLY pass the press handler if there are multiple options
-          onCategoryPress={
-            availableCategories.length > 1 ? () => setIsCategoryOpen(!isCategoryOpen) : undefined
-          }
         />
 
         {loading ? (
@@ -169,6 +198,13 @@ export const SportsHomeScreen = () => {
                 onSlotPress={_slot => {}}
               />
             )}
+
+            <Text
+              variant="body1"
+              weight="bold"
+              style={[styles.sectionTitle, { marginTop: vs(24) }]}>
+              BOOKINGS
+            </Text>
 
             <View style={styles.bookingsContainer}>
               {bookingsLoading ? (
@@ -258,36 +294,6 @@ export const SportsHomeScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
-
-      {/* --- DYNAMIC OVERLAY DROPDOWN --- */}
-      {isCategoryOpen && (
-        <View style={styles.dropdownOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => setIsCategoryOpen(false)}
-          />
-          <View style={styles.dropdownMenu}>
-            {availableCategories.map(cat => (
-              <TouchableOpacity
-                key={cat}
-                style={styles.dropdownItem}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setSelectedCategory(cat);
-                  setIsCategoryOpen(false);
-                }}>
-                <Text variant="body2" weight="semiBold">
-                  {cat}
-                </Text>
-                <View style={styles.radioOuter}>
-                  {selectedCategory === cat && <View style={styles.radioInner} />}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
     </View>
   );
 };
@@ -312,7 +318,7 @@ const styles = StyleSheet.create({
   emptySlotsText: { textAlign: "center", marginVertical: vs(20) },
   loaderStyle: { marginVertical: vs(20) },
   sectionTitle: { textTransform: "uppercase", marginBottom: vs(6) },
-  bookingsContainer: { marginTop: vs(20), width: "100%" },
+  bookingsContainer: { marginTop: vs(8), width: "100%" },
   fab: {
     position: "absolute",
     right: hs(12),
@@ -346,49 +352,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-  },
-  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
-  dropdownMenu: {
-    position: "absolute",
-    top: vs(55),
-    right: hs(12),
-    backgroundColor: COLORS.background,
-    borderRadius: ms(10),
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    width: hs(180),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-    padding: hs(6),
-    gap: vs(6),
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(8),
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    borderRadius: ms(8),
-  },
-  radioOuter: {
-    width: ms(20),
-    height: ms(20),
-    borderRadius: ms(10),
-    borderWidth: 2,
-    borderColor: COLORS.text.primary,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  radioInner: {
-    width: ms(10),
-    height: ms(10),
-    borderRadius: ms(5),
-    backgroundColor: COLORS.text.primary,
   },
   emptyVenueText: {
     textAlign: "center",

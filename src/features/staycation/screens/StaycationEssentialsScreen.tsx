@@ -6,7 +6,12 @@ import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
-import { Ban, Ticket, RefreshCw, ChevronRight } from "lucide-react-native";
+import {
+  Ban,
+  Ticket,
+  //  RefreshCw,
+  ChevronRight,
+} from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -46,7 +51,7 @@ export const StaycationEssentialsScreen = () => {
     serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
   }
 
-  const { venue } = useStaycationHome(serviceId);
+  const { activeVenue: venue } = useStaycationHome(serviceId);
 
   const handlePress = (label: string) => {
     if (label === "Close date") {
@@ -69,11 +74,11 @@ export const StaycationEssentialsScreen = () => {
       <View style={styles.listContainer}>
         <EssentialsItem label="Close date" Icon={Ban} onPress={() => handlePress("Close date")} />
         <EssentialsItem label="Offers" Icon={Ticket} onPress={() => handlePress("Offers")} />
-        <EssentialsItem
+        {/* <EssentialsItem
           label="Update Venue Info"
           Icon={RefreshCw}
           onPress={() => handlePress("Update Venue Info")}
-        />
+        /> */}
       </View>
     </ScreenContainer>
   );

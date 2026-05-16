@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Bookr Partner</string>
+    <string name="StallionProjectId">69eddef6a3e81eefa553da7c</string>
+    <string name="StallionAppToken">spb_WlvlpOmwCHRWPsZ_jrykU_Xz4IIj4ZCE8OAcATBavG</string>
 </resources>
