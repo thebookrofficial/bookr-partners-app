@@ -97,7 +97,11 @@ export const OfflineBookingSheet = ({
   const [hasHistory, setHasHistory] = useState(false);
   const [bookedHours, setBookedHours] = useState<string[]>([]);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
+
+  // Pricing State
   const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0 });
+
+  // Hour Selection State
   const [fromTime, setFromTime] = useState("Start Time");
   const [toTime, setToTime] = useState("End Time");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
@@ -220,6 +224,7 @@ export const OfflineBookingSheet = ({
     fetchVenuePricing();
   }, [venueId, isVisible]);
 
+  // AUTO-CALCULATE TOTAL PAYMENT
   useEffect(() => {
     if (
       !fromTime ||
@@ -227,19 +232,31 @@ export const OfflineBookingSheet = ({
       fromTime === "Start Time" ||
       toTime === "End Time" ||
       pricing.default === 0
-    )
+    ) {
       return;
+    }
+
     const startIdx = HOURS.indexOf(fromTime);
     const endIdx = HOURS.indexOf(toTime);
+
     if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) return;
 
     const selectedHours = HOURS.slice(startIdx, endIdx);
     let total = 0;
+
     selectedHours.forEach(hour => {
+      // Day Session: 6 AM to 5 PM
+      // Night Session: 5 PM to 12 AM
       const hIdx = HOURS.indexOf(hour);
       const fivePMIdx = HOURS.indexOf("5 PM");
-      total += hIdx < fivePMIdx ? pricing.day || pricing.default : pricing.night || pricing.default;
+
+      if (hIdx < fivePMIdx) {
+        total += pricing.day || pricing.default;
+      } else {
+        total += pricing.night || pricing.default;
+      }
     });
+
     setTotalPayment(total.toString());
   }, [fromTime, toTime, pricing, HOURS]);
 
@@ -423,6 +440,7 @@ export const OfflineBookingSheet = ({
         </TouchableOpacity>
       </TouchableOpacity>
 
+      {/* FIXED HOUR PICKER MODAL */}
       <Modal visible={!!showHourPicker} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowHourPicker(null)} />

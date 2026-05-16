@@ -69,9 +69,6 @@ export const BookingDetailsScreen = () => {
   // Automatically set suggested extra money when time changes
   useEffect(() => {
     if (isAddingOn) {
-      // Basic logic: if 30 min, suggest half of an hour's price, else full
-      // You can adjust this to pull from your venue pricing state if available
-      // const hourlyRate = 1000; // Fallback or booking.total_amount based on duration
       const suggested = addOnTime === "30 min" ? "500" : "1000";
       setExtraMoney(suggested);
     }
@@ -187,6 +184,7 @@ export const BookingDetailsScreen = () => {
       return;
     }
 
+    // REGEX FIX: Remove EVERYTHING except digits and the '+' sign
     const cleanNumber = guestPhone.replace(/[^\d+]/g, "");
     const url = `tel:${cleanNumber}`;
 
@@ -615,6 +613,7 @@ export const BookingDetailsScreen = () => {
                   setShowCancelModal(false);
                   const success = await cancelBooking();
 
+                  // If cancellation was successful in the database, close this screen!
                   if (success) {
                     navigation.goBack();
                   }
@@ -812,6 +811,7 @@ const styles = StyleSheet.create({
     padding: ms(6),
     gap: hs(6),
     marginTop: vs(10),
+    marginBottom: vs(12),
   },
   shareText: {
     flex: 1,

@@ -45,7 +45,7 @@ export const useBookingDetails = (bookingId: string) => {
   const fetchDetails = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Fetch Booking Details (Added created_at)
+      // 1. Fetch Booking Details
       const { data: rawData, error: bookingError } = await supabase
         .from("sports_bookings")
         .select(
@@ -211,7 +211,6 @@ export const useBookingDetails = (bookingId: string) => {
     }
   };
 
-  // Add this inside the useBookingDetails hook
   const extendBooking = async (additionalMinutes: number, additionalCost: number) => {
     if (!booking) return false;
     setIsSaving(true);

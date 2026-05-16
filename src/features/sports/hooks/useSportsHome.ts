@@ -48,6 +48,7 @@ const getLocalDateString = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+// Helper to format raw database sports_type into beautiful display names
 const formatCategoryName = (dbName: string) => {
   const MAP: Record<string, string> = {
     football: "Football",
@@ -56,6 +57,7 @@ const formatCategoryName = (dbName: string) => {
     cricket: "Cricket",
   };
   if (MAP[dbName]) return MAP[dbName];
+  // Fallback: replaces underscores with spaces and capitalizes each word
   return dbName
     .split("_")
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -69,6 +71,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
   const [activeGroundId, setActiveGroundId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [slots, setSlots] = useState<SlotData[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
