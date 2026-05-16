@@ -12,6 +12,9 @@ import { EventSummaryStats } from "../components/EventSummaryStats";
 import { EventBookingList } from "../components/EventBookingList";
 import { EventCharts } from "../components/EventCharts";
 import { useEventHomeOpen } from "../hooks/useEventHomeOpen";
+import { useNavigation } from "@react-navigation/native";
+import { MainStackParamList } from "@/navigation/navigation.types";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -20,6 +23,7 @@ interface EventHomeScreenOpenProps {
 }
 
 export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const {
     loading,
     refreshing,
@@ -33,6 +37,10 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
     setActiveTab,
     refresh,
   } = useEventHomeOpen(eventId);
+
+  const handleBookingPress = (booking: any) => {
+    navigation.navigate("EventEntryDetails", { entryId: booking.id });
+  };
 
   if (loading) {
     return (
@@ -81,7 +89,7 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
         </View>
 
         {/* 4. Booking List */}
-        <EventBookingList bookings={filteredBookings} />
+        <EventBookingList bookings={filteredBookings} onBookingPress={handleBookingPress} />
 
         {/* 5. Charts */}
         {/* Pass categories exactly as expected by EventCharts */}

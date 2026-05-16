@@ -56,8 +56,6 @@ export const useAuthLogic = () => {
       await GoogleSignin.hasPlayServices();
       const response = await GoogleSignin.signIn();
 
-      // console.log("Google Sign-In Response:", JSON.stringify(response, null, 2));
-
       if (isSuccessResponse(response)) {
         if (response.data.idToken) {
           const { error } = await supabase.auth.signInWithIdToken({

@@ -15,22 +15,11 @@ import {
   Share,
 } from "react-native";
 import { Text } from "@/components/ui";
-import {
-  User,
-  Phone,
-  Calendar,
-  ChevronDown,
-  FileText,
-  ChevronRight,
-  Wallet,
-} from "lucide-react-native";
+import { User, Phone, Calendar, ChevronDown, Wallet } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { supabase } from "@/lib/supabase";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { MainStackParamList } from "@/navigation/navigation.types";
 import { useCreateStaycationOfflineBooking } from "../hooks/useCreateStaycationOfflineBooking";
 
 interface StaycationOfflineBookingSheetProps {
@@ -49,7 +38,6 @@ export const StaycationOfflineBookingSheet = ({
   venueId,
 }: StaycationOfflineBookingSheetProps) => {
   const isFarmhouse = activeCategory === "Farmhouse";
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { createBooking, isLoading } = useCreateStaycationOfflineBooking();
 
   const [bookingFor, setBookingFor] = useState(isFarmhouse ? "Farmhouse" : "Cottages");
@@ -74,14 +62,39 @@ export const StaycationOfflineBookingSheet = ({
     title: string;
   } | null>(null);
 
-  const [hasHistory, setHasHistory] = useState(false);
+  const [availableRooms, setAvailableRooms] = useState<{ id: string; name: string }[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible && !isFarmhouse && venueId) {
+      const fetchVenueRooms = async () => {
+        const { data } = await supabase
+          .from("staycation_rooms")
+          .select("id, room_name, room_number")
+          .eq("venue_id", venueId)
+          .eq("is_active", true);
+
+        if (data) {
+          const mapped = data.map(r => ({
+            id: r.id,
+            name: `${r.room_name} (${r.room_number})`,
+          }));
+          setAvailableRooms(mapped);
+          if (mapped.length > 0) {
+            setRoomType(mapped[0].name);
+            setSelectedRoomId(mapped[0].id);
+          }
+        }
+      };
+      fetchVenueRooms();
+    }
+  }, [visible, isFarmhouse, venueId]);
 
   useEffect(() => {
     const lookupGuest = async () => {
       const cleanMobile = phone.replace(/[^\d]/g, "");
 
       if (cleanMobile.length !== 10) {
-        setHasHistory(false);
         return;
       }
 
@@ -131,14 +144,6 @@ export const StaycationOfflineBookingSheet = ({
         if (foundName) {
           setName(foundName);
         }
-
-        const historyOrQuery = guestPhoneOrQuery + (profile?.id ? `,user_id.eq.${profile.id}` : "");
-        const { count, error: historyError } = await supabase
-          .from("staycation_bookings")
-          .select("id", { count: "exact", head: true })
-          .or(historyOrQuery);
-
-        setHasHistory(!historyError && !!count && count > 0);
       } catch (err) {
         console.error("Lookup error:", err);
       }
@@ -159,7 +164,14 @@ export const StaycationOfflineBookingSheet = ({
   const handleDropdownSelect = (option: string) => {
     if (!activeDropdown) return;
     if (activeDropdown.type === "bookingFor") setBookingFor(option);
-    if (activeDropdown.type === "roomType") setRoomType(option);
+
+    // UPDATED: If selecting a room, find its ID from our state
+    if (activeDropdown.type === "roomType") {
+      setRoomType(option);
+      const roomObj = availableRooms.find(r => r.name === option);
+      if (roomObj) setSelectedRoomId(roomObj.id);
+    }
+
     if (activeDropdown.type === "guestCount") setGuestCount(option);
     if (activeDropdown.type === "groupType") setGroupType(option);
     setActiveDropdown(null);
@@ -193,6 +205,7 @@ export const StaycationOfflineBookingSheet = ({
       advancePaid: parseFloat(advancePaid) || 0,
       bookingType: bookingFor.toLowerCase(),
       roomType: isFarmhouse ? undefined : roomType,
+      roomId: isFarmhouse ? undefined : selectedRoomId,
       groupType: isFarmhouse ? groupType : undefined,
     });
 
@@ -345,7 +358,7 @@ Thank you for booking with Bookr!`;
                     onPress={() =>
                       setActiveDropdown({
                         type: "roomType",
-                        options: ["Private Room", "Deluxe Room"],
+                        options: availableRooms.map(r => r.name),
                         title: "Select Room Type",
                       })
                     }>
@@ -516,25 +529,6 @@ Thank you for booking with Bookr!`;
                 </View>
               </View>
 
-              {/* Previous History Button */}
-              {hasHistory && (
-                <TouchableOpacity
-                  style={styles.historyButton}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    onClose();
-                    navigation.navigate("GuestHistory", { guestId: phone, bookingId: "" });
-                  }}>
-                  <View style={styles.historyLeft}>
-                    <FileText size={ms(20)} color={COLORS.text.primary} />
-                    <Text weight="semiBold" style={styles.historyText}>
-                      Previous History
-                    </Text>
-                  </View>
-                  <ChevronRight size={ms(18)} color={COLORS.text.primary} />
-                </TouchableOpacity>
-              )}
-
               {/* Submit Button */}
               <TouchableOpacity
                 style={styles.bookNowButton}
@@ -651,19 +645,6 @@ const styles = StyleSheet.create({
   mutedText: { color: "#8C8C8C" },
   guestCountRight: { flexDirection: "row", alignItems: "center", gap: hs(6) },
   guestCountNum: { fontSize: fs(14), color: COLORS.text.primary },
-  historyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#CBDFFE",
-    borderRadius: ms(10),
-    paddingHorizontal: hs(12),
-    paddingVertical: vs(12),
-    marginTop: vs(8),
-  },
-  historyLeft: { flexDirection: "row", alignItems: "center", gap: hs(8) },
-  historyText: { fontSize: fs(14), color: COLORS.text.primary },
   bookNowButton: {
     backgroundColor: "#000000",
     borderRadius: ms(10),

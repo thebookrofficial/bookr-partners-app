@@ -46,7 +46,11 @@ export const useEventHomeOpen = (eventId: string) => {
 
   const fetchEventData = useCallback(
     async (actionType: "initial" | "refresh" | "silent" = "initial") => {
-      if (!eventId) return;
+      if (!eventId) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
       if (actionType === "initial") setLoading(true);
       if (actionType === "refresh") setRefreshing(true);
       try {

@@ -13,21 +13,41 @@ export const EventHomeScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
 
-  // Safely resolve serviceId from params or parent navigator
-  let serviceId = route.params?.serviceId;
-  if (!serviceId) {
-    const parentState = navigation.getParent()?.getState();
-    const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
-    const tabParams = tabRoute?.params as any;
-    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
-  }
-
   const [loading, setLoading] = useState(true);
   const [eventData, setEventData] = useState<{ id: string; seating_type: string } | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchBaseEvent = async () => {
-      if (!serviceId) return;
+      // 1. Resolve serviceId
+      let serviceId = route.params?.serviceId;
+      if (!serviceId) {
+        try {
+          const parentState = navigation.getParent()?.getState();
+          const currentRoute = parentState?.routes[parentState.index];
+          serviceId = currentRoute?.params?.serviceId;
+
+          if (!serviceId) {
+            // Fallback: look for EventServiceTabs specifically
+            const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
+            const tabParams = tabRoute?.params as any;
+            serviceId = tabParams?.serviceId || tabParams?.params?.serviceId;
+          }
+        } catch (e) {
+          console.warn("EventHome: Failed to resolve serviceId from parent state", e);
+        }
+      }
+
+      if (!isMounted) return;
+
+      if (!serviceId) {
+        console.warn("EventHome: No serviceId found, stopping loading.");
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
       try {
         const { data, error } = await supabase
           .from("events")
@@ -35,18 +55,31 @@ export const EventHomeScreen = () => {
           .eq("venue_id", serviceId)
           .order("created_at", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
-        if (error && error.code !== "PGRST116") throw error;
-        setEventData(data);
+        if (error) {
+          console.error("EventHome: Supabase error:", error.message);
+          throw error;
+        }
+
+        if (isMounted) {
+          setEventData(data);
+        }
       } catch (err) {
-        console.error("Error fetching base event:", err);
+        console.error("EventHome: Error fetching base event:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
+
     fetchBaseEvent();
-  }, [serviceId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [route.params?.serviceId, navigation]);
 
   if (loading) {
     return (

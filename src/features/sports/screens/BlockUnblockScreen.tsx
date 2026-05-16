@@ -96,6 +96,8 @@ export const BlockUnblockScreen = () => {
   const [toTime, setToTime] = useState("4 PM");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
 
+  const { activeVenueName } = useServiceStore();
+
   const handleDateChange = (event: any, selectedDate?: Date) => {
     const activePicker = showDatePicker;
     setShowDatePicker(null); // Hide picker (Android behavior)
@@ -163,7 +165,7 @@ export const BlockUnblockScreen = () => {
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <ServiceHeader
-          title="Elite Strikers Club"
+          title={activeVenueName}
           subtitle="Block / Unblock"
           category={selectedCategory}
           onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}

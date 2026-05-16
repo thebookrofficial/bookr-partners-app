@@ -8,6 +8,9 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { ChevronUp, FileText, Calendar } from "lucide-react-native";
 import { EventBookingCard } from "./EventBookingCard";
+import { useNavigation } from "@react-navigation/native";
+
+const DEFAULT_AVATAR = require("../../../assets/icons/ic-user-profile.png");
 
 interface BookingData {
   id: string;
@@ -15,14 +18,17 @@ interface BookingData {
   passType: string;
   time: string;
   date: string;
+  avatarUrl?: string;
 }
 
 interface EventBookingListProps {
   bookings: BookingData[];
+  onBookingPress?: (booking: BookingData) => void;
 }
 
-export const EventBookingList = ({ bookings }: EventBookingListProps) => {
+export const EventBookingList = ({ bookings, onBookingPress }: EventBookingListProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const navigation = useNavigation<any>();
 
   // Group bookings by date
   const groupedBookings = bookings.reduce((acc, booking) => {
@@ -33,7 +39,10 @@ export const EventBookingList = ({ bookings }: EventBookingListProps) => {
     return acc;
   }, {} as Record<string, BookingData[]>);
 
-  const dates = Object.keys(groupedBookings);
+  // Sort dates descending (newest dates first)
+  const dates = Object.keys(groupedBookings).sort((a, b) => {
+    return new Date(b).getTime() - new Date(a).getTime();
+  });
 
   return (
     <View style={styles.container}>
@@ -62,34 +71,50 @@ export const EventBookingList = ({ bookings }: EventBookingListProps) => {
 
       {!isCollapsed && (
         <View style={styles.listContainer}>
-          {dates.map(date => (
-            <View key={date} style={styles.dateGroup}>
-              <View style={styles.dateHeader}>
-                <View style={styles.dateHeaderLeft}>
-                  <Calendar size={ms(20)} color={COLORS.primary} />
-                  <Text weight="bold" style={styles.dateText}>
-                    {date}
-                  </Text>
-                </View>
-                <TouchableOpacity style={styles.dateHeaderRight} activeOpacity={0.7}>
-                  <Text weight="semiBold" style={styles.dateActionText}>
-                    All
-                  </Text>
-                  <ChevronUp size={ms(16)} color={COLORS.text.primary} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.cardsWrapper}>
-                {groupedBookings[date].map(booking => (
-                  <EventBookingCard
-                    key={booking.id}
-                    name={booking.name}
-                    passType={booking.passType}
-                    time={booking.time}
-                  />
-                ))}
-              </View>
+          {dates.length === 0 ? (
+            <View style={styles.emptyStateContainer}>
+              <Text weight="medium" style={styles.emptyStateText}>
+                No bookings found for this event.
+              </Text>
             </View>
-          ))}
+          ) : (
+            dates.map(date => (
+              <View key={date} style={styles.dateGroup}>
+                <View style={styles.dateHeader}>
+                  <View style={styles.dateHeaderLeft}>
+                    <Calendar size={ms(20)} color={COLORS.primary} />
+                    <Text weight="bold" style={styles.dateText}>
+                      {date}
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={styles.dateHeaderRight} activeOpacity={0.7}>
+                    <Text weight="semiBold" style={styles.dateActionText}>
+                      All
+                    </Text>
+                    <ChevronUp size={ms(16)} color={COLORS.text.primary} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.cardsWrapper}>
+                  {groupedBookings[date].map(booking => (
+                    <EventBookingCard
+                      key={booking.id}
+                      name={booking.name}
+                      passType={booking.passType}
+                      time={booking.time}
+                      avatarSource={booking.avatarUrl ? { uri: booking.avatarUrl } : DEFAULT_AVATAR}
+                      onPress={() => {
+                        if (onBookingPress) {
+                          onBookingPress(booking);
+                        } else {
+                          navigation.navigate("EventEntryDetails", { entryId: booking.id });
+                        }
+                      }}
+                    />
+                  ))}
+                </View>
+              </View>
+            ))
+          )}
         </View>
       )}
     </View>
@@ -118,7 +143,7 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: hs(2),
+    gap: hs(6),
     flex: 1,
   },
   headerTitle: {
@@ -140,6 +165,17 @@ const styles = StyleSheet.create({
   listContainer: {
     gap: vs(15),
   },
+  emptyStateContainer: {
+    paddingVertical: vs(30),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface.primary,
+    borderRadius: ms(10),
+  },
+  emptyStateText: {
+    fontSize: fs(14),
+    color: COLORS.text.muted,
+  },
   dateGroup: {
     gap: vs(10),
   },
@@ -152,7 +188,7 @@ const styles = StyleSheet.create({
   dateHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: hs(4),
+    gap: hs(6),
   },
   dateHeaderRight: {
     flexDirection: "row",

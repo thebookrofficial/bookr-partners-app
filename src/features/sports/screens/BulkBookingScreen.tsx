@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -16,11 +16,10 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useServiceStore } from "@/store/serviceStore";
 import { supabase } from "@/lib/supabase";
 
-// Match the exact status type defined in BookingData/BookingCard
 type BookingStatus = "Online" | "Offline" | "Settlement";
 
 interface BulkBookingItem {
-  ids: string[]; // Store all IDs in the batch
+  ids: string[];
   name: string;
   phone: string;
   dateRange: string;
@@ -37,20 +36,34 @@ export const BulkBookingScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "BulkBooking">>();
   const { venueId, groundId } = route.params;
 
+  // NEW: State for Grounds
+  const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
+  const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId || "");
+
   const { selectedCategories, setServiceCategory } = useServiceStore();
   const selectedCategory = selectedCategories[venueId] || "Football";
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
-  // --- ADD THIS DEBUG EFFECT ---
-  // useEffect(() => {
-  //   console.log("=== DEBUG BULK SCREEN ===");
-  //   console.log("Venue ID:", venueId);
-  //   console.log("Ground ID:", groundId);
-  //   console.log("Selected Category:", selectedCategory);
-  //   console.log("=========================");
-  // }, [venueId, groundId, selectedCategory]);
+  // NEW: Fetch Grounds on mount
+  useEffect(() => {
+    const fetchGrounds = async () => {
+      const { data } = await supabase
+        .from("sports_grounds")
+        .select("id, name")
+        .eq("venue_id", venueId)
+        .order("display_order", { ascending: true });
+
+      if (data && data.length > 0) {
+        setGrounds(data);
+        if (!selectedGroundId) setSelectedGroundId(data[0].id);
+      }
+    };
+    fetchGrounds();
+  }, [selectedGroundId, venueId]);
 
   const fetchBulkBookings = useCallback(async () => {
+    if (!selectedGroundId) return; // Wait until ground is selected
+
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -67,10 +80,11 @@ export const BulkBookingScreen = () => {
           created_at,
           booking_status,
           profiles (full_name, phone),
-          sports_slots (slot_date, start_time, end_time)
+          sports_slots!inner (slot_date, start_time, end_time, ground_id)
         `,
         )
         .eq("venue_id", venueId)
+        .eq("sports_slots.ground_id", selectedGroundId) // <-- CRITICAL FIX: Filters by selected ground
         .eq("platform_fee", 0)
         .eq("notes", "Bulk Booking Record")
         .neq("booking_status", "cancelled")
@@ -79,7 +93,6 @@ export const BulkBookingScreen = () => {
       if (error) throw error;
 
       // --- 1. SMART GROUPING ALGORITHM ---
-      // Groups rows inserted at the same time by the same vendor for the same user
       const groupedBatches: any[] = [];
       let currentBatch: any = null;
 
@@ -101,7 +114,6 @@ export const BulkBookingScreen = () => {
             item.guest_phone === currentBatch.base.guest_phone &&
             item.user_id === currentBatch.base.user_id;
 
-          // If created within 60 seconds of each other, it's the same bulk transaction!
           const isSameTransaction = Math.abs(batchTime - itemTime) < 60000;
 
           if (isSameUser && isSameTransaction) {
@@ -126,7 +138,6 @@ export const BulkBookingScreen = () => {
       const formattedData: BulkBookingItem[] = groupedBatches.map(batch => {
         const { base, ids, slots, totalPaid, totalCost } = batch;
 
-        // Calculate Date Range (e.g., "06 May - 12 May")
         const dates = slots.map((s: any) => new Date(s.slot_date).getTime());
         const minDate = new Date(Math.min(...dates));
         const maxDate = new Date(Math.max(...dates));
@@ -138,7 +149,6 @@ export const BulkBookingScreen = () => {
             ? formatDate(minDate)
             : `${formatDate(minDate)} - ${formatDate(maxDate)}`;
 
-        // Calculate Time Range (e.g., "7 AM - 10 AM")
         const formatTime = (t: string) => {
           const [h] = t.split(":");
           const hour = parseInt(h, 10);
@@ -171,7 +181,7 @@ export const BulkBookingScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [venueId]);
+  }, [venueId, selectedGroundId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -188,13 +198,12 @@ export const BulkBookingScreen = () => {
       return (
         <View style={styles.emptyContainer}>
           <Text variant="body2" color={COLORS.text.muted}>
-            No bulk bookings found.
+            No bulk bookings found for this ground.
           </Text>
         </View>
       );
     }
 
-    // Filter by tab if necessary, or show all
     return (
       <View style={styles.listContainer}>
         {bookings.map(item => (
@@ -205,14 +214,14 @@ export const BulkBookingScreen = () => {
             date={item.dateRange}
             time={item.timeRange}
             price=""
-            status={item.status} // Now correctly typed
+            status={item.status}
             hideCallButton={false}
             onPress={() =>
               navigation.navigate("BulkBookingDetails", {
                 bookingId: item.ids[0],
                 type: activeTab === "multiple" ? "multi" : "single",
                 venueId,
-                groundId,
+                groundId: selectedGroundId, // Passed currently selected ground
               })
             }
           />
@@ -225,10 +234,34 @@ export const BulkBookingScreen = () => {
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <ServiceHeader
         title="Elite Strikers Club"
-        subtitle="Bulk Booking"
+        subtitle="Bulk Booking 🚀"
         category={selectedCategory}
         onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
       />
+
+      {/* --- NEW GROUND SELECTOR --- */}
+      {grounds.length > 0 && (
+        <View style={styles.groundScrollWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.groundScroll}>
+            {grounds.map(g => (
+              <TouchableOpacity
+                key={g.id}
+                style={[styles.groundPill, selectedGroundId === g.id && styles.groundPillActive]}
+                onPress={() => setSelectedGroundId(g.id)}>
+                <Text
+                  variant="body2"
+                  weight="semiBold"
+                  color={selectedGroundId === g.id ? COLORS.text.inverse : COLORS.text.primary}>
+                  {g.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       <View style={styles.tabContainer}>
         <TouchableOpacity
@@ -266,7 +299,7 @@ export const BulkBookingScreen = () => {
             bookingId: "new",
             type: activeTab === "multiple" ? "multi" : "single",
             venueId,
-            groundId,
+            groundId: selectedGroundId, // Passes current ground to the form!
           })
         }>
         <Plus size={ms(30)} color={COLORS.text.inverse} />
@@ -306,12 +339,32 @@ export const BulkBookingScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  groundScrollWrapper: {
+    marginVertical: vs(10),
+  },
+  groundScroll: {
+    alignItems: "center",
+    paddingRight: hs(20), // buffer for scroll edge
+  },
+  groundPill: {
+    paddingHorizontal: hs(16),
+    paddingVertical: vs(8),
+    borderRadius: ms(20),
+    backgroundColor: COLORS.surface.primary,
+    marginRight: hs(10),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+  },
+  groundPillActive: {
+    backgroundColor: "#000000",
+    borderColor: "#000000",
+  },
   tabContainer: {
     flexDirection: "row",
     backgroundColor: COLORS.surface.primary,
     borderRadius: ms(10),
     padding: ms(4),
-    marginVertical: vs(10),
+    marginBottom: vs(10),
     gap: hs(10),
   },
   tab: {
@@ -336,8 +389,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
-  /* --- FIXED OVERLAY DROPDOWN STYLES --- */
   dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
   dropdownMenu: {
     position: "absolute",

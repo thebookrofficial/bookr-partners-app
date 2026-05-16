@@ -12,12 +12,16 @@ interface ServiceCardProps {
   title: string;
   location: string;
   image: ImageSourcePropType;
-  onPress?: () => void; // ADDED THIS LINE
+  onPress?: () => void;
 }
 
 export const ServiceCard = ({ title, location, image, onPress }: ServiceCardProps) => (
-  // CHANGED View to TouchableOpacity
-  <TouchableOpacity style={styles.container} activeOpacity={0.8} onPress={onPress}>
+  <TouchableOpacity
+    style={styles.container}
+    activeOpacity={0.8}
+    onPress={() => {
+      if (onPress) onPress();
+    }}>
     <Image source={image} style={styles.image} />
     <View style={styles.info}>
       <Text family="nichrome" style={styles.title}>

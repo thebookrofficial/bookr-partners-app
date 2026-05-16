@@ -20,9 +20,7 @@ import {
   User,
   ClipboardList,
   Plus,
-  ChevronRight,
   Share2,
-  FileText,
   Trash2,
   ChevronDown,
   Minus,
@@ -309,18 +307,6 @@ Thank you for booking with Bookr!`;
           )}
         </View>
 
-        {isFromHistory && (
-          <TouchableOpacity style={styles.historyBtn}>
-            <View style={styles.historyContent}>
-              <Clock size={ms(20)} color="#e55959" />
-              <Text style={[styles.historyText, styles.currentHistoryText]}>
-                Current Booking Payment History
-              </Text>
-            </View>
-            <ChevronRight size={ms(18)} color="black" />
-          </TouchableOpacity>
-        )}
-
         {/* WhatsApp Share Button */}
         <TouchableOpacity
           style={styles.whatsappBtn}
@@ -331,14 +317,6 @@ Thank you for booking with Bookr!`;
             <Text style={styles.whatsappText}>Share confirmation</Text>
           </View>
           <Share2 size={ms(18)} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.historyBtn}>
-          <View style={styles.historyContent}>
-            <FileText size={ms(20)} color="black" />
-            <Text style={styles.historyText}>Previous History</Text>
-          </View>
-          <ChevronRight size={ms(18)} color="black" />
         </TouchableOpacity>
 
         {!isFromHistory && !isOnline && !isCancelled && (
@@ -434,7 +412,6 @@ const styles = StyleSheet.create({
   addText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#00b562" },
   amountPaidText: { color: "#00b562" },
   remainingAmountText: { color: "#e55959" },
-  currentHistoryText: { color: "#e55959" },
   savePaymentBtn: {
     backgroundColor: "#63a1fd",
     paddingVertical: vs(12),
@@ -454,18 +431,6 @@ const styles = StyleSheet.create({
   },
   whatsappContent: { flexDirection: "row", alignItems: "center", gap: hs(6) },
   whatsappText: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: "white" },
-  historyBtn: {
-    borderWidth: 1,
-    borderColor: "#cbdffe",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: hs(10),
-    borderRadius: ms(10),
-    marginBottom: vs(10),
-  },
-  historyContent: { flexDirection: "row", alignItems: "center", gap: hs(6) },
-  historyText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "black" },
   cancelBtn: {
     borderWidth: 1,
     borderColor: "#cbdffe",

@@ -49,20 +49,30 @@ export const useSportsHistory = (
 
       const { data: initialVenue } = await supabase
         .from("venues")
-        .select("owner_id")
+        .select("id, owner_id, sports_venues(sports_type)")
         .eq("id", initialVenueId)
         .single();
       if (!initialVenue) throw new Error("Owner not found");
 
-      const { data: matchedVenue } = await supabase
-        .from("venues")
-        .select("id, sports_venues!inner(sports_type)")
-        .eq("owner_id", initialVenue.owner_id)
-        .eq("sports_venues.sports_type", dbSportType)
-        .limit(1)
-        .maybeSingle();
+      // Check if the initial venue itself matches the sport type
+      const initialSportType = initialVenue.sports_venues?.[0]?.sports_type;
+      let finalVenueId = "";
 
-      setCurrentVenueId(matchedVenue ? matchedVenue.id : "");
+      if (initialSportType === dbSportType) {
+        finalVenueId = initialVenue.id;
+      } else {
+        const { data: matchedVenue } = await supabase
+          .from("venues")
+          .select("id, sports_venues!inner(sports_type)")
+          .eq("owner_id", initialVenue.owner_id)
+          .eq("sports_venues.sports_type", dbSportType)
+          .limit(1)
+          .maybeSingle();
+
+        if (matchedVenue) finalVenueId = matchedVenue.id;
+      }
+
+      setCurrentVenueId(finalVenueId);
     } catch (error) {
       console.error("Venue resolution error:", error);
     }
@@ -82,12 +92,13 @@ export const useSportsHistory = (
         .from("sports_bookings")
         .select(
           `
-          id, guest_name, guest_phone, total_amount, paid_amount,
+          id, guest_name, guest_phone, total_amount, paid_amount, booking_status,
           profiles(full_name, phone),
           sports_slots!inner(slot_date, start_time, end_time)
         `,
         )
         .eq("venue_id", currentVenueId)
+        .neq("booking_status", "cancelled")
         .order("created_at", { ascending: false });
 
       if (error) throw error;

@@ -21,8 +21,8 @@ interface BookingCardProps {
   hideCallButton?: boolean;
   hideDateText?: boolean;
   useClockIcon?: boolean;
-  isDisabled?: boolean; // NEW: Triggers the greyed-out state
-  isPaymentPending?: boolean; // NEW: Triggers the red blinking text
+  isDisabled?: boolean;
+  isPaymentPending?: boolean;
   onPress?: () => void;
   onCallPress?: () => void;
 }
@@ -46,9 +46,8 @@ export const BookingCard = ({
 }: BookingCardProps) => {
   const textColor = isDisabled ? COLORS.text.secondary : COLORS.text.primary;
   const iconColor = COLORS.text.muted;
-  const cardBg = isDisabled ? "#E0E0E0" : COLORS.surface.primary; // Light grey for disabled state
+  const cardBg = isDisabled ? "#E0E0E0" : COLORS.surface.primary;
 
-  // Blinking Animation Logic
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -68,7 +67,7 @@ export const BookingCard = ({
         ]),
       ).start();
     } else {
-      fadeAnim.setValue(1); // Reset to fully visible if not pending
+      fadeAnim.setValue(1);
     }
   }, [isPaymentPending, fadeAnim]);
 
@@ -91,7 +90,7 @@ export const BookingCard = ({
   };
 
   const getStatusColor = () => {
-    if (isDisabled) return COLORS.text.muted; // Mute status color if past
+    if (isDisabled) return COLORS.text.muted;
     if (status === "Offline") return COLORS.danger;
     if (status === "Online") return COLORS.primary;
     return COLORS.text.muted;
@@ -141,6 +140,7 @@ export const BookingCard = ({
                   Payment Pending
                 </Animated.Text>
               )}
+              {/* CRITICAL FIX: Added explicit "Paid:" label for clarity */}
               <Text variant="body2" weight="semiBold" color={getPriceColor()}>
                 {price}
               </Text>
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   blinkingText: {
     color: COLORS.danger,
     fontSize: fs(10),
-    fontFamily: "Gilroy-Bold", // Match your app's font
+    fontFamily: "Gilroy-Bold",
     textTransform: "uppercase",
   },
   statusText: {

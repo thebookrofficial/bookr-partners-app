@@ -30,6 +30,7 @@ import {
   Send,
   Trash2,
   X,
+  ChevronDown,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -47,8 +48,12 @@ export const BookingDetailsScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "BookingDetails">>();
   const { bookingId } = route.params;
 
-  const { booking, paymentLogs, loading, isSaving, logPayment, cancelBooking } =
+  const { booking, paymentLogs, loading, isSaving, logPayment, cancelBooking, extendBooking } =
     useBookingDetails(bookingId);
+
+  const [isAddingOn, setIsAddingOn] = useState(false);
+  const [addOnTime, setAddOnTime] = useState("30 min");
+  const [extraMoney, setExtraMoney] = useState("0");
 
   const lottie = useMemo(() => {
     try {
@@ -61,14 +66,23 @@ export const BookingDetailsScreen = () => {
 
   const progress = useSharedValue(0);
 
+  // Automatically set suggested extra money when time changes
+  useEffect(() => {
+    if (isAddingOn) {
+      // Basic logic: if 30 min, suggest half of an hour's price, else full
+      // You can adjust this to pull from your venue pricing state if available
+      // const hourlyRate = 1000; // Fallback or booking.total_amount based on duration
+      const suggested = addOnTime === "30 min" ? "500" : "1000";
+      setExtraMoney(suggested);
+    }
+  }, [addOnTime, isAddingOn]);
+
   useEffect(() => {
     if (lottie) {
       const duration = lottie.duration();
-      // Initial animation
       progress.value = 0;
       progress.value = withTiming(duration, { duration: duration * 1000 });
 
-      // Repeat animation after 5 seconds
       const timer = setTimeout(() => {
         progress.value = 0;
         progress.value = withTiming(duration, { duration: duration * 1000 });
@@ -77,6 +91,16 @@ export const BookingDetailsScreen = () => {
       return () => clearTimeout(timer);
     }
   }, [lottie, progress]);
+
+  const handleConfirmExtension = async () => {
+    const mins = addOnTime === "30 min" ? 30 : 60;
+    const cost = parseFloat(extraMoney) || 0;
+
+    const success = await extendBooking(mins, cost);
+    if (success) {
+      setIsAddingOn(false);
+    }
+  };
 
   const frame = useDerivedValue(() => {
     if (!lottie) {
@@ -94,6 +118,7 @@ export const BookingDetailsScreen = () => {
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [cashInput, setCashInput] = useState("");
   const [onlineInput, setOnlineInput] = useState("");
 
@@ -105,7 +130,10 @@ export const BookingDetailsScreen = () => {
     );
   }
 
-  // Dynamic Calculations
+  const profileData = Array.isArray(booking.profiles) ? booking.profiles[0] : booking.profiles;
+  const guestName = booking.guest_name || profileData?.full_name || "Guest User";
+  const guestPhone = booking.guest_phone || profileData?.phone || "N/A";
+
   const totalAmount = Number(booking.total_amount) || 0;
   const currentPaid = Number(booking.paid_amount) || 0;
   const remainingAmount = Math.max(0, totalAmount - currentPaid);
@@ -136,13 +164,11 @@ export const BookingDetailsScreen = () => {
 
     let success = true;
 
-    // Log Cash (if any)
     if (cashAdded > 0) {
       const cashSuccess = await logPayment(cashAdded, "cash");
       if (!cashSuccess) success = false;
     }
 
-    // Log Online (if any)
     if (onlineAdded > 0 && success) {
       const onlineSuccess = await logPayment(onlineAdded, "online");
       if (!onlineSuccess) success = false;
@@ -156,17 +182,12 @@ export const BookingDetailsScreen = () => {
   };
 
   const handleCall = () => {
-    // 1. Prioritize the profile phone, then fallback to guest_phone
-    const rawPhoneNumber = booking.profiles?.phone || booking.guest_phone;
-
-    if (!rawPhoneNumber) {
+    if (guestPhone === "N/A") {
       Alert.alert("Error", "No phone number available for this guest.");
       return;
     }
 
-    // 2. REGEX FIX: Remove EVERYTHING except digits and the '+' sign
-    // This removes spaces, hyphens, and hidden characters that break deep links
-    const cleanNumber = rawPhoneNumber.replace(/[^\d+]/g, "");
+    const cleanNumber = guestPhone.replace(/[^\d+]/g, "");
     const url = `tel:${cleanNumber}`;
 
     Linking.openURL(url).catch(err => {
@@ -176,14 +197,12 @@ export const BookingDetailsScreen = () => {
   };
 
   const handleShareWhatsApp = async () => {
-    const guestName = booking.guest_name || booking.profiles?.full_name || "Guest";
     const venueName = booking.venues?.name || "the venue";
     const bookingDate = new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB");
     const bookingTime = `${formatHour(booking.sports_slots.start_time)} to ${formatHour(
       booking.sports_slots.end_time,
     )}`;
 
-    // Construct the text template
     const message =
       `Booking Confirmed! 🎉\n` +
       `Hi ${guestName},\n` +
@@ -199,21 +218,15 @@ export const BookingDetailsScreen = () => {
     try {
       const result = await Share.share({
         message: message,
-        title: "Booking Confirmation", // For email/dialog subjects
+        title: "Booking Confirmation",
       });
 
       if (result.action === Share.sharedAction) {
         if (result.activityType) {
-          // shared with a specific activity type on iOS
-          // eslint-disable-next-line no-console
-          console.log("Shared via:", result.activityType);
-        } else {
           // shared
         }
       } else if (result.action === Share.dismissedAction) {
         // dismissed
-        // eslint-disable-next-line no-console
-        console.log("Share sheet dismissed");
       }
     } catch (error: any) {
       Alert.alert("Error", "Unable to open share sheet.");
@@ -223,7 +236,6 @@ export const BookingDetailsScreen = () => {
 
   return (
     <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-      {/* 1. Header Section */}
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
@@ -231,16 +243,14 @@ export const BookingDetailsScreen = () => {
         <Image
           source={{
             uri:
-              booking.profiles?.avatar_url ||
-              `https://ui-avatars.com/api/?name=${
-                booking.guest_name || booking.profiles?.full_name || "Guest"
-              }&background=random`,
+              profileData?.avatar_url ||
+              `https://ui-avatars.com/api/?name=${guestName}&background=random`,
           }}
           style={styles.avatar}
         />
 
         <Text variant="h3" weight="bold" style={styles.headerName}>
-          {booking.guest_name || booking.profiles?.full_name || "Guest User"}
+          {guestName}
         </Text>
 
         <Text variant="body2" weight="semiBold" style={styles.categoryText}>
@@ -248,7 +258,6 @@ export const BookingDetailsScreen = () => {
         </Text>
       </View>
 
-      {/* 2. Mobile Number Section */}
       <View style={styles.fieldGroup}>
         <View style={styles.labelRow}>
           <Phone size={ms(16)} color={COLORS.primary} fill={COLORS.primary} />
@@ -258,10 +267,10 @@ export const BookingDetailsScreen = () => {
         </View>
         <View style={styles.inputBoxRow}>
           <Text variant="body2" weight="semiBold" style={styles.inputText} onPress={handleCall}>
-            {booking.profiles?.phone || booking.guest_phone || "N/A"}
+            {guestPhone}
           </Text>
 
-          <View style={styles.actionButtons}>
+          <View style={styles.actionButtonsRow}>
             <TouchableOpacity style={styles.callButton} activeOpacity={0.7} onPress={handleCall}>
               <Text variant="body2" weight="bold" color={COLORS.text.inverse}>
                 Call
@@ -271,40 +280,112 @@ export const BookingDetailsScreen = () => {
         </View>
       </View>
 
-      {/* 3. Date & Time Row */}
-      <View style={styles.row}>
-        <View style={[styles.fieldGroup, styles.flex1]}>
-          <View style={styles.labelRow}>
-            <Calendar size={ms(16)} color={COLORS.primary} />
-            <Text variant="body2" weight="medium">
-              Date
-            </Text>
-          </View>
-          <View style={styles.inputBox}>
-            <Text variant="body2" weight="semiBold" style={styles.inputText}>
-              {new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB")}
-            </Text>
-          </View>
+      <View style={styles.fieldGroup}>
+        <View style={styles.labelRow}>
+          <Calendar size={ms(16)} color={COLORS.primary} />
+          <Text variant="body2" weight="bold">
+            Date
+          </Text>
         </View>
+        <View style={styles.inputBox}>
+          <Text variant="body2" weight="semiBold" style={styles.inputText}>
+            {new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB")}
+          </Text>
+        </View>
+      </View>
 
-        <View style={[styles.fieldGroup, styles.flex1]}>
-          <View style={styles.labelRow}>
-            <Clock size={ms(16)} color={COLORS.primary} />
-            <Text variant="body2" weight="medium">
-              Time
+      <View style={styles.fieldGroup}>
+        <View style={styles.labelRow}>
+          <Clock size={ms(16)} color={COLORS.primary} />
+          <Text variant="body2" weight="bold">
+            Time Slots
+          </Text>
+        </View>
+        <View style={styles.row}>
+          <View style={styles.flex1}>
+            <Text variant="body2" weight="medium" style={styles.subLabel}>
+              From
             </Text>
+            <View style={styles.inputBox}>
+              <Text variant="body2" weight="semiBold" style={styles.inputText}>
+                {formatHour(booking.sports_slots.start_time)}
+              </Text>
+            </View>
           </View>
-          <View style={styles.inputBox}>
-            <Text variant="body2" weight="semiBold" style={styles.inputText}>
-              {`${formatHour(booking.sports_slots.start_time)} - ${formatHour(
-                booking.sports_slots.end_time,
-              )}`}
+
+          <View style={styles.flex1}>
+            <Text variant="body2" weight="medium" style={styles.subLabel}>
+              To
             </Text>
+            <View style={styles.inputBoxRowWithInline}>
+              <Text variant="body2" weight="semiBold" style={styles.inputText}>
+                {formatHour(booking.sports_slots.end_time)}
+              </Text>
+              <TouchableOpacity
+                style={styles.inlineAddBtn}
+                onPress={() => setIsAddingOn(!isAddingOn)}>
+                <Text
+                  variant="body2"
+                  weight="semiBold"
+                  color={isAddingOn ? COLORS.danger : COLORS.primary}>
+                  {isAddingOn ? "Cancel" : "Add"}
+                </Text>
+                {isAddingOn ? (
+                  <X size={ms(16)} color={COLORS.danger} />
+                ) : (
+                  <Plus size={ms(16)} color={COLORS.primary} />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
 
-      {/* 4. Total Payment */}
+      {isAddingOn && (
+        <View style={styles.addOnContainer}>
+          <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
+            Add On
+          </Text>
+          <View style={styles.row}>
+            <View style={styles.flex1}>
+              <Text variant="body2" weight="medium" style={styles.subLabel}>
+                Extra Time
+              </Text>
+              <TouchableOpacity
+                style={styles.dropDownPlaceholder}
+                onPress={() => setAddOnTime(addOnTime === "30 min" ? "60 min" : "30 min")}>
+                <Text variant="body2" weight="semiBold">
+                  {addOnTime}
+                </Text>
+                <ChevronDown size={ms(16)} color={COLORS.text.primary} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.flex1}>
+              <Text variant="body2" weight="medium" style={styles.subLabel}>
+                Extra Money
+              </Text>
+              <View style={styles.inputBox}>
+                <TextInput
+                  style={styles.extraMoneyInput}
+                  keyboardType="numeric"
+                  value={extraMoney}
+                  onChangeText={setExtraMoney}
+                />
+              </View>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirmExtension}>
+            <Text
+              variant="h3"
+              family="nichrome"
+              color={COLORS.text.inverse}
+              style={styles.confirmText}>
+              CONFIRM
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.fieldGroup}>
         <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
           Total Payment
@@ -316,7 +397,6 @@ export const BookingDetailsScreen = () => {
         </View>
       </View>
 
-      {/* 5. Remaining Amount */}
       <View style={styles.fieldGroup}>
         <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
           Remaining Amount
@@ -325,13 +405,12 @@ export const BookingDetailsScreen = () => {
           <Text
             variant="body2"
             weight="semiBold"
-            color={remainingAmount > 0 ? COLORS.danger : "#00B562"}>
+            color={remainingAmount > 0 ? "#E55959" : "#00B562"}>
             ₹ {remainingAmount}
           </Text>
         </View>
       </View>
 
-      {/* 6. Amount Paid (with interactive toggle button) */}
       <View style={styles.fieldGroup}>
         <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
           Amount Paid
@@ -343,7 +422,7 @@ export const BookingDetailsScreen = () => {
 
           {remainingAmount > 0 && (
             <TouchableOpacity
-              style={styles.addButton}
+              style={styles.inlineAddBtn}
               activeOpacity={0.7}
               onPress={() => setIsAddingPayment(!isAddingPayment)}>
               <Text
@@ -362,7 +441,6 @@ export const BookingDetailsScreen = () => {
         </View>
       </View>
 
-      {/* 7. Cash / Online Split Box */}
       {isAddingPayment && (
         <View style={styles.splitBox}>
           <Text variant="body2" weight="medium" style={styles.splitLabel}>
@@ -395,8 +473,7 @@ export const BookingDetailsScreen = () => {
         </View>
       )}
 
-      {/* 8. Immutable Ledger Display (Visual Confirmation) */}
-      {paymentLogs.length > 0 && (
+      {showPaymentHistory && paymentLogs.length > 0 && (
         <View style={styles.ledgerContainer}>
           <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
             Payment History
@@ -414,7 +491,7 @@ export const BookingDetailsScreen = () => {
                   ₹{log.amount}
                 </Text>
                 <Text variant="caption" color={COLORS.text.muted} style={styles.ledgerMode}>
-                  ({log.payment_mode.toUpperCase()})
+                  ({log.payment_mode === "upi" ? "ONLINE" : log.payment_mode.toUpperCase()})
                 </Text>
               </View>
             </View>
@@ -422,7 +499,6 @@ export const BookingDetailsScreen = () => {
         </View>
       )}
 
-      {/* 9. Save Button (Only visible when adding payment) */}
       {isAddingPayment && (
         <TouchableOpacity
           style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
@@ -443,18 +519,29 @@ export const BookingDetailsScreen = () => {
         </TouchableOpacity>
       )}
 
-      {/* 10. Previous History Row */}
       <TouchableOpacity
-        style={styles.historyRow}
+        style={styles.actionCard}
+        activeOpacity={0.7}
+        onPress={() => setShowPaymentHistory(!showPaymentHistory)}>
+        <Clock size={ms(20)} color="#E55959" />
+        <Text variant="body2" weight="semiBold" color="#E55959" style={styles.actionCardText}>
+          Current Booking Payment History
+        </Text>
+        <ChevronRight size={ms(20)} color={COLORS.text.primary} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.actionCard}
         activeOpacity={0.7}
         onPress={() =>
           navigation.navigate("GuestHistory", {
-            guestId: booking.profiles.phone || booking.guest_phone || "unknown",
+            guestId: guestPhone === "N/A" ? undefined : guestPhone,
             bookingId: booking.id,
+            vertical: "sports",
           })
         }>
         <FileText size={ms(20)} color={COLORS.text.primary} />
-        <Text variant="body2" weight="semiBold" style={styles.historyText}>
+        <Text variant="body2" weight="semiBold" style={styles.actionCardText}>
           Previous History
         </Text>
         <ChevronRight size={ms(20)} color={COLORS.text.primary} />
@@ -479,21 +566,18 @@ export const BookingDetailsScreen = () => {
         <Send size={ms(20)} color={COLORS.text.inverse} />
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.cancelBookingBtn}
-        activeOpacity={0.7}
-        onPress={() => setShowCancelModal(true)}>
-        <Text
-          variant="body1"
-          weight="bold"
-          color={COLORS.text.primary}
-          style={styles.cancelBtnText}>
-          Cancel Booking
-        </Text>
-        <Trash2 size={ms(24)} color={COLORS.text.primary} />
-      </TouchableOpacity>
+      {booking.booking_status !== "cancelled" && (
+        <TouchableOpacity
+          style={styles.actionCard}
+          activeOpacity={0.7}
+          onPress={() => setShowCancelModal(true)}>
+          <Text variant="body2" weight="bold" style={styles.actionCardText}>
+            Cancel Your Booking
+          </Text>
+          <Trash2 size={ms(20)} color={COLORS.text.primary} />
+        </TouchableOpacity>
+      )}
 
-      {/* --- CANCELLATION MODAL --- */}
       <Modal visible={showCancelModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCancelModal(false)} />
@@ -531,7 +615,6 @@ export const BookingDetailsScreen = () => {
                   setShowCancelModal(false);
                   const success = await cancelBooking();
 
-                  // If cancellation was successful in the database, close this screen!
                   if (success) {
                     navigation.goBack();
                   }
@@ -601,8 +684,12 @@ const styles = StyleSheet.create({
   standaloneLabel: {
     marginBottom: vs(4),
   },
+  subLabel: {
+    fontSize: fs(14),
+    marginBottom: vs(4),
+  },
   inputBox: {
-    backgroundColor: COLORS.surface.primary,
+    backgroundColor: "#F4F7FC",
     borderRadius: ms(10),
     paddingVertical: vs(12),
     paddingHorizontal: hs(10),
@@ -612,19 +699,69 @@ const styles = StyleSheet.create({
   inputBoxRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surface.primary,
+    backgroundColor: "#F4F7FC",
     borderRadius: ms(10),
     paddingVertical: vs(8),
     paddingHorizontal: hs(10),
     minHeight: vs(46),
   },
+  inputBoxRowWithInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
+    paddingHorizontal: hs(10),
+    minHeight: vs(40),
+  },
   inputText: {
     flex: 1,
+    fontSize: fs(14),
+    fontFamily: "Gilroy-SemiBold",
+    color: COLORS.text.primary,
   },
-  actionButtons: {
+  extraMoneyInput: {
+    flex: 1,
+    fontSize: fs(14),
+    fontFamily: "Gilroy-SemiBold",
+    color: COLORS.text.primary,
+    fontWeight: "600",
+  },
+  inlineAddBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(4),
+    padding: hs(4),
+  },
+  actionButtonsRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: hs(8),
+  },
+  actionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#CBDFFE",
+    borderRadius: ms(10),
+    paddingHorizontal: hs(10),
+    height: vs(44),
+    marginBottom: vs(12),
+  },
+  actionCardText: {
+    flex: 1,
+    marginLeft: hs(8),
+  },
+  confirmBtn: {
+    backgroundColor: "#000000",
+    borderRadius: ms(10),
+    height: vs(44),
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: vs(12),
+  },
+  confirmText: {
+    fontSize: fs(20),
+    textTransform: "uppercase",
   },
   whatsappAnimWrapper: {
     width: ms(30),
@@ -643,12 +780,6 @@ const styles = StyleSheet.create({
     borderRadius: ms(6),
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.25)",
-  },
-  addButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(4),
-    padding: hs(4),
   },
   splitBox: {
     borderWidth: 1,
@@ -673,20 +804,6 @@ const styles = StyleSheet.create({
     fontSize: fs(20),
     textTransform: "uppercase",
   },
-  historyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    height: vs(40),
-    marginBottom: vs(10),
-  },
-  historyText: {
-    flex: 1,
-    marginLeft: hs(6),
-  },
   shareWhatsappBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -697,20 +814,6 @@ const styles = StyleSheet.create({
     marginTop: vs(10),
   },
   shareText: {
-    flex: 1,
-    fontSize: fs(14),
-  },
-  cancelBookingBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#CBDFFE",
-    borderRadius: ms(10),
-    padding: ms(6),
-    gap: hs(6),
-    marginTop: vs(10),
-  },
-  cancelBtnText: {
     flex: 1,
     fontSize: fs(14),
   },
@@ -786,7 +889,7 @@ const styles = StyleSheet.create({
     marginTop: vs(4),
     marginBottom: vs(14),
     padding: hs(10),
-    backgroundColor: COLORS.surface.primary,
+    backgroundColor: "#F4F7FC",
     borderRadius: ms(10),
     borderWidth: 1,
     borderColor: COLORS.border.navBar,
@@ -820,8 +923,24 @@ const styles = StyleSheet.create({
     fontFamily: "Gilroy-SemiBold",
     color: COLORS.text.primary,
   },
-  // Add this for the saving state of the button
   saveButtonDisabled: {
     opacity: 0.7,
+  },
+  addOnContainer: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#63A1FD",
+    borderRadius: ms(10),
+    padding: ms(12),
+    marginVertical: vs(10),
+  },
+  dropDownPlaceholder: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
+    padding: ms(10),
+    marginTop: vs(4),
   },
 });

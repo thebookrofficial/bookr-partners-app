@@ -28,7 +28,7 @@ export const StaycationCloseDateScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationCloseDate">>();
   const { serviceId } = route.params;
-  const { venue } = useStaycationHome(serviceId);
+  const { activeVenue: venue } = useStaycationHome(serviceId);
 
   const {
     upcomingClosedDates,

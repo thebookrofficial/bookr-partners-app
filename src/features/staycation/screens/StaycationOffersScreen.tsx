@@ -43,7 +43,7 @@ export const StaycationOffersScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationOffers">>();
   const { serviceId } = route.params;
-  const { venue } = useStaycationHome(serviceId);
+  const { activeVenue: venue } = useStaycationHome(serviceId);
 
   // Hook for Database Interactions
   const {

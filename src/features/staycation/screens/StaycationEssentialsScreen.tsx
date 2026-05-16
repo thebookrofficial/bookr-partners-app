@@ -51,7 +51,7 @@ export const StaycationEssentialsScreen = () => {
     serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
   }
 
-  const { venue } = useStaycationHome(serviceId);
+  const { activeVenue: venue } = useStaycationHome(serviceId);
 
   const handlePress = (label: string) => {
     if (label === "Close date") {

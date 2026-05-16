@@ -98,7 +98,7 @@ export const StaycationDashboardScreen = () => {
     serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
   }
 
-  const { venue } = useStaycationHome(serviceId);
+  const { activeVenue: venue } = useStaycationHome(serviceId);
 
   const [selection, setSelection] = useState("This Month");
   const [activeTab, setActiveTab] = useState("All Rooms");

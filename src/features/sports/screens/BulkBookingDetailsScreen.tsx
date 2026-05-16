@@ -14,7 +14,16 @@ import {
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, TextInput } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
-import { Plus, Minus, ChevronDown, Phone, User, Calendar, Clock } from "lucide-react-native";
+import {
+  Plus,
+  Minus,
+  ChevronDown,
+  Phone,
+  User,
+  Calendar,
+  Clock,
+  MapPin,
+} from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
@@ -54,7 +63,7 @@ const HOURS = [
 const CreateBulkBooking = ({
   type,
   venueId,
-  groundId,
+  groundId: initialGroundId,
 }: {
   type: "multi" | "single";
   venueId: string;
@@ -70,6 +79,27 @@ const CreateBulkBooking = ({
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setOwnerId(data.user?.id));
   }, []);
+
+  // NEW: State for Grounds inside the form
+  const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
+  const [selectedGroundId, setSelectedGroundId] = useState<string>(initialGroundId || "");
+  const [showGroundPicker, setShowGroundPicker] = useState(false);
+
+  useEffect(() => {
+    const fetchGrounds = async () => {
+      const { data } = await supabase
+        .from("sports_grounds")
+        .select("id, name")
+        .eq("venue_id", venueId)
+        .order("display_order", { ascending: true });
+
+      if (data && data.length > 0) {
+        setGrounds(data);
+        if (!selectedGroundId) setSelectedGroundId(data[0].id);
+      }
+    };
+    fetchGrounds();
+  }, [selectedGroundId, venueId]);
 
   const [bookingType, setBookingType] = useState<"multi" | "single">(type);
   const [mobile, setMobile] = useState("");
@@ -98,6 +128,8 @@ const CreateBulkBooking = ({
   const totalPayment = totalSlots * pricePerHour;
   const amountPaid = stagedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remainingAmount = totalPayment - amountPaid;
+
+  const { activeVenueName } = useServiceStore();
 
   useEffect(() => {
     const lookupGuest = async () => {
@@ -142,14 +174,14 @@ const CreateBulkBooking = ({
   };
 
   const onConfirm = async () => {
-    if (!mobile || !name || totalSlots <= 0) {
-      Alert.alert("Missing Info", "Please ensure dates, times, and guest info are valid.");
+    if (!mobile || !name || totalSlots <= 0 || !selectedGroundId) {
+      Alert.alert("Missing Info", "Please ensure dates, times, ground, and guest info are valid.");
       return;
     }
     const success = await confirmBulkBooking({
       ownerId,
       venueId,
-      groundId,
+      groundId: selectedGroundId, // Pass the selected ground to the hook
       category: selectedCategory,
       mobile,
       name,
@@ -163,11 +195,14 @@ const CreateBulkBooking = ({
     if (success) navigation.goBack();
   };
 
+  // Helper to display current ground name
+  const currentGroundName = grounds.find(g => g.id === selectedGroundId)?.name || "Select Ground";
+
   return (
     <View style={styles.flex1}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <ServiceHeader
-          title="Elite Strikers Club"
+          title={activeVenueName}
           subtitle="Bulk Booking"
           category={selectedCategory}
           onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
@@ -238,6 +273,22 @@ const CreateBulkBooking = ({
             style={styles.inputFill}
           />
         </View>
+
+        {/* --- NEW GROUND SELECTION FIELD --- */}
+        {grounds.length > 0 && (
+          <View style={styles.fieldGroup}>
+            <View style={styles.labelRow}>
+              <MapPin size={ms(18)} color="#63A1FD" />
+              <Text style={styles.labelBold}>Select Ground</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.inputBoxFillRow}
+              onPress={() => setShowGroundPicker(true)}>
+              <Text style={[styles.inputText, styles.flex1]}>{currentGroundName}</Text>
+              <ChevronDown size={ms(16)} color="#000" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
@@ -385,20 +436,44 @@ const CreateBulkBooking = ({
         />
       )}
 
+      {/* --- TIME PICKER MODAL --- */}
       <Modal visible={!!showHourPicker} transparent animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowHourPicker(null)}>
-          <View style={styles.hourPickerContainer}>
+          <View style={styles.pickerContainer}>
             <ScrollView showsVerticalScrollIndicator={false}>
               {HOURS.map(hour => (
                 <TouchableOpacity
                   key={hour}
-                  style={styles.hourItem}
+                  style={styles.pickerItem}
                   onPress={() => {
                     if (showHourPicker === "from") setFromTime(hour);
                     else setToTime(hour);
                     setShowHourPicker(null);
                   }}>
                   <Text style={styles.inputText}>{hour}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* --- NEW GROUND PICKER MODAL --- */}
+      <Modal visible={showGroundPicker} transparent animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowGroundPicker(false)}>
+          <View style={styles.pickerContainer}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {grounds.map(g => (
+                <TouchableOpacity
+                  key={g.id}
+                  style={styles.pickerItem}
+                  onPress={() => {
+                    setSelectedGroundId(g.id);
+                    setShowGroundPicker(false);
+                  }}>
+                  <Text style={[styles.inputText, selectedGroundId === g.id && styles.textPrimary]}>
+                    {g.name}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -483,6 +558,7 @@ const styles = StyleSheet.create({
   addText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#00B562" },
   textDanger: { color: "#E55959" },
   textSuccessFlex: { color: "#00B562", flex: 1 },
+  textPrimary: { color: "#63A1FD" },
 
   /* --- CREATE LAYOUT --- */
   tabBar: { flexDirection: "row", alignItems: "center", marginBottom: vs(15), gap: hs(10) },
@@ -570,14 +646,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  hourPickerContainer: {
+  pickerContainer: {
     width: "80%",
     backgroundColor: "#FFF",
     borderRadius: ms(10),
     maxHeight: "50%",
     padding: ms(10),
   },
-  hourItem: {
+  pickerItem: {
     padding: ms(15),
     borderBottomWidth: 1,
     borderBottomColor: "#EEE",

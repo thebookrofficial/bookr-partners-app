@@ -18,6 +18,7 @@ interface Venue {
   status: "draft" | "pending_approval" | "active" | "inactive" | "suspended";
   avg_rating: number;
   total_reviews: number;
+  sports_venues?: { sports_type: string }[];
 }
 
 export const useVendorData = () => {
@@ -47,13 +48,6 @@ export const useVendorData = () => {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      // // --- ADD THESE DEBUG LOGS ---
-      // console.log("=== PROFILE DEBUG ===");
-      // console.log("Logged in User ID:", user.id);
-      // console.log("Client Profile Data:", clientData);
-      // console.log("Client Profile Error:", clientError);
-      // console.log("======================");
-
       if (clientError) throw clientError;
 
       if (clientData) {
@@ -62,7 +56,7 @@ export const useVendorData = () => {
         // 3. Fetch Venues (Blueprint Table 6.1)
         const { data: venuesData, error: venuesError } = await supabase
           .from("venues")
-          .select("*")
+          .select("*, sports_venues(sports_type)")
           .eq("owner_id", clientData.id)
           .is("deleted_at", null);
 

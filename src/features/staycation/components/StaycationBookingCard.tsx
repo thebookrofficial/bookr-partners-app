@@ -17,11 +17,6 @@ import { COLORS } from "@/constants/theme";
 import { StaycationBooking } from "../types/staycation.types";
 import { useNavigation } from "@react-navigation/native";
 import { useStaycationBooking } from "../hooks/useStaycationBooking";
-
-// Import the specific phone icon from assets as it differs slightly in Figma,
-// but we'll use a basic vector icon or the one provided if not available.
-// Since we don't have the explicit icon asset, we'll keep using lucide-react-native Phone
-// but styled to match the design (e.g., filled).
 import { Phone } from "lucide-react-native";
 
 interface StaycationBookingCardProps extends Partial<StaycationBooking> {
@@ -29,6 +24,7 @@ interface StaycationBookingCardProps extends Partial<StaycationBooking> {
   onPress?: () => void;
   onCancelPress?: (id: string) => void;
   isFarmhouse?: boolean;
+  isUpcoming?: boolean;
 }
 
 // Helper to format date for card display (e.g., "2026-04-26" -> "26 Apr")
@@ -57,28 +53,25 @@ export const StaycationBookingCard = ({
   phone,
   avatarUrl,
   amount,
+  paidAmount,
+  totalAmount,
   status,
   checkIn,
   checkOut,
   guestCount,
   roomName,
   onPress,
-  onCancelPress,
   isFarmhouse = true,
+  isUpcoming = false,
 }: StaycationBookingCardProps) => {
   const navigation = useNavigation<any>();
 
-  // If bookingId is provided, we fetch the data.
-  // Otherwise, we use the props passed from parent (compatibility mode)
   const { isLoading, booking: fetchedBooking } = useStaycationBooking(bookingId);
 
-  // Use fetched data if available, otherwise fallback to props
   const displayData = useMemo(() => {
     if (fetchedBooking) {
       return {
         ...fetchedBooking,
-        checkIn: fetchedBooking.checkIn,
-        checkOut: fetchedBooking.checkOut,
       };
     }
     return {
@@ -87,6 +80,8 @@ export const StaycationBookingCard = ({
       phone,
       avatarUrl,
       amount,
+      paidAmount,
+      totalAmount,
       status,
       checkIn,
       checkOut,
@@ -100,6 +95,8 @@ export const StaycationBookingCard = ({
     phone,
     avatarUrl,
     amount,
+    paidAmount,
+    totalAmount,
     status,
     checkIn,
     checkOut,
@@ -135,9 +132,9 @@ export const StaycationBookingCard = ({
     const s = displayData.status?.toLowerCase();
     switch (s) {
       case "online":
-        return "#00B562"; // Using green for Online (Full)
+        return "#63A1FD";
       case "offline":
-        return "#63A1FD"; // Using blue for Offline (Advance)
+        return "#E55959";
       case "complete":
         return "#00B562";
       case "cancelled":
@@ -147,29 +144,44 @@ export const StaycationBookingCard = ({
     }
   };
 
-  // Mock payment pending state based on amount or random logic if undefined.
-  // In the real app, this should be derived from the backend data.
-  // We'll assume amount === 500 means Payment Pending (as per Figma Farmhouse example).
-  const isPaymentPending = String(displayData.amount) === "500" && displayData.status === "Online";
+  // Payment Pending logic: if paid amount is less than total amount and it's not cancelled
+  const isPaymentPending = useMemo(() => {
+    if (displayData.status === "Cancelled") return false;
+    const paid =
+      typeof displayData.paidAmount === "number"
+        ? displayData.paidAmount
+        : parseFloat(displayData.paidAmount || "0");
+    const total =
+      typeof displayData.totalAmount === "number"
+        ? displayData.totalAmount
+        : parseFloat(displayData.totalAmount || "0");
+    return total > 0 && paid < total;
+  }, [displayData.paidAmount, displayData.totalAmount, displayData.status]);
 
   const renderDetails = () => {
     let dateRoomText = "";
 
     if (isFarmhouse) {
-      // Farmhouse shows Date range
       dateRoomText = `${formatDisplayDate(displayData.checkIn || "")} - ${formatDisplayDate(
         displayData.checkOut || "",
       )}`;
     } else {
-      // Rooms show "24 Apr 26 | Room 1" or similar
-      const prefix = displayData.roomName || "Private | Room 1"; // Mock prefix
-      dateRoomText = `${formatDisplayDateWithYear(displayData.checkIn || "")} | ${prefix}`;
+      // FIX: Use real roomName from database, fallback only if missing
+      const roomPrefix = displayData.roomName || "Room Assigned";
+
+      if (isUpcoming) {
+        dateRoomText = `${formatDisplayDateWithYear(displayData.checkIn || "")} | ${roomPrefix}`;
+      } else {
+        dateRoomText = roomPrefix;
+      }
     }
 
     return (
       <View style={styles.detailsRow}>
         <View style={styles.dateContainer}>
-          {isFarmhouse && <Calendar size={ms(20)} color={COLORS.text.primary} />}
+          {isFarmhouse || isUpcoming ? (
+            <Calendar size={ms(20)} color={COLORS.text.primary} />
+          ) : null}
           <Text weight="semiBold" style={[styles.dateText, !isFarmhouse && styles.roomsDateText]}>
             {dateRoomText}
           </Text>
@@ -182,16 +194,6 @@ export const StaycationBookingCard = ({
         </View>
 
         <View style={styles.actionButtons}>
-          {onCancelPress && displayData.id && (
-            <TouchableOpacity
-              style={styles.cancelButton}
-              activeOpacity={0.7}
-              onPress={() => onCancelPress(displayData.id!)}>
-              <Text weight="bold" style={styles.cancelButtonText}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          )}
           <TouchableOpacity style={styles.callButton} activeOpacity={0.7} onPress={handleCall}>
             <Text weight="bold" style={styles.callButtonText}>
               Call
@@ -212,10 +214,20 @@ export const StaycationBookingCard = ({
 
   if (!displayData.id && bookingId && !isLoading) return null;
 
-  // Determine card background color. From Figma, some cards are #E0E0E0 (grey) e.g., Rohit Sharma
-  // For simplicity, we'll stick to the base #F4F7FC or conditionally style based on status.
-  const isGreyBg =
-    displayData.status?.toLowerCase() === "offline" || displayData.name?.includes("Rohit");
+  // Only show grey if the booking is finished (Complete) or voided (Cancelled)
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const isGreyBg = useMemo(() => {
+    const s = displayData.status?.toLowerCase();
+    // Only grey out if explicitly cancelled or completed history
+    return s === "cancelled" || s === "complete";
+  }, [displayData.status]);
+
+  const getAmountColor = () => {
+    const s = displayData.status?.toLowerCase();
+    if (s === "advance" || s === "complete") return "#00B562";
+    if (s === "online" || s === "offline") return "#00B562";
+    return "#00B562";
+  };
 
   return (
     <TouchableOpacity
@@ -230,7 +242,6 @@ export const StaycationBookingCard = ({
       </View>
 
       <View style={styles.mainContent}>
-        {/* Top Section */}
         <View style={styles.topHeader}>
           <View style={styles.namePhoneContainer}>
             <Text weight="bold" style={[styles.nameText, isGreyBg && styles.nameTextGrey]}>
@@ -256,7 +267,7 @@ export const StaycationBookingCard = ({
           </View>
 
           <View style={styles.amountStatusWrapper}>
-            <Text weight="semiBold" style={styles.amountText}>
+            <Text weight="semiBold" style={[styles.amountText, { color: getAmountColor() }]}>
               ₹{displayData.amount}
             </Text>
             <Text weight="semiBold" style={[styles.statusLabel, { color: getStatusColor() }]}>
@@ -265,7 +276,6 @@ export const StaycationBookingCard = ({
           </View>
         </View>
 
-        {/* Bottom Section */}
         {renderDetails()}
       </View>
     </TouchableOpacity>
@@ -277,7 +287,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: "#F4F7FC",
     borderRadius: ms(10),
-    paddingHorizontal: hs(6),
+    paddingHorizontal: hs(8),
     paddingVertical: vs(10),
     marginBottom: vs(10),
     width: "100%",
@@ -343,17 +353,16 @@ const styles = StyleSheet.create({
     lineHeight: fs(12),
   },
   amountStatusWrapper: {
-    alignItems: "flex-end", // Align to right as per Figma
+    alignItems: "flex-end",
     justifyContent: "center",
   },
   amountText: {
     fontSize: fs(14),
-    color: "#00B562",
     lineHeight: fs(14),
   },
   statusLabel: {
     fontSize: fs(10),
-    lineHeight: fs(14), // Gives it a slight gap below amount
+    lineHeight: fs(14),
     textTransform: "capitalize",
   },
   detailsRow: {
@@ -372,7 +381,7 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
   },
   roomsDateText: {
-    // In Figma, rooms date text is sometimes different color, but we'll stick to primary or grey based on card
+    color: COLORS.text.primary,
   },
   guestWrapper: {
     justifyContent: "center",
@@ -383,7 +392,7 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
   },
   roomsGuestText: {
-    // Rooms guest text styling
+    color: COLORS.text.primary,
   },
   actionButtons: {
     flexDirection: "row",
@@ -407,10 +416,8 @@ const styles = StyleSheet.create({
   callButton: {
     backgroundColor: "black",
     paddingHorizontal: hs(14),
-    paddingVertical: vs(4),
+    paddingVertical: vs(6),
     borderRadius: ms(6),
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.25)",
   },
   callButtonText: {
     fontSize: fs(14),
