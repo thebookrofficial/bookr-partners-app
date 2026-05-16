@@ -153,6 +153,8 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
           <Calendar
             current={new Date().toISOString().split("T")[0]}
             markingType={"custom"}
+            // ADDED FIX: Strictly hide extra days from other months
+            hideExtraDays={true}
             markedDates={{
               ...markedDates,
               [selectedDate || ""]: {
@@ -245,7 +247,7 @@ const calendarTheme = {
   selectedDayTextColor: COLORS.text.inverse,
   todayTextColor: "black",
   dayTextColor: "black",
-  textDisabledColor: "transparent",
+  textDisabledColor: "transparent", // ADDED FIX: Ensuring extra days are completely invisible
   monthTextColor: "black",
   textDayFontFamily: "Gilroy-Medium",
   textMonthFontFamily: "Gilroy-Bold",

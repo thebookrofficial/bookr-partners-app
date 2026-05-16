@@ -65,6 +65,8 @@ export const StaycationOfflineBookingSheet = ({
   const [availableRooms, setAvailableRooms] = useState<{ id: string; name: string }[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
 
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+
   useEffect(() => {
     if (visible && !isFarmhouse && venueId) {
       const fetchVenueRooms = async () => {
@@ -77,18 +79,75 @@ export const StaycationOfflineBookingSheet = ({
         if (data) {
           const mapped = data.map(r => ({
             id: r.id,
-            name: `${r.room_name} (${r.room_number})`,
+            name: r.room_name,
           }));
-          setAvailableRooms(mapped);
-          if (mapped.length > 0) {
-            setRoomType(mapped[0].name);
-            setSelectedRoomId(mapped[0].id);
+
+          const uniqueRooms = Array.from(new Map(mapped.map(item => [item.name, item])).values());
+
+          setAvailableRooms(uniqueRooms);
+          if (uniqueRooms.length > 0) {
+            setRoomType(uniqueRooms[0].name);
+            setSelectedRoomId(uniqueRooms[0].id);
           }
         }
       };
       fetchVenueRooms();
     }
   }, [visible, isFarmhouse, venueId]);
+
+  useEffect(() => {
+    if (!visible || !venueId) return;
+
+    const fetchBlockedDates = async () => {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const dates = new Set<string>();
+
+      // 1. Fetch Availability Blocks
+      let query = supabase
+        .from("staycation_availability")
+        .select("date")
+        .eq("venue_id", venueId)
+        .eq("is_blocked", true)
+        .gte("date", todayStr);
+
+      if (!isFarmhouse && selectedRoomId) {
+        query = query.eq("room_id", selectedRoomId);
+      }
+      const { data: blocks } = await query;
+      blocks?.forEach(b => dates.add(b.date));
+
+      // 2. Fetch Active Bookings
+      let bQuery = supabase
+        .from("staycation_bookings")
+        .select("check_in_date, check_out_date")
+        .eq("venue_id", venueId)
+        .neq("booking_status", "cancelled")
+        .gte("check_out_date", todayStr);
+
+      if (isFarmhouse) {
+        bQuery = bQuery.eq("booking_type", "full_property");
+      } else if (selectedRoomId) {
+        bQuery = bQuery.eq("room_id", selectedRoomId);
+      }
+      const { data: bookings } = await bQuery;
+
+      bookings?.forEach(b => {
+        let curr = new Date(b.check_in_date);
+        const end = new Date(b.check_out_date);
+        while (curr < end) {
+          const year = curr.getFullYear();
+          const month = (curr.getMonth() + 1).toString().padStart(2, "0");
+          const day = curr.getDate().toString().padStart(2, "0");
+          dates.add(`${year}-${month}-${day}`);
+          curr.setDate(curr.getDate() + 1);
+        }
+      });
+
+      setBlockedDates(Array.from(dates));
+    };
+
+    fetchBlockedDates();
+  }, [visible, venueId, isFarmhouse, selectedRoomId]);
 
   useEffect(() => {
     const lookupGuest = async () => {
@@ -165,7 +224,6 @@ export const StaycationOfflineBookingSheet = ({
     if (!activeDropdown) return;
     if (activeDropdown.type === "bookingFor") setBookingFor(option);
 
-    // UPDATED: If selecting a room, find its ID from our state
     if (activeDropdown.type === "roomType") {
       setRoomType(option);
       const roomObj = availableRooms.find(r => r.name === option);
@@ -210,10 +268,8 @@ export const StaycationOfflineBookingSheet = ({
     });
 
     if (result.success) {
-      // 1. Calculate due dynamically
       const dueAmount = (parseFloat(totalPayment) || 0) - (parseFloat(advancePaid) || 0);
 
-      // 2. Build the dynamic template string
       const shareMessage = `Booking Confirmed! 🎉
 Hi ${finalName},
 Your slot at ${result.venueName || "our venue"} is locked in via Bookr.
@@ -224,7 +280,6 @@ Paid: ₹${advancePaid || 0}
 Due at Venue: ₹${dueAmount}
 Thank you for booking with Bookr!`;
 
-      // 3. Trigger Native Share
       try {
         await Share.share({
           message: shareMessage,
@@ -243,18 +298,67 @@ Thank you for booking with Bookr!`;
 
   const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (event.type === "set" && selectedDate) {
+      const formatYMD = (d: Date) => {
+        const year = d.getFullYear();
+        const month = (d.getMonth() + 1).toString().padStart(2, "0");
+        const day = d.getDate().toString().padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      };
+
+      const dateStr = formatYMD(selectedDate);
+
       if (showDatePicker === "in") {
+        if (blockedDates.includes(dateStr)) {
+          Alert.alert("Date Booked", "The selected check-in date is already booked or blocked.");
+          setShowDatePicker(null);
+          return;
+        }
+
         setCheckInDate(selectedDate);
         const tomorrow = new Date(selectedDate);
         tomorrow.setDate(tomorrow.getDate() + 1);
+
         if (selectedDate >= checkOutDate) {
           setCheckOutDate(tomorrow);
+        } else {
+          // Check if any dates between the new checkIn and old checkOut are blocked
+          let hasBlock = false;
+          let curr = new Date(selectedDate);
+          while (curr < checkOutDate) {
+            if (blockedDates.includes(formatYMD(curr))) {
+              hasBlock = true;
+              break;
+            }
+            curr.setDate(curr.getDate() + 1);
+          }
+          if (hasBlock) {
+            Alert.alert(
+              "Range Adjusted",
+              "Your previous check-out date overlapped with booked dates. It has been automatically adjusted to the next available day.",
+            );
+            setCheckOutDate(tomorrow);
+          }
         }
       } else if (showDatePicker === "out") {
         if (selectedDate <= checkInDate) {
           Alert.alert("Invalid Date", "Check-out date must be after check-in date.");
         } else {
-          setCheckOutDate(selectedDate);
+          // Check if the entire range is clear
+          let hasBlock = false;
+          let curr = new Date(checkInDate);
+          while (curr < selectedDate) {
+            if (blockedDates.includes(formatYMD(curr))) {
+              hasBlock = true;
+              break;
+            }
+            curr.setDate(curr.getDate() + 1);
+          }
+
+          if (hasBlock) {
+            Alert.alert("Date Booked", "The selected date range contains already booked dates.");
+          } else {
+            setCheckOutDate(selectedDate);
+          }
         }
       }
     }
@@ -323,28 +427,31 @@ Thank you for booking with Bookr!`;
 
               {/* Booking For & Type */}
               <View style={styles.row}>
-                <View style={styles.col}>
-                  <View style={styles.labelRow}>
-                    <Text weight="medium" style={styles.label}>
-                      Booking For
-                    </Text>
+                {isFarmhouse && (
+                  <View style={styles.col}>
+                    <View style={styles.labelRow}>
+                      <Text weight="medium" style={styles.label}>
+                        Booking For
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.dropdownWrapper}
+                      activeOpacity={0.7}
+                      onPress={() =>
+                        setActiveDropdown({
+                          type: "bookingFor",
+                          options: ["Farmhouse", "Cottages"],
+                          title: "Select Booking Type",
+                        })
+                      }>
+                      <Text weight="semiBold" style={styles.dropdownText}>
+                        {bookingFor}
+                      </Text>
+                      <ChevronDown size={ms(16)} color={COLORS.text.primary} />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    style={styles.dropdownWrapper}
-                    activeOpacity={0.7}
-                    onPress={() =>
-                      setActiveDropdown({
-                        type: "bookingFor",
-                        options: ["Farmhouse", "Cottages"],
-                        title: "Select Booking Type",
-                      })
-                    }>
-                    <Text weight="semiBold" style={styles.dropdownText}>
-                      {bookingFor}
-                    </Text>
-                    <ChevronDown size={ms(16)} color={COLORS.text.primary} />
-                  </TouchableOpacity>
-                </View>
+                )}
+
                 <View style={styles.col}>
                   <View style={styles.labelRow}>
                     <Text weight="medium" style={styles.label}>
@@ -596,7 +703,6 @@ Thank you for booking with Bookr!`;
   );
 };
 
-// ... keep existing styles below ...
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0, 0, 0, 0.4)" },
   backdrop: { ...StyleSheet.absoluteFillObject },

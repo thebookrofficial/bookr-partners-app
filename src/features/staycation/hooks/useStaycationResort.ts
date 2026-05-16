@@ -19,8 +19,13 @@ const formatDate = (date: Date) => {
  * Specialized hook for Resort (Per Room) staycation data.
  * @param initialVenueId Optional initial venue
  * @param selectedDate The currently active date from the calendar
+ * @param activeRoomType The currently selected room type tab
  */
-export const useStaycationResort = (initialVenueId?: string, selectedDate: Date = new Date()) => {
+export const useStaycationResort = (
+  initialVenueId?: string,
+  selectedDate: Date = new Date(),
+  activeRoomType: string = "All",
+) => {
   const {
     isLoading: isVenuesLoading,
     venues,
@@ -45,7 +50,6 @@ export const useStaycationResort = (initialVenueId?: string, selectedDate: Date 
 
     try {
       setIsDataLoading(true);
-      // Use the date passed from the UI
       const targetDateStr = formatDate(selectedDate);
       const todayRealStr = formatDate(new Date());
 
@@ -58,8 +62,13 @@ export const useStaycationResort = (initialVenueId?: string, selectedDate: Date 
       const validRooms = roomsData || [];
       setRooms(validRooms);
 
+      // CRITICAL FIX: Use .trim() to match safely against the UI tabs
+      const relevantRooms =
+        activeRoomType === "All"
+          ? validRooms
+          : validRooms.filter(r => r.room_name?.trim() === activeRoomType);
+
       // 2. Fetch Bookings (Include explicit room details)
-      // We still fetch upcoming, but base the 'gte' on the selected date to show future history
       const { data: bookingsData, error: bookingsError } = await supabase
         .from("staycation_bookings")
         .select(
@@ -73,7 +82,7 @@ export const useStaycationResort = (initialVenueId?: string, selectedDate: Date 
         .eq("venue_id", activeVenue.venueId)
         .eq("booking_type", "per_room")
         .neq("booking_status", "cancelled")
-        .gte("check_out_date", targetDateStr) // Show anything active on or after selected date
+        .gte("check_out_date", targetDateStr)
         .order("check_in_date", { ascending: true });
 
       if (bookingsError) throw bookingsError;
@@ -86,15 +95,28 @@ export const useStaycationResort = (initialVenueId?: string, selectedDate: Date 
       let occupiedTargetDay = 0;
 
       bookings.forEach(b => {
-        // Calculate occupancy based on the SELECTED date
-        if (b.check_in_date <= targetDateStr && b.check_out_date > targetDateStr)
-          occupiedTargetDay++;
-
-        // SAFE EXTRACTION: Check if it's an array OR an object
         const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
         const roomData = Array.isArray(b.staycation_rooms)
           ? b.staycation_rooms[0]
           : b.staycation_rooms;
+
+        const isOnline = (parseFloat(b.platform_fee) || 0) > 0;
+
+        // CRITICAL FIX: Trim the room name here as well so the cards look clean
+        const formattedRoomName = roomData
+          ? `${roomData.room_name?.trim()} (${roomData.room_number || "N/A"})`
+          : "Room Unassigned";
+
+        // CRITICAL FIX: Use .trim() to calculate accurate occupancy
+        const isRelevantRoom =
+          activeRoomType === "All" || roomData?.room_name?.trim() === activeRoomType;
+        if (
+          isRelevantRoom &&
+          b.check_in_date <= targetDateStr &&
+          b.check_out_date > targetDateStr
+        ) {
+          occupiedTargetDay++;
+        }
 
         const formatted: StaycationBooking = {
           id: b.id,
@@ -104,33 +126,28 @@ export const useStaycationResort = (initialVenueId?: string, selectedDate: Date 
           amount: b.total_amount.toString(),
           paidAmount: parseFloat(b.paid_amount) || 0,
           totalAmount: parseFloat(b.total_amount) || 0,
-          status: b.paid_amount >= b.total_amount ? "Online" : "Offline",
+          status: isOnline ? "Online" : "Offline",
           checkIn: b.check_in_date,
           checkOut: b.check_out_date,
           guestCount: b.guest_count,
-          roomName: roomData ? `${roomData.room_name} | ${roomData.room_number}` : undefined,
+          roomName: formattedRoomName,
         };
 
-        // STRICT CATEGORIZATION
         if (b.check_out_date === targetDateStr) {
           checkOutsList.push(formatted);
         } else if (b.check_in_date === targetDateStr) {
-          // STRICTLY only if they check IN on the target date
           targetDayList.push(formatted);
         } else if (b.check_in_date > targetDateStr) {
           upcomingList.push(formatted);
         }
-        // Notice we REMOVED the "ongoing stay" block entirely.
-        // Ongoing stays will still count towards "Rooms Filled" at the top,
-        // but won't clutter the Check-In list.
       });
 
-      setRoomsFilled({ occupied: occupiedTargetDay, total: validRooms.length });
+      // Update Rooms Filled state with the targeted counts!
+      setRoomsFilled({ occupied: occupiedTargetDay, total: relevantRooms.length });
 
       const sections = [];
       if (checkOutsList.length) sections.push({ title: "Check outs", data: checkOutsList });
 
-      // Dynamically title the section based on whether it's actually today
       const isActuallyToday = targetDateStr === todayRealStr;
       const currentTitle = isActuallyToday
         ? "Today's Bookings"
@@ -148,9 +165,8 @@ export const useStaycationResort = (initialVenueId?: string, selectedDate: Date 
     } finally {
       setIsDataLoading(false);
     }
-  }, [activeVenue, selectedDate]); // Add selectedDate as dependency
+  }, [activeVenue, selectedDate, activeRoomType]);
 
-  // ... (Keep cancelBooking as is) ...
   const cancelBooking = async (bookingId: string) => {
     try {
       const { data: b, error: fetchErr } = await supabase

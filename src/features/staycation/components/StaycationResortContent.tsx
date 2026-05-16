@@ -35,8 +35,9 @@ type ListEntry =
 export const StaycationResortContent = ({ initialVenueId }: StaycationResortContentProps) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [activeRoomType, setActiveRoomType] = useState<string>("All");
 
-  // PASS SELECTED DATE TO HOOK
+  // CRITICAL FIX: Passed activeRoomType to the hook so occupancy updates dynamically!
   const {
     isLoading,
     groupedBookings,
@@ -47,9 +48,8 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
     rooms,
     roomsFilled,
     cancelBooking,
-  } = useStaycationResort(initialVenueId, selectedDate);
+  } = useStaycationResort(initialVenueId, selectedDate, activeRoomType);
 
-  const [activeRoomType, setActiveRoomType] = useState<string>("All");
   const [activeRoomStatus, setActiveRoomStatus] = useState<"Check Outs" | "Bookings">("Check Outs");
   const [isOfflineSheetVisible, setIsOfflineSheetVisible] = useState(false);
 
@@ -74,11 +74,8 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
   const roomTypeOptions = useMemo(() => {
     const types = new Set<string>(["All"]);
     rooms.forEach(r => {
-      const nameParts = r.room_name.split(" ");
-      if (nameParts.length > 1) {
-        types.add(nameParts[0]);
-      } else {
-        types.add(r.room_name);
+      if (r.room_name) {
+        types.add(r.room_name.trim());
       }
     });
     return Array.from(types);
@@ -94,9 +91,6 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
         filteredBookings = filteredBookings.filter(b => b.roomName?.includes(activeRoomType));
       }
 
-      // Determine which sections to show based on the active tab (Today vs Upcoming)
-      // "Check Outs" status represents the "Today" tab
-      // "Bookings" status represents the "Upcoming" tab
       const isTargetSection =
         section.title.includes("Today") || section.title.includes("Bookings for");
       const isCheckOutSection = section.title.toLowerCase().includes("check out");
@@ -104,10 +98,8 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
       let shouldShow = false;
       if (activeRoomStatus === "Check Outs") {
-        // Today tab: Show Check-outs and Today's Bookings (Check-ins)
         shouldShow = isCheckOutSection || isTargetSection;
       } else {
-        // Upcoming tab: Show only Upcoming Bookings
         shouldShow = isUpcomingSection;
       }
 
@@ -124,7 +116,6 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
   const renderItem = ({ item }: { item: ListEntry }) => {
     if (item.type === "header") {
-      // Map backend titles to Figma design titles
       let displayTitle = item.title;
       if (item.title.toLowerCase().includes("check out")) {
         displayTitle = "Check-Out";
@@ -158,7 +149,6 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
   };
 
   const listHeader = useMemo(() => {
-    // Determine label for the date picker
     const isToday = new Date().toDateString() === selectedDate.toDateString();
     const dateLabel = isToday ? "(Today)" : "";
 
@@ -178,10 +168,11 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
           </Text>
           <PillTabs
             variant="dark"
-            tabs={venues.map(v => v.tabLabel || v.name)}
+            // Filter duplicates out of the PillTabs visually so you only see one "Rooms" button
+            tabs={Array.from(new Set(venues.map(v => v.tabLabel || v.name)))}
             activeTab={activeVenue?.tabLabel || ""}
             onTabChange={label => {
-              const selected = venues.find(v => v.tabLabel === label);
+              const selected = venues.find(v => v.tabLabel === label || v.name === label);
               if (selected) setActiveVenueId(selected.id);
             }}
             style={styles.typeTabs}
@@ -196,8 +187,8 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
             <View style={styles.typesSegmentedControl}>
               {roomTypeOptions.map(type => {
                 const isActive = activeRoomType === type;
-                const label = type === "All" ? "All" : `${type} Rooms`;
-                const textLines = label.split(" ");
+                const textLines = type.split(" ");
+
                 return (
                   <TouchableOpacity
                     key={type}
@@ -349,7 +340,7 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
   );
 };
 
-// ... keep your existing styles ...
+// ... keep your existing styles below ...
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   headerContainer: { paddingTop: vs(10) },

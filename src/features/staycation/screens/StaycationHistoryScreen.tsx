@@ -4,10 +4,10 @@
 import React, { useState, useMemo } from "react";
 import { View, StyleSheet, SectionList, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, PillTabs } from "@/components/ui";
+import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import { StaycationBookingCard } from "../components/StaycationBookingCard";
-import { Calendar, Plus } from "lucide-react-native";
+import { Calendar } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -40,15 +40,14 @@ export const StaycationHistoryScreen = () => {
     dateFilter,
     customRange,
   );
-  const [activeTab, setActiveTab] = useState("All Rooms");
 
-  const tabNames = useMemo(() => {
-    return rooms.length > 0 ? rooms.map(r => r.name) : ["All Rooms"];
+  const displayLabel = useMemo(() => {
+    return rooms.length > 0 ? "All Rooms" : "Farmhouse";
   }, [rooms]);
 
   const listData = useMemo(() => {
-    return getGroupedBookings(activeTab);
-  }, [activeTab, getGroupedBookings]);
+    return getGroupedBookings("All Rooms");
+  }, [getGroupedBookings]);
 
   return (
     <ScreenContainer scrollable={false} paddingHorizontal={hs(12)}>
@@ -62,13 +61,11 @@ export const StaycationHistoryScreen = () => {
         <Text variant="body1" weight="bold" style={styles.bookingsLabel}>
           Bookings
         </Text>
-        <PillTabs
-          tabs={tabNames}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          variant="dark"
-          style={styles.pillTabs}
-        />
+        <View style={styles.staticPill}>
+          <Text variant="body2" weight="semiBold" color={COLORS.text.inverse}>
+            {displayLabel}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.filterRow}>
@@ -145,13 +142,6 @@ export const StaycationHistoryScreen = () => {
         />
       )}
 
-      {/* Floating Action Button */}
-      <View style={styles.fabContainer}>
-        <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
-          <Plus size={ms(30)} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
       {/* Date Filter Bottom Sheet */}
       <FilterBottomSheet
         visible={isFilterOpen}
@@ -179,9 +169,13 @@ const styles = StyleSheet.create({
     fontSize: fs(16),
     color: "#000",
   },
-  pillTabs: {
-    flex: 1,
-    marginVertical: 0,
+  staticPill: {
+    paddingHorizontal: hs(16),
+    paddingVertical: vs(6),
+    backgroundColor: "#282828",
+    borderRadius: ms(20),
+    justifyContent: "center",
+    alignItems: "center",
   },
   filterRow: {
     flexDirection: "row",
@@ -243,23 +237,5 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: fs(14),
     color: COLORS.text.muted,
-  },
-  fabContainer: {
-    position: "absolute",
-    bottom: vs(100),
-    right: hs(12),
-  },
-  fab: {
-    width: ms(60),
-    height: ms(60),
-    borderRadius: ms(30),
-    backgroundColor: "#63A1FD",
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
   },
 });

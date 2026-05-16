@@ -27,7 +27,6 @@ interface StaycationBookingCardProps extends Partial<StaycationBooking> {
   isUpcoming?: boolean;
 }
 
-// Helper to format date for card display (e.g., "2026-04-26" -> "26 Apr")
 const formatDisplayDate = (dateStr: string) => {
   if (!dateStr) return "";
   const date = new Date(dateStr);
@@ -36,7 +35,6 @@ const formatDisplayDate = (dateStr: string) => {
   return `${day} ${month}`;
 };
 
-// Helper for rooms format (e.g., "2026-04-24" -> "24 Apr 26")
 const formatDisplayDateWithYear = (dateStr: string) => {
   if (!dateStr) return "";
   const date = new Date(dateStr);
@@ -72,6 +70,8 @@ export const StaycationBookingCard = ({
     if (fetchedBooking) {
       return {
         ...fetchedBooking,
+        // CRITICAL FIX: Ensure the deep fetch doesn't overwrite the correctly mapped roomName
+        roomName: fetchedBooking.roomName || roomName,
       };
     }
     return {
@@ -144,7 +144,6 @@ export const StaycationBookingCard = ({
     }
   };
 
-  // Payment Pending logic: if paid amount is less than total amount and it's not cancelled
   const isPaymentPending = useMemo(() => {
     if (displayData.status === "Cancelled") return false;
     const paid =
@@ -166,7 +165,6 @@ export const StaycationBookingCard = ({
         displayData.checkOut || "",
       )}`;
     } else {
-      // FIX: Use real roomName from database, fallback only if missing
       const roomPrefix = displayData.roomName || "Room Assigned";
 
       if (isUpcoming) {
@@ -214,11 +212,9 @@ export const StaycationBookingCard = ({
 
   if (!displayData.id && bookingId && !isLoading) return null;
 
-  // Only show grey if the booking is finished (Complete) or voided (Cancelled)
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const isGreyBg = useMemo(() => {
     const s = displayData.status?.toLowerCase();
-    // Only grey out if explicitly cancelled or completed history
     return s === "cancelled" || s === "complete";
   }, [displayData.status]);
 
@@ -268,7 +264,7 @@ export const StaycationBookingCard = ({
 
           <View style={styles.amountStatusWrapper}>
             <Text weight="semiBold" style={[styles.amountText, { color: getAmountColor() }]}>
-              ₹{displayData.amount}
+              ₹{displayData.paidAmount || 0}
             </Text>
             <Text weight="semiBold" style={[styles.statusLabel, { color: getStatusColor() }]}>
               {displayData.status}
