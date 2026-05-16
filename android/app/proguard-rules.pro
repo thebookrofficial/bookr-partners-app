@@ -13,6 +13,12 @@
 -keep class com.bookrpartners.BuildConfig { *; }
 
 # ==========================================
+# Stallion OTA Updates
+# ==========================================
+-keep class com.stallion.** { *; }
+-dontwarn com.stallion.**
+
+# ==========================================
 # React Native Vision Camera & Nitro Modules
 # ==========================================
 -keep class com.margelo.nitro.** { *; }

@@ -234,7 +234,7 @@ export const BulkBookingScreen = () => {
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <ServiceHeader
         title="Elite Strikers Club"
-        subtitle="Bulk Booking"
+        subtitle="Bulk Booking 🚀"
         category={selectedCategory}
         onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
       />
