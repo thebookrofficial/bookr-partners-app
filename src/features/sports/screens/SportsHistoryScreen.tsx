@@ -67,13 +67,27 @@ const MonthSectionHeader = ({
   </View>
 );
 
-const DateSectionHeader = ({ date, settlement }: { date: string; settlement: number }) => (
+const DateSectionHeader = ({
+  date,
+  settlement,
+  isExpanded,
+  onToggle,
+}: {
+  date: string;
+  settlement: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) => (
   <View style={styles.dateHeaderRow}>
-    <TouchableOpacity style={styles.dateLeft} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.dateLeft} activeOpacity={0.7} onPress={onToggle}>
       <Text variant="body2" weight="bold" style={styles.dateText}>
         {date}
       </Text>
-      <ChevronDown size={ms(16)} color={COLORS.text.primary} />
+      <ChevronDown
+        size={ms(16)}
+        color={COLORS.text.primary}
+        style={{ transform: [{ rotate: isExpanded ? "180deg" : "0deg" }] }}
+      />
     </TouchableOpacity>
 
     <View style={styles.settlementRight}>
@@ -117,12 +131,21 @@ export const SportsHistoryScreen = () => {
 
   const selectedCategory = selectedCategories[serviceId] || routeCategory || "Football";
 
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilterOption>("all");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>();
+
+  // NEW: State to track which dates are collapsed (Accordion logic)
+  const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
+
+  const toggleDateAccordion = (dateStr: string) => {
+    setCollapsedDates(prev => ({
+      ...prev,
+      [dateStr]: !prev[dateStr],
+    }));
+  };
 
   // Pass dynamic IDs and filters to the updated hook
   const { currentVenueId, historyGroups, loading } = useSportsHistory(
@@ -139,12 +162,7 @@ export const SportsHistoryScreen = () => {
       <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[1]}>
         {/* Header */}
         <View style={styles.headerZIndex}>
-          <ServiceHeader
-            title={activeVenueName}
-            subtitle="History"
-            category={selectedCategory}
-            onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
-          />
+          <ServiceHeader title={activeVenueName} subtitle="History" category={selectedCategory} />
         </View>
 
         {/* Sticky Search */}
@@ -182,22 +200,31 @@ export const SportsHistoryScreen = () => {
                   totalSettlement={monthGroup.totalSettlement}
                 />
 
-                {monthGroup.days.map((dayGroup, dIndex) => (
-                  <View key={`day-${dIndex}`}>
-                    <DateSectionHeader date={dayGroup.date} settlement={dayGroup.settlement} />
-
-                    {dayGroup.bookings.map(booking => (
-                      <HistoryCard
-                        key={booking.id}
-                        name={booking.name}
-                        phone={booking.phone}
-                        time={booking.timeRanges}
-                        price={`₹${booking.price}`}
-                        status={booking.status}
+                {monthGroup.days.map((dayGroup, dIndex) => {
+                  const isCollapsed = !!collapsedDates[dayGroup.date];
+                  return (
+                    <View key={`day-${dIndex}`}>
+                      <DateSectionHeader
+                        date={dayGroup.date}
+                        settlement={dayGroup.settlement}
+                        isExpanded={!isCollapsed}
+                        onToggle={() => toggleDateAccordion(dayGroup.date)}
                       />
-                    ))}
-                  </View>
-                ))}
+
+                      {!isCollapsed &&
+                        dayGroup.bookings.map(booking => (
+                          <HistoryCard
+                            key={booking.id}
+                            name={booking.name}
+                            phone={booking.phone}
+                            time={booking.timeRanges}
+                            price={`₹${booking.price}`}
+                            status={booking.status}
+                          />
+                        ))}
+                    </View>
+                  );
+                })}
               </View>
             ))
           )}
@@ -209,39 +236,6 @@ export const SportsHistoryScreen = () => {
       {/* ========================================== */}
       {/* ABSOLUTE OVERLAYS (Rendered on top of everything) */}
       {/* ========================================== */}
-
-      {/* 1. FIXED Category Dropdown Overlay */}
-      {isCategoryOpen && (
-        <View style={styles.dropdownOverlay}>
-          {/* Invisible Backdrop (Closes the menu when tapping outside) */}
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => setIsCategoryOpen(false)}
-          />
-
-          {/* The Menu Itself */}
-          <View style={styles.dropdownMenu}>
-            {["Football", "Box Cricket", "Pickleball"].map(cat => (
-              <TouchableOpacity
-                key={cat}
-                style={styles.dropdownItem}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setServiceCategory(serviceId, cat);
-                  setIsCategoryOpen(false);
-                }}>
-                <Text variant="body2" weight="semiBold">
-                  {cat}
-                </Text>
-                <View style={styles.radioOuter}>
-                  {selectedCategory === cat && <View style={styles.radioInner} />}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
 
       {/* 2. Filter Bottom Sheet */}
       <FilterBottomSheet
@@ -260,55 +254,6 @@ export const SportsHistoryScreen = () => {
 
 const styles = StyleSheet.create({
   headerZIndex: { zIndex: 10, paddingHorizontal: hs(12) },
-
-  /* --- OVERLAY DROPDOWN STYLES --- */
-  dropdownOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1000,
-    elevation: 1000,
-  },
-  dropdownMenu: {
-    position: "absolute",
-    top: vs(55),
-    right: hs(12),
-    backgroundColor: COLORS.background,
-    borderRadius: ms(10),
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    width: hs(180),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-    padding: hs(6),
-    gap: vs(6),
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(8),
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    borderRadius: ms(8),
-  },
-  radioOuter: {
-    width: ms(20),
-    height: ms(20),
-    borderRadius: ms(10),
-    borderWidth: 2,
-    borderColor: COLORS.text.primary,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  radioInner: {
-    width: ms(10),
-    height: ms(10),
-    borderRadius: ms(5),
-    backgroundColor: COLORS.text.primary,
-  },
 
   stickySearchWrapper: {
     backgroundColor: COLORS.background,
@@ -360,8 +305,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: vs(8),
     marginTop: vs(12),
+    paddingVertical: vs(4),
   },
-  dateLeft: { flexDirection: "row", alignItems: "center", gap: hs(6) },
+  dateLeft: { flexDirection: "row", alignItems: "center", gap: hs(6), paddingRight: hs(10) },
   dateText: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: COLORS.text.primary },
   settlementRight: { alignItems: "center", justifyContent: "center" },
   datePriceText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#00B562" },

@@ -265,30 +265,43 @@ export const SportsService = {
     newEndTime24: string;
     extraAmount: number;
   }) {
-    // 1. Update the slot end time
+    // 1. Fetch current slot price to increment it properly
+    const { data: currentSlot, error: slotFetchError } = await supabase
+      .from("sports_slots")
+      .select("price")
+      .eq("id", params.slotId)
+      .single();
+
+    if (slotFetchError) throw slotFetchError;
+
+    const newSlotPrice = Number(currentSlot.price || 0) + params.extraAmount;
+
+    // 2. Update the slot end time AND the slot price
     const { error: slotError } = await supabase
       .from("sports_slots")
-      .update({ end_time: params.newEndTime24 })
+      .update({ end_time: params.newEndTime24, price: newSlotPrice })
       .eq("id", params.slotId);
 
     if (slotError) throw slotError;
 
-    // 2. Update the booking total amount
+    // 3. Update the booking total amount AND subtotal
     // We fetch current values first to ensure accuracy
     const { data: currentBooking, error: fetchError } = await supabase
       .from("sports_bookings")
-      .select("total_amount, vendor_payout")
+      .select("subtotal, total_amount, vendor_payout")
       .eq("id", params.bookingId)
       .single();
 
     if (fetchError) throw fetchError;
 
-    const newTotal = Number(currentBooking.total_amount) + params.extraAmount;
-    const newPayout = Number(currentBooking.vendor_payout) + params.extraAmount;
+    const newSubtotal = Number(currentBooking.subtotal || 0) + params.extraAmount;
+    const newTotal = Number(currentBooking.total_amount || 0) + params.extraAmount;
+    const newPayout = Number(currentBooking.vendor_payout || 0) + params.extraAmount;
 
     const { error: bookingError } = await supabase
       .from("sports_bookings")
       .update({
+        subtotal: newSubtotal,
         total_amount: newTotal,
         vendor_payout: newPayout,
       })

@@ -6,7 +6,7 @@ import { View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "re
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
-import { ChevronRight, Files, Ban, CalendarDays, RefreshCw } from "lucide-react-native";
+import { ChevronRight, Files, Ban } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
@@ -59,8 +59,6 @@ export const SportsEssentialsScreen = () => {
   }, [routeCategory, venueId, setServiceCategory, selectedCategories]);
 
   const selectedCategory = selectedCategories[venueId] || routeCategory || "Football";
-
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
   // --- DYNAMIC VENUE STATES ---
   const [currentVenueId, setCurrentVenueId] = useState<string>("");
@@ -140,12 +138,7 @@ export const SportsEssentialsScreen = () => {
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <View style={styles.headerWrapper}>
         {/* 1. Header with Dropdown */}
-        <ServiceHeader
-          title={activeVenueName}
-          subtitle="Essentials"
-          category={selectedCategory}
-          onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
-        />
+        <ServiceHeader title={activeVenueName} subtitle="Essentials" category={selectedCategory} />
       </View>
 
       {/* 2. Conditional Rendering for Content */}
@@ -186,41 +179,10 @@ export const SportsEssentialsScreen = () => {
               }
             }}
           />
+          {/* 
           <EssentialActionRow title="Offers" icon={CalendarDays} onPress={() => {}} />
-          <EssentialActionRow title="Update Venue Info" icon={RefreshCw} onPress={() => {}} />
-        </View>
-      )}
-
-      {/* --- FIXED OVERLAY DROPDOWN --- */}
-      {isCategoryOpen && (
-        <View style={styles.dropdownOverlay}>
-          {/* Invisible Backdrop */}
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => setIsCategoryOpen(false)}
-          />
-
-          {/* Menu */}
-          <View style={styles.dropdownMenu}>
-            {["Football", "Box Cricket", "Pickleball"].map(cat => (
-              <TouchableOpacity
-                key={cat}
-                style={styles.dropdownItem}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setServiceCategory(venueId, cat);
-                  setIsCategoryOpen(false);
-                }}>
-                <Text variant="body2" weight="semiBold">
-                  {cat}
-                </Text>
-                <View style={styles.radioOuter}>
-                  {selectedCategory === cat && <View style={styles.radioInner} />}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <EssentialActionRow title="Update Venue Info" icon={RefreshCw} onPress={() => {}} /> 
+          */}
         </View>
       )}
     </ScreenContainer>
@@ -242,49 +204,4 @@ const styles = StyleSheet.create({
 
   loader: { marginTop: vs(60) },
   emptyStateText: { textAlign: "center", marginTop: vs(60), color: COLORS.text.muted },
-
-  /* --- FIXED OVERLAY DROPDOWN STYLES --- */
-  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
-  dropdownMenu: {
-    position: "absolute",
-    top: vs(55),
-    right: hs(12),
-    backgroundColor: COLORS.background,
-    borderRadius: ms(10),
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    width: hs(180),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-    padding: hs(6),
-    gap: vs(6),
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(8),
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    borderRadius: ms(8),
-  },
-  radioOuter: {
-    width: ms(20),
-    height: ms(20),
-    borderRadius: ms(10),
-    borderWidth: 2,
-    borderColor: COLORS.text.primary,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  radioInner: {
-    width: ms(10),
-    height: ms(10),
-    borderRadius: ms(5),
-    backgroundColor: COLORS.text.primary,
-  },
 });
