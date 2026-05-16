@@ -13,7 +13,6 @@ import {
   Linking,
   Modal,
   Pressable,
-  Share,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -194,42 +193,50 @@ export const BookingDetailsScreen = () => {
     });
   };
 
-  const handleShareWhatsApp = async () => {
+  const handleShareWhatsApp = () => {
+    if (guestPhone === "N/A") {
+      Alert.alert("Error", "No phone number available to share WhatsApp message.");
+      return;
+    }
+
+    let cleanNumber = guestPhone.replace(/\D/g, "");
+    // Default to Indian country code if missing
+    if (cleanNumber.length === 10) {
+      cleanNumber = `91${cleanNumber}`;
+    }
+
     const venueName = booking.venues?.name || "the venue";
     const bookingDate = new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB");
     const bookingTime = `${formatHour(booking.sports_slots.start_time)} to ${formatHour(
       booking.sports_slots.end_time,
     )}`;
 
-    const message =
+    const message = encodeURIComponent(
       `Booking Confirmed! 🎉\n` +
-      `Hi ${guestName},\n` +
-      `Your booking at ${venueName} has been successfully reserved.\n\n` +
-      `Date: ${bookingDate}\n` +
-      `Time: ${bookingTime}\n\n` +
-      `Payment Summary:\n` +
-      `Total: ₹${totalAmount}\n` +
-      `Paid: ₹${currentPaid}\n` +
-      `Due at Venue: ₹${remainingAmount}\n\n` +
-      `Thank you for booking.`;
+        `Hi ${guestName},\n` +
+        `Your booking at ${venueName} has been successfully reserved.\n\n` +
+        `Date: ${bookingDate}\n` +
+        `Time: ${bookingTime}\n\n` +
+        `Payment Summary:\n` +
+        `Total: ₹${totalAmount}\n` +
+        `Paid: ₹${currentPaid}\n` +
+        `Due at Venue: ₹${remainingAmount}\n\n` +
+        `Thank you for booking.`,
+    );
 
-    try {
-      const result = await Share.share({
-        message: message,
-        title: "Booking Confirmation",
-      });
+    const url = `whatsapp://send?phone=${cleanNumber}&text=${message}`;
 
-      if (result.action === Share.sharedAction) {
-        if (result.activityType) {
-          // shared
+    Linking.canOpenURL(url)
+      .then(supported => {
+        if (supported) {
+          return Linking.openURL(url);
+        } else {
+          // Fallback to web link if app isn't installed
+          const webUrl = `https://wa.me/${cleanNumber}?text=${message}`;
+          return Linking.openURL(webUrl);
         }
-      } else if (result.action === Share.dismissedAction) {
-        // dismissed
-      }
-    } catch (error: any) {
-      Alert.alert("Error", "Unable to open share sheet.");
-      console.error("Native Share Error:", error.message);
-    }
+      })
+      .catch(err => console.error("An error occurred", err));
   };
 
   return (

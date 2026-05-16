@@ -305,6 +305,14 @@ export const OfflineBookingSheet = ({
     }
   };
 
+  // Get current real-world time for disabling past hours
+  const now = new Date();
+  const isToday =
+    currentDate.getDate() === now.getDate() &&
+    currentDate.getMonth() === now.getMonth() &&
+    currentDate.getFullYear() === now.getFullYear();
+  const currentHour = now.getHours();
+
   return (
     <Modal
       visible={isVisible}
@@ -409,7 +417,7 @@ export const OfflineBookingSheet = ({
                   navigation.navigate("GuestHistory", {
                     guestId: mobile,
                     bookingId: "",
-                    vertical: "sports", // <---- ADD THIS LINE
+                    vertical: "sports",
                   });
                 }}>
                 <FileText size={ms(20)} color={COLORS.text.primary} />
@@ -457,21 +465,43 @@ export const OfflineBookingSheet = ({
                 nestedScrollEnabled={true}>
                 {HOURS.map((hour, index) => {
                   const isBooked = bookedHours.includes(hour);
+
+                  // FIX: Treat 12 AM as the end of the day (24:00) so it isn't incorrectly marked as past
+                  const hour24 =
+                    hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
+                  const isPast = isToday && hour24 <= currentHour;
+
                   let isDisabled = false;
                   let reasonText = "";
 
                   if (showHourPicker === "from") {
-                    isDisabled = isBooked;
-                    if (isBooked) reasonText = "(Booked)";
-                  } else {
-                    const fromIndex = HOURS.indexOf(fromTime);
-                    if (index <= fromIndex) isDisabled = true;
-                    const hasBookingInBetween = HOURS.slice(fromIndex, index).some(h =>
-                      bookedHours.includes(h),
-                    );
-                    if (hasBookingInBetween) {
+                    if (isBooked) {
+                      isDisabled = true;
+                      reasonText = "(Booked)";
+                    } else if (isPast) {
                       isDisabled = true;
                       reasonText = "(Unavailable)";
+                    }
+                  } else {
+                    const fromIndex = HOURS.indexOf(fromTime);
+                    if (index <= fromIndex) {
+                      isDisabled = true;
+                    } else {
+                      if (isBooked) {
+                        isDisabled = true;
+                        reasonText = "(Booked)";
+                      } else if (isPast) {
+                        isDisabled = true;
+                        reasonText = "(Unavailable)";
+                      }
+
+                      const hasBookingInBetween = HOURS.slice(fromIndex, index).some(h =>
+                        bookedHours.includes(h),
+                      );
+                      if (hasBookingInBetween) {
+                        isDisabled = true;
+                        reasonText = "(Unavailable)";
+                      }
                     }
                   }
 
@@ -498,8 +528,23 @@ export const OfflineBookingSheet = ({
                       <Text
                         variant="body1"
                         weight="bold"
-                        color={isDisabled ? COLORS.text.secondary : COLORS.text.primary}>
-                        {hour} {reasonText}
+                        color={
+                          isDisabled && reasonText !== "(Booked)"
+                            ? COLORS.text.secondary
+                            : COLORS.text.primary
+                        }>
+                        {hour}
+                        {reasonText ? (
+                          <Text
+                            variant="body1"
+                            weight="bold"
+                            color={
+                              reasonText === "(Booked)" ? COLORS.danger : COLORS.text.secondary
+                            }>
+                            {" "}
+                            {reasonText}
+                          </Text>
+                        ) : null}
                       </Text>
                     </TouchableOpacity>
                   );
