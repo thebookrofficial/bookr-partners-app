@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -28,7 +29,6 @@ import {
   useCameraPermission,
   useObjectOutput,
 } from "react-native-vision-camera";
-import { Platform } from "react-native";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -82,6 +82,7 @@ const CameraDisclosureModal = ({
 );
 
 // --- Camera Components ---
+
 const FullScreenCameraIOS = ({ onClose, onCodeScanned, isActive }: any) => {
   const device = useCameraDevice("back");
   const isScanning = useRef(true);
@@ -138,7 +139,7 @@ const FullScreenCameraAndroid = ({ onClose, onCodeScanned, isActive }: any) => {
         style={StyleSheet.absoluteFill}
         device={device}
         isActive={isActive}
-        onError={error => {
+        onError={(error: any) => {
           Alert.alert("Camera Error", error.message);
           onClose();
         }}
@@ -149,7 +150,7 @@ const FullScreenCameraAndroid = ({ onClose, onCodeScanned, isActive }: any) => {
         </TouchableOpacity>
         <View style={styles.scanFrame} />
         <Text weight="semiBold" style={styles.cameraHint}>
-          Scanner restricted on Android Nitro version
+          Scanner restricted on Android Nitro
         </Text>
         {__DEV__ && (
           <TouchableOpacity
@@ -284,6 +285,7 @@ export const EventScanScreen = () => {
   const [isScanningMode, setIsScanningMode] = useState(false);
 
   // Real DB Data states
+  const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [scannedAttendees, setScannedAttendees] = useState<Attendee[]>([]);
   const [ticketCategories, setTicketCategories] = useState<string[]>([]);
   const [isFetchingHistory, setIsFetchingHistory] = useState(true);
@@ -295,11 +297,49 @@ export const EventScanScreen = () => {
 
   const { hasPermission, requestPermission } = useCameraPermission();
 
-  // 1. Fetch History from DB (Attendees who already entered)
+  // 1. Fetch Event, Pre-load Passes, and Fetch Scanned History
   const fetchScannedHistory = useCallback(async () => {
     if (!serviceId) return;
     try {
       setIsFetchingHistory(true);
+
+      // A. Fetch the main event for this venue to get its real event_id and its passes
+      const { data: event, error: eventError } = await supabase
+        .from("events")
+        .select(
+          `
+          id,
+          event_passes ( name ),
+          event_zones ( zone_name )
+        `,
+        )
+        .eq("venue_id", serviceId)
+        .order("total_capacity", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (eventError) throw eventError;
+      if (!event) {
+        setIsFetchingHistory(false);
+        return;
+      }
+
+      const realEventId = event.id;
+      setActiveEventId(realEventId);
+
+      // B. Pre-fill categories from passes and zones so the tabs ALWAYS exist
+      const cats = new Set<string>();
+      const passesData = event.event_passes || [];
+      const zonesData = event.event_zones || [];
+
+      passesData.forEach((p: any) => {
+        if (p.name) cats.add(p.name);
+      });
+      zonesData.forEach((z: any) => {
+        if (z.zone_name) cats.add(z.zone_name);
+      });
+
+      // C. Fetch only COMPLETED (scanned) bookings for the history list
       const { data, error } = await supabase
         .from("event_bookings")
         .select(
@@ -310,20 +350,19 @@ export const EventScanScreen = () => {
           event_zones (zone_name)
         `,
         )
-        .eq("event_id", serviceId)
+        .eq("event_id", realEventId)
         .eq("booking_status", "completed") // Completed means they have checked in
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
 
-      const cats = new Set<string>();
       const formattedData: Attendee[] = (data || []).map((b: any) => {
         const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
         const pass = Array.isArray(b.event_passes) ? b.event_passes[0] : b.event_passes;
         const zone = Array.isArray(b.event_zones) ? b.event_zones[0] : b.event_zones;
 
         const catName = pass?.name || zone?.zone_name || "General";
-        cats.add(catName);
+        cats.add(catName); // Catch any missing ones
 
         const timeStr = new Date(b.updated_at).toLocaleTimeString("en-GB", {
           hour: "2-digit",
@@ -355,16 +394,19 @@ export const EventScanScreen = () => {
     fetchScannedHistory();
   }, [fetchScannedHistory]);
 
+  // Build tabs cleanly, filtering out Guest from the mapped list to prevent duplicates
   const TABS = [
     { label: "All", count: scannedAttendees.length },
     {
       label: "Guest",
       count: scannedAttendees.filter(a => a.categoryName.toLowerCase() === "guest").length,
     },
-    ...ticketCategories.map(cat => ({
-      label: cat,
-      count: scannedAttendees.filter(a => a.categoryName === cat).length,
-    })),
+    ...ticketCategories
+      .filter(cat => cat.toLowerCase() !== "guest")
+      .map(cat => ({
+        label: cat,
+        count: scannedAttendees.filter(a => a.categoryName === cat).length,
+      })),
   ];
 
   const filteredScans =
@@ -395,23 +437,24 @@ export const EventScanScreen = () => {
   };
 
   // 2. Validate Scanned Token against Supabase DB
-  // 2. Validate Scanned Token against Supabase DB
   const handleCodeScanned = useCallback(
     async (code: string) => {
+      if (!activeEventId) return;
+
       try {
         // Search in regular event bookings first
         const { data: booking } = await supabase
           .from("event_bookings")
           .select(
             `
-        id, ticket_count, booking_status, guest_name, guest_phone,
-        profiles (full_name, phone, avatar_url),
-        event_passes (name),
-        event_zones (zone_name)
-      `,
+            id, ticket_count, booking_status, guest_name, guest_phone,
+            profiles (full_name, phone, avatar_url),
+            event_passes (name),
+            event_zones (zone_name)
+          `,
           )
           .eq("qr_code_token", code)
-          .eq("event_id", serviceId)
+          .eq("event_id", activeEventId) // CRITICAL: Uses actual event ID now, not Venue ID!
           .maybeSingle();
 
         if (booking) {
@@ -431,7 +474,7 @@ export const EventScanScreen = () => {
             time: "Now",
             ticketType: `${catName} x ${booking.ticket_count}`,
             categoryName: catName,
-            isAlreadyScanned: booking.booking_status === "completed", // Use booking_status enum
+            isAlreadyScanned: booking.booking_status === "completed",
             isInvite: false,
           };
 
@@ -445,7 +488,7 @@ export const EventScanScreen = () => {
           .from("event_guest_invites")
           .select("*")
           .eq("qr_code_token", code)
-          .eq("event_id", serviceId)
+          .eq("event_id", activeEventId)
           .maybeSingle();
 
         if (invite) {
@@ -471,7 +514,7 @@ export const EventScanScreen = () => {
         Alert.alert("Lookup Failed", "Failed to retrieve ticket information.");
       }
     },
-    [serviceId],
+    [activeEventId],
   );
 
   // 3. Confirm Entry (Update DB)
@@ -486,14 +529,12 @@ export const EventScanScreen = () => {
           .update({ status: "completed" })
           .eq("id", activeAttendee.id);
       } else {
-        // Mark regular booking as 'completed' upon check-in
         await supabase
           .from("event_bookings")
           .update({ booking_status: "completed" })
           .eq("id", activeAttendee.id);
       }
 
-      // Refresh history, close modal, exit scanner
       fetchScannedHistory();
       setModalMode(null);
       setActiveAttendee(null);
@@ -539,7 +580,7 @@ export const EventScanScreen = () => {
   const renderScanItem = ({ item }: { item: Attendee }) => (
     <TouchableOpacity
       style={styles.scanItem}
-      onPress={() => navigation.navigate("EventEntryDetails", { entryId: item.id })}>
+      onPress={() => navigation.navigate("EventEntryDetails", { entryId: item.id } as any)}>
       <View style={styles.avatarContainer}>
         <Image
           source={item.avatarUrl ? { uri: item.avatarUrl } : USER_PROFILE}
@@ -637,7 +678,6 @@ export const EventScanScreen = () => {
   );
 };
 
-// ... keep existing styles object at the bottom ...
 const styles = StyleSheet.create({
   dateRow: {
     flexDirection: "row",

@@ -24,9 +24,10 @@ interface BookingData {
 interface EventBookingListProps {
   bookings: BookingData[];
   onBookingPress?: (booking: BookingData) => void;
+  onPress?: (booking: BookingData) => void; // FIXED: Added standard onPress to satisfy TypeScript
 }
 
-export const EventBookingList = ({ bookings, onBookingPress }: EventBookingListProps) => {
+export const EventBookingList = ({ bookings, onBookingPress, onPress }: EventBookingListProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const navigation = useNavigation<any>();
 
@@ -103,8 +104,11 @@ export const EventBookingList = ({ bookings, onBookingPress }: EventBookingListP
                       time={booking.time}
                       avatarSource={booking.avatarUrl ? { uri: booking.avatarUrl } : DEFAULT_AVATAR}
                       onPress={() => {
+                        // Bulletproof click handler: Tries both prop names, or falls back to direct navigation
                         if (onBookingPress) {
                           onBookingPress(booking);
+                        } else if (onPress) {
+                          onPress(booking);
                         } else {
                           navigation.navigate("EventEntryDetails", { entryId: booking.id });
                         }

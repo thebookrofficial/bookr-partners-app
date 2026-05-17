@@ -6,7 +6,7 @@ import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-nat
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Avatar, PillTabs } from "@/components/ui";
 import { ServiceCard } from "../components/ServiceCard";
-import { Bell, Settings } from "lucide-react-native";
+import { Settings } from "lucide-react-native";
 import { vs, hs, ms } from "@/utils/responsive.utils";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -73,9 +73,9 @@ export const VendorProfileScreen = () => {
           </Text>
         </View>
         <View style={styles.appBarRight}>
-          <TouchableOpacity style={styles.iconBtn}>
+          {/* <TouchableOpacity style={styles.iconBtn}>
             <Bell size={ms(24)} color={COLORS.text.primary} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate("Settings")}>
             <Settings size={ms(24)} color={COLORS.text.primary} />
           </TouchableOpacity>
