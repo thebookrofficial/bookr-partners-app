@@ -29,7 +29,7 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useStaycationBookingDetails } from "../hooks/useStaycationBookingDetails";
-import { supabase } from "@/lib/supabase"; // <-- Add this for inline fetch
+import { supabase } from "@/lib/supabase";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -141,11 +141,11 @@ export const StaycationBookingDetailsScreen = () => {
     amountPaid: amountPaid.toString(),
   };
 
-  // Native Share Handler with Dynamic Data
+  // Direct WhatsApp Share Handler
   const handleWhatsAppShare = async () => {
     let venueName = "our venue";
 
-    // 1. Dynamically fetch the venue name from the database using the booking ID
+    // 1. Dynamically fetch the venue name
     if (bookingDetails?.id) {
       try {
         const { data } = await supabase
@@ -160,7 +160,7 @@ export const StaycationBookingDetailsScreen = () => {
       }
     }
 
-    // 2. Build the dynamic template string using the screen's data
+    // 2. Build the message
     const shareMessage = `Booking Confirmed! 🎉
 Hi ${bookingData.name},
 Your slot at ${venueName} is locked in via Bookr.
@@ -171,7 +171,31 @@ Paid: ₹${bookingData.amountPaid}
 Due at Venue: ₹${bookingData.remainingAmount}
 Thank you for booking with Bookr!`;
 
-    // 3. Trigger Native Share
+    // 3. Try to open WhatsApp directly if we have a valid phone number
+    if (bookingData.phone && bookingData.phone !== "N/A") {
+      // Remove all non-numeric characters
+      let cleanPhone = bookingData.phone.replace(/\D/g, "");
+
+      // If it's a standard 10 digit Indian number, append the 91 country code
+      if (cleanPhone.length === 10) {
+        cleanPhone = `91${cleanPhone}`;
+      }
+
+      const encodedMessage = encodeURIComponent(shareMessage);
+      const whatsappUrl = `whatsapp://send?phone=${cleanPhone}&text=${encodedMessage}`;
+
+      try {
+        const canOpen = await Linking.canOpenURL(whatsappUrl);
+        if (canOpen) {
+          await Linking.openURL(whatsappUrl);
+          return; // Stop here if WhatsApp successfully opened
+        }
+      } catch (err) {
+        console.warn("Could not check/open WhatsApp URL", err);
+      }
+    }
+
+    // 4. Fallback to standard share if WhatsApp isn't installed or number is invalid
     try {
       await Share.share({
         message: shareMessage,
