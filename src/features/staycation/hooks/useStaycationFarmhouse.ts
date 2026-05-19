@@ -123,7 +123,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
 
         // console.log(`[DEBUG] Final Display Name: ${finalDisplayName}`);
 
-        const isOnline = (parseFloat(b.platform_fee) || 0) > 0;
+        const isOnline = !!b.user_id;
         const rangeColor = isOnline ? COLORS.primary : COLORS.danger;
 
         // Calendar marking
@@ -148,7 +148,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           amount: b.total_amount.toString(),
           paidAmount: parseFloat(b.paid_amount) || 0,
           totalAmount: parseFloat(b.total_amount) || 0,
-          status: b.paid_amount >= b.total_amount ? "Online" : "Offline",
+          status: isOnline ? "Online" : "Offline",
           checkIn: b.check_in_date,
           checkOut: b.check_out_date,
           guestCount: b.guest_count,

@@ -73,7 +73,7 @@ export const useStaycationResort = (
         .from("staycation_bookings")
         .select(
           `
-            id, booking_type, booking_status, platform_fee, check_in_date, check_out_date,
+            id, user_id, booking_type, booking_status, platform_fee, check_in_date, check_out_date,
             guest_count, total_amount, paid_amount, guest_name, guest_phone, room_id,
             staycation_rooms ( room_name, room_number ),
             profiles ( full_name, phone, avatar_url )
@@ -100,7 +100,7 @@ export const useStaycationResort = (
           ? b.staycation_rooms[0]
           : b.staycation_rooms;
 
-        const isOnline = (parseFloat(b.platform_fee) || 0) > 0;
+        const isOnline = !!b.user_id;
 
         // CRITICAL FIX: Trim the room name here as well so the cards look clean
         const formattedRoomName = roomData
