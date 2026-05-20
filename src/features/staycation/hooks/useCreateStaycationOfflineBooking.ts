@@ -18,6 +18,7 @@ interface CreateOfflineBookingPayload {
   bookingType: string;
   roomType?: string;
   groupType?: string;
+  unitCount?: number;
 }
 
 export const useCreateStaycationOfflineBooking = () => {
@@ -32,7 +33,6 @@ export const useCreateStaycationOfflineBooking = () => {
     return `${year}-${month}-${day}`;
   };
 
-  // UPDATED: Now returns the venueName alongside success status
   const createBooking = async (
     payload: CreateOfflineBookingPayload,
   ): Promise<{ success: boolean; venueName?: string }> => {
@@ -45,7 +45,6 @@ export const useCreateStaycationOfflineBooking = () => {
       setIsLoading(true);
       setError(null);
 
-      // Fetch the Venue Name so we can use it in the WhatsApp message
       const { data: venueData } = await supabase
         .from("venues")
         .select("name")
@@ -78,37 +77,96 @@ export const useCreateStaycationOfflineBooking = () => {
       );
 
       const bookingTypeValue = payload.bookingType === "farmhouse" ? "full_property" : "per_room";
+      const requiredUnits = payload.unitCount || 1;
+
+      // =========================================================
+      // 1. MULTI-UNIT SEQUENCE AUTO-ASSIGNMENT ENGINE
+      // =========================================================
+      let assignedRoomId = payload.roomId || null;
+      let assignedRoomStr = payload.roomType || "-";
+      let assignedRoomsToBlock: string[] = [];
+
+      if (bookingTypeValue === "per_room" && !assignedRoomId && payload.roomType) {
+        // Fetch all rooms of this type ordered sequentially (PRI-111, PRI-112...)
+        const { data: availableRooms, error: roomErr } = await supabase
+          .from("staycation_rooms")
+          .select("id, room_name, room_number")
+          .eq("venue_id", payload.venueId)
+          .eq("room_name", payload.roomType)
+          .eq("is_active", true)
+          .order("room_number", { ascending: true });
+
+        if (roomErr) throw new Error("Room Fetch Error: " + JSON.stringify(roomErr));
+
+        if (availableRooms && availableRooms.length > 0) {
+          // Fetch overlapping bookings for these specific dates
+          const { data: overlaps, error: overlapErr } = await supabase
+            .from("staycation_bookings")
+            .select("room_id")
+            .eq("venue_id", payload.venueId)
+            .neq("booking_status", "cancelled")
+            .lt("check_in_date", checkOutStr)
+            .gt("check_out_date", checkInStr);
+
+          if (overlapErr) throw new Error("Overlap Fetch Error: " + JSON.stringify(overlapErr));
+
+          const occupiedIds = new Set(overlaps?.map(o => o.room_id));
+
+          // Filter out occupied rooms and grab the required number of units
+          const freeRooms = availableRooms.filter(r => !occupiedIds.has(r.id));
+
+          if (freeRooms.length < requiredUnits) {
+            throw new Error(
+              `Only ${freeRooms.length} ${payload.roomType} unit(s) available for these dates.`,
+            );
+          }
+
+          const selectedUnits = freeRooms.slice(0, requiredUnits);
+          assignedRoomId = selectedUnits[0].id; // Primary room for the booking row
+          assignedRoomsToBlock = selectedUnits.map(r => r.id);
+          assignedRoomStr = selectedUnits.map(r => `${r.room_name} (${r.room_number})`).join(", ");
+        } else {
+          throw new Error(`No active rooms found for type: ${payload.roomType}`);
+        }
+      }
+
+      const safeGuestCount = Math.max(1, payload.guestCount || 1);
+      const safeTotalPayment = Math.max(0, payload.totalPayment || 0);
+      const safeAdvancePaid = Math.max(0, payload.advancePaid || 0);
 
       const { error: insertError } = await supabase.from("staycation_bookings").insert({
         user_id: userId,
         venue_id: payload.venueId,
-        room_id: payload.roomId || null,
+        room_id: assignedRoomId,
+        unit_count: requiredUnits,
         booking_type: bookingTypeValue,
         check_in_date: checkInStr,
         check_out_date: checkOutStr,
         nights_count: nightsCount,
-        guest_count: payload.guestCount,
-        subtotal: payload.totalPayment,
+        guest_count: safeGuestCount,
+        subtotal: safeTotalPayment,
         discount_amount: 0,
         platform_fee: 0,
         gateway_fee: 0,
-        total_amount: payload.totalPayment,
-        vendor_payout: payload.totalPayment,
-        booking_status: payload.advancePaid > 0 ? "confirmed" : "pending",
-        paid_amount: payload.advancePaid,
-        guest_name: payload.guestName,
-        guest_phone: payload.guestPhone,
-        special_requests: `Booking For: ${payload.bookingType}, Type: ${
-          payload.roomType || "-"
-        }, Group: ${payload.groupType || "-"}`,
+        total_amount: safeTotalPayment,
+        vendor_payout: safeTotalPayment,
+        booking_status: safeAdvancePaid > 0 ? "confirmed" : "pending",
+        paid_amount: safeAdvancePaid,
+        guest_name: payload.guestName || "Guest",
+        guest_phone: payload.guestPhone || "N/A",
+        special_requests: `Booking For: ${payload.bookingType}, Type: ${assignedRoomStr}, Group: ${
+          payload.groupType || "-"
+        }`,
       });
 
       if (insertError) {
-        console.error("Supabase Insertion Error:", insertError);
-        throw new Error(insertError.message);
+        console.error("Supabase Insertion Error:", JSON.stringify(insertError, null, 2));
+        throw new Error(insertError.message || "Failed to insert booking");
       }
 
-      // Manually block dates
+      // =========================================================
+      // 2. AVAILABILITY CALENDAR BLOCKING (BLOCKS ALL UNITS)
+      // =========================================================
       try {
         const targetDates: string[] = [];
         let currentDate = new Date(payload.checkInDate);
@@ -120,20 +178,12 @@ export const useCreateStaycationOfflineBooking = () => {
         }
 
         if (targetDates.length > 0) {
-          // Determine if we should block specific rooms or the whole property
           let targetRoomIds: (string | null)[] = [null];
 
           if (bookingTypeValue === "per_room") {
-            const { data: rooms } = await supabase
-              .from("staycation_rooms")
-              .select("id")
-              .eq("venue_id", payload.venueId);
-            if (rooms && rooms.length > 0) {
-              targetRoomIds = rooms.map(r => r.id);
-            }
+            targetRoomIds = assignedRoomsToBlock;
           }
 
-          // Use an UPSERT to handle both inserting new blocks and updating existing availability
           const upsertData = [];
           for (const roomId of targetRoomIds) {
             for (const date of targetDates) {
