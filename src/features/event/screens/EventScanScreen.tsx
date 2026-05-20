@@ -12,6 +12,7 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -130,6 +131,21 @@ const FullScreenCameraIOS = ({ onClose, onCodeScanned, isActive }: any) => {
 
 const FullScreenCameraAndroid = ({ onClose, onCodeScanned, isActive }: any) => {
   const device = useCameraDevice("back");
+  const isScanning = useRef(true);
+
+  // Define the code scanner
+  const codeScanner = {
+    codeTypes: ["qr"] as const,
+    onCodeScanned: (codes: any[]) => {
+      if (codes.length > 0 && codes[0].value && isScanning.current) {
+        isScanning.current = false;
+        onCodeScanned(codes[0].value);
+        setTimeout(() => {
+          isScanning.current = true;
+        }, 2000);
+      }
+    },
+  };
 
   if (!device) return <View style={styles.loadingContainer} />;
 
@@ -139,6 +155,8 @@ const FullScreenCameraAndroid = ({ onClose, onCodeScanned, isActive }: any) => {
         style={StyleSheet.absoluteFill}
         device={device}
         isActive={isActive}
+        // @ts-ignore
+        codeScanner={codeScanner}
         onError={(error: any) => {
           Alert.alert("Camera Error", error.message);
           onClose();
@@ -149,9 +167,18 @@ const FullScreenCameraAndroid = ({ onClose, onCodeScanned, isActive }: any) => {
           <X size={ms(24)} color="#FFF" />
         </TouchableOpacity>
         <View style={styles.scanFrame} />
-        <Text weight="semiBold" style={styles.cameraHint}>
+        {/* <Text weight="semiBold" style={styles.cameraHint}>
           Scanner restricted on Android Nitro
-        </Text>
+        </Text> */}
+        <View style={styles.cameraOverlay} pointerEvents="box-none">
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <X size={ms(24)} color="#FFF" />
+          </TouchableOpacity>
+          <View style={styles.scanFrame} />
+          <Text weight="semiBold" style={styles.cameraHint}>
+            Align QR code within the frame
+          </Text>
+        </View>
         {__DEV__ && (
           <TouchableOpacity
             style={styles.simulateButton}
@@ -289,6 +316,7 @@ export const EventScanScreen = () => {
   const [scannedAttendees, setScannedAttendees] = useState<Attendee[]>([]);
   const [ticketCategories, setTicketCategories] = useState<string[]>([]);
   const [isFetchingHistory, setIsFetchingHistory] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isProcessingEntry, setIsProcessingEntry] = useState(false);
 
   const [modalMode, setModalMode] = useState<"confirmation" | "warning" | null>(null);
@@ -394,6 +422,12 @@ export const EventScanScreen = () => {
     fetchScannedHistory();
   }, [fetchScannedHistory]);
 
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await fetchScannedHistory();
+    setIsRefreshing(false);
+  }, [fetchScannedHistory]);
+
   // Build tabs cleanly, filtering out Guest from the mapped list to prevent duplicates
   const TABS = [
     { label: "All", count: scannedAttendees.length },
@@ -443,7 +477,7 @@ export const EventScanScreen = () => {
 
       try {
         // Search in regular event bookings first
-        const { data: booking } = await supabase
+        const { data: booking, error: bErr } = await supabase
           .from("event_bookings")
           .select(
             `
@@ -453,9 +487,11 @@ export const EventScanScreen = () => {
             event_zones (zone_name)
           `,
           )
-          .eq("qr_code_token", code)
+          .eq("qr_code_token", code.trim())
           .eq("event_id", activeEventId) // CRITICAL: Uses actual event ID now, not Venue ID!
           .maybeSingle();
+
+        if (bErr) console.error("Booking Query Error:", bErr);
 
         if (booking) {
           const profile = Array.isArray(booking.profiles) ? booking.profiles[0] : booking.profiles;
@@ -646,7 +682,7 @@ export const EventScanScreen = () => {
             />
           </View>
 
-          {isFetchingHistory ? (
+          {isFetchingHistory && !isRefreshing ? (
             <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: vs(20) }} />
           ) : (
             <FlatList
@@ -656,6 +692,14 @@ export const EventScanScreen = () => {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.listContainer}
               ListEmptyComponent={<Text style={styles.emptyListText}>No tickets scanned yet.</Text>}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={onRefresh}
+                  tintColor={COLORS.primary}
+                  colors={[COLORS.primary]}
+                />
+              }
             />
           )}
         </ScreenContainer>

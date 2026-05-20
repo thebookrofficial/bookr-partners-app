@@ -12,6 +12,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { COLORS } from "@/constants/theme";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useEventEntryDetails } from "../hooks/useEventEntryDetails";
+import { MainScreenProps } from "@/navigation/navigation.types";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -21,11 +22,10 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
  */
 export const EventEntryDetailsScreen = () => {
   const navigation = useNavigation();
-  const route = useRoute<any>();
+  const route = useRoute<MainScreenProps<"EventEntryDetails">["route"]>();
+  const bookingId = route.params.entryId;
 
-  // Extract bookingId passed from the scanner or booking list
-  const bookingId = route.params?.bookingId || "";
-
+  // console.log("DEBUG - Received Params:", route.params); // Look for 'entryId' here in your terminal
   const { data, loading, error } = useEventEntryDetails(bookingId);
 
   const handleBack = () => {
