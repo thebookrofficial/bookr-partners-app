@@ -2,7 +2,8 @@
 // Confidential and Proprietary.
 
 export interface StaycationBooking {
-  id: string;
+  id: string; // The UI unique ID (e.g., "uuid-unit-1")
+  dbId?: string; // The real database UUID for fetching/cancelling
   name: string;
   phone: string;
   avatarUrl?: string;

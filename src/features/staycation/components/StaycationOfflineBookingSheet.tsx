@@ -36,6 +36,14 @@ interface RoomConfig {
   totalInventory: number;
 }
 
+// 1. Move this OUTSIDE the component (e.g., above the component definition)
+const formatYMD = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export const StaycationOfflineBookingSheet = ({
   visible,
   onClose,
@@ -73,13 +81,6 @@ export const StaycationOfflineBookingSheet = ({
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [availableUnitsForCurrentDates, setAvailableUnitsForCurrentDates] = useState<number>(1);
 
-  // --- Logic Helpers ---
-  const formatYMD = (d: Date) => {
-    const year = d.getFullYear();
-    const month = (d.getMonth() + 1).toString().padStart(2, "0");
-    const day = d.getDate().toString().padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
   const formatDateLabel = (date: Date) => {
     return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
   };

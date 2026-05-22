@@ -102,7 +102,7 @@ export const useCreateStaycationOfflineBooking = () => {
           // Fetch overlapping bookings for these specific dates
           const { data: overlaps, error: overlapErr } = await supabase
             .from("staycation_bookings")
-            .select("room_id")
+            .select("room_id, unit_count")
             .eq("venue_id", payload.venueId)
             .neq("booking_status", "cancelled")
             .lt("check_in_date", checkOutStr)

@@ -138,12 +138,14 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
     return (
       <StaycationBookingCard
-        bookingId={item.data.id}
+        // CRITICAL FIX: Pass the real dbId if available, fallback to id
+        bookingId={item.data.dbId || item.data.id}
         isFarmhouse={false}
         isUpcoming={isUpcoming}
-        onCancelPress={handleCancel}
+        onCancelPress={() => handleCancel(item.data.dbId || item.data.id)}
         {...item.data}
         checkIn={isCheckOutSection ? item.data.checkOut : item.data.checkIn}
+        roomName={item.data.roomName}
       />
     );
   };

@@ -15,12 +15,6 @@ const formatDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-/**
- * Specialized hook for Resort (Per Room) staycation data.
- * @param initialVenueId Optional initial venue
- * @param selectedDate The currently active date from the calendar
- * @param activeRoomType The currently selected room type tab
- */
 export const useStaycationResort = (
   initialVenueId?: string,
   selectedDate: Date = new Date(),
@@ -53,28 +47,29 @@ export const useStaycationResort = (
       const targetDateStr = formatDate(selectedDate);
       const todayRealStr = formatDate(new Date());
 
-      // 1. Fetch Rooms
       const { data: roomsData } = await supabase
         .from("staycation_rooms")
         .select("*")
         .eq("venue_id", activeVenue.venueId)
         .eq("is_active", true);
+
+      // 1. Keep the full list for indexing
       const validRooms = roomsData || [];
       setRooms(validRooms);
 
-      // CRITICAL FIX: Use .trim() to match safely against the UI tabs
+      // 2. Filter for display (but don't use this for indexing!)
       const relevantRooms =
         activeRoomType === "All"
           ? validRooms
           : validRooms.filter(r => r.room_name?.trim() === activeRoomType);
 
-      // 2. Fetch Bookings (Include explicit room details)
+      // ADDED unit_count TO THE SELECT QUERY
       const { data: bookingsData, error: bookingsError } = await supabase
         .from("staycation_bookings")
         .select(
           `
             id, user_id, booking_type, booking_status, platform_fee, check_in_date, check_out_date,
-            guest_count, total_amount, paid_amount, guest_name, guest_phone, room_id,
+            guest_count, total_amount, paid_amount, guest_name, guest_phone, room_id, unit_count,
             staycation_rooms ( room_name, room_number ),
             profiles ( full_name, phone, avatar_url )
           `,
@@ -88,7 +83,6 @@ export const useStaycationResort = (
       if (bookingsError) throw bookingsError;
       const bookings = bookingsData || [];
 
-      // 3. Process Bookings for UI
       const targetDayList: StaycationBooking[] = [];
       const upcomingList: StaycationBooking[] = [];
       const checkOutsList: StaycationBooking[] = [];
@@ -96,53 +90,59 @@ export const useStaycationResort = (
 
       bookings.forEach(b => {
         const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
-        const roomData = Array.isArray(b.staycation_rooms)
-          ? b.staycation_rooms[0]
-          : b.staycation_rooms;
-
         const isOnline = !!b.user_id;
 
-        // CRITICAL FIX: Trim the room name here as well so the cards look clean
-        const formattedRoomName = roomData
-          ? `${roomData.room_name?.trim()} (${roomData.room_number || "N/A"})`
-          : "Room Unassigned";
+        // --- SERIAL ASSIGNMENT LOGIC ---
+        // Find where the booking starts in our sorted master room list
+        const startIndex = validRooms.findIndex(r => r.id === b.room_id);
+        const start = startIndex >= 0 ? startIndex : 0;
 
-        // CRITICAL FIX: Use .trim() to calculate accurate occupancy
-        const isRelevantRoom =
-          activeRoomType === "All" || roomData?.room_name?.trim() === activeRoomType;
-        if (
-          isRelevantRoom &&
-          b.check_in_date <= targetDateStr &&
-          b.check_out_date > targetDateStr
-        ) {
-          occupiedTargetDay++;
-        }
+        const units = b.unit_count && b.unit_count > 0 ? b.unit_count : 1;
+        const baseGuestsPerUnit = Math.floor(b.guest_count / units);
+        const remainderGuests = b.guest_count % units;
 
-        const formatted: StaycationBooking = {
-          id: b.id,
-          name: b.guest_name || profile?.full_name || "Guest",
-          phone: b.guest_phone || profile?.phone || "N/A",
-          avatarUrl: profile?.avatar_url,
-          amount: b.total_amount.toString(),
-          paidAmount: parseFloat(b.paid_amount) || 0,
-          totalAmount: parseFloat(b.total_amount) || 0,
-          status: isOnline ? "Online" : "Offline",
-          checkIn: b.check_in_date,
-          checkOut: b.check_out_date,
-          guestCount: b.guest_count,
-          roomName: formattedRoomName,
-        };
+        for (let i = 0; i < units; i++) {
+          const currentUnitIndex = start + i;
+          const assignedRoom = validRooms[currentUnitIndex]; // Picks DEL-101, then 102, then 103...
 
-        if (b.check_out_date === targetDateStr) {
-          checkOutsList.push(formatted);
-        } else if (b.check_in_date === targetDateStr) {
-          targetDayList.push(formatted);
-        } else if (b.check_in_date > targetDateStr) {
-          upcomingList.push(formatted);
+          const currentGuestCount = baseGuestsPerUnit + (i < remainderGuests ? 1 : 0);
+
+          // Track occupancy based on the actual room assigned
+          if (
+            assignedRoom &&
+            activeRoomType !== "All" &&
+            activeRoomType === assignedRoom.room_name &&
+            b.check_in_date <= targetDateStr &&
+            b.check_out_date > targetDateStr
+          ) {
+            occupiedTargetDay++;
+          }
+
+          const formatted: StaycationBooking = {
+            id: `${b.id}-unit-${i + 1}`,
+            dbId: b.id,
+            name: b.guest_name || profile?.full_name || "Guest",
+            phone: b.guest_phone || profile?.phone || "N/A",
+            avatarUrl: profile?.avatar_url,
+            amount: (parseFloat(b.total_amount) / units).toFixed(2),
+            paidAmount: (parseFloat(b.paid_amount) || 0) / units,
+            totalAmount: (parseFloat(b.total_amount) || 0) / units,
+            status: isOnline ? "Online" : "Offline",
+            checkIn: b.check_in_date,
+            checkOut: b.check_out_date,
+            guestCount: currentGuestCount,
+            // Uses the room from the serial lookup
+            roomName: assignedRoom
+              ? `${assignedRoom.room_name} (${assignedRoom.room_number})`
+              : "Room",
+          };
+
+          if (b.check_out_date === targetDateStr) checkOutsList.push(formatted);
+          else if (b.check_in_date === targetDateStr) targetDayList.push(formatted);
+          else if (b.check_in_date > targetDateStr) upcomingList.push(formatted);
         }
       });
 
-      // Update Rooms Filled state with the targeted counts!
       setRoomsFilled({ occupied: occupiedTargetDay, total: relevantRooms.length });
 
       const sections = [];
