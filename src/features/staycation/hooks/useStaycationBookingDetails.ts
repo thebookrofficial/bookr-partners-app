@@ -25,6 +25,8 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
         .select(
           `
           id,
+          user_id,
+          unit_count,
           check_in_date,
           check_out_date,
           guest_count,

@@ -109,17 +109,25 @@ export const StaycationBookingDetailsScreen = () => {
     );
   }
 
-  const totalPayment =
-    parseFloat(bookingDetails?.total_amount) || parseFloat(initialBooking?.amount) || 0;
-  const amountPaid = parseFloat(bookingDetails?.paid_amount) || 0;
+  // 1. Calculate split units exactly like the previous screen
+  const units = bookingDetails?.unit_count || 1;
+
+  const totalPayment = bookingDetails?.total_amount
+    ? parseFloat(bookingDetails.total_amount) / units
+    : parseFloat(initialBooking?.amount) || 0;
+
+  const amountPaid = bookingDetails?.paid_amount
+    ? parseFloat(bookingDetails.paid_amount) / units
+    : parseFloat(initialBooking?.paidAmount) || 0;
+
   const remainingAmount = Math.max(0, totalPayment - amountPaid);
 
-  const isOnline =
-    bookingDetails?.booking_type === "online" ||
-    (parseFloat(bookingDetails?.platform_fee) || 0) > 0;
+  // 2. The CORRECT way to check if a booking is online
+  const isOnline = !!bookingDetails?.user_id;
   const isCancelled = bookingDetails?.booking_status === "cancelled";
   const bookingType = isOnline ? "Online" : "Manual";
 
+  // 3. Assemble the data, prioritizing the "unrolled" data passed from the card
   const bookingData = {
     name:
       bookingDetails?.guest_name ||
@@ -134,11 +142,18 @@ export const StaycationBookingDetailsScreen = () => {
     avatarUrl: bookingDetails?.profiles?.avatar_url || initialBooking?.avatarUrl,
     checkIn: formatDate(bookingDetails?.check_in_date || initialBooking?.checkIn),
     checkOut: formatDate(bookingDetails?.check_out_date || initialBooking?.checkOut),
-    guestCount: bookingDetails?.guest_count || initialBooking?.guestCount || 0,
+
+    // Use initialBooking.guestCount to preserve the remainder math we did on the previous screen!
+    guestCount:
+      initialBooking?.guestCount || Math.floor((bookingDetails?.guest_count || 0) / units),
+
+    // Preserve the serial room name (e.g., DEL-101) passed from the card
+    roomName: initialBooking?.roomName || "Room Assigned",
+
     bookingType: isCancelled ? "Cancelled" : bookingType,
-    totalPayment: totalPayment.toString(),
-    remainingAmount: remainingAmount.toString(),
-    amountPaid: amountPaid.toString(),
+    totalPayment: totalPayment.toFixed(2), // Keep it clean
+    remainingAmount: remainingAmount.toFixed(2),
+    amountPaid: amountPaid.toFixed(2),
   };
 
   // Direct WhatsApp Share Handler
@@ -243,9 +258,9 @@ Thank you for booking with Bookr!`;
           <InfoBlock label="Check Out" value={bookingData.checkOut} icon={Clock} />
         </View>
 
-        {/* Guest / Booking Type Section */}
+        {/* --- ADD THIS ROW to show the actual Room Name --- */}
         <View style={styles.row}>
-          <InfoBlock label="No Of Guest" value={bookingData.guestCount} icon={User} />
+          <InfoBlock label="Room / Property" value={bookingData.roomName} icon={User} />
           <View style={{ width: hs(20) }} />
           <InfoBlock
             label="Booking Type"
@@ -253,6 +268,13 @@ Thank you for booking with Bookr!`;
             icon={ClipboardList}
             valueColor={isCancelled ? COLORS.text.muted : "#63a1fd"}
           />
+        </View>
+
+        {/* Guest / Booking Type Section */}
+        <View style={styles.row}>
+          <InfoBlock label="No Of Guest" value={bookingData.guestCount} icon={User} />
+          <View style={{ width: hs(20) }} />
+          <View style={styles.infoBlock} />
         </View>
 
         {/* Payment Card */}
