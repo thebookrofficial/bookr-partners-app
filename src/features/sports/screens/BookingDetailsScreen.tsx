@@ -610,7 +610,7 @@ export const BookingDetailsScreen = () => {
                 style={styles.modalBackBtn}
                 onPress={() => setShowCancelModal(false)}>
                 <Text variant="h3" family="nichrome" style={styles.modalBackText}>
-                  no go back
+                  Back
                 </Text>
               </TouchableOpacity>
 

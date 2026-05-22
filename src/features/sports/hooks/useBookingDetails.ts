@@ -182,9 +182,9 @@ export const useBookingDetails = (bookingId: string) => {
       const { error: bookingError } = await supabase
         .from("sports_bookings")
         .update({ booking_status: "cancelled" })
-        .eq("id", bookingId)
-        .select()
-        .single();
+        .eq("id", bookingId);
+      // .select()
+      // .single();
 
       if (bookingError) {
         console.error("Booking Error:", bookingError);
@@ -194,9 +194,9 @@ export const useBookingDetails = (bookingId: string) => {
       const { error: slotError } = await supabase
         .from("sports_slots")
         .update({ status: "available" })
-        .eq("id", booking.slot_id)
-        .select()
-        .maybeSingle();
+        .eq("id", booking.slot_id);
+      // .select()
+      // .maybeSingle();
 
       if (slotError) console.warn("Slot update issue:", slotError);
 

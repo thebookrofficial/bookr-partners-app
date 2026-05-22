@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -38,6 +38,7 @@ interface OfflineBookingSheetProps {
   _groundId: string;
   selectedDate: Date;
   onSuccess: () => void;
+  onCheckHistory?: () => void;
 }
 
 const offlineBookingSchema = z.object({
@@ -84,6 +85,7 @@ export const OfflineBookingSheet = ({
   _groundId,
   selectedDate: initialDate,
   onSuccess,
+  onCheckHistory,
 }: OfflineBookingSheetProps) => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 
@@ -138,6 +140,21 @@ export const OfflineBookingSheet = ({
     return `${year}-${month}-${day}`;
   };
 
+  const resetForm = useCallback(() => {
+    setCurrentDate(initialDate);
+    setMobile("");
+    setName("");
+    setTotalPayment("");
+    setAdvancePaid("");
+    setFromTime("Start Time");
+    setToTime("End Time");
+    setHasHistory(false);
+  }, [initialDate]);
+
+  useEffect(() => {
+    setCurrentDate(initialDate);
+  }, [initialDate]);
+
   useEffect(() => {
     const fetchUnavailableSlots = async () => {
       if (!isVisible || !_groundId) return;
@@ -162,18 +179,16 @@ export const OfflineBookingSheet = ({
     fetchUnavailableSlots();
   }, [currentDate, _groundId, isVisible]);
 
+  const prevGroundId = React.useRef<string | null>(null);
+
+  // Clear form ONLY if the ground actually changes to a different one
   useEffect(() => {
-    if (isVisible) {
-      setCurrentDate(initialDate);
-      setMobile("");
-      setName("");
-      setTotalPayment("");
-      setAdvancePaid("");
-      setFromTime("Start Time");
-      setToTime("End Time");
-      setHasHistory(false);
+    // Only reset if we had a previous ground ID and the new one is different
+    if (prevGroundId.current !== null && _groundId !== prevGroundId.current) {
+      resetForm();
     }
-  }, [initialDate, isVisible]);
+    prevGroundId.current = _groundId;
+  }, [_groundId, resetForm]);
 
   useEffect(() => {
     const checkGuest = async () => {
@@ -297,6 +312,7 @@ export const OfflineBookingSheet = ({
       });
 
       Alert.alert("Success", "Booking Saved!");
+      resetForm();
       onSuccess();
     } catch (error: any) {
       Alert.alert("Booking Failed", error.message || "Something went wrong.");
@@ -413,7 +429,11 @@ export const OfflineBookingSheet = ({
                 style={styles.historyRow}
                 activeOpacity={0.7}
                 onPress={() => {
-                  onClose();
+                  if (onCheckHistory) {
+                    onCheckHistory();
+                  } else {
+                    onClose();
+                  }
                   navigation.navigate("GuestHistory", {
                     guestId: mobile,
                     bookingId: "",
@@ -487,18 +507,20 @@ export const OfflineBookingSheet = ({
                     if (index <= fromIndex) {
                       isDisabled = true;
                     } else {
-                      if (isBooked) {
-                        isDisabled = true;
-                        reasonText = "(Booked)";
-                      } else if (isPast) {
-                        isDisabled = true;
-                        reasonText = "(Unavailable)";
-                      }
-
-                      const hasBookingInBetween = HOURS.slice(fromIndex, index).some(h =>
+                      // For "to" time, we check if any slot strictly between the start time
+                      // and this end time is booked.
+                      // A slot starting at `hour` is fine to be an end time for an earlier slot.
+                      // We check from `fromIndex` up to `index - 1`.
+                      const intermediateHours = HOURS.slice(fromIndex, index);
+                      const hasBookingInBetween = intermediateHours.some(h =>
                         bookedHours.includes(h),
                       );
+
                       if (hasBookingInBetween) {
+                        isDisabled = true;
+                        reasonText = "(Unavailable)";
+                      } else if (isPast && !isBooked) {
+                        // Standard past time check
                         isDisabled = true;
                         reasonText = "(Unavailable)";
                       }
