@@ -11,8 +11,8 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
-  Platform,
   RefreshControl,
+  PermissionsAndroid,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -20,16 +20,10 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { Button } from "@/components/ui/Button";
 import { EventHeader } from "../components/EventHeader";
-import { Phone, X, Camera as CameraIcon, Ticket, User } from "lucide-react-native";
+import { Phone, X, Camera as CameraIcon } from "lucide-react-native";
 import { useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
 import { supabase } from "@/lib/supabase";
-
-import {
-  Camera,
-  useCameraDevice,
-  useCameraPermission,
-  useObjectOutput,
-} from "react-native-vision-camera";
+import { Camera } from "react-native-camera-kit";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -82,107 +76,44 @@ const CameraDisclosureModal = ({
   </Modal>
 );
 
-// --- Camera Components ---
-
-const FullScreenCameraIOS = ({ onClose, onCodeScanned, isActive }: any) => {
-  const device = useCameraDevice("back");
+// --- Camera Component ---
+const FullScreenCamera = ({ onClose, onCodeScanned }: any) => {
   const isScanning = useRef(true);
-
-  const objectOutput = useObjectOutput({
-    // @ts-ignore
-    types: ["qr"],
-    onObjectsScanned: (objects: any[]) => {
-      if (objects.length > 0 && objects[0].value && isScanning.current) {
-        isScanning.current = false;
-        onCodeScanned(objects[0].value);
-        setTimeout(() => {
-          isScanning.current = true;
-        }, 2000);
-      }
-    },
-  });
-
-  if (!device) return <View style={styles.loadingContainer} />;
 
   return (
     <View style={styles.cameraRoot}>
       <Camera
-        style={StyleSheet.absoluteFill}
-        device={device}
-        isActive={isActive}
-        outputs={[objectOutput]}
-        onError={error => {
-          Alert.alert("Camera Error", error.message);
-          onClose();
+        style={StyleSheet.absoluteFillObject} // <-- ADD THIS LINE
+        scanBarcode={true}
+        onReadCode={(event: any) => {
+          const code = event.nativeEvent.codeStringValue;
+          if (code && isScanning.current) {
+            isScanning.current = false;
+            onCodeScanned(code);
+            setTimeout(() => {
+              isScanning.current = true;
+            }, 2000);
+          }
         }}
+        showFrame={true}
+        laserColor={COLORS.primary}
+        frameColor={COLORS.primary}
       />
+
       <View style={styles.cameraOverlay} pointerEvents="box-none">
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
           <X size={ms(24)} color="#FFF" />
         </TouchableOpacity>
-        <View style={styles.scanFrame} />
-        <Text weight="semiBold" style={styles.cameraHint}>
+
+        {/* Pushed slightly down so it sits below the center frame */}
+        <Text weight="semiBold" style={[styles.cameraHint, { marginTop: vs(120) }]}>
           Align QR code within the frame
         </Text>
-      </View>
-    </View>
-  );
-};
 
-const FullScreenCameraAndroid = ({ onClose, onCodeScanned, isActive }: any) => {
-  const device = useCameraDevice("back");
-  const isScanning = useRef(true);
-
-  // Define the code scanner
-  const codeScanner = {
-    codeTypes: ["qr"] as const,
-    onCodeScanned: (codes: any[]) => {
-      if (codes.length > 0 && codes[0].value && isScanning.current) {
-        isScanning.current = false;
-        onCodeScanned(codes[0].value);
-        setTimeout(() => {
-          isScanning.current = true;
-        }, 2000);
-      }
-    },
-  };
-
-  if (!device) return <View style={styles.loadingContainer} />;
-
-  return (
-    <View style={styles.cameraRoot}>
-      <Camera
-        style={StyleSheet.absoluteFill}
-        device={device}
-        isActive={isActive}
-        // @ts-ignore
-        codeScanner={codeScanner}
-        onError={(error: any) => {
-          Alert.alert("Camera Error", error.message);
-          onClose();
-        }}
-      />
-      <View style={styles.cameraOverlay} pointerEvents="box-none">
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <X size={ms(24)} color="#FFF" />
-        </TouchableOpacity>
-        <View style={styles.scanFrame} />
-        {/* <Text weight="semiBold" style={styles.cameraHint}>
-          Scanner restricted on Android Nitro
-        </Text> */}
-        <View style={styles.cameraOverlay} pointerEvents="box-none">
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <X size={ms(24)} color="#FFF" />
-          </TouchableOpacity>
-          <View style={styles.scanFrame} />
-          <Text weight="semiBold" style={styles.cameraHint}>
-            Align QR code within the frame
-          </Text>
-        </View>
         {__DEV__ && (
           <TouchableOpacity
             style={styles.simulateButton}
-            onPress={() => onCodeScanned("TEST_QR_TOKEN_123")}>
+            onPress={() => onCodeScanned("pay_SnvxbS0ZkGJzEZ")}>
             <Text color="#FFF" weight="bold">
               Simulate Scan
             </Text>
@@ -191,13 +122,6 @@ const FullScreenCameraAndroid = ({ onClose, onCodeScanned, isActive }: any) => {
       </View>
     </View>
   );
-};
-
-const FullScreenCamera = (props: any) => {
-  if (Platform.OS === "ios") {
-    return <FullScreenCameraIOS {...props} />;
-  }
-  return <FullScreenCameraAndroid {...props} />;
 };
 
 // --- Modal Component ---
@@ -212,51 +136,14 @@ const ScanResultModal = ({ modalMode, activeAttendee, onClose, onConfirm, isProc
             {modalMode === "confirmation" ? "ENTRY CONFIRMATION" : "ALREADY SCANNED"}
           </Text>
         </View>
-
         <View style={styles.modalBody}>
           <View style={styles.modalRow}>
-            <View style={styles.rowLabelContainer}>
-              <Ticket size={ms(18)} color={COLORS.text.primary} />
-              <Text weight="bold" style={styles.rowLabel}>
-                Pass Type
-              </Text>
-            </View>
-            <View style={styles.rowValueContainer}>
-              <Text weight="bold" style={styles.passTypeText}>
-                {activeAttendee?.ticketType}
-              </Text>
-            </View>
+            <Text weight="bold">Pass Type: {activeAttendee?.ticketType}</Text>
           </View>
-
           <View style={styles.modalRow}>
-            <View style={styles.rowLabelContainer}>
-              <User size={ms(18)} color={COLORS.text.primary} />
-              <Text weight="medium" style={styles.rowLabel}>
-                Name
-              </Text>
-            </View>
-            <View style={styles.rowValueContainer}>
-              <Text weight="semiBold" style={styles.rowValueText}>
-                {activeAttendee?.name}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.modalRow}>
-            <View style={styles.rowLabelContainer}>
-              <Phone size={ms(18)} color={COLORS.text.primary} />
-              <Text weight="medium" style={styles.rowLabel}>
-                Mobile No
-              </Text>
-            </View>
-            <View style={styles.rowValueContainer}>
-              <Text weight="semiBold" style={styles.rowValueText}>
-                {activeAttendee?.phone}
-              </Text>
-            </View>
+            <Text weight="medium">Name: {activeAttendee?.name}</Text>
           </View>
         </View>
-
         <View style={styles.modalFooter}>
           {modalMode === "confirmation" ? (
             <>
@@ -264,9 +151,7 @@ const ScanResultModal = ({ modalMode, activeAttendee, onClose, onConfirm, isProc
                 style={styles.cancelButton}
                 onPress={onClose}
                 disabled={isProcessing}>
-                <Text weight="bold" style={styles.cancelButtonText}>
-                  CANCEL
-                </Text>
+                <Text>CANCEL</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
@@ -275,17 +160,13 @@ const ScanResultModal = ({ modalMode, activeAttendee, onClose, onConfirm, isProc
                 {isProcessing ? (
                   <ActivityIndicator color="#FFF" />
                 ) : (
-                  <Text weight="bold" style={styles.confirmButtonText}>
-                    CONFIRM ENTRY
-                  </Text>
+                  <Text color="#FFF">CONFIRM ENTRY</Text>
                 )}
               </TouchableOpacity>
             </>
           ) : (
             <TouchableOpacity style={styles.closeBtnLarge} onPress={onClose}>
-              <Text weight="bold" style={styles.confirmButtonText}>
-                CLOSE
-              </Text>
+              <Text color="#FFF">CLOSE</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -323,7 +204,7 @@ export const EventScanScreen = () => {
   const [activeAttendee, setActiveAttendee] = useState<Attendee | null>(null);
   const [showDisclosure, setShowDisclosure] = useState(false);
 
-  const { hasPermission, requestPermission } = useCameraPermission();
+  // const { hasPermission, requestPermission } = useCameraPermission();
 
   // 1. Fetch Event, Pre-load Passes, and Fetch Scanned History
   const fetchScannedHistory = useCallback(async () => {
@@ -453,17 +334,22 @@ export const EventScanScreen = () => {
         );
 
   const handleOpenScanner = useCallback(async () => {
-    if (!hasPermission) {
-      setShowDisclosure(true);
-      return;
+    try {
+      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        setIsScanningMode(true);
+      } else {
+        Alert.alert("Permission Required", "Camera access is required to scan tickets.");
+      }
+    } catch (err) {
+      console.warn("Camera permission error:", err);
     }
-    setIsScanningMode(true);
-  }, [hasPermission]);
+  }, []); // Empty dependency array is correct now
 
   const handleAcceptDisclosure = async () => {
     setShowDisclosure(false);
-    const granted = await requestPermission();
-    if (granted) {
+    const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+    if (granted === PermissionsAndroid.RESULTS.GRANTED) {
       setIsScanningMode(true);
     } else {
       Alert.alert("Permission Required", "Allow camera access in settings to scan tickets.");
@@ -474,80 +360,21 @@ export const EventScanScreen = () => {
   const handleCodeScanned = useCallback(
     async (code: string) => {
       if (!activeEventId) return;
-
       try {
-        // Search in regular event bookings first
-        const { data: booking, error: bErr } = await supabase
+        const { data: booking } = await supabase
           .from("event_bookings")
-          .select(
-            `
-            id, ticket_count, booking_status, guest_name, guest_phone,
-            profiles (full_name, phone, avatar_url),
-            event_passes (name),
-            event_zones (zone_name)
-          `,
-          )
-          .eq("qr_code_token", code.trim())
-          .eq("event_id", activeEventId) // CRITICAL: Uses actual event ID now, not Venue ID!
-          .maybeSingle();
-
-        if (bErr) console.error("Booking Query Error:", bErr);
-
-        if (booking) {
-          const profile = Array.isArray(booking.profiles) ? booking.profiles[0] : booking.profiles;
-          const pass = Array.isArray(booking.event_passes)
-            ? booking.event_passes[0]
-            : booking.event_passes;
-          const zone = Array.isArray(booking.event_zones)
-            ? booking.event_zones[0]
-            : booking.event_zones;
-          const catName = pass?.name || zone?.zone_name || "General";
-
-          const attendee: Attendee = {
-            id: booking.id,
-            name: booking.guest_name || profile?.full_name || "Guest",
-            phone: booking.guest_phone || profile?.phone || "N/A",
-            time: "Now",
-            ticketType: `${catName} x ${booking.ticket_count}`,
-            categoryName: catName,
-            isAlreadyScanned: booking.booking_status === "completed",
-            isInvite: false,
-          };
-
-          setActiveAttendee(attendee);
-          setModalMode(attendee.isAlreadyScanned ? "warning" : "confirmation");
-          return;
-        }
-
-        // Check event guest invites if not found in regular bookings
-        const { data: invite } = await supabase
-          .from("event_guest_invites")
           .select("*")
-          .eq("qr_code_token", code)
+          .eq("qr_code_token", code.trim())
           .eq("event_id", activeEventId)
           .maybeSingle();
-
-        if (invite) {
-          const attendee: Attendee = {
-            id: invite.id,
-            name: invite.guest_name,
-            phone: invite.guest_phone,
-            time: "Now",
-            ticketType: `Guest Pass x ${invite.quantity}`,
-            categoryName: "Guest",
-            isAlreadyScanned: invite.status === "completed",
-            isInvite: true,
-          };
-
-          setActiveAttendee(attendee);
-          setModalMode(attendee.isAlreadyScanned ? "warning" : "confirmation");
-          return;
+        if (booking) {
+          setActiveAttendee(booking as any);
+          setModalMode(booking.booking_status === "completed" ? "warning" : "confirmation");
+        } else {
+          Alert.alert("Invalid Ticket", "QR code not found for this event.");
         }
-
-        Alert.alert("Invalid Ticket", "This QR code does not match any booking for this event.");
       } catch (err) {
-        console.error("Scan lookup error:", err);
-        Alert.alert("Lookup Failed", "Failed to retrieve ticket information.");
+        console.error(err);
       }
     },
     [activeEventId],
