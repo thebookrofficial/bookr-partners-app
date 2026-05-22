@@ -280,12 +280,25 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
       });
 
-      // Deduplicate ghost bookings by slot time
+      // // Deduplicate ghost bookings by slot time
       const uniqueBookings = Array.from(
         new Map(sortedBookings.map(b => [b.startTimeRaw, b])).values(),
       );
+      const merged = uniqueBookings.reduce((acc, current) => {
+        const existing = acc.find(b => b.phone === current.phone && b.date === current.date);
+        if (existing) {
+          // Merge the time and price
+          existing.time = existing.time.replace(/ - .*/, "") + " - " + current.time.split(" - ")[1];
+          existing.price = `₹${
+            Number(existing.price.replace("₹", "")) + Number(current.price.replace("₹", ""))
+          }`;
+        } else {
+          acc.push(current);
+        }
+        return acc;
+      }, [] as BookingData[]);
 
-      setBookings(uniqueBookings);
+      setBookings(merged);
     } catch (error) {
       console.error("Error fetching bookings:", error);
     } finally {

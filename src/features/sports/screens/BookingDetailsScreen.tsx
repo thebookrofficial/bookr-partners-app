@@ -262,7 +262,6 @@ export const BookingDetailsScreen = () => {
           {booking.venues?.name}
         </Text>
       </View>
-
       <View style={styles.fieldGroup}>
         <View style={styles.labelRow}>
           <Phone size={ms(16)} color={COLORS.primary} fill={COLORS.primary} />
@@ -284,7 +283,6 @@ export const BookingDetailsScreen = () => {
           </View>
         </View>
       </View>
-
       <View style={styles.fieldGroup}>
         <View style={styles.labelRow}>
           <Calendar size={ms(16)} color={COLORS.primary} />
@@ -298,7 +296,6 @@ export const BookingDetailsScreen = () => {
           </Text>
         </View>
       </View>
-
       <View style={styles.fieldGroup}>
         <View style={styles.labelRow}>
           <Clock size={ms(16)} color={COLORS.primary} />
@@ -345,7 +342,6 @@ export const BookingDetailsScreen = () => {
           </View>
         </View>
       </View>
-
       {isAddingOn && (
         <View style={styles.addOnContainer}>
           <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
@@ -390,18 +386,21 @@ export const BookingDetailsScreen = () => {
           </TouchableOpacity>
         </View>
       )}
-
+      <View style={styles.inputBox}>
+        <Text variant="body2" weight="semiBold" style={styles.inputText}>
+          {booking.combined_time}
+        </Text>
+      </View>
       <View style={styles.fieldGroup}>
         <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
           Total Payment
         </Text>
         <View style={styles.inputBox}>
           <Text variant="body2" weight="semiBold" style={styles.inputText}>
-            ₹ {totalAmount}
+            ₹ {booking.total_amount}
           </Text>
         </View>
       </View>
-
       <View style={styles.fieldGroup}>
         <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
           Remaining Amount
@@ -415,7 +414,6 @@ export const BookingDetailsScreen = () => {
           </Text>
         </View>
       </View>
-
       <View style={styles.fieldGroup}>
         <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
           Amount Paid
@@ -445,7 +443,6 @@ export const BookingDetailsScreen = () => {
           )}
         </View>
       </View>
-
       {isAddingPayment && (
         <View style={styles.splitBox}>
           <Text variant="body2" weight="medium" style={styles.splitLabel}>
@@ -477,7 +474,6 @@ export const BookingDetailsScreen = () => {
           </View>
         </View>
       )}
-
       {showPaymentHistory && paymentLogs.length > 0 && (
         <View style={styles.ledgerContainer}>
           <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
@@ -503,7 +499,6 @@ export const BookingDetailsScreen = () => {
           ))}
         </View>
       )}
-
       {isAddingPayment && (
         <TouchableOpacity
           style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
@@ -523,7 +518,6 @@ export const BookingDetailsScreen = () => {
           )}
         </TouchableOpacity>
       )}
-
       <TouchableOpacity
         style={styles.actionCard}
         activeOpacity={0.7}
@@ -534,7 +528,6 @@ export const BookingDetailsScreen = () => {
         </Text>
         <ChevronRight size={ms(20)} color={COLORS.text.primary} />
       </TouchableOpacity>
-
       <TouchableOpacity
         style={styles.actionCard}
         activeOpacity={0.7}
@@ -551,7 +544,6 @@ export const BookingDetailsScreen = () => {
         </Text>
         <ChevronRight size={ms(20)} color={COLORS.text.primary} />
       </TouchableOpacity>
-
       <TouchableOpacity
         style={styles.shareWhatsappBtn}
         activeOpacity={0.8}
@@ -570,7 +562,6 @@ export const BookingDetailsScreen = () => {
         </Text>
         <Send size={ms(20)} color={COLORS.text.inverse} />
       </TouchableOpacity>
-
       {booking.booking_status !== "cancelled" && (
         <TouchableOpacity
           style={styles.actionCard}
@@ -582,7 +573,6 @@ export const BookingDetailsScreen = () => {
           <Trash2 size={ms(20)} color={COLORS.text.primary} />
         </TouchableOpacity>
       )}
-
       <Modal visible={showCancelModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCancelModal(false)} />
@@ -633,7 +623,6 @@ export const BookingDetailsScreen = () => {
           </View>
         </View>
       </Modal>
-
       <View style={{ height: vs(40) }} />
     </ScreenContainer>
   );

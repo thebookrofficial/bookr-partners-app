@@ -259,55 +259,80 @@ export const SportsService = {
   },
 
   // Add this method inside the SportsService object
+  // REPLACE THIS FUNCTION ENTIRELY
   async extendBookingDuration(params: {
     slotId: string;
     bookingId: string;
-    newEndTime24: string;
+    newEndTime24: string; // The time they WANT to end at (e.g., 18:00)
     extraAmount: number;
   }) {
-    // 1. Fetch current slot price to increment it properly
-    const { data: currentSlot, error: slotFetchError } = await supabase
-      .from("sports_slots")
-      .select("price")
-      .eq("id", params.slotId)
-      .single();
-
-    if (slotFetchError) throw slotFetchError;
-
-    const newSlotPrice = Number(currentSlot.price || 0) + params.extraAmount;
-
-    // 2. Update the slot end time AND the slot price
-    const { error: slotError } = await supabase
-      .from("sports_slots")
-      .update({ end_time: params.newEndTime24, price: newSlotPrice })
-      .eq("id", params.slotId);
-
-    if (slotError) throw slotError;
-
-    // 3. Update the booking total amount AND subtotal
-    // We fetch current values first to ensure accuracy
-    const { data: currentBooking, error: fetchError } = await supabase
+    // 1. Fetch the original booking to use as a template
+    const { data: originalBooking, error: fetchError } = await supabase
       .from("sports_bookings")
-      .select("subtotal, total_amount, vendor_payout")
+      .select("*, sports_slots!inner(ground_id, slot_date, end_time)")
       .eq("id", params.bookingId)
       .single();
 
-    if (fetchError) throw fetchError;
+    if (fetchError || !originalBooking)
+      throw fetchError || new Error("Original booking not found.");
 
-    const newSubtotal = Number(currentBooking.subtotal || 0) + params.extraAmount;
-    const newTotal = Number(currentBooking.total_amount || 0) + params.extraAmount;
-    const newPayout = Number(currentBooking.vendor_payout || 0) + params.extraAmount;
+    // The slot they want to book STARTS when the original booking ENDS
+    const nextSlotStartTime = originalBooking.sports_slots.end_time;
+    const targetDate = originalBooking.sports_slots.slot_date;
+    const groundId = originalBooking.sports_slots.ground_id;
 
-    const { error: bookingError } = await supabase
-      .from("sports_bookings")
-      .update({
-        subtotal: newSubtotal,
-        total_amount: newTotal,
-        vendor_payout: newPayout,
-      })
-      .eq("id", params.bookingId);
+    // 2. Find the specific slot in the database that matches the new time window
+    const { data: targetSlot, error: targetSlotError } = await supabase
+      .from("sports_slots")
+      .select("id, status")
+      .eq("venue_id", originalBooking.venue_id)
+      .eq("ground_id", groundId)
+      .eq("slot_date", targetDate)
+      .eq("start_time", nextSlotStartTime)
+      .eq("end_time", params.newEndTime24)
+      .maybeSingle();
 
-    if (bookingError) throw bookingError;
+    if (targetSlotError || !targetSlot) {
+      throw new Error(
+        `Could not find a valid 1-hour slot from ${nextSlotStartTime} to ${params.newEndTime24}.`,
+      );
+    }
+
+    if (targetSlot.status !== "available") {
+      throw new Error("The requested extension slot is already booked or blocked.");
+    }
+
+    // 3. Mark the new slot as booked
+    const { error: slotUpdateError } = await supabase
+      .from("sports_slots")
+      .update({ status: "booked" })
+      .eq("id", targetSlot.id);
+
+    if (slotUpdateError) throw slotUpdateError;
+
+    // 4. Create a NEW booking for this new slot, inheriting the guest details
+    const { error: bookingError } = await supabase.from("sports_bookings").insert({
+      user_id: originalBooking.user_id, // Keep null if manual
+      guest_name: originalBooking.guest_name,
+      guest_phone: originalBooking.guest_phone,
+      venue_id: originalBooking.venue_id,
+      slot_id: targetSlot.id,
+      booking_status: "confirmed",
+      subtotal: params.extraAmount,
+      total_amount: params.extraAmount,
+      vendor_payout: params.extraAmount,
+      paid_amount: params.extraAmount, // Assuming extension is paid immediately
+      discount_amount: 0,
+      platform_fee: 0,
+      gateway_fee: 0,
+      notes: `Extension of booking: ${params.bookingId}`,
+    });
+
+    if (bookingError) {
+      // Rollback slot if booking fails
+      await supabase.from("sports_slots").update({ status: "available" }).eq("id", targetSlot.id);
+      throw bookingError;
+    }
 
     return true;
   },
