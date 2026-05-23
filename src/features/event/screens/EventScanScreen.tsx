@@ -83,6 +83,7 @@ const FullScreenCamera = ({ onClose, onCodeScanned }: any) => {
   return (
     <View style={styles.cameraRoot}>
       <Camera
+        testID="camera-view"
         style={StyleSheet.absoluteFillObject} // <-- ADD THIS LINE
         scanBarcode={true}
         onReadCode={(event: any) => {
@@ -356,63 +357,8 @@ export const EventScanScreen = () => {
     }
   };
 
-  // 2. Validate Scanned Token against Supabase DB
-  const handleCodeScanned = useCallback(
-    async (code: string) => {
-      if (!activeEventId) return;
-      try {
-        const { data: booking } = await supabase
-          .from("event_bookings")
-          .select("*")
-          .eq("qr_code_token", code.trim())
-          .eq("event_id", activeEventId)
-          .maybeSingle();
-        if (booking) {
-          setActiveAttendee(booking as any);
-          setModalMode(booking.booking_status === "completed" ? "warning" : "confirmation");
-        } else {
-          Alert.alert("Invalid Ticket", "QR code not found for this event.");
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    },
-    [activeEventId],
-  );
-
-  // 3. Confirm Entry (Update DB)
-  const handleConfirmEntry = async () => {
-    if (!activeAttendee) return;
-    setIsProcessingEntry(true);
-
-    try {
-      if (activeAttendee.isInvite) {
-        await supabase
-          .from("event_guest_invites")
-          .update({ status: "completed" })
-          .eq("id", activeAttendee.id);
-      } else {
-        await supabase
-          .from("event_bookings")
-          .update({ booking_status: "completed" })
-          .eq("id", activeAttendee.id);
-      }
-
-      fetchScannedHistory();
-      setModalMode(null);
-      setActiveAttendee(null);
-      setIsScanningMode(false);
-    } catch (err) {
-      console.error("Check-in error:", err);
-      Alert.alert("Error", "Failed to check in attendee.");
-    } finally {
-      setIsProcessingEntry(false);
-    }
-  };
-
   const handleCloseModal = () => {
-    setModalMode(null);
-    setActiveAttendee(null);
+    // modalMode no longer used but keeping for safety if needed
   };
 
   useEffect(() => {
@@ -474,6 +420,70 @@ export const EventScanScreen = () => {
     </TouchableOpacity>
   );
 
+  // 2. Validate Scanned Token against Supabase DB
+  const handleCodeScanned = useCallback(
+    async (code: string) => {
+      if (!activeEventId) return;
+      try {
+        const { data: booking } = await supabase
+          .from("event_bookings")
+          .select("*")
+          .eq("qr_code_token", code.trim())
+          .eq("event_id", activeEventId)
+          .maybeSingle();
+
+        if (booking) {
+          if (booking.booking_status === "completed") {
+            Alert.alert("Already Scanned", "This ticket has already been used for entry.");
+            return;
+          }
+          
+          setIsScanningMode(false);
+          navigation.navigate("EventScanConfirmation", {
+            attendee: {
+              ...booking,
+              name: booking.guest_name || booking.name || "Guest",
+              phone: booking.guest_phone || booking.phone || "N/A",
+              ticketType: booking.ticketType || "General",
+            },
+            isInvite: false,
+          });
+        } else {
+          // Check for Guest Invites
+          const { data: invite } = await supabase
+            .from("event_guest_invites")
+            .select("*")
+            .eq("qr_code_token", code.trim())
+            .eq("event_id", activeEventId)
+            .maybeSingle();
+
+          if (invite) {
+            if (invite.status === "completed") {
+              Alert.alert("Already Scanned", "This invite has already been used.");
+              return;
+            }
+            
+            setIsScanningMode(false);
+            navigation.navigate("EventScanConfirmation", {
+              attendee: {
+                ...invite,
+                name: invite.name || "Guest",
+                phone: invite.phone || "N/A",
+                ticketType: "GUEST INVITE",
+              },
+              isInvite: true,
+            });
+          } else {
+            Alert.alert("Invalid Ticket", "QR code not found for this event.");
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    [activeEventId, navigation],
+  );
+
   return (
     <View style={styles.flex1}>
       {isScanningMode ? (
@@ -531,14 +541,6 @@ export const EventScanScreen = () => {
           )}
         </ScreenContainer>
       )}
-
-      <ScanResultModal
-        modalMode={modalMode}
-        activeAttendee={activeAttendee}
-        onClose={handleCloseModal}
-        onConfirm={handleConfirmEntry}
-        isProcessing={isProcessingEntry}
-      />
 
       <CameraDisclosureModal
         visible={showDisclosure}

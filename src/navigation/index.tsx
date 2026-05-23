@@ -59,6 +59,7 @@ import { EventGuestInviteScreen } from "@/features/event/screens/EventGuestInvit
 import { EventDashboardScreen } from "@/features/event/screens/EventDashboardScreen";
 import { EventScanScreen } from "@/features/event/screens/EventScanScreen";
 import { EventEntryDetailsScreen } from "@/features/event/screens/EventEntryDetailsScreen";
+import { EventScanConfirmationScreen } from "@/features/event/screens/EventScanConfirmationScreen";
 import { LegalViewScreen } from "@/features/settings/screens/LegalViewScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
@@ -315,6 +316,7 @@ const MainNavigator = () => (
     <MainStack.Screen name="EventOffers" component={EventOffersScreen} />
     <MainStack.Screen name="EventGuestInvite" component={EventGuestInviteScreen} />
     <MainStack.Screen name="EventEntryDetails" component={EventEntryDetailsScreen} />
+    <MainStack.Screen name="EventScanConfirmation" component={EventScanConfirmationScreen} />
     <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />
     <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
     <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />

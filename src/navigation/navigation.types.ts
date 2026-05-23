@@ -80,6 +80,7 @@ export type MainStackParamList = {
   EventOffers: { serviceId: string };
   EventGuestInvite: { serviceId: string };
   EventEntryDetails: { entryId: string };
+  EventScanConfirmation: { attendee: any; isInvite?: boolean };
   GuestHistory: {
     bookingId: string;
     guestId?: string;
