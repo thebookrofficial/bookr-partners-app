@@ -115,6 +115,21 @@ jest.mock("react-native-reanimated", () => {
   };
 });
 
+// Mock react-native-blob-util
+jest.mock("react-native-blob-util", () => ({
+  fs: {
+    dirs: {
+      CacheDir: "/mock/cache/dir",
+    },
+    writeFile: jest.fn(() => Promise.resolve()),
+  },
+}));
+
+// Mock react-native-share
+jest.mock("react-native-share", () => ({
+  open: jest.fn(() => Promise.resolve()),
+}));
+
 // Mock Stallion OTA wrapper
 jest.mock(
   "react-native-stallion",

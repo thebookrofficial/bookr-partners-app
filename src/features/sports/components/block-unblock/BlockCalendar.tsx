@@ -4,13 +4,21 @@ import { Text } from "@/components/ui";
 import { COLORS } from "@/constants/theme";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 
+export type BookingStatus = "online" | "manual" | "partial" | "full";
+
 interface BlockCalendarProps {
   fromDate: string;
   toDate: string;
   onSelectDate: (day: number) => void;
+  bookedDates?: Record<number, BookingStatus>;
 }
 
-export const BlockCalendar = ({ fromDate, toDate, onSelectDate }: BlockCalendarProps) => {
+export const BlockCalendar = ({
+  fromDate,
+  toDate,
+  onSelectDate,
+  bookedDates = {},
+}: BlockCalendarProps) => {
   const days = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   const dates = [
     "",
@@ -90,6 +98,8 @@ export const BlockCalendar = ({ fromDate, toDate, onSelectDate }: BlockCalendarP
             color = "#1270B0";
           }
 
+          const bookingStatus = isCurrentMonth ? bookedDates[date as number] : null;
+
           return (
             <TouchableOpacity
               key={i}
@@ -99,6 +109,16 @@ export const BlockCalendar = ({ fromDate, toDate, onSelectDate }: BlockCalendarP
               <Text variant="caption" style={{ color, fontSize: fs(12) }}>
                 {date}
               </Text>
+              {bookingStatus && (
+                <View
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor: bookingStatus === "online" ? "#63A1FD" : "#E55959",
+                    },
+                  ]}
+                />
+              )}
             </TouchableOpacity>
           );
         })}
@@ -129,4 +149,11 @@ const styles = StyleSheet.create({
   },
   calCellEndpoint: { backgroundColor: COLORS.primary },
   calCellMiddle: { backgroundColor: "#CBDFFE" },
+  dot: {
+    width: ms(4),
+    height: ms(4),
+    borderRadius: ms(2),
+    position: "absolute",
+    bottom: vs(2),
+  },
 });

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -18,6 +18,68 @@ export const EventScanConfirmationScreen = () => {
   const { attendee, isInvite } = route.params || {};
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [details, setDetails] = useState<any>(null);
+
+  const fetchBookingDetails = useCallback(async () => {
+    if (!attendee?.id) return;
+    try {
+      setIsLoading(true);
+      if (isInvite) {
+        const { data, error } = await supabase
+          .from("event_guest_invites")
+          .select("*")
+          .eq("id", attendee.id)
+          .single();
+
+        if (error) throw error;
+        setDetails({
+          ...data,
+          displayName: data.guest_name || "Guest",
+          displayPhone: data.guest_phone || "N/A",
+          displayPassType: data.pass_type || "GUEST INVITE",
+          displayTime: "8 PM", // Default or fetch from event
+        });
+      } else {
+        const { data, error } = await supabase
+          .from("event_bookings")
+          .select(
+            `
+            *,
+            profiles (full_name, phone, avatar_url),
+            event_passes (name),
+            event_zones (zone_name)
+          `,
+          )
+          .eq("id", attendee.id)
+          .single();
+
+        if (error) throw error;
+
+        const profile = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
+        const pass = Array.isArray(data.event_passes) ? data.event_passes[0] : data.event_passes;
+        const zone = Array.isArray(data.event_zones) ? data.event_zones[0] : data.event_zones;
+        const catName = pass?.name || zone?.zone_name || "General";
+
+        setDetails({
+          ...data,
+          displayName: data.guest_name || profile?.full_name || "Guest User",
+          displayPhone: data.guest_phone || profile?.phone || "N/A",
+          displayPassType: `${catName} x ${data.ticket_count}`,
+          displayTime: "8 PM", // Default or fetch from event
+        });
+      }
+    } catch (err) {
+      console.error("DEBUG: Fetch details error:", err);
+      Alert.alert("Error", "Failed to fetch booking details.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [attendee?.id, isInvite]);
+
+  useEffect(() => {
+    fetchBookingDetails();
+  }, [fetchBookingDetails]);
 
   if (!attendee) {
     return (
@@ -31,18 +93,54 @@ export const EventScanConfirmationScreen = () => {
   const handleConfirmEntry = async () => {
     setIsProcessing(true);
     try {
+      console.log("DEBUG: Confirming entry for:", attendee.id, "isInvite:", isInvite);
+      let error;
+      let data;
+      const now = new Date().toISOString();
+
       if (isInvite) {
-        await supabase
+        // Use "completed" as the definitive status
+        const { data: updateData, error: updateErr } = await supabase
           .from("event_guest_invites")
-          .update({ status: "completed" })
-          .eq("id", attendee.id);
+          .update({ 
+            status: "completed"
+          })
+          .eq("id", attendee.id)
+          .select();
+        error = updateErr;
+        data = updateData;
       } else {
-        await supabase
+        // Use "completed" as the definitive booking_status
+        console.log("DEBUG: Attempting update on event_bookings...");
+        const { data: updateData, error: updateErr } = await supabase
           .from("event_bookings")
-          .update({ booking_status: "completed" })
-          .eq("id", attendee.id);
+          .update({ 
+            booking_status: "completed",
+            updated_at: now 
+          } as any)
+          .eq("id", attendee.id)
+          .select();
+        error = updateErr;
+        data = updateData;
       }
-      
+
+      if (error) {
+        console.error("DEBUG: Update error:", error);
+        throw error;
+      }
+
+      console.log("DEBUG: Update result data:", data);
+
+      if (!data || data.length === 0) {
+        console.warn("DEBUG: No rows were updated. Check RLS policies or ID.");
+        Alert.alert(
+          "Update Failed", 
+          "The database accepted the request but no changes were made. This usually means you don't have permission to update this record (RLS)."
+        );
+        return;
+      }
+
+      console.log("DEBUG: Update successful at", now);
       Alert.alert("Success", "Entry confirmed successfully.");
       navigation.goBack();
     } catch (err) {
@@ -62,18 +160,25 @@ export const EventScanConfirmationScreen = () => {
         </Text>
       </View>
       <View style={styles.valueBox}>
-        <Text 
-            weight="semiBold" 
-            style={[
-                styles.valueText, 
-                label === "Pass Type" && { color: COLORS.primary }
-            ]}
-        >
+        <Text
+          weight="semiBold"
+          style={[styles.valueText, label === "Pass Type" && { color: COLORS.primary }]}>
           {value}
         </Text>
       </View>
     </View>
   );
+
+  if (isLoading) {
+    return (
+      <ScreenContainer backgroundColor={COLORS.background}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={{ marginTop: vs(10) }}>Fetching Details...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(16)}>
@@ -84,37 +189,25 @@ export const EventScanConfirmationScreen = () => {
       </View>
 
       <View style={styles.content}>
-        <InfoRow 
-            label="Pass Type" 
-            value={attendee.ticketType || attendee.categoryName} 
-            icon={Ticket} 
-        />
+        <InfoRow label="Pass Type" value={details?.displayPassType} icon={Ticket} />
 
         <View style={styles.row}>
-          <InfoRow 
-            label="Date" 
-            value={new Date(attendee.created_at || Date.now()).toLocaleDateString("en-GB")} 
-            icon={Calendar} 
-            fullWidth={false} 
+          <InfoRow
+            label="Date"
+            value={new Date(details?.created_at || Date.now()).toLocaleDateString("en-GB")}
+            icon={Calendar}
+            fullWidth={false}
           />
-          <InfoRow 
-            label="Time / Slot Time" 
-            value={attendee.time || "8 PM"} 
-            icon={Clock} 
-            fullWidth={false} 
+          <InfoRow
+            label="Time / Slot Time"
+            value={details?.displayTime}
+            icon={Clock}
+            fullWidth={false}
           />
         </View>
 
-        <InfoRow 
-            label="Name" 
-            value={attendee.name || attendee.guest_name} 
-            icon={User} 
-        />
-        <InfoRow 
-            label="Mobile No" 
-            value={attendee.phone || attendee.guest_phone} 
-            icon={Phone} 
-        />
+        <InfoRow label="Name" value={details?.displayName} icon={User} />
+        <InfoRow label="Mobile No" value={details?.displayPhone} icon={Phone} />
       </View>
 
       <View style={styles.footer}>
@@ -220,5 +313,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: vs(10),
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
