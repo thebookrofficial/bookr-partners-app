@@ -60,7 +60,7 @@ export const StaycationBookingDetailsScreen = () => {
   const { booking: initialBooking, isFromHistory } = route.params || {};
 
   const { isLoading, isUpdating, bookingDetails, updatePayment, cancelBooking } =
-    useStaycationBookingDetails(initialBooking?.id);
+    useStaycationBookingDetails(initialBooking?.dbId || initialBooking?.id);
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
@@ -116,9 +116,13 @@ export const StaycationBookingDetailsScreen = () => {
     ? parseFloat(bookingDetails.total_amount) / units
     : parseFloat(initialBooking?.amount) || 0;
 
+  const discountAmount = bookingDetails?.discount_amount
+    ? parseFloat(bookingDetails.discount_amount) / units
+    : parseFloat(initialBooking?.discountAmount) || 0;
+
   const amountPaid = bookingDetails?.paid_amount
-    ? parseFloat(bookingDetails.paid_amount) / units
-    : parseFloat(initialBooking?.paidAmount) || 0;
+    ? parseFloat(bookingDetails.paid_amount) / units + discountAmount
+    : (parseFloat(initialBooking?.paidAmount) || 0) + discountAmount;
 
   const remainingAmount = Math.max(0, totalPayment - amountPaid);
 
@@ -151,6 +155,7 @@ export const StaycationBookingDetailsScreen = () => {
     roomName: initialBooking?.roomName || "Room Assigned",
 
     bookingType: isCancelled ? "Cancelled" : bookingType,
+    realBookingType: bookingDetails?.booking_type, // "full_property" or "per_room"
     totalPayment: totalPayment.toFixed(2), // Keep it clean
     remainingAmount: remainingAmount.toFixed(2),
     amountPaid: amountPaid.toFixed(2),
@@ -258,23 +263,16 @@ Thank you for booking with Bookr!`;
           <InfoBlock label="Check Out" value={bookingData.checkOut} icon={Clock} />
         </View>
 
-        {/* --- ADD THIS ROW to show the actual Room Name --- */}
+        {/* Booking Type / Guest Section */}
         <View style={styles.row}>
-          <InfoBlock label="Room / Property" value={bookingData.roomName} icon={User} />
-          <View style={{ width: hs(20) }} />
           <InfoBlock
             label="Booking Type"
             value={bookingData.bookingType}
             icon={ClipboardList}
             valueColor={isCancelled ? COLORS.text.muted : "#63a1fd"}
           />
-        </View>
-
-        {/* Guest / Booking Type Section */}
-        <View style={styles.row}>
-          <InfoBlock label="No Of Guest" value={bookingData.guestCount} icon={User} />
           <View style={{ width: hs(20) }} />
-          <View style={styles.infoBlock} />
+          <InfoBlock label="No Of Guest" value={bookingData.guestCount} icon={User} />
         </View>
 
         {/* Payment Card */}
@@ -302,18 +300,19 @@ Thank you for booking with Bookr!`;
                 ₹ {bookingData.amountPaid}
               </Text>
 
-              {remainingAmount > 0 && !isCancelled && (
-                <TouchableOpacity
-                  style={styles.addBtnRow}
-                  onPress={() => setIsAddingPayment(!isAddingPayment)}>
-                  <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
-                  {isAddingPayment ? (
-                    <Minus size={ms(20)} color="#e55959" />
-                  ) : (
-                    <Plus size={ms(20)} color="#00b562" />
-                  )}
-                </TouchableOpacity>
-              )}
+              {(remainingAmount > 0 || bookingData.realBookingType === "full_property") &&
+                !isCancelled && (
+                  <TouchableOpacity
+                    style={styles.addBtnRow}
+                    onPress={() => setIsAddingPayment(!isAddingPayment)}>
+                    <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
+                    {isAddingPayment ? (
+                      <Minus size={ms(20)} color="#e55959" />
+                    ) : (
+                      <Plus size={ms(20)} color="#00b562" />
+                    )}
+                  </TouchableOpacity>
+                )}
             </View>
           </View>
 
@@ -365,7 +364,8 @@ Thank you for booking with Bookr!`;
           <Share2 size={ms(18)} color="white" />
         </TouchableOpacity>
 
-        {!isFromHistory && !isOnline && !isCancelled && (
+        {/* Removed the !isOnline check so vendors can cancel ANY active booking */}
+        {!isFromHistory && !isCancelled && (
           <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} disabled={isUpdating}>
             <View style={styles.cancelContent}>
               {isUpdating ? (

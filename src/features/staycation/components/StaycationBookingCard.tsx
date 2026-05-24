@@ -145,7 +145,8 @@ export const StaycationBookingCard = ({
   };
 
   const isPaymentPending = useMemo(() => {
-    if (displayData.status === "Cancelled") return false;
+    if (displayData.status === "Cancelled" || displayData.status === "Complete") return false;
+
     const paid =
       typeof displayData.paidAmount === "number"
         ? displayData.paidAmount
@@ -154,8 +155,25 @@ export const StaycationBookingCard = ({
       typeof displayData.totalAmount === "number"
         ? displayData.totalAmount
         : parseFloat(displayData.totalAmount || "0");
-    return total > 0 && paid < total;
-  }, [displayData.paidAmount, displayData.totalAmount, displayData.status]);
+
+    const hasBalance = total > 0 && paid < total;
+    if (!hasBalance) return false;
+
+    if (!displayData.checkOut) return false;
+
+    // Get today's local date in YYYY-MM-DD format for comparison
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}-${now
+      .getDate()
+      .toString()
+      .padStart(2, "0")}`;
+
+    // Extract only the date part (YYYY-MM-DD) from the check-out string
+    const checkOutDateOnly = displayData.checkOut.split("T")[0];
+
+    // Show pending status if today is the check-out day or later
+    return todayStr >= checkOutDateOnly;
+  }, [displayData.paidAmount, displayData.totalAmount, displayData.status, displayData.checkOut]);
 
   const renderDetails = () => {
     let dateRoomText = "";

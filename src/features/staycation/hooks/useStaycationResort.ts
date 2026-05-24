@@ -34,6 +34,7 @@ export const useStaycationResort = (
 
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [rooms, setRooms] = useState<StaycationRoom[]>([]);
+  const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [roomsFilled, setRoomsFilled] = useState({ occupied: 0, total: 0 });
   const [groupedBookings, setGroupedBookings] = useState<
     { title: string; data: StaycationBooking[] }[]
@@ -46,6 +47,23 @@ export const useStaycationResort = (
       setIsDataLoading(true);
       const targetDateStr = formatDate(selectedDate);
       const todayRealStr = formatDate(new Date());
+
+      // 0. Fetch Closed Dates
+      const newClosedDates = new Set<string>();
+      const { data: closedDatesData } = await supabase
+        .from("venue_closed_dates")
+        .select("start_date, end_date")
+        .eq("venue_id", activeVenue.venueId);
+
+      closedDatesData?.forEach(c => {
+        let curr = new Date(c.start_date);
+        const end = c.end_date ? new Date(c.end_date) : new Date(c.start_date);
+        while (curr <= end) {
+          newClosedDates.add(formatDate(curr));
+          curr.setDate(curr.getDate() + 1);
+        }
+      });
+      setClosedDates(newClosedDates);
 
       const { data: roomsData } = await supabase
         .from("staycation_rooms")
@@ -217,6 +235,7 @@ export const useStaycationResort = (
 
   return {
     isLoading: isVenuesLoading || isDataLoading,
+    closedDates,
     groupedBookings,
     refetch: fetchResortData,
     venues,

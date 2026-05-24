@@ -41,7 +41,10 @@ export const useStaycationVenues = (options: UseStaycationVenuesOptions = {}) =>
             staycation_venues!inner (
               id,
               property_type,
-              booking_type
+              booking_type,
+              base_price_per_night,
+              extra_guest_charge,
+              max_guests
             )
           `,
           )
@@ -74,6 +77,9 @@ export const useStaycationVenues = (options: UseStaycationVenuesOptions = {}) =>
             property_type: pType,
             booking_type: bType,
             tabLabel: label,
+            base_price_per_night: sv?.base_price_per_night,
+            extra_guest_charge: sv?.extra_guest_charge,
+            max_occupancy: sv?.max_occupancy,
           };
         });
 

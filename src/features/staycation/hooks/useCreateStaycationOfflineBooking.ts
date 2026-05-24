@@ -52,19 +52,7 @@ export const useCreateStaycationOfflineBooking = () => {
         .maybeSingle();
       const venueName = venueData?.name || "our venue";
 
-      const cleanMobile = payload.guestPhone.replace(/[^\d]/g, "");
-
       let userId: string | null = null;
-      if (cleanMobile.length >= 10) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("phone", cleanMobile)
-          .maybeSingle();
-        if (profile?.id) {
-          userId = profile.id;
-        }
-      }
 
       const checkInStr = formatLocalDate(payload.checkInDate);
       const checkOutStr = formatLocalDate(payload.checkOutDate);
@@ -150,7 +138,7 @@ export const useCreateStaycationOfflineBooking = () => {
         gateway_fee: 0,
         total_amount: safeTotalPayment,
         vendor_payout: safeTotalPayment,
-        booking_status: safeAdvancePaid > 0 ? "confirmed" : "pending",
+        booking_status: safeTotalPayment > 0 ? "confirmed" : "pending",
         paid_amount: safeAdvancePaid,
         guest_name: payload.guestName || "Guest",
         guest_phone: payload.guestPhone || "N/A",
