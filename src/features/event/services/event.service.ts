@@ -11,6 +11,25 @@ import {
   EventBookingPayload,
 } from "../types/event.types";
 
+export const fetchEventBookings = async (
+  eventId: string,
+  startDate: Date,
+  endDate: Date,
+): Promise<any[]> => {
+  const { data, error } = await supabase
+    .from("event_bookings")
+    .select("id, guest_name, guest_phone, ticket_count, total_amount, booking_status, created_at")
+    .eq("event_id", eventId)
+    .gte("created_at", startDate.toISOString())
+    .lte("created_at", endDate.toISOString());
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+};
+
 /**
  * Fetches event availability details including passes, zones, and available seats.
  *
