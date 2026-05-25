@@ -26,6 +26,7 @@ import {
   Minus,
   CheckCircle2,
   ChevronRight,
+  FileText,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -129,6 +130,26 @@ export const StaycationBookingDetailsScreen = () => {
 
   const remainingAmount = Math.max(0, totalPayment - amountPaid);
 
+  // Parse Group Type from special_requests
+  const getGroupType = (requests: string) => {
+    if (!requests) return null;
+    const parts = requests.split("|");
+    const groupPart = parts.find(p => p.trim().toLowerCase().startsWith("group type:"));
+    if (groupPart) {
+      return groupPart.split(":")[1]?.trim();
+    }
+    return null;
+  };
+
+  // Check if it's a farmhouse
+  const staycationVenues = (bookingDetails?.venues as any)?.staycation_venues;
+  const propertyType = Array.isArray(staycationVenues)
+    ? staycationVenues[0]?.property_type
+    : staycationVenues?.property_type;
+  const isFarmhouse = propertyType?.toLowerCase() === "farmhouse";
+
+  const groupType = getGroupType(bookingDetails?.special_requests);
+
   // 2. The CORRECT way to check if a booking is online
   const isOnline = !!bookingDetails?.user_id;
   const isCancelled = bookingDetails?.booking_status === "cancelled";
@@ -162,6 +183,7 @@ export const StaycationBookingDetailsScreen = () => {
     totalPayment: totalPayment.toFixed(2), // Keep it clean
     remainingAmount: remainingAmount.toFixed(2),
     amountPaid: amountPaid.toFixed(2),
+    groupType: groupType,
   };
 
   // Direct WhatsApp Share Handler
@@ -258,6 +280,19 @@ Thank you for booking with Bookr!`;
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Group Type Section */}
+        {isFarmhouse && bookingData.groupType && (
+          <View style={styles.section}>
+            <View style={styles.labelRow}>
+              <FileText size={ms(18)} color={COLORS.text?.primary || "black"} />
+              <Text style={styles.labelText}>Group Type</Text>
+            </View>
+            <View style={styles.valueBox}>
+              <Text style={styles.valueText}>{bookingData.groupType}</Text>
+            </View>
+          </View>
+        )}
 
         {/* Check In / Out Section */}
         <View style={styles.row}>

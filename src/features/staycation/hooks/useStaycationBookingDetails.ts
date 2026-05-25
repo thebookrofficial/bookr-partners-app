@@ -51,6 +51,8 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
           guest_phone,   
           booking_status,
           created_at,
+          special_requests,
+          venues!venue_id ( staycation_venues ( property_type ) ),
           profiles:user_id ( full_name, phone, avatar_url, email )
         `,
         )

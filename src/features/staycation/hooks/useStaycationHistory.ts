@@ -156,20 +156,13 @@ export const useStaycationHistory = (
         const checkOutStr = booking.check_out_date;
         const profile = Array.isArray(booking.profiles) ? booking.profiles[0] : booking.profiles;
 
-        const isOnline =
-          booking.booking_type === "online" || (parseFloat(booking.platform_fee) || 0) > 0;
+        const isOnline = !!booking.user_id;
 
         let statusTag: StaycationBooking["status"] = isOnline ? "Online" : "Offline";
 
         if (booking.booking_status === "cancelled") {
           statusTag = "Cancelled";
-        } else if (booking.paid_amount >= booking.total_amount) {
-          statusTag = "Online";
-        } else if (booking.paid_amount > 0) {
-          statusTag = "Offline";
-        }
-
-        if (checkOutStr < todayStr && booking.booking_status !== "cancelled") {
+        } else if (checkOutStr < todayStr) {
           statusTag = "Complete";
         }
 

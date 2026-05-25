@@ -7,6 +7,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacityProps,
+  StyleProp,
+  TextStyle,
 } from "react-native";
 import { Text } from "./Text";
 import { hs, vs, ms } from "@/utils/responsive.utils";
@@ -18,6 +20,7 @@ export interface ButtonProps extends TouchableOpacityProps {
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  textStyle?: StyleProp<TextStyle>;
 }
 
 export const Button = ({
@@ -27,6 +30,7 @@ export const Button = ({
   leftIcon,
   rightIcon,
   style,
+  textStyle,
   disabled,
   ...rest
 }: ButtonProps) => {
@@ -56,6 +60,7 @@ export const Button = ({
             style={[
               leftIcon ? { marginLeft: hs(8) } : undefined,
               rightIcon ? { marginRight: hs(8) } : undefined,
+              textStyle,
             ]}>
             {title}
           </Text>
