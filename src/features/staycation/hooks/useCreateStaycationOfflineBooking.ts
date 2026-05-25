@@ -41,6 +41,12 @@ export const useCreateStaycationOfflineBooking = () => {
       return { success: false };
     }
 
+    // --- ADD THIS VALIDATION ---
+    if (payload.checkOutDate <= payload.checkInDate) {
+      setError("Check-out date must be after check-in date.");
+      return { success: false };
+    }
+
     try {
       setIsLoading(true);
       setError(null);
@@ -93,26 +99,39 @@ export const useCreateStaycationOfflineBooking = () => {
             .select("room_id, unit_count")
             .eq("venue_id", payload.venueId)
             .neq("booking_status", "cancelled")
-            .lt("check_in_date", checkOutStr)
-            .gt("check_out_date", checkInStr);
+            .lte("check_in_date", checkOutStr)
+            .gte("check_out_date", checkInStr);
 
           if (overlapErr) throw new Error("Could not verify room availability. Please try again.");
 
           const occupiedIds = new Set(overlaps?.map(o => o.room_id));
 
-          // Filter out occupied rooms and grab the required number of units
-          const freeRooms = availableRooms.filter(r => !occupiedIds.has(r.id));
+          // FIXED: Added validation to check if specifically provided roomId is occupied
+          if (assignedRoomId && overlaps?.some(o => o.room_id === assignedRoomId)) {
+            console.error("[DEBUG: Booking] Conflict detected for room:", assignedRoomId);
+            throw new Error("This room is already booked for these dates. Please select another.");
+          }
 
+          const freeRooms = availableRooms.filter(r => !occupiedIds.has(r.id));
           if (freeRooms.length < requiredUnits) {
-            throw new Error(`Not enough units of this type available for the selected dates.`);
+            throw new Error(`Not enough units of this type available.`);
           }
 
           const selectedUnits = freeRooms.slice(0, requiredUnits);
-          assignedRoomId = selectedUnits[0].id; // Primary room for the booking row
+          assignedRoomId = selectedUnits[0].id;
           assignedRoomsToBlock = selectedUnits.map(r => r.id);
           assignedRoomStr = selectedUnits.map(r => `${r.room_name} (${r.room_number})`).join(", ");
-        } else {
-          throw new Error(`The selected room type is currently unavailable.`);
+        }
+        // CORRECTED: 'elseif' -> 'else if'
+        else if (bookingTypeValue === "per_room" && !assignedRoomId) {
+          throw new Error("Room selection is required.");
+        }
+
+        // ---------------------------------------------------------
+        // ADD THIS BLOCK BEFORE TRY/CATCH block starts
+        // ---------------------------------------------------------
+        if (payload.checkOutDate <= payload.checkInDate) {
+          throw new Error("Check-out date must be after check-in date.");
         }
       }
 

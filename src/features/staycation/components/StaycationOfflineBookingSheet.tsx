@@ -504,6 +504,10 @@ export const StaycationOfflineBookingSheet = ({
   };
 
   const handleBookNow = async () => {
+    if (isLoading) {
+      console.warn("[DEBUG: UI] Prevented double submission!");
+      return;
+    }
     if (!venueId) {
       Alert.alert("Error", "Venue information missing.");
       return;
@@ -605,7 +609,13 @@ Thank you for booking with Bookr!`;
           setShowDatePicker(null);
           return;
         }
-        setCheckInDate(selectedDate);
+        const newCheckIn = selectedDate;
+        const nextDay = new Date(selectedDate);
+        nextDay.setDate(nextDay.getDate() + 1); // Force checkout to be at least tomorrow
+
+        setCheckInDate(newCheckIn);
+        setCheckOutDate(nextDay);
+        // setCheckInDate(selectedDate);
         const tomorrow = new Date(selectedDate);
         tomorrow.setDate(tomorrow.getDate() + 1);
 

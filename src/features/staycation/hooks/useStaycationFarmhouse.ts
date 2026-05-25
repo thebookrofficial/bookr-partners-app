@@ -118,15 +118,11 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
             !b.profiles || (Array.isArray(b.profiles) && b.profiles.length === 0);
 
           if (isProfileEmpty && b.user_id) {
-            // console.log(`[DEBUG] Fallback triggered for user_id: ${b.user_id}`);
-
             const { data: profileData, error: _profileErr } = await supabase
               .from("profiles")
               .select("full_name, phone, avatar_url")
               .eq("id", b.user_id)
               .maybeSingle();
-
-            // console.log(`[DEBUG] Fallback result:`, profileData, profileErr);
 
             if (profileData) {
               b.profiles = [profileData] as any;
@@ -143,12 +139,8 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         // 4. Map the data safely
         const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
 
-        // console.log(`[DEBUG] Final Extracted Profile for ${b.id}:`, profile);
-
         const finalDisplayName = b.guest_name || profile?.full_name || "Guest";
         const finalPhone = b.guest_phone || profile?.phone || "N/A";
-
-        // console.log(`[DEBUG] Final Display Name: ${finalDisplayName}`);
 
         const isOnline = !!b.user_id;
         const rangeColor = isOnline ? COLORS.primary : COLORS.danger;
@@ -265,10 +257,6 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         .update({ booking_status: "cancelled" })
         .eq("id", bookingId)
         .select();
-
-      // 3. Print the absolute truth to the console
-      // console.log("DEBUG - Updated Rows:", updatedRows);
-      // console.log("DEBUG - Cancel Error:", cancelErr);
 
       if (cancelErr) throw cancelErr;
 
