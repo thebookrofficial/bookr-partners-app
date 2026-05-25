@@ -138,7 +138,7 @@ export const SportsEssentialsScreen = () => {
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <View style={styles.headerWrapper}>
         {/* 1. Header with Dropdown */}
-        <ServiceHeader title={activeVenueName} subtitle="Essentials" category={selectedCategory} />
+        <ServiceHeader title={activeVenueName} subtitle="Essentials" />
       </View>
 
       {/* 2. Conditional Rendering for Content */}

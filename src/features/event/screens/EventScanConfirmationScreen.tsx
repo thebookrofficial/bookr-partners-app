@@ -93,7 +93,6 @@ export const EventScanConfirmationScreen = () => {
   const handleConfirmEntry = async () => {
     setIsProcessing(true);
     try {
-      console.log("DEBUG: Confirming entry for:", attendee.id, "isInvite:", isInvite);
       let error;
       let data;
       const now = new Date().toISOString();
@@ -102,8 +101,8 @@ export const EventScanConfirmationScreen = () => {
         // Use "completed" as the definitive status
         const { data: updateData, error: updateErr } = await supabase
           .from("event_guest_invites")
-          .update({ 
-            status: "completed"
+          .update({
+            status: "completed",
           })
           .eq("id", attendee.id)
           .select();
@@ -111,12 +110,11 @@ export const EventScanConfirmationScreen = () => {
         data = updateData;
       } else {
         // Use "completed" as the definitive booking_status
-        console.log("DEBUG: Attempting update on event_bookings...");
         const { data: updateData, error: updateErr } = await supabase
           .from("event_bookings")
-          .update({ 
+          .update({
             booking_status: "completed",
-            updated_at: now 
+            updated_at: now,
           } as any)
           .eq("id", attendee.id)
           .select();
@@ -125,22 +123,17 @@ export const EventScanConfirmationScreen = () => {
       }
 
       if (error) {
-        console.error("DEBUG: Update error:", error);
         throw error;
       }
 
-      console.log("DEBUG: Update result data:", data);
-
       if (!data || data.length === 0) {
-        console.warn("DEBUG: No rows were updated. Check RLS policies or ID.");
         Alert.alert(
-          "Update Failed", 
-          "The database accepted the request but no changes were made. This usually means you don't have permission to update this record (RLS)."
+          "Update Failed",
+          "The database accepted the request but no changes were made. This usually means you don't have permission to update this record (RLS).",
         );
         return;
       }
 
-      console.log("DEBUG: Update successful at", now);
       Alert.alert("Success", "Entry confirmed successfully.");
       navigation.goBack();
     } catch (err) {

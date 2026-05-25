@@ -12,6 +12,7 @@ export interface BookingDetailData {
   venue_id: string;
   total_amount: number;
   paid_amount: number;
+  discount_amount: number;
   booking_status: string;
   guest_name: string | null;
   guest_phone: string | null;
@@ -65,26 +66,41 @@ export const useBookingDetails = (bookingId: string) => {
       if (baseError) throw baseError;
 
       // 2. Fetch ALL related bookings for this user/slot/date (including extensions)
-      // We filter by phone and date to catch the "Add On" records
-      const { data: allLinkedBookings, error: linkedError } = await supabase
+      // We filter by phone/user and date to catch the "Add On" records
+      let linkedQuery = supabase
         .from("sports_bookings")
         .select("*, sports_slots!inner(*)")
-        .eq("guest_phone", baseBooking.guest_phone)
         .eq("sports_slots.slot_date", baseBooking.sports_slots.slot_date)
         .eq("sports_slots.ground_id", baseBooking.sports_slots.ground_id)
         .order("created_at", { ascending: true });
 
+      if (baseBooking.user_id) {
+        linkedQuery = linkedQuery.eq("user_id", baseBooking.user_id);
+      } else {
+        linkedQuery = linkedQuery.eq("guest_phone", baseBooking.guest_phone);
+      }
+
+      const { data: linkedData, error: linkedError } = await linkedQuery;
+
       if (linkedError) throw linkedError;
+
+      // Ensure we have at least the current booking in the list
+      const allLinkedBookings = linkedData && linkedData.length > 0 ? linkedData : [baseBooking];
 
       // 3. Aggregate data
       const totalAmount = allLinkedBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
       const paidAmount = allLinkedBookings.reduce((sum, b) => sum + Number(b.paid_amount), 0);
+      const discountAmount = allLinkedBookings.reduce(
+        (sum, b) => sum + Number(b.discount_amount || 0),
+        0,
+      );
 
       // Combine the booking details
       const aggregatedBooking = {
         ...baseBooking,
         total_amount: totalAmount,
         paid_amount: paidAmount,
+        discount_amount: discountAmount,
         // Create a combined time string (e.g., 9 AM - 11 AM)
         combined_time: `${formatHour(baseBooking.sports_slots.start_time)} - ${formatHour(
           allLinkedBookings[allLinkedBookings.length - 1].sports_slots.end_time,
@@ -93,7 +109,7 @@ export const useBookingDetails = (bookingId: string) => {
 
       setBooking(aggregatedBooking);
 
-      // 2. Fetch Payment Logs Ledger
+      // 4. Fetch Payment Logs Ledger
       const { data: logsData, error: logsError } = await supabase
         .from("offline_payment_logs")
         .select("id, amount, payment_mode, note, created_at")
@@ -107,7 +123,7 @@ export const useBookingDetails = (bookingId: string) => {
         console.warn("Could not fetch payment logs:", logsError);
       }
 
-      // 3. Reconstruct Initial Advance Payment
+      // 5. Reconstruct Initial Advance Payment
       const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
       const totalPaidAmount = Number(baseBooking.paid_amount) || 0;
 

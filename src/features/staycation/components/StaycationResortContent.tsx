@@ -230,7 +230,7 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
         )}
       </View>
     );
-  }, [activeVenue, activeRoomStatus, roomsFilled, selectedDate, showDatePicker]);
+  }, [activeVenue, activeRoomStatus, roomsFilled, selectedDate, showDatePicker, isDateClosed]);
 
   return (
     <View style={styles.root}>
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: hs(16),
-    bottom: vs(65),
+    bottom: vs(110),
     width: ms(60),
     height: ms(60),
     borderRadius: ms(30),
@@ -357,5 +357,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
+    zIndex: 10,
   },
 });

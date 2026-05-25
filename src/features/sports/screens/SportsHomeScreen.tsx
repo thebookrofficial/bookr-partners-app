@@ -151,7 +151,6 @@ export const SportsHomeScreen = () => {
         {/* Dropdown action removed, now it functions as a static label */}
         <ServiceHeader
           title={venue?.name || activeVenueName}
-          category={selectedCategory}
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
         />
 
@@ -344,8 +343,8 @@ const styles = StyleSheet.create({
   bookingsContainer: { marginTop: vs(8), width: "100%" },
   fab: {
     position: "absolute",
-    right: hs(12),
-    bottom: vs(95),
+    right: hs(16),
+    bottom: vs(110),
     width: ms(58),
     height: ms(58),
     borderRadius: ms(29),

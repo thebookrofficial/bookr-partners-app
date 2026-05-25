@@ -132,6 +132,14 @@ export const BookingDetailsScreen = () => {
 
   const totalAmount = Number(booking.total_amount) || 0;
   const currentPaid = Number(booking.paid_amount) || 0;
+  const totalDiscount = Number(booking.discount_amount) || 0;
+
+  // The vendor wants to see the "Gross" amount (Value before discount)
+  const displayTotalAmount = totalAmount + totalDiscount;
+  // The vendor wants to see the "Credit" (Cash + Discount) as the total amount paid
+  const displayAmountPaid = currentPaid + totalDiscount;
+
+  // Remaining Amount is what is still due at the venue
   const remainingAmount = Math.max(0, totalAmount - currentPaid);
 
   const formatHour = (timeStr: string) => {
@@ -218,8 +226,8 @@ export const BookingDetailsScreen = () => {
         `Date: ${bookingDate}\n` +
         `Time: ${bookingTime}\n\n` +
         `Payment Summary:\n` +
-        `Total: ₹${totalAmount}\n` +
-        `Paid: ₹${currentPaid}\n` +
+        `Total: ₹${displayTotalAmount}\n` +
+        `Paid: ₹${displayAmountPaid}\n` +
         `Due at Venue: ₹${remainingAmount}\n\n` +
         `Thank you for booking.`,
     );
@@ -397,7 +405,7 @@ export const BookingDetailsScreen = () => {
         </Text>
         <View style={styles.inputBox}>
           <Text variant="body2" weight="semiBold" style={styles.inputText}>
-            ₹ {booking.total_amount}
+            ₹ {displayTotalAmount}
           </Text>
         </View>
       </View>
@@ -420,7 +428,7 @@ export const BookingDetailsScreen = () => {
         </Text>
         <View style={styles.inputBoxRow}>
           <Text variant="body2" weight="semiBold" color="#00B562" style={styles.inputText}>
-            ₹ {currentPaid}
+            ₹ {displayAmountPaid}
           </Text>
 
           {remainingAmount > 0 && (

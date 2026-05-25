@@ -196,7 +196,7 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
         </View>
       </View>
     ),
-    [activeVenue, markedDates, selectedDate, setSelectedDate],
+    [activeVenue, markedDates, selectedDate, setSelectedDate, isDateClosed],
   );
 
   return (
@@ -414,14 +414,19 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    right: hs(0),
-    bottom: vs(65),
+    right: hs(16),
+    bottom: vs(110),
     width: ms(60),
     height: ms(60),
     borderRadius: ms(30),
     backgroundColor: "#63A1FD",
     justifyContent: "center",
     alignItems: "center",
-    boxShadow: "0px 5px 5px rgba(0, 0, 0, 0.16)",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
+    zIndex: 10,
   },
 });

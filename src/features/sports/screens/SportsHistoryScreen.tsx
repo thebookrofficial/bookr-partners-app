@@ -162,7 +162,7 @@ export const SportsHistoryScreen = () => {
       <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[1]}>
         {/* Header */}
         <View style={styles.headerZIndex}>
-          <ServiceHeader title={activeVenueName} subtitle="History" category={selectedCategory} />
+          <ServiceHeader title={activeVenueName} subtitle="History" />
         </View>
 
         {/* Sticky Search */}

@@ -131,7 +131,7 @@ export const SportsDashboardScreen = () => {
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* 1. Header */}
-        <ServiceHeader title={activeVenueName} subtitle="Dashboard" category={selectedCategory} />
+        <ServiceHeader title={activeVenueName} subtitle="Dashboard" />
 
         {/* 2. Conditional Rendering for Dashboard Content */}
         {loading || dataLoading ? (

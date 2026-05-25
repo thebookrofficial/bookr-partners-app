@@ -41,8 +41,7 @@ export const BulkBookingScreen = () => {
   const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
   const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId || "");
 
-  const { selectedCategories, activeVenueName } = useServiceStore();
-  const selectedCategory = selectedCategories[venueId] || "Football";
+  const { activeVenueName } = useServiceStore();
 
   // NEW: Fetch Grounds on mount
   useEffect(() => {
@@ -240,11 +239,7 @@ export const BulkBookingScreen = () => {
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-      <ServiceHeader
-        title={activeVenueName}
-        subtitle="Bulk Booking 🚀"
-        category={selectedCategory}
-      />
+      <ServiceHeader title={activeVenueName} subtitle="Bulk Booking 🚀" />
 
       {/* --- NEW GROUND SELECTOR --- */}
       {grounds.length > 0 && (
