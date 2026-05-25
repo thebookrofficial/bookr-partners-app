@@ -146,7 +146,7 @@ export const useStaycationCloseDate = (venueId: string) => {
       await fetchClosedDates(false);
       return true;
     } catch (err: any) {
-      Alert.alert("Error", err.message);
+      Alert.alert("Error", "Could not block the selected dates. Please try again.");
       return false;
     }
   };
@@ -194,7 +194,7 @@ export const useStaycationCloseDate = (venueId: string) => {
       await fetchClosedDates(false);
       return true;
     } catch (err: any) {
-      Alert.alert("Error", err.message);
+      Alert.alert("Error", "Could not unblock the selected dates. Please try again.");
       return false;
     }
   };

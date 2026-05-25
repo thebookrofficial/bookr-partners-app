@@ -84,7 +84,7 @@ export const useCreateStaycationOfflineBooking = () => {
           .eq("is_active", true)
           .order("room_number", { ascending: true });
 
-        if (roomErr) throw new Error("Room Fetch Error: " + JSON.stringify(roomErr));
+        if (roomErr) throw new Error("Could not fetch available rooms. Please try again.");
 
         if (availableRooms && availableRooms.length > 0) {
           // Fetch overlapping bookings for these specific dates
@@ -96,7 +96,7 @@ export const useCreateStaycationOfflineBooking = () => {
             .lt("check_in_date", checkOutStr)
             .gt("check_out_date", checkInStr);
 
-          if (overlapErr) throw new Error("Overlap Fetch Error: " + JSON.stringify(overlapErr));
+          if (overlapErr) throw new Error("Could not verify room availability. Please try again.");
 
           const occupiedIds = new Set(overlaps?.map(o => o.room_id));
 
@@ -104,9 +104,7 @@ export const useCreateStaycationOfflineBooking = () => {
           const freeRooms = availableRooms.filter(r => !occupiedIds.has(r.id));
 
           if (freeRooms.length < requiredUnits) {
-            throw new Error(
-              `Only ${freeRooms.length} ${payload.roomType} unit(s) available for these dates.`,
-            );
+            throw new Error(`Not enough units of this type available for the selected dates.`);
           }
 
           const selectedUnits = freeRooms.slice(0, requiredUnits);
@@ -114,7 +112,7 @@ export const useCreateStaycationOfflineBooking = () => {
           assignedRoomsToBlock = selectedUnits.map(r => r.id);
           assignedRoomStr = selectedUnits.map(r => `${r.room_name} (${r.room_number})`).join(", ");
         } else {
-          throw new Error(`No active rooms found for type: ${payload.roomType}`);
+          throw new Error(`The selected room type is currently unavailable.`);
         }
       }
 
@@ -149,7 +147,7 @@ export const useCreateStaycationOfflineBooking = () => {
 
       if (insertError) {
         console.error("Supabase Insertion Error:", JSON.stringify(insertError, null, 2));
-        throw new Error(insertError.message || "Failed to insert booking");
+        throw new Error("Could not save your booking at this time.");
       }
 
       // =========================================================
@@ -201,7 +199,10 @@ export const useCreateStaycationOfflineBooking = () => {
 
       return { success: true, venueName };
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred while creating booking.");
+      setError(
+        err.message ||
+          "An unexpected error occurred while creating your booking. Please try again.",
+      );
       return { success: false };
     } finally {
       setIsLoading(false);

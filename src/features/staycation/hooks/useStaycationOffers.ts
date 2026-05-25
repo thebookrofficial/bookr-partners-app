@@ -123,7 +123,7 @@ export const useStaycationOffers = (venueId: string) => {
       await fetchOffers(false);
       return true;
     } catch (err: any) {
-      Alert.alert("Error", err.message);
+      Alert.alert("Error", "Could not create the offer. Please try again.");
       return false;
     }
   };
@@ -140,7 +140,7 @@ export const useStaycationOffers = (venueId: string) => {
       await fetchOffers(false);
       return true;
     } catch (err: any) {
-      Alert.alert("Error", err.message);
+      Alert.alert("Error", "Could not remove the offer. Please try again.");
       return false;
     }
   };

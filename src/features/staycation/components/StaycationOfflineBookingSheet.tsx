@@ -254,13 +254,6 @@ export const StaycationOfflineBookingSheet = ({
       }
 
       // Check for Closed Dates
-      const { data: closedDates } = await supabase
-        .from("venue_closed_dates")
-        .select("start_date, end_date")
-        .eq("venue_id", venueId)
-        .lt("start_date", dOutStr)
-        .gt("end_date", dInStr); // This filter might be tricky depending on how end_date is stored (it can be null)
-
       // Let's just fetch all and check overlap manually to be safe if query is complex
       const { data: allClosed } = await supabase
         .from("venue_closed_dates")
@@ -538,8 +531,28 @@ export const StaycationOfflineBookingSheet = ({
       }
     }
 
-    const finalName = name.trim() || "Offline Guest";
-    const finalPhone = phone.trim() || "";
+    const finalName = name.trim();
+    const finalPhone = phone.trim();
+
+    if (!finalName) {
+      Alert.alert("Error", "Please enter the guest name.");
+      return;
+    }
+
+    if (!finalPhone) {
+      Alert.alert("Error", "Please enter the mobile number.");
+      return;
+    }
+
+    if (!totalPayment.trim() || isNaN(parseFloat(totalPayment))) {
+      Alert.alert("Error", "Please enter a valid total payment amount.");
+      return;
+    }
+
+    if (!advancePaid.trim() || isNaN(parseFloat(advancePaid))) {
+      Alert.alert("Error", "Please enter the advance paid amount. Enter 0 if none.");
+      return;
+    }
 
     const result = await createBooking({
       venueId,

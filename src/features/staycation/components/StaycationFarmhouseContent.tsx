@@ -140,7 +140,7 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
             </Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.dot, styles.manuelDot]} />
+            <View style={[styles.dot, styles.closedDot]} />
             <Text weight="bold" style={styles.legendText}>
               Closed
             </Text>
@@ -153,14 +153,7 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
             markingType={"custom"}
             // ADDED FIX: Strictly hide extra days from other months
             hideExtraDays={true}
-            markedDates={{
-              ...markedDates,
-              [selectedDate || ""]: {
-                ...(markedDates[selectedDate || ""] || {}),
-                selected: true,
-                selectedColor: COLORS.primary,
-              },
-            }}
+            markedDates={markedDates}
             onDayPress={day =>
               setSelectedDate(day.dateString === selectedDate ? null : day.dateString)
             }
@@ -334,10 +327,13 @@ const styles = StyleSheet.create({
     borderColor: "#B3B3B3",
   },
   manuelDot: {
-    backgroundColor: "#E55959",
+    backgroundColor: COLORS.danger,
   },
   onlineDot: {
     backgroundColor: "#63A1FD",
+  },
+  closedDot: {
+    backgroundColor: "black",
   },
   legendText: {
     fontSize: fs(14),

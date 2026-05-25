@@ -61,7 +61,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
       blocks?.forEach(b => {
         newMarkedDates[b.date] = {
           customStyles: {
-            container: { backgroundColor: COLORS.danger, borderRadius: 4 },
+            container: { backgroundColor: "black", borderRadius: 4, width: "100%" },
             text: { color: "white" },
           },
         };
@@ -82,7 +82,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           newClosedDates.add(dStr);
           newMarkedDates[dStr] = {
             customStyles: {
-              container: { backgroundColor: COLORS.danger, borderRadius: 0, width: "100%" },
+              container: { backgroundColor: "black", borderRadius: 4, width: "100%" },
               text: { color: "white" },
             },
           };
@@ -137,7 +137,6 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
       );
 
       const todayList: StaycationBooking[] = [];
-      const tomorrowList: StaycationBooking[] = [];
       const upcomingList: StaycationBooking[] = [];
 
       bookings.forEach(b => {
@@ -161,7 +160,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           const dStr = formatDate(curr);
           newMarkedDates[dStr] = {
             customStyles: {
-              container: { backgroundColor: rangeColor, borderRadius: 0, width: "100%" },
+              container: { backgroundColor: rangeColor, borderRadius: 4, width: "100%" },
               text: { color: "white" },
             },
           };
@@ -182,18 +181,63 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           guestCount: b.guest_count,
         };
 
-        const tomorrowStr = formatDate(new Date(Date.now() + 86400000));
+        if (b.check_in_date === todayStr) {
+          todayList.push(formatted);
+        } else {
+          upcomingList.push(formatted);
+        }
+      });
 
-        if (b.check_in_date === todayStr) todayList.push(formatted);
-        else if (b.check_in_date === tomorrowStr) tomorrowList.push(formatted);
-        else upcomingList.push(formatted);
+      // 5. Post-process to connect continuous dates
+      Object.keys(newMarkedDates).forEach(dStr => {
+        const current = newMarkedDates[dStr];
+        if (!current.customStyles || !current.customStyles.container) return;
+
+        const color = current.customStyles.container.backgroundColor;
+
+        const parts = dStr.split("-").map(Number);
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+
+        const prev = new Date(d);
+        prev.setDate(d.getDate() - 1);
+        const prevStr = formatDate(prev);
+
+        const next = new Date(d);
+        next.setDate(d.getDate() + 1);
+        const nextStr = formatDate(next);
+
+        const hasPrev =
+          newMarkedDates[prevStr] &&
+          newMarkedDates[prevStr].customStyles?.container?.backgroundColor === color;
+        const hasNext =
+          newMarkedDates[nextStr] &&
+          newMarkedDates[nextStr].customStyles?.container?.backgroundColor === color;
+
+        const container = current.customStyles.container;
+
+        if (hasPrev && hasNext) {
+          container.borderRadius = 0;
+        } else if (hasPrev) {
+          container.borderTopLeftRadius = 0;
+          container.borderBottomLeftRadius = 0;
+          container.borderTopRightRadius = 4;
+          container.borderBottomRightRadius = 4;
+          delete container.borderRadius;
+        } else if (hasNext) {
+          container.borderTopLeftRadius = 4;
+          container.borderBottomLeftRadius = 4;
+          container.borderTopRightRadius = 0;
+          container.borderBottomRightRadius = 0;
+          delete container.borderRadius;
+        } else {
+          container.borderRadius = 4;
+        }
       });
 
       setMarkedDates(newMarkedDates);
 
       const sections = [];
       if (todayList.length) sections.push({ title: "Today's Check-ins", data: todayList });
-      if (tomorrowList.length) sections.push({ title: "Tomorrow's Check-ins", data: tomorrowList });
       if (upcomingList.length) sections.push({ title: "Upcoming Bookings", data: upcomingList });
 
       setGroupedBookings(sections);
@@ -278,7 +322,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
     return groupedBookings
       .map(section => ({
         ...section,
-        data: section.data.filter(b => b.checkIn === selectedDate || b.checkOut === selectedDate),
+        data: section.data.filter(b => b.checkIn === selectedDate),
       }))
       .filter(s => s.data.length > 0);
   }, [groupedBookings, selectedDate]);
