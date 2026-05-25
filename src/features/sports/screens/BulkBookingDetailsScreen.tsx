@@ -201,12 +201,7 @@ const CreateBulkBooking = ({
   return (
     <View style={styles.flex1}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <ServiceHeader
-          title={activeVenueName}
-          subtitle="Bulk Booking"
-          category={selectedCategory}
-          onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
-        />
+        <ServiceHeader title={activeVenueName} subtitle="Bulk Booking" />
 
         <View style={styles.tabBar}>
           <View style={styles.tabContainer}>

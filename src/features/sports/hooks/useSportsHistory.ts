@@ -126,9 +126,13 @@ export const useSportsHistory = (
         if (!groupedByMonth[monthStr].days[dateStr])
           groupedByMonth[monthStr].days[dateStr] = { rawDate, settlement: 0, users: {} };
 
+        // CRITICAL FIX: Sum the 'total_amount' instead of 'paid_amount' so the day/month
+        // headers reflect the overall cost of all bookings for that period.
+        const totalAmt = Number(b.total_amount || 0);
         const paidAmt = Number(b.paid_amount || 0);
-        groupedByMonth[monthStr].totalSettlement += paidAmt;
-        groupedByMonth[monthStr].days[dateStr].settlement += paidAmt;
+
+        groupedByMonth[monthStr].totalSettlement += totalAmt;
+        groupedByMonth[monthStr].days[dateStr].settlement += totalAmt;
 
         if (!groupedByMonth[monthStr].days[dateStr].users[userKey]) {
           groupedByMonth[monthStr].days[dateStr].users[userKey] = {
@@ -141,9 +145,7 @@ export const useSportsHistory = (
           };
         }
 
-        groupedByMonth[monthStr].days[dateStr].users[userKey].totalCost += Number(
-          b.total_amount || 0,
-        );
+        groupedByMonth[monthStr].days[dateStr].users[userKey].totalCost += totalAmt;
         groupedByMonth[monthStr].days[dateStr].users[userKey].totalPaid += paidAmt;
         groupedByMonth[monthStr].days[dateStr].users[userKey].slots.push(b.sports_slots);
       });
@@ -165,18 +167,37 @@ export const useSportsHistory = (
             const sortedSlots = u.slots.sort((a: any, b: any) =>
               a.start_time.localeCompare(b.start_time),
             );
-            const timeRanges = sortedSlots
-              .map((s: any) => `${formatTime(s.start_time)} - ${formatTime(s.end_time)}`)
-              .join("  |  ");
+
+            // LOGIC: Merge consecutive slots into single blocks
+            let timeRanges = "";
+            if (sortedSlots.length > 0) {
+              let currentStart = sortedSlots[0].start_time;
+              let currentEnd = sortedSlots[0].end_time;
+              const blocks = [];
+
+              for (let i = 1; i < sortedSlots.length; i++) {
+                if (sortedSlots[i].start_time === currentEnd) {
+                  currentEnd = sortedSlots[i].end_time;
+                } else {
+                  blocks.push(`${formatTime(currentStart)} - ${formatTime(currentEnd)}`);
+                  currentStart = sortedSlots[i].start_time;
+                  currentEnd = sortedSlots[i].end_time;
+                }
+              }
+              blocks.push(`${formatTime(currentStart)} - ${formatTime(currentEnd)}`);
+              timeRanges = blocks.join("  |  ");
+            }
+
             let status: "Online" | "Offline" = "Offline";
             if (u.totalPaid >= u.totalCost && u.totalCost > 0) status = "Online";
             else if (u.totalPaid > 0) status = "Offline";
+
             return {
               id: u.id,
               name: u.name,
               phone: u.phone,
               timeRanges,
-              price: u.totalPaid,
+              price: u.totalCost,
               status,
             };
           });

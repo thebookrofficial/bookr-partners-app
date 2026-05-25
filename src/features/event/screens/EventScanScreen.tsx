@@ -11,6 +11,9 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  RefreshControl,
+  PermissionsAndroid,
+  Vibration,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -18,17 +21,10 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { Button } from "@/components/ui/Button";
 import { EventHeader } from "../components/EventHeader";
-import { Phone, X, Camera as CameraIcon, Ticket, User } from "lucide-react-native";
-import { useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
+import { Phone, X, Camera as CameraIcon } from "lucide-react-native";
+import { useIsFocused, useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { supabase } from "@/lib/supabase";
-
-import {
-  Camera,
-  useCameraDevice,
-  useCameraPermission,
-  useObjectOutput,
-} from "react-native-vision-camera";
-import { Platform } from "react-native";
+import { Camera } from "react-native-camera-kit";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -45,6 +41,7 @@ export interface Attendee {
   isAlreadyScanned?: boolean;
   isInvite?: boolean;
   avatarUrl?: string;
+  updatedAt: string; // Used for sorting
 }
 
 // --- Disclosure Modal ---
@@ -81,80 +78,59 @@ const CameraDisclosureModal = ({
   </Modal>
 );
 
-// --- Camera Components ---
-const FullScreenCameraIOS = ({ onClose, onCodeScanned, isActive }: any) => {
-  const device = useCameraDevice("back");
+// --- Camera Component ---
+const FullScreenCamera = ({ onClose, onCodeScanned }: any) => {
   const isScanning = useRef(true);
 
-  const objectOutput = useObjectOutput({
-    // @ts-ignore
-    types: ["qr"],
-    onObjectsScanned: (objects: any[]) => {
-      if (objects.length > 0 && objects[0].value && isScanning.current) {
-        isScanning.current = false;
-        onCodeScanned(objects[0].value);
-        setTimeout(() => {
-          isScanning.current = true;
-        }, 2000);
-      }
-    },
-  });
-
-  if (!device) return <View style={styles.loadingContainer} />;
-
   return (
     <View style={styles.cameraRoot}>
       <Camera
-        style={StyleSheet.absoluteFill}
-        device={device}
-        isActive={isActive}
-        outputs={[objectOutput]}
-        onError={error => {
-          Alert.alert("Camera Error", error.message);
-          onClose();
+        testID="camera-view"
+        style={StyleSheet.absoluteFillObject}
+        scanBarcode={true}
+        onReadCode={(event: any) => {
+          const code = event.nativeEvent.codeStringValue;
+          if (code && isScanning.current) {
+            isScanning.current = false;
+            Vibration.vibrate(100);
+            onCodeScanned(code);
+            setTimeout(() => {
+              isScanning.current = true;
+            }, 2000);
+          }
         }}
+        showFrame={false}
       />
-      <View style={styles.cameraOverlay} pointerEvents="box-none">
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+
+      {/* Subtle Overlay Mask */}
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        <View style={styles.maskTop} />
+        <View style={styles.maskMiddle}>
+          <View style={styles.maskSide} />
+          <View style={styles.maskFrame}>
+            <View style={[styles.corner, styles.topLeft]} />
+            <View style={[styles.corner, styles.topRight]} />
+            <View style={[styles.corner, styles.bottomLeft]} />
+            <View style={[styles.corner, styles.bottomRight]} />
+          </View>
+          <View style={styles.maskSide} />
+        </View>
+        <View style={styles.maskBottom} />
+      </View>
+
+      <View style={styles.cameraUIOverlay} pointerEvents="box-none">
+        <TouchableOpacity style={styles.cameraCloseBtn} onPress={onClose}>
           <X size={ms(24)} color="#FFF" />
         </TouchableOpacity>
-        <View style={styles.scanFrame} />
-        <Text weight="semiBold" style={styles.cameraHint}>
+
+        <Text weight="medium" style={styles.cameraHintText}>
           Align QR code within the frame
         </Text>
-      </View>
-    </View>
-  );
-};
 
-const FullScreenCameraAndroid = ({ onClose, onCodeScanned, isActive }: any) => {
-  const device = useCameraDevice("back");
-
-  if (!device) return <View style={styles.loadingContainer} />;
-
-  return (
-    <View style={styles.cameraRoot}>
-      <Camera
-        style={StyleSheet.absoluteFill}
-        device={device}
-        isActive={isActive}
-        onError={error => {
-          Alert.alert("Camera Error", error.message);
-          onClose();
-        }}
-      />
-      <View style={styles.cameraOverlay} pointerEvents="box-none">
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <X size={ms(24)} color="#FFF" />
-        </TouchableOpacity>
-        <View style={styles.scanFrame} />
-        <Text weight="semiBold" style={styles.cameraHint}>
-          Scanner restricted on Android Nitro version
-        </Text>
         {__DEV__ && (
           <TouchableOpacity
-            style={styles.simulateButton}
-            onPress={() => onCodeScanned("TEST_QR_TOKEN_123")}>
+            style={styles.simulateBtn}
+            onPress={() => onCodeScanned("pay_SnvxbS0ZkGJzEZ")}>
             <Text color="#FFF" weight="bold">
               Simulate Scan
             </Text>
@@ -164,107 +140,6 @@ const FullScreenCameraAndroid = ({ onClose, onCodeScanned, isActive }: any) => {
     </View>
   );
 };
-
-const FullScreenCamera = (props: any) => {
-  if (Platform.OS === "ios") {
-    return <FullScreenCameraIOS {...props} />;
-  }
-  return <FullScreenCameraAndroid {...props} />;
-};
-
-// --- Modal Component ---
-const ScanResultModal = ({ modalMode, activeAttendee, onClose, onConfirm, isProcessing }: any) => (
-  <Modal visible={modalMode !== null} transparent animationType="slide" statusBarTranslucent={true}>
-    <View style={styles.modalOverlay}>
-      <View style={styles.modalContent}>
-        <View style={styles.modalHeader}>
-          <Text
-            weight="bold"
-            style={[styles.modalTitle, modalMode === "warning" && styles.warningTitle]}>
-            {modalMode === "confirmation" ? "ENTRY CONFIRMATION" : "ALREADY SCANNED"}
-          </Text>
-        </View>
-
-        <View style={styles.modalBody}>
-          <View style={styles.modalRow}>
-            <View style={styles.rowLabelContainer}>
-              <Ticket size={ms(18)} color={COLORS.text.primary} />
-              <Text weight="bold" style={styles.rowLabel}>
-                Pass Type
-              </Text>
-            </View>
-            <View style={styles.rowValueContainer}>
-              <Text weight="bold" style={styles.passTypeText}>
-                {activeAttendee?.ticketType}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.modalRow}>
-            <View style={styles.rowLabelContainer}>
-              <User size={ms(18)} color={COLORS.text.primary} />
-              <Text weight="medium" style={styles.rowLabel}>
-                Name
-              </Text>
-            </View>
-            <View style={styles.rowValueContainer}>
-              <Text weight="semiBold" style={styles.rowValueText}>
-                {activeAttendee?.name}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.modalRow}>
-            <View style={styles.rowLabelContainer}>
-              <Phone size={ms(18)} color={COLORS.text.primary} />
-              <Text weight="medium" style={styles.rowLabel}>
-                Mobile No
-              </Text>
-            </View>
-            <View style={styles.rowValueContainer}>
-              <Text weight="semiBold" style={styles.rowValueText}>
-                {activeAttendee?.phone}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.modalFooter}>
-          {modalMode === "confirmation" ? (
-            <>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={onClose}
-                disabled={isProcessing}>
-                <Text weight="bold" style={styles.cancelButtonText}>
-                  CANCEL
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={onConfirm}
-                disabled={isProcessing}>
-                {isProcessing ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <Text weight="bold" style={styles.confirmButtonText}>
-                    CONFIRM ENTRY
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </>
-          ) : (
-            <TouchableOpacity style={styles.closeBtnLarge} onPress={onClose}>
-              <Text weight="bold" style={styles.confirmButtonText}>
-                CLOSE
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </View>
-  </Modal>
-);
 
 // --- Main Screen ---
 export const EventScanScreen = () => {
@@ -284,40 +159,93 @@ export const EventScanScreen = () => {
   const [isScanningMode, setIsScanningMode] = useState(false);
 
   // Real DB Data states
+  const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [scannedAttendees, setScannedAttendees] = useState<Attendee[]>([]);
   const [ticketCategories, setTicketCategories] = useState<string[]>([]);
   const [isFetchingHistory, setIsFetchingHistory] = useState(true);
-  const [isProcessingEntry, setIsProcessingEntry] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const [modalMode, setModalMode] = useState<"confirmation" | "warning" | null>(null);
-  const [activeAttendee, setActiveAttendee] = useState<Attendee | null>(null);
   const [showDisclosure, setShowDisclosure] = useState(false);
 
-  const { hasPermission, requestPermission } = useCameraPermission();
+  // const { hasPermission, requestPermission } = useCameraPermission();
 
-  // 1. Fetch History from DB (Attendees who already entered)
+  // 1. Fetch Event, Pre-load Passes, and Fetch Scanned History
   const fetchScannedHistory = useCallback(async () => {
     if (!serviceId) return;
     try {
       setIsFetchingHistory(true);
-      const { data, error } = await supabase
-        .from("event_bookings")
+
+      // A. Fetch the main event for this venue to get its real event_id and its passes
+      const { data: event, error: eventError } = await supabase
+        .from("events")
         .select(
           `
-          id, ticket_count, booking_status, guest_name, guest_phone, updated_at,
-          profiles (full_name, phone, avatar_url),
-          event_passes (name),
-          event_zones (zone_name)
+          id,
+          event_passes ( name ),
+          event_zones ( zone_name )
         `,
         )
-        .eq("event_id", serviceId)
-        .eq("booking_status", "completed") // Completed means they have checked in
-        .order("updated_at", { ascending: false });
+        .eq("venue_id", serviceId)
+        .order("total_capacity", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (eventError) throw eventError;
+      if (!event) {
+        setIsFetchingHistory(false);
+        return;
+      }
 
+      const realEventId = event.id;
+      setActiveEventId(realEventId);
+      console.log("DEBUG: Active Event ID:", realEventId);
+
+      // B. Pre-fill categories from passes and zones so the tabs ALWAYS exist
       const cats = new Set<string>();
-      const formattedData: Attendee[] = (data || []).map((b: any) => {
+      const passesData = event.event_passes || [];
+      const zonesData = event.event_zones || [];
+
+      passesData.forEach((p: any) => {
+        if (p.name) cats.add(p.name);
+      });
+      zonesData.forEach((z: any) => {
+        if (z.zone_name) cats.add(z.zone_name);
+      });
+
+      // C. Fetch only COMPLETED (scanned) bookings for the history list
+      const [bookingsRes, invitesRes] = await Promise.all([
+        supabase
+          .from("event_bookings")
+          .select(
+            `
+            id, ticket_count, booking_status, guest_name, guest_phone, updated_at,
+            profiles (full_name, phone, avatar_url),
+            event_passes (name),
+            event_zones (zone_name)
+          `,
+          )
+          .eq("event_id", realEventId)
+          .eq("booking_status", "completed")
+          .order("updated_at", { ascending: false }),
+        supabase
+          .from("event_guest_invites")
+          .select(`id, guest_name, guest_phone, status, created_at`)
+          .eq("event_id", realEventId)
+          .eq("status", "completed")
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (bookingsRes.error) throw bookingsRes.error;
+      if (invitesRes.error) throw invitesRes.error;
+
+      console.log("DEBUG: Bookings found:", bookingsRes.data?.length);
+      console.log(
+        "DEBUG: Booking IDs:",
+        bookingsRes.data?.map(b => b.id),
+      );
+      console.log("DEBUG: Invites found:", invitesRes.data?.length);
+
+      const formattedBookings: Attendee[] = (bookingsRes.data || []).map((b: any) => {
         const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
         const pass = Array.isArray(b.event_passes) ? b.event_passes[0] : b.event_passes;
         const zone = Array.isArray(b.event_zones) ? b.event_zones[0] : b.event_zones;
@@ -339,11 +267,35 @@ export const EventScanScreen = () => {
           ticketType: `${catName} x ${b.ticket_count}`,
           categoryName: catName,
           avatarUrl: profile?.avatar_url,
+          updatedAt: b.updated_at,
         };
       });
 
+      const formattedInvites: Attendee[] = (invitesRes.data || []).map((i: any) => {
+        const timeStr = new Date(i.created_at).toLocaleTimeString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+
+        return {
+          id: i.id,
+          name: i.guest_name || "Guest",
+          phone: i.guest_phone || "N/A",
+          time: timeStr.toUpperCase(),
+          ticketType: "GUEST INVITE",
+          categoryName: "Guest",
+          isInvite: true,
+          updatedAt: i.created_at,
+        };
+      });
+
+      const combined = [...formattedBookings, ...formattedInvites].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
+
       setTicketCategories(Array.from(cats));
-      setScannedAttendees(formattedData);
+      setScannedAttendees(combined);
     } catch (err) {
       console.error("Error fetching scanned history:", err);
     } finally {
@@ -351,20 +303,31 @@ export const EventScanScreen = () => {
     }
   }, [serviceId]);
 
-  useEffect(() => {
-    fetchScannedHistory();
+  useFocusEffect(
+    useCallback(() => {
+      fetchScannedHistory();
+    }, [fetchScannedHistory]),
+  );
+
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await fetchScannedHistory();
+    setIsRefreshing(false);
   }, [fetchScannedHistory]);
 
+  // Build tabs cleanly, filtering out Guest from the mapped list to prevent duplicates
   const TABS = [
     { label: "All", count: scannedAttendees.length },
     {
       label: "Guest",
       count: scannedAttendees.filter(a => a.categoryName.toLowerCase() === "guest").length,
     },
-    ...ticketCategories.map(cat => ({
-      label: cat,
-      count: scannedAttendees.filter(a => a.categoryName === cat).length,
-    })),
+    ...ticketCategories
+      .filter(cat => cat.toLowerCase() !== "guest")
+      .map(cat => ({
+        label: cat,
+        count: scannedAttendees.filter(a => a.categoryName === cat).length,
+      })),
   ];
 
   const filteredScans =
@@ -377,138 +340,26 @@ export const EventScanScreen = () => {
         );
 
   const handleOpenScanner = useCallback(async () => {
-    if (!hasPermission) {
-      setShowDisclosure(true);
-      return;
+    try {
+      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        setIsScanningMode(true);
+      } else {
+        Alert.alert("Permission Required", "Camera access is required to scan tickets.");
+      }
+    } catch (err) {
+      console.warn("Camera permission error:", err);
     }
-    setIsScanningMode(true);
-  }, [hasPermission]);
+  }, []); // Empty dependency array is correct now
 
   const handleAcceptDisclosure = async () => {
     setShowDisclosure(false);
-    const granted = await requestPermission();
-    if (granted) {
+    const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+    if (granted === PermissionsAndroid.RESULTS.GRANTED) {
       setIsScanningMode(true);
     } else {
       Alert.alert("Permission Required", "Allow camera access in settings to scan tickets.");
     }
-  };
-
-  // 2. Validate Scanned Token against Supabase DB
-  // 2. Validate Scanned Token against Supabase DB
-  const handleCodeScanned = useCallback(
-    async (code: string) => {
-      try {
-        // Search in regular event bookings first
-        const { data: booking } = await supabase
-          .from("event_bookings")
-          .select(
-            `
-        id, ticket_count, booking_status, guest_name, guest_phone,
-        profiles (full_name, phone, avatar_url),
-        event_passes (name),
-        event_zones (zone_name)
-      `,
-          )
-          .eq("qr_code_token", code)
-          .eq("event_id", serviceId)
-          .maybeSingle();
-
-        if (booking) {
-          const profile = Array.isArray(booking.profiles) ? booking.profiles[0] : booking.profiles;
-          const pass = Array.isArray(booking.event_passes)
-            ? booking.event_passes[0]
-            : booking.event_passes;
-          const zone = Array.isArray(booking.event_zones)
-            ? booking.event_zones[0]
-            : booking.event_zones;
-          const catName = pass?.name || zone?.zone_name || "General";
-
-          const attendee: Attendee = {
-            id: booking.id,
-            name: booking.guest_name || profile?.full_name || "Guest",
-            phone: booking.guest_phone || profile?.phone || "N/A",
-            time: "Now",
-            ticketType: `${catName} x ${booking.ticket_count}`,
-            categoryName: catName,
-            isAlreadyScanned: booking.booking_status === "completed", // Use booking_status enum
-            isInvite: false,
-          };
-
-          setActiveAttendee(attendee);
-          setModalMode(attendee.isAlreadyScanned ? "warning" : "confirmation");
-          return;
-        }
-
-        // Check event guest invites if not found in regular bookings
-        const { data: invite } = await supabase
-          .from("event_guest_invites")
-          .select("*")
-          .eq("qr_code_token", code)
-          .eq("event_id", serviceId)
-          .maybeSingle();
-
-        if (invite) {
-          const attendee: Attendee = {
-            id: invite.id,
-            name: invite.guest_name,
-            phone: invite.guest_phone,
-            time: "Now",
-            ticketType: `Guest Pass x ${invite.quantity}`,
-            categoryName: "Guest",
-            isAlreadyScanned: invite.status === "completed",
-            isInvite: true,
-          };
-
-          setActiveAttendee(attendee);
-          setModalMode(attendee.isAlreadyScanned ? "warning" : "confirmation");
-          return;
-        }
-
-        Alert.alert("Invalid Ticket", "This QR code does not match any booking for this event.");
-      } catch (err) {
-        console.error("Scan lookup error:", err);
-        Alert.alert("Lookup Failed", "Failed to retrieve ticket information.");
-      }
-    },
-    [serviceId],
-  );
-
-  // 3. Confirm Entry (Update DB)
-  const handleConfirmEntry = async () => {
-    if (!activeAttendee) return;
-    setIsProcessingEntry(true);
-
-    try {
-      if (activeAttendee.isInvite) {
-        await supabase
-          .from("event_guest_invites")
-          .update({ status: "completed" })
-          .eq("id", activeAttendee.id);
-      } else {
-        // Mark regular booking as 'completed' upon check-in
-        await supabase
-          .from("event_bookings")
-          .update({ booking_status: "completed" })
-          .eq("id", activeAttendee.id);
-      }
-
-      // Refresh history, close modal, exit scanner
-      fetchScannedHistory();
-      setModalMode(null);
-      setActiveAttendee(null);
-      setIsScanningMode(false);
-    } catch (err) {
-      console.error("Check-in error:", err);
-      Alert.alert("Error", "Failed to check in attendee.");
-    } finally {
-      setIsProcessingEntry(false);
-    }
-  };
-
-  const handleCloseModal = () => {
-    setModalMode(null);
-    setActiveAttendee(null);
   };
 
   useEffect(() => {
@@ -539,7 +390,7 @@ export const EventScanScreen = () => {
   const renderScanItem = ({ item }: { item: Attendee }) => (
     <TouchableOpacity
       style={styles.scanItem}
-      onPress={() => navigation.navigate("EventEntryDetails", { entryId: item.id })}>
+      onPress={() => navigation.navigate("EventEntryDetails", { entryId: item.id } as any)}>
       <View style={styles.avatarContainer}>
         <Image
           source={item.avatarUrl ? { uri: item.avatarUrl } : USER_PROFILE}
@@ -568,6 +419,87 @@ export const EventScanScreen = () => {
         </View>
       </View>
     </TouchableOpacity>
+  );
+
+  // 2. Validate Scanned Token against Supabase DB
+  const handleCodeScanned = useCallback(
+    async (code: string) => {
+      if (!activeEventId) return;
+      try {
+        console.log("DEBUG: Scanned Code:", code);
+        const { data: booking } = await supabase
+          .from("event_bookings")
+          .select(
+            `
+            *,
+            event_passes (name),
+            event_zones (zone_name)
+          `,
+          )
+          .eq("qr_code_token", code.trim())
+          .eq("event_id", activeEventId)
+          .maybeSingle();
+
+        if (booking) {
+          console.log("DEBUG: Booking found:", booking.id, "Status:", booking.booking_status);
+          if (booking.booking_status === "completed") {
+            Alert.alert("Already Scanned", "This ticket has already been used for entry.");
+            return;
+          }
+
+          const pass = Array.isArray(booking.event_passes)
+            ? booking.event_passes[0]
+            : booking.event_passes;
+          const zone = Array.isArray(booking.event_zones)
+            ? booking.event_zones[0]
+            : booking.event_zones;
+          const actualTicketType = pass?.name || zone?.zone_name || "General";
+
+          setIsScanningMode(false);
+          navigation.navigate("EventScanConfirmation", {
+            attendee: {
+              ...booking,
+              name: booking.guest_name || booking.name || "Guest",
+              phone: booking.guest_phone || booking.phone || "N/A",
+              ticketType: `${actualTicketType} x ${booking.ticket_count}`,
+            },
+            isInvite: false,
+          });
+        } else {
+          // Check for Guest Invites
+          const { data: invite } = await supabase
+            .from("event_guest_invites")
+            .select("*")
+            .eq("qr_code_token", code.trim())
+            .eq("event_id", activeEventId)
+            .maybeSingle();
+
+          if (invite) {
+            console.log("DEBUG: Invite found:", invite.id, "Status:", invite.status);
+            if (invite.status === "completed") {
+              Alert.alert("Already Scanned", "This invite has already been used.");
+              return;
+            }
+
+            setIsScanningMode(false);
+            navigation.navigate("EventScanConfirmation", {
+              attendee: {
+                ...invite,
+                name: invite.guest_name || "Guest",
+                phone: invite.guest_phone || "N/A",
+                ticketType: "GUEST INVITE",
+              },
+              isInvite: true,
+            });
+          } else {
+            Alert.alert("Invalid Ticket", "QR code not found for this event.");
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    [activeEventId, navigation],
   );
 
   return (
@@ -605,7 +537,7 @@ export const EventScanScreen = () => {
             />
           </View>
 
-          {isFetchingHistory ? (
+          {isFetchingHistory && !isRefreshing ? (
             <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: vs(20) }} />
           ) : (
             <FlatList
@@ -615,18 +547,18 @@ export const EventScanScreen = () => {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.listContainer}
               ListEmptyComponent={<Text style={styles.emptyListText}>No tickets scanned yet.</Text>}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={onRefresh}
+                  tintColor={COLORS.primary}
+                  colors={[COLORS.primary]}
+                />
+              }
             />
           )}
         </ScreenContainer>
       )}
-
-      <ScanResultModal
-        modalMode={modalMode}
-        activeAttendee={activeAttendee}
-        onClose={handleCloseModal}
-        onConfirm={handleConfirmEntry}
-        isProcessing={isProcessingEntry}
-      />
 
       <CameraDisclosureModal
         visible={showDisclosure}
@@ -637,7 +569,6 @@ export const EventScanScreen = () => {
   );
 };
 
-// ... keep existing styles object at the bottom ...
 const styles = StyleSheet.create({
   dateRow: {
     flexDirection: "row",
@@ -698,18 +629,45 @@ const styles = StyleSheet.create({
   scanTime: { fontSize: fs(14), color: COLORS.text.primary },
   scanType: { fontSize: fs(14), color: COLORS.primary },
   cameraRoot: { flex: 1, backgroundColor: "#000" },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
+  maskTop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
+  maskMiddle: { flexDirection: "row", height: hs(260) },
+  maskSide: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
+  maskFrame: { width: hs(260), backgroundColor: "transparent" },
+  maskBottom: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
+  corner: {
+    position: "absolute",
+    width: hs(30),
+    height: hs(30),
+    borderColor: COLORS.primary,
   },
-  cameraOverlay: {
+  topLeft: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: ms(15) },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: ms(15),
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: ms(15),
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: ms(15),
+  },
+  cameraUIOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
   },
-  closeButton: {
+  cameraCloseBtn: {
     position: "absolute",
     top: vs(50),
     right: hs(20),
@@ -718,29 +676,22 @@ const styles = StyleSheet.create({
     borderRadius: ms(25),
     zIndex: 10,
   },
-  scanFrame: {
-    width: hs(250),
-    height: hs(250),
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    borderRadius: ms(20),
-    backgroundColor: "rgba(255,255,255,0.1)",
-  },
-  cameraHint: {
+  cameraHintText: {
     color: "#FFF",
-    marginTop: vs(30),
+    marginTop: vs(320),
     fontSize: fs(16),
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: hs(16),
-    paddingVertical: vs(8),
-    borderRadius: ms(8),
-    overflow: "hidden",
     textAlign: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+    paddingHorizontal: hs(16),
+    paddingVertical: vs(6),
+    borderRadius: ms(20),
+    overflow: "hidden",
   },
-  simulateButton: {
-    marginTop: vs(20),
+  simulateBtn: {
+    position: "absolute",
+    bottom: vs(50),
     backgroundColor: COLORS.primary,
-    paddingHorizontal: hs(20),
+    paddingHorizontal: hs(24),
     paddingVertical: vs(12),
     borderRadius: ms(10),
   },

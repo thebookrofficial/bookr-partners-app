@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React, { useEffect, useState } from "react";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ActivityIndicator, StyleSheet, Text } from "react-native";
 import { EventHomeScreenOpen } from "./EventHomeScreenOpen";
 import { EventHomeScreenAssigned } from "./EventHomeScreenAssigned";
 import { supabase } from "@/lib/supabase";
@@ -14,7 +14,11 @@ export const EventHomeScreen = () => {
   const route = useRoute<any>();
 
   const [loading, setLoading] = useState(true);
-  const [eventData, setEventData] = useState<{ id: string; seating_type: string } | null>(null);
+  const [eventData, setEventData] = useState<{
+    id: string;
+    seating_type: string;
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -29,7 +33,6 @@ export const EventHomeScreen = () => {
           serviceId = currentRoute?.params?.serviceId;
 
           if (!serviceId) {
-            // Fallback: look for EventServiceTabs specifically
             const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
             const tabParams = tabRoute?.params as any;
             serviceId = tabParams?.serviceId || tabParams?.params?.serviceId;
@@ -49,21 +52,31 @@ export const EventHomeScreen = () => {
 
       setLoading(true);
       try {
+        // Fetch ALL events for this venue to see what's going on!
         const { data, error } = await supabase
           .from("events")
-          .select("id, seating_type")
-          .eq("venue_id", serviceId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .select("id, seating_type, title, total_capacity, created_at")
+          .eq("venue_id", serviceId);
 
         if (error) {
           console.error("EventHome: Supabase error:", error.message);
           throw error;
         }
 
-        if (isMounted) {
-          setEventData(data);
+        if (isMounted && data && data.length > 0) {
+          // 1. Try to specifically find Neon Shadow first
+          let selectedEvent = data.find(e => e.title.includes("Neon Shadow"));
+
+          // 2. If not found, sort by oldest created_at (usually the main one you set up first)
+          if (!selectedEvent) {
+            selectedEvent = data.sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+            )[0];
+          }
+
+          setEventData(selectedEvent);
+        } else {
+          setLoading(false);
         }
       } catch (err) {
         console.error("EventHome: Error fetching base event:", err);
@@ -90,8 +103,11 @@ export const EventHomeScreen = () => {
   }
 
   if (!eventData) {
-    // If no event found, default to Assigned (or could show empty state)
-    return <EventHomeScreenAssigned eventId="" />;
+    return (
+      <View style={styles.loadingWrapper}>
+        <Text style={{ color: COLORS.text.primary }}>No Events found for this service.</Text>
+      </View>
+    );
   }
 
   if (eventData.seating_type === "open") {

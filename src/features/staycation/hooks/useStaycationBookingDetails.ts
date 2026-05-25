@@ -25,6 +25,10 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
         .select(
           `
           id,
+          user_id,
+          venue_id,
+          room_id,
+          unit_count,
           check_in_date,
           check_out_date,
           guest_count,
@@ -32,6 +36,7 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
           platform_fee,
           total_amount,
           paid_amount,
+          discount_amount,
           guest_name,   
           guest_phone,   
           booking_status,
@@ -123,14 +128,34 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
 
     try {
       setIsUpdating(true);
-      const { error } = await supabase
+
+      // 1. Update the booking status to cancelled
+      const { error: bookingError } = await supabase
         .from("staycation_bookings")
         .update({ booking_status: "cancelled" })
         .eq("id", bookingDetails.id);
 
-      if (error) throw error;
+      if (bookingError) {
+        console.error("SUPABASE UPDATE ERROR:", bookingError); // <-- THIS WILL TELL US THE CAUSE
+        throw bookingError;
+      }
+
+      // 2. Trigger your custom RPC to accurately release the blocked units/dates
+      const { error: rpcError } = await supabase.rpc("unblock_staycation_dates", {
+        p_venue_id: bookingDetails.venue_id,
+        p_room_id: bookingDetails.room_id || null, // Fallback to null for Farmhouses
+        p_start_date: bookingDetails.check_in_date,
+        p_end_date: bookingDetails.check_out_date,
+        p_unit_count: bookingDetails.unit_count || 1, // Pass the units so it frees all rooms
+      });
+
+      if (rpcError) {
+        console.error("Error releasing availability via RPC:", rpcError);
+        // We log the error but don't throw, as the booking is already cancelled
+      }
 
       await fetchBookingDetails();
+      Alert.alert("Success", "Booking cancelled successfully.");
       return true;
     } catch (error: any) {
       console.error("Error cancelling booking:", error);

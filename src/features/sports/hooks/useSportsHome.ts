@@ -238,10 +238,17 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           // DETERMINING OFFLINE VS ONLINE
           const isOffline = !!b.guest_name && b.guest_name !== "null";
 
-          // TIME CALCULATIONS
-          const [endH, endM] = b.end_time.split(":").map(Number);
+          // TIME CALCULATIONS (WITH MIDNIGHT FIX)
+          let [endH, endM] = b.end_time.split(":").map(Number);
+
+          // FIX: Treat 00:00:00 as 24:00 for the end of the day bound so it doesn't immediately gray out
+          if (endH === 0 && endM === 0) {
+            endH = 24;
+          }
+
           const slotEndTime = new Date(b.slot_date);
           slotEndTime.setHours(endH, endM, 0, 0);
+
           const isDisabled = now > slotEndTime;
           const isUnpaid = Number(b.paid_amount || 0) < Number(b.total_amount || 0);
 
@@ -254,7 +261,6 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             phone: finalPhone,
             date: formattedDate,
             time: `${formatTime(b.start_time)} - ${formatTime(b.end_time)}`,
-            // CRITICAL FIX: Changed total_amount to paid_amount
             price: `₹${b.paid_amount || 0}`,
             status: isOffline ? "Offline" : "Online",
             avatarUrl: b.avatar_url,
@@ -274,12 +280,25 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
       });
 
-      // Deduplicate ghost bookings by slot time
+      // // Deduplicate ghost bookings by slot time
       const uniqueBookings = Array.from(
         new Map(sortedBookings.map(b => [b.startTimeRaw, b])).values(),
       );
+      const merged = uniqueBookings.reduce((acc, current) => {
+        const existing = acc.find(b => b.phone === current.phone && b.date === current.date);
+        if (existing) {
+          // Merge the time and price
+          existing.time = existing.time.replace(/ - .*/, "") + " - " + current.time.split(" - ")[1];
+          existing.price = `₹${
+            Number(existing.price.replace("₹", "")) + Number(current.price.replace("₹", ""))
+          }`;
+        } else {
+          acc.push(current);
+        }
+        return acc;
+      }, [] as BookingData[]);
 
-      setBookings(uniqueBookings);
+      setBookings(merged);
     } catch (error) {
       console.error("Error fetching bookings:", error);
     } finally {

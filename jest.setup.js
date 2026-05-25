@@ -57,15 +57,39 @@ jest.mock("react-native-worklets", () => ({
   },
 }));
 
-// Mock Vision Camera
-jest.mock("react-native-vision-camera", () => ({
-  Camera: "Camera",
-  useCameraDevice: jest.fn(() => ({})),
-  useObjectOutput: jest.fn(() => ({})),
-  useCameraPermission: jest.fn(() => ({
-    hasPermission: true,
-    requestPermission: jest.fn(() => Promise.resolve(true)),
+// Mock Supabase
+jest.mock("@supabase/supabase-js", () => ({
+  createClient: jest.fn(() => ({
+    from: jest.fn(() => ({
+      select: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn(() => Promise.resolve({ data: null, error: null })),
+      single: jest.fn(() => Promise.resolve({ data: null, error: null })),
+    })),
+    auth: {
+      onAuthStateChange: jest.fn(() => ({
+        data: { subscription: { unsubscribe: jest.fn() } },
+      })),
+      getSession: jest.fn(() => Promise.resolve({ data: { session: null } })),
+      getUser: jest.fn(() => Promise.resolve({ data: { user: null } })),
+      signInWithPassword: jest.fn(() => Promise.resolve({ data: {}, error: null })),
+      signOut: jest.fn(() => Promise.resolve({ error: null })),
+    },
+    storage: {
+      from: jest.fn(() => ({
+        upload: jest.fn(() => Promise.resolve({ data: {}, error: null })),
+        getPublicUrl: jest.fn(() => ({ data: { publicUrl: "mock-url" } })),
+      })),
+    },
   })),
+}));
+
+// Mock Camera Kit
+jest.mock("react-native-camera-kit", () => ({
+  Camera: "Camera",
 }));
 
 // Mock Nitro Modules
@@ -90,6 +114,21 @@ jest.mock("react-native-reanimated", () => {
     makeMutable: jest.fn(val => ({ value: val })),
   };
 });
+
+// Mock react-native-blob-util
+jest.mock("react-native-blob-util", () => ({
+  fs: {
+    dirs: {
+      CacheDir: "/mock/cache/dir",
+    },
+    writeFile: jest.fn(() => Promise.resolve()),
+  },
+}));
+
+// Mock react-native-share
+jest.mock("react-native-share", () => ({
+  open: jest.fn(() => Promise.resolve()),
+}));
 
 // Mock Stallion OTA wrapper
 jest.mock(

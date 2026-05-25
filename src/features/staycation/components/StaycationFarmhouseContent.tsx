@@ -11,7 +11,7 @@ import {
   RefreshControl,
   Alert,
 } from "react-native";
-import { Text, PillTabs } from "@/components/ui";
+import { Text } from "@/components/ui";
 import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
@@ -34,15 +34,19 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
   const {
     isLoading,
     markedDates,
+    closedDates,
     groupedBookings,
     refetch,
     venues,
     activeVenue,
-    setActiveVenueId,
     cancelBooking,
     selectedDate,
     setSelectedDate,
   } = useStaycationFarmhouse(initialVenueId);
+
+  const isDateClosed = useMemo(() => {
+    return selectedDate ? closedDates.has(selectedDate) : false;
+  }, [selectedDate, closedDates]);
 
   const [isOfflineSheetVisible, setIsOfflineSheetVisible] = useState(false);
 
@@ -62,7 +66,11 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
     groupedBookings.forEach(section => {
       if (section.data.length > 0) {
         data.push({ type: "header", title: section.title });
-        section.data.forEach(b => {
+
+        // Sort bookings by check-in date ascending
+        const sortedBookings = [...section.data].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+
+        sortedBookings.forEach(b => {
           data.push({ type: "booking", data: b });
         });
       }
@@ -112,22 +120,6 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
           }
         />
 
-        <View style={styles.bookingsTabsRow}>
-          <Text weight="bold" style={styles.bookingsHeaderText}>
-            Bookings
-          </Text>
-          <PillTabs
-            variant="dark"
-            tabs={venues.map(v => v.tabLabel || v.name)}
-            activeTab={activeVenue?.tabLabel || ""}
-            onTabChange={label => {
-              const selected = venues.find(v => v.tabLabel === label);
-              if (selected) setActiveVenueId(selected.id);
-            }}
-            style={styles.typeTabs}
-          />
-        </View>
-
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
             <View style={styles.availableDot} />
@@ -138,13 +130,19 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
           <View style={styles.legendItem}>
             <View style={[styles.dot, styles.manuelDot]} />
             <Text weight="bold" style={styles.legendText}>
-              Blocked
+              Manual
             </Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.dot, styles.onlineDot]} />
             <Text weight="bold" style={styles.legendText}>
-              Booked
+              Online
+            </Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, styles.manuelDot]} />
+            <Text weight="bold" style={styles.legendText}>
+              Closed
             </Text>
           </View>
         </View>
@@ -153,6 +151,8 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
           <Calendar
             current={new Date().toISOString().split("T")[0]}
             markingType={"custom"}
+            // ADDED FIX: Strictly hide extra days from other months
+            hideExtraDays={true}
             markedDates={{
               ...markedDates,
               [selectedDate || ""]: {
@@ -171,6 +171,14 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
           />
         </View>
 
+        {isDateClosed && (
+          <View style={styles.closedDateContainer}>
+            <Text weight="bold" style={styles.closedDateText}>
+              This date is closed
+            </Text>
+          </View>
+        )}
+
         <View style={styles.bookingsForMonthHeader}>
           <Text weight="bold" style={styles.bookingsForMonthTitle}>
             {selectedDate
@@ -188,7 +196,7 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
         </View>
       </View>
     ),
-    [venues, activeVenue, markedDates, setActiveVenueId, selectedDate, setSelectedDate],
+    [activeVenue, markedDates, selectedDate, setSelectedDate, isDateClosed],
   );
 
   return (
@@ -245,7 +253,7 @@ const calendarTheme = {
   selectedDayTextColor: COLORS.text.inverse,
   todayTextColor: "black",
   dayTextColor: "black",
-  textDisabledColor: "transparent",
+  textDisabledColor: "transparent", // ADDED FIX: Ensuring extra days are completely invisible
   monthTextColor: "black",
   textDayFontFamily: "Gilroy-Medium",
   textMonthFontFamily: "Gilroy-Bold",
@@ -300,21 +308,6 @@ const styles = StyleSheet.create({
   headerContainer: {
     paddingTop: vs(10),
   },
-  bookingsTabsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: vs(15),
-    gap: hs(230),
-    minHeight: vs(40),
-  },
-  bookingsHeaderText: {
-    fontSize: fs(16),
-    color: COLORS.text.primary,
-  },
-  typeTabs: {
-    flex: 1,
-    marginVertical: 0,
-  },
   legendRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -354,6 +347,20 @@ const styles = StyleSheet.create({
   calendarContainer: {
     backgroundColor: COLORS.background,
     marginBottom: vs(10),
+  },
+  closedDateContainer: {
+    backgroundColor: "#FEF2F2",
+    paddingVertical: vs(10),
+    paddingHorizontal: hs(12),
+    borderRadius: ms(8),
+    marginBottom: vs(12),
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+  },
+  closedDateText: {
+    fontSize: fs(14),
+    color: COLORS.danger,
+    textAlign: "center",
   },
   calendarArrow: {
     fontSize: fs(16),
@@ -407,14 +414,19 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    right: hs(0),
-    bottom: vs(65),
+    right: hs(16),
+    bottom: vs(110),
     width: ms(60),
     height: ms(60),
     borderRadius: ms(30),
     backgroundColor: "#63A1FD",
     justifyContent: "center",
     alignItems: "center",
-    boxShadow: "0px 5px 5px rgba(0, 0, 0, 0.16)",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
+    zIndex: 10,
   },
 });

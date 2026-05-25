@@ -12,7 +12,13 @@ import { BookingCard } from "../components/BookingCard";
 import { Calendar as CalendarIcon, Plus } from "lucide-react-native";
 import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { RouteProp, useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
+import {
+  RouteProp,
+  useNavigation,
+  useRoute,
+  useFocusEffect,
+  useIsFocused,
+} from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { OfflineBookingSheet } from "../components/OfflineBookingSheet";
@@ -70,14 +76,27 @@ export const SportsHomeScreen = () => {
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const shouldReOpenSheet = React.useRef(false);
 
   const { activeVenueName, setActiveVenueName } = useServiceStore();
+  const isFocused = useIsFocused();
 
   useFocusEffect(
     React.useCallback(() => {
       refresh();
     }, [refresh]),
   );
+
+  useEffect(() => {
+    if (isFocused && shouldReOpenSheet.current) {
+      // Delay opening to ensure navigation transition is complete and any previous modal is fully dismissed
+      const timer = setTimeout(() => {
+        setIsBottomSheetOpen(true);
+        shouldReOpenSheet.current = false;
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [isFocused]);
 
   useEffect(() => {
     if (venue?.name) {
@@ -132,7 +151,6 @@ export const SportsHomeScreen = () => {
         {/* Dropdown action removed, now it functions as a static label */}
         <ServiceHeader
           title={venue?.name || activeVenueName}
-          category={selectedCategory}
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
         />
 
@@ -253,6 +271,10 @@ export const SportsHomeScreen = () => {
           venueId={venue.id}
           _groundId={activeGroundId}
           selectedDate={selectedDate}
+          onCheckHistory={() => {
+            shouldReOpenSheet.current = true;
+            setIsBottomSheetOpen(false);
+          }}
           onSuccess={() => {
             setIsBottomSheetOpen(false);
             refresh();
@@ -321,8 +343,8 @@ const styles = StyleSheet.create({
   bookingsContainer: { marginTop: vs(8), width: "100%" },
   fab: {
     position: "absolute",
-    right: hs(12),
-    bottom: vs(95),
+    right: hs(16),
+    bottom: vs(110),
     width: ms(58),
     height: ms(58),
     borderRadius: ms(29),

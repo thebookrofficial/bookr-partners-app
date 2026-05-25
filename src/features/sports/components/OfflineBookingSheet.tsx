@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -38,6 +38,7 @@ interface OfflineBookingSheetProps {
   _groundId: string;
   selectedDate: Date;
   onSuccess: () => void;
+  onCheckHistory?: () => void;
 }
 
 const offlineBookingSchema = z.object({
@@ -84,6 +85,7 @@ export const OfflineBookingSheet = ({
   _groundId,
   selectedDate: initialDate,
   onSuccess,
+  onCheckHistory,
 }: OfflineBookingSheetProps) => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 
@@ -138,6 +140,21 @@ export const OfflineBookingSheet = ({
     return `${year}-${month}-${day}`;
   };
 
+  const resetForm = useCallback(() => {
+    setCurrentDate(initialDate);
+    setMobile("");
+    setName("");
+    setTotalPayment("");
+    setAdvancePaid("");
+    setFromTime("Start Time");
+    setToTime("End Time");
+    setHasHistory(false);
+  }, [initialDate]);
+
+  useEffect(() => {
+    setCurrentDate(initialDate);
+  }, [initialDate]);
+
   useEffect(() => {
     const fetchUnavailableSlots = async () => {
       if (!isVisible || !_groundId) return;
@@ -162,18 +179,16 @@ export const OfflineBookingSheet = ({
     fetchUnavailableSlots();
   }, [currentDate, _groundId, isVisible]);
 
+  const prevGroundId = React.useRef<string | null>(null);
+
+  // Clear form ONLY if the ground actually changes to a different one
   useEffect(() => {
-    if (isVisible) {
-      setCurrentDate(initialDate);
-      setMobile("");
-      setName("");
-      setTotalPayment("");
-      setAdvancePaid("");
-      setFromTime("Start Time");
-      setToTime("End Time");
-      setHasHistory(false);
+    // Only reset if we had a previous ground ID and the new one is different
+    if (prevGroundId.current !== null && _groundId !== prevGroundId.current) {
+      resetForm();
     }
-  }, [initialDate, isVisible]);
+    prevGroundId.current = _groundId;
+  }, [_groundId, resetForm]);
 
   useEffect(() => {
     const checkGuest = async () => {
@@ -297,6 +312,7 @@ export const OfflineBookingSheet = ({
       });
 
       Alert.alert("Success", "Booking Saved!");
+      resetForm();
       onSuccess();
     } catch (error: any) {
       Alert.alert("Booking Failed", error.message || "Something went wrong.");
@@ -304,6 +320,14 @@ export const OfflineBookingSheet = ({
       setIsSubmitting(false);
     }
   };
+
+  // Get current real-world time for disabling past hours
+  const now = new Date();
+  const isToday =
+    currentDate.getDate() === now.getDate() &&
+    currentDate.getMonth() === now.getMonth() &&
+    currentDate.getFullYear() === now.getFullYear();
+  const currentHour = now.getHours();
 
   return (
     <Modal
@@ -405,11 +429,15 @@ export const OfflineBookingSheet = ({
                 style={styles.historyRow}
                 activeOpacity={0.7}
                 onPress={() => {
-                  onClose();
+                  if (onCheckHistory) {
+                    onCheckHistory();
+                  } else {
+                    onClose();
+                  }
                   navigation.navigate("GuestHistory", {
                     guestId: mobile,
                     bookingId: "",
-                    vertical: "sports", // <---- ADD THIS LINE
+                    vertical: "sports",
                   });
                 }}>
                 <FileText size={ms(20)} color={COLORS.text.primary} />
@@ -457,21 +485,45 @@ export const OfflineBookingSheet = ({
                 nestedScrollEnabled={true}>
                 {HOURS.map((hour, index) => {
                   const isBooked = bookedHours.includes(hour);
+
+                  // FIX: Treat 12 AM as the end of the day (24:00) so it isn't incorrectly marked as past
+                  const hour24 =
+                    hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
+                  const isPast = isToday && hour24 <= currentHour;
+
                   let isDisabled = false;
                   let reasonText = "";
 
                   if (showHourPicker === "from") {
-                    isDisabled = isBooked;
-                    if (isBooked) reasonText = "(Booked)";
-                  } else {
-                    const fromIndex = HOURS.indexOf(fromTime);
-                    if (index <= fromIndex) isDisabled = true;
-                    const hasBookingInBetween = HOURS.slice(fromIndex, index).some(h =>
-                      bookedHours.includes(h),
-                    );
-                    if (hasBookingInBetween) {
+                    if (isBooked) {
+                      isDisabled = true;
+                      reasonText = "(Booked)";
+                    } else if (isPast) {
                       isDisabled = true;
                       reasonText = "(Unavailable)";
+                    }
+                  } else {
+                    const fromIndex = HOURS.indexOf(fromTime);
+                    if (index <= fromIndex) {
+                      isDisabled = true;
+                    } else {
+                      // For "to" time, we check if any slot strictly between the start time
+                      // and this end time is booked.
+                      // A slot starting at `hour` is fine to be an end time for an earlier slot.
+                      // We check from `fromIndex` up to `index - 1`.
+                      const intermediateHours = HOURS.slice(fromIndex, index);
+                      const hasBookingInBetween = intermediateHours.some(h =>
+                        bookedHours.includes(h),
+                      );
+
+                      if (hasBookingInBetween) {
+                        isDisabled = true;
+                        reasonText = "(Unavailable)";
+                      } else if (isPast && !isBooked) {
+                        // Standard past time check
+                        isDisabled = true;
+                        reasonText = "(Unavailable)";
+                      }
                     }
                   }
 
@@ -498,8 +550,23 @@ export const OfflineBookingSheet = ({
                       <Text
                         variant="body1"
                         weight="bold"
-                        color={isDisabled ? COLORS.text.secondary : COLORS.text.primary}>
-                        {hour} {reasonText}
+                        color={
+                          isDisabled && reasonText !== "(Booked)"
+                            ? COLORS.text.secondary
+                            : COLORS.text.primary
+                        }>
+                        {hour}
+                        {reasonText ? (
+                          <Text
+                            variant="body1"
+                            weight="bold"
+                            color={
+                              reasonText === "(Booked)" ? COLORS.danger : COLORS.text.secondary
+                            }>
+                            {" "}
+                            {reasonText}
+                          </Text>
+                        ) : null}
                       </Text>
                     </TouchableOpacity>
                   );

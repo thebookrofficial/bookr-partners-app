@@ -25,6 +25,7 @@ interface BulkBookingItem {
   dateRange: string;
   timeRange: string;
   status: BookingStatus;
+  isMultiDay: boolean;
 }
 
 export const BulkBookingScreen = () => {
@@ -40,9 +41,7 @@ export const BulkBookingScreen = () => {
   const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
   const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId || "");
 
-  const { selectedCategories, setServiceCategory } = useServiceStore();
-  const selectedCategory = selectedCategories[venueId] || "Football";
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const { activeVenueName } = useServiceStore();
 
   // NEW: Fetch Grounds on mount
   useEffect(() => {
@@ -138,6 +137,9 @@ export const BulkBookingScreen = () => {
       const formattedData: BulkBookingItem[] = groupedBatches.map(batch => {
         const { base, ids, slots, totalPaid, totalCost } = batch;
 
+        const uniqueDates = new Set(slots.map((s: any) => s.slot_date));
+        const isMultiDay = uniqueDates.size > 1;
+
         const dates = slots.map((s: any) => new Date(s.slot_date).getTime());
         const minDate = new Date(Math.min(...dates));
         const maxDate = new Date(Math.max(...dates));
@@ -172,6 +174,7 @@ export const BulkBookingScreen = () => {
           dateRange: dateRangeStr,
           timeRange: timeRangeStr,
           status: statusValue,
+          isMultiDay,
         };
       });
 
@@ -194,11 +197,15 @@ export const BulkBookingScreen = () => {
       return <ActivityIndicator color={COLORS.primary} style={{ marginTop: vs(20) }} />;
     }
 
-    if (bookings.length === 0) {
+    const filteredBookings = bookings.filter(item =>
+      activeTab === "multiple" ? item.isMultiDay : !item.isMultiDay,
+    );
+
+    if (filteredBookings.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <Text variant="body2" color={COLORS.text.muted}>
-            No bulk bookings found for this ground.
+            No {activeTab === "multiple" ? "multiple" : "single"} day bookings found.
           </Text>
         </View>
       );
@@ -206,7 +213,7 @@ export const BulkBookingScreen = () => {
 
     return (
       <View style={styles.listContainer}>
-        {bookings.map(item => (
+        {filteredBookings.map(item => (
           <BookingCard
             key={item.ids[0]}
             name={item.name}
@@ -232,12 +239,7 @@ export const BulkBookingScreen = () => {
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-      <ServiceHeader
-        title="Elite Strikers Club"
-        subtitle="Bulk Booking 🚀"
-        category={selectedCategory}
-        onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
-      />
+      <ServiceHeader title={activeVenueName} subtitle="Bulk Booking 🚀" />
 
       {/* --- NEW GROUND SELECTOR --- */}
       {grounds.length > 0 && (
@@ -304,36 +306,6 @@ export const BulkBookingScreen = () => {
         }>
         <Plus size={ms(30)} color={COLORS.text.inverse} />
       </TouchableOpacity>
-
-      {/* --- FIXED OVERLAY DROPDOWN --- */}
-      {isCategoryOpen && (
-        <View style={styles.dropdownOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => setIsCategoryOpen(false)}
-          />
-          <View style={styles.dropdownMenu}>
-            {["Football", "Box Cricket", "Pickleball"].map(cat => (
-              <TouchableOpacity
-                key={cat}
-                style={styles.dropdownItem}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setServiceCategory(venueId, cat);
-                  setIsCategoryOpen(false);
-                }}>
-                <Text variant="body2" weight="semiBold">
-                  {cat}
-                </Text>
-                <View style={styles.radioOuter}>
-                  {selectedCategory === cat && <View style={styles.radioInner} />}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
     </ScreenContainer>
   );
 };
@@ -388,48 +360,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#63A1FD",
     justifyContent: "center",
     alignItems: "center",
-  },
-  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
-  dropdownMenu: {
-    position: "absolute",
-    top: vs(55),
-    right: hs(12),
-    backgroundColor: COLORS.background,
-    borderRadius: ms(10),
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    width: hs(180),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-    padding: hs(6),
-    gap: vs(6),
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(8),
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    borderRadius: ms(8),
-  },
-  radioOuter: {
-    width: ms(20),
-    height: ms(20),
-    borderRadius: ms(10),
-    borderWidth: 2,
-    borderColor: COLORS.text.primary,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  radioInner: {
-    width: ms(10),
-    height: ms(10),
-    borderRadius: ms(5),
-    backgroundColor: COLORS.text.primary,
   },
 });

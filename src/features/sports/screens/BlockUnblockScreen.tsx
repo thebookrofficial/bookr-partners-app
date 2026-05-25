@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -24,6 +24,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 // Sub-components & Hooks
 import { ClosedDatesAlert } from "../components/block-unblock/ClosedDatesAlert";
 import { useBlockUnblock, BlockedEntry } from "../hooks/useBlockUnblock";
+import { SportsService } from "../services/sports.service";
 
 const HOURS = [
   "6 AM",
@@ -73,14 +74,32 @@ export const BlockUnblockScreen = () => {
   const route = useRoute<RouteProp<SportsTabParamList, "BlockUnblock">>();
   const { venueId, groundId } = route.params || { venueId: "", groundId: "" };
 
-  const { selectedCategories, setServiceCategory } = useServiceStore();
-  const selectedCategory = selectedCategories[venueId] || "Football";
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
+  const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId || "");
 
   const { activeBlocks, pastBlocks, loading, blockSlots, unblockSlots } = useBlockUnblock(
     venueId,
-    groundId,
+    selectedGroundId,
   );
+
+  const selectedGroundName = grounds.find(g => g.id === selectedGroundId)?.name || "";
+
+  useEffect(() => {
+    const fetchGrounds = async () => {
+      try {
+        const data = await SportsService.getGrounds(venueId);
+        if (data && data.length > 0) {
+          setGrounds(data);
+          if (!selectedGroundId) {
+            setSelectedGroundId(data[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching grounds:", err);
+      }
+    };
+    fetchGrounds();
+  }, [venueId, selectedGroundId]);
 
   const [isSelectingRange, setIsSelectingRange] = useState(false);
   const [slotType, setSlotType] = useState<"Custom" | "All">("All");
@@ -164,12 +183,31 @@ export const BlockUnblockScreen = () => {
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <ServiceHeader
-          title={activeVenueName}
-          subtitle="Block / Unblock"
-          category={selectedCategory}
-          onCategoryPress={() => setIsCategoryOpen(!isCategoryOpen)}
-        />
+        <ServiceHeader title={activeVenueName} subtitle="Block / Unblock" />
+
+        {/* Ground Selector */}
+        {grounds.length > 0 && (
+          <View style={styles.groundScrollWrapper}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.groundScroll}>
+              {grounds.map(g => (
+                <TouchableOpacity
+                  key={g.id}
+                  style={[styles.groundPill, selectedGroundId === g.id && styles.groundPillActive]}
+                  onPress={() => setSelectedGroundId(g.id)}>
+                  <Text
+                    variant="body2"
+                    weight="semiBold"
+                    color={selectedGroundId === g.id ? COLORS.text.inverse : COLORS.text.primary}>
+                    {g.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* 1. CLOSED DATES (Active Blocks) */}
         <View style={styles.section}>
@@ -210,6 +248,17 @@ export const BlockUnblockScreen = () => {
           <Text variant="body1" weight="bold" style={styles.sectionTitle}>
             SET CLOSE DATE
           </Text>
+
+          <View style={styles.fieldGroup}>
+            <Text variant="body2" weight="medium" style={styles.label}>
+              Ground
+            </Text>
+            <View style={styles.inputBox}>
+              <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
+                {selectedGroundName}
+              </Text>
+            </View>
+          </View>
 
           <View style={styles.fieldGroup}>
             <Text variant="body2" weight="medium" style={styles.label}>
@@ -435,36 +484,6 @@ export const BlockUnblockScreen = () => {
           </View>
         </View>
       </Modal>
-
-      {/* --- FIXED OVERLAY DROPDOWN --- */}
-      {isCategoryOpen && (
-        <View style={styles.dropdownOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => setIsCategoryOpen(false)}
-          />
-          <View style={styles.dropdownMenu}>
-            {["Football", "Box Cricket", "Pickleball"].map(cat => (
-              <TouchableOpacity
-                key={cat}
-                style={styles.dropdownItem}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setServiceCategory(venueId, cat);
-                  setIsCategoryOpen(false);
-                }}>
-                <Text variant="body2" weight="semiBold">
-                  {cat}
-                </Text>
-                <View style={styles.radioOuter}>
-                  {selectedCategory === cat && <View style={styles.radioInner} />}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
     </ScreenContainer>
   );
 };
@@ -478,6 +497,26 @@ const styles = StyleSheet.create({
   },
   alertSpacing: {
     marginBottom: vs(10),
+  },
+  groundScrollWrapper: {
+    marginBottom: vs(20),
+  },
+  groundScroll: {
+    alignItems: "center",
+    paddingRight: hs(20),
+  },
+  groundPill: {
+    paddingHorizontal: hs(16),
+    paddingVertical: vs(8),
+    borderRadius: ms(20),
+    backgroundColor: COLORS.surface.primary,
+    marginRight: hs(10),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+  },
+  groundPillActive: {
+    backgroundColor: "#000000",
+    borderColor: "#000000",
   },
   scrollContent: { paddingTop: vs(10), paddingBottom: vs(40) },
   section: { marginBottom: vs(24) },
@@ -555,50 +594,5 @@ const styles = StyleSheet.create({
   },
   hourItemDisabled: {
     opacity: 0.5,
-  },
-
-  /* --- FIXED OVERLAY DROPDOWN STYLES --- */
-  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
-  dropdownMenu: {
-    position: "absolute",
-    top: vs(55),
-    right: hs(12),
-    backgroundColor: COLORS.background,
-    borderRadius: ms(10),
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    width: hs(180),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-    padding: hs(6),
-    gap: vs(6),
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(8),
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    borderRadius: ms(8),
-  },
-  radioOuter: {
-    width: ms(20),
-    height: ms(20),
-    borderRadius: ms(10),
-    borderWidth: 2,
-    borderColor: COLORS.text.primary,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  radioInner: {
-    width: ms(10),
-    height: ms(10),
-    borderRadius: ms(5),
-    backgroundColor: COLORS.text.primary,
   },
 });

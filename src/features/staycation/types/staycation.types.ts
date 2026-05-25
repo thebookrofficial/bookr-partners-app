@@ -2,7 +2,8 @@
 // Confidential and Proprietary.
 
 export interface StaycationBooking {
-  id: string;
+  id: string; // The UI unique ID (e.g., "uuid-unit-1")
+  dbId?: string; // The real database UUID for fetching/cancelling
   name: string;
   phone: string;
   avatarUrl?: string;
@@ -26,6 +27,9 @@ export interface StaycationVenue {
   property_type: string;
   booking_type: "full_property" | "per_room";
   tabLabel?: string;
+  base_price_per_night?: number;
+  extra_guest_charge?: number;
+  max_occupancy?: number;
 }
 
 export interface StaycationRoom {

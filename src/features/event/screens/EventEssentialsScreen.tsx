@@ -54,6 +54,11 @@ export const EventEssentialsScreen = () => {
             label="Guest Invite"
             onPress={() => navigation.navigate("EventGuestInvite", { serviceId })}
           />
+          <EventActionRow
+            icon={<Calendar size={ms(20)} color={COLORS.primary} />}
+            label="Export Bookings"
+            onPress={() => navigation.navigate("EventExportBookings", { serviceId })}
+          />
           {/* <EventActionRow
             icon={<RotateCcw size={ms(20)} color={COLORS.primary} />}
             label="Update Venue Info"

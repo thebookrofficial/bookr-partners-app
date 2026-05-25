@@ -13,7 +13,6 @@ import {
   Linking,
   Modal,
   Pressable,
-  Share,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -133,6 +132,14 @@ export const BookingDetailsScreen = () => {
 
   const totalAmount = Number(booking.total_amount) || 0;
   const currentPaid = Number(booking.paid_amount) || 0;
+  const totalDiscount = Number(booking.discount_amount) || 0;
+
+  // The vendor wants to see the "Gross" amount (Value before discount)
+  const displayTotalAmount = totalAmount + totalDiscount;
+  // The vendor wants to see the "Credit" (Cash + Discount) as the total amount paid
+  const displayAmountPaid = currentPaid + totalDiscount;
+
+  // Remaining Amount is what is still due at the venue
   const remainingAmount = Math.max(0, totalAmount - currentPaid);
 
   const formatHour = (timeStr: string) => {
@@ -194,42 +201,50 @@ export const BookingDetailsScreen = () => {
     });
   };
 
-  const handleShareWhatsApp = async () => {
+  const handleShareWhatsApp = () => {
+    if (guestPhone === "N/A") {
+      Alert.alert("Error", "No phone number available to share WhatsApp message.");
+      return;
+    }
+
+    let cleanNumber = guestPhone.replace(/\D/g, "");
+    // Default to Indian country code if missing
+    if (cleanNumber.length === 10) {
+      cleanNumber = `91${cleanNumber}`;
+    }
+
     const venueName = booking.venues?.name || "the venue";
     const bookingDate = new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB");
     const bookingTime = `${formatHour(booking.sports_slots.start_time)} to ${formatHour(
       booking.sports_slots.end_time,
     )}`;
 
-    const message =
+    const message = encodeURIComponent(
       `Booking Confirmed! 🎉\n` +
-      `Hi ${guestName},\n` +
-      `Your booking at ${venueName} has been successfully reserved.\n\n` +
-      `Date: ${bookingDate}\n` +
-      `Time: ${bookingTime}\n\n` +
-      `Payment Summary:\n` +
-      `Total: ₹${totalAmount}\n` +
-      `Paid: ₹${currentPaid}\n` +
-      `Due at Venue: ₹${remainingAmount}\n\n` +
-      `Thank you for booking.`;
+        `Hi ${guestName},\n` +
+        `Your booking at ${venueName} has been successfully reserved.\n\n` +
+        `Date: ${bookingDate}\n` +
+        `Time: ${bookingTime}\n\n` +
+        `Payment Summary:\n` +
+        `Total: ₹${displayTotalAmount}\n` +
+        `Paid: ₹${displayAmountPaid}\n` +
+        `Due at Venue: ₹${remainingAmount}\n\n` +
+        `Thank you for booking.`,
+    );
 
-    try {
-      const result = await Share.share({
-        message: message,
-        title: "Booking Confirmation",
-      });
+    const url = `whatsapp://send?phone=${cleanNumber}&text=${message}`;
 
-      if (result.action === Share.sharedAction) {
-        if (result.activityType) {
-          // shared
+    Linking.canOpenURL(url)
+      .then(supported => {
+        if (supported) {
+          return Linking.openURL(url);
+        } else {
+          // Fallback to web link if app isn't installed
+          const webUrl = `https://wa.me/${cleanNumber}?text=${message}`;
+          return Linking.openURL(webUrl);
         }
-      } else if (result.action === Share.dismissedAction) {
-        // dismissed
-      }
-    } catch (error: any) {
-      Alert.alert("Error", "Unable to open share sheet.");
-      console.error("Native Share Error:", error.message);
-    }
+      })
+      .catch(err => console.error("An error occurred", err));
   };
 
   return (
@@ -255,7 +270,6 @@ export const BookingDetailsScreen = () => {
           {booking.venues?.name}
         </Text>
       </View>
-
       <View style={styles.fieldGroup}>
         <View style={styles.labelRow}>
           <Phone size={ms(16)} color={COLORS.primary} fill={COLORS.primary} />
@@ -277,7 +291,6 @@ export const BookingDetailsScreen = () => {
           </View>
         </View>
       </View>
-
       <View style={styles.fieldGroup}>
         <View style={styles.labelRow}>
           <Calendar size={ms(16)} color={COLORS.primary} />
@@ -291,7 +304,6 @@ export const BookingDetailsScreen = () => {
           </Text>
         </View>
       </View>
-
       <View style={styles.fieldGroup}>
         <View style={styles.labelRow}>
           <Clock size={ms(16)} color={COLORS.primary} />
@@ -338,7 +350,6 @@ export const BookingDetailsScreen = () => {
           </View>
         </View>
       </View>
-
       {isAddingOn && (
         <View style={styles.addOnContainer}>
           <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
@@ -383,18 +394,21 @@ export const BookingDetailsScreen = () => {
           </TouchableOpacity>
         </View>
       )}
-
+      <View style={styles.inputBox}>
+        <Text variant="body2" weight="semiBold" style={styles.inputText}>
+          {booking.combined_time}
+        </Text>
+      </View>
       <View style={styles.fieldGroup}>
         <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
           Total Payment
         </Text>
         <View style={styles.inputBox}>
           <Text variant="body2" weight="semiBold" style={styles.inputText}>
-            ₹ {totalAmount}
+            ₹ {displayTotalAmount}
           </Text>
         </View>
       </View>
-
       <View style={styles.fieldGroup}>
         <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
           Remaining Amount
@@ -408,14 +422,13 @@ export const BookingDetailsScreen = () => {
           </Text>
         </View>
       </View>
-
       <View style={styles.fieldGroup}>
         <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
           Amount Paid
         </Text>
         <View style={styles.inputBoxRow}>
           <Text variant="body2" weight="semiBold" color="#00B562" style={styles.inputText}>
-            ₹ {currentPaid}
+            ₹ {displayAmountPaid}
           </Text>
 
           {remainingAmount > 0 && (
@@ -438,7 +451,6 @@ export const BookingDetailsScreen = () => {
           )}
         </View>
       </View>
-
       {isAddingPayment && (
         <View style={styles.splitBox}>
           <Text variant="body2" weight="medium" style={styles.splitLabel}>
@@ -470,7 +482,6 @@ export const BookingDetailsScreen = () => {
           </View>
         </View>
       )}
-
       {showPaymentHistory && paymentLogs.length > 0 && (
         <View style={styles.ledgerContainer}>
           <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
@@ -496,7 +507,6 @@ export const BookingDetailsScreen = () => {
           ))}
         </View>
       )}
-
       {isAddingPayment && (
         <TouchableOpacity
           style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
@@ -516,7 +526,6 @@ export const BookingDetailsScreen = () => {
           )}
         </TouchableOpacity>
       )}
-
       <TouchableOpacity
         style={styles.actionCard}
         activeOpacity={0.7}
@@ -527,7 +536,6 @@ export const BookingDetailsScreen = () => {
         </Text>
         <ChevronRight size={ms(20)} color={COLORS.text.primary} />
       </TouchableOpacity>
-
       <TouchableOpacity
         style={styles.actionCard}
         activeOpacity={0.7}
@@ -544,7 +552,6 @@ export const BookingDetailsScreen = () => {
         </Text>
         <ChevronRight size={ms(20)} color={COLORS.text.primary} />
       </TouchableOpacity>
-
       <TouchableOpacity
         style={styles.shareWhatsappBtn}
         activeOpacity={0.8}
@@ -563,7 +570,6 @@ export const BookingDetailsScreen = () => {
         </Text>
         <Send size={ms(20)} color={COLORS.text.inverse} />
       </TouchableOpacity>
-
       {booking.booking_status !== "cancelled" && (
         <TouchableOpacity
           style={styles.actionCard}
@@ -575,7 +581,6 @@ export const BookingDetailsScreen = () => {
           <Trash2 size={ms(20)} color={COLORS.text.primary} />
         </TouchableOpacity>
       )}
-
       <Modal visible={showCancelModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCancelModal(false)} />
@@ -603,7 +608,7 @@ export const BookingDetailsScreen = () => {
                 style={styles.modalBackBtn}
                 onPress={() => setShowCancelModal(false)}>
                 <Text variant="h3" family="nichrome" style={styles.modalBackText}>
-                  no go back
+                  Back
                 </Text>
               </TouchableOpacity>
 
@@ -626,7 +631,6 @@ export const BookingDetailsScreen = () => {
           </View>
         </View>
       </Modal>
-
       <View style={{ height: vs(40) }} />
     </ScreenContainer>
   );

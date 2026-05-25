@@ -41,7 +41,10 @@ export const useStaycationVenues = (options: UseStaycationVenuesOptions = {}) =>
             staycation_venues!inner (
               id,
               property_type,
-              booking_type
+              booking_type,
+              base_price_per_night,
+              extra_guest_charge,
+              max_guests
             )
           `,
           )
@@ -74,15 +77,23 @@ export const useStaycationVenues = (options: UseStaycationVenuesOptions = {}) =>
             property_type: pType,
             booking_type: bType,
             tabLabel: label,
+            base_price_per_night: sv?.base_price_per_night,
+            extra_guest_charge: sv?.extra_guest_charge,
+            max_occupancy: sv?.max_occupancy,
           };
         });
 
-        const labelCounts: Record<string, number> = {};
-        const uniqueVenues = allVenues.map(v => {
-          const base = v.tabLabel || "Venue";
-          labelCounts[base] = (labelCounts[base] || 0) + 1;
-          return labelCounts[base] > 1 ? { ...v, tabLabel: `${base} ${labelCounts[base]}` } : v;
+        // Deduplicate venues by venueId safely
+        const uniqueVenuesMap = new Map<string, StaycationVenue>();
+        allVenues.forEach(v => {
+          const safeVenueKey = (v.venueId || v.id) as string;
+          if (safeVenueKey && !uniqueVenuesMap.has(safeVenueKey)) {
+            uniqueVenuesMap.set(safeVenueKey, v);
+          }
         });
+
+        // FIXED: Removed the labelCounts logic that was adding "Rooms 2", "Rooms 3"
+        const uniqueVenues = Array.from(uniqueVenuesMap.values());
 
         setVenues(uniqueVenues);
 

@@ -12,6 +12,7 @@ export interface BookingDetailData {
   venue_id: string;
   total_amount: number;
   paid_amount: number;
+  discount_amount: number;
   booking_status: string;
   guest_name: string | null;
   guest_phone: string | null;
@@ -25,6 +26,7 @@ export interface BookingDetailData {
     ground_id: string;
   };
   venues: { name: string; vertical: string };
+  combined_time?: string;
 }
 
 export interface PaymentLog {
@@ -36,6 +38,15 @@ export interface PaymentLog {
   isInitial?: boolean; // Flag to identify our synthetic log
 }
 
+const formatHour = (timeStr: string) => {
+  if (!timeStr) return "";
+  const [h] = timeStr.split(":");
+  const hourInt = parseInt(h, 10);
+  const ampm = hourInt >= 12 ? "PM" : "AM";
+  const displayHour = hourInt % 12 || 12;
+  return `${displayHour} ${ampm}`;
+};
+
 export const useBookingDetails = (bookingId: string) => {
   const [booking, setBooking] = useState<BookingDetailData | null>(null);
   const [paymentLogs, setPaymentLogs] = useState<PaymentLog[]>([]);
@@ -45,53 +56,60 @@ export const useBookingDetails = (bookingId: string) => {
   const fetchDetails = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Fetch Booking Details
-      const { data: rawData, error: bookingError } = await supabase
+      // 1. Fetch the original booking first
+      const { data: baseBooking, error: baseError } = await supabase
         .from("sports_bookings")
-        .select(
-          `
-          id, user_id, venue_id, total_amount, paid_amount, booking_status, guest_name, guest_phone, slot_id, created_at,
-          profiles ( full_name, phone, avatar_url ),
-          sports_slots ( start_time, end_time, slot_date, ground_id ),
-          venues ( name, vertical )
-        `,
-        )
+        .select("*, sports_slots!inner(*), profiles(*), venues(*)")
         .eq("id", bookingId)
         .single();
 
-      if (bookingError) throw bookingError;
+      if (baseError) throw baseError;
 
-      let bookingData = rawData as any;
+      // 2. Fetch ALL related bookings for this user/slot/date (including extensions)
+      // We filter by phone/user and date to catch the "Add On" records
+      let linkedQuery = supabase
+        .from("sports_bookings")
+        .select("*, sports_slots!inner(*)")
+        .eq("sports_slots.slot_date", baseBooking.sports_slots.slot_date)
+        .eq("sports_slots.ground_id", baseBooking.sports_slots.ground_id)
+        .order("created_at", { ascending: true });
 
-      // SECURE FALLBACK
-      const profileData = Array.isArray(bookingData.profiles)
-        ? bookingData.profiles[0]
-        : bookingData.profiles;
-
-      if (!profileData && bookingData.user_id) {
-        try {
-          const rpcBookings = await SportsService.getBookings(
-            bookingData.venue_id,
-            bookingData.sports_slots.ground_id,
-            bookingData.sports_slots.slot_date,
-          );
-
-          const matched = rpcBookings.find((b: any) => b.id === bookingId);
-          if (matched && matched.full_name) {
-            bookingData.profiles = {
-              full_name: matched.full_name,
-              phone: matched.phone || "",
-              avatar_url: matched.avatar_url || "",
-            };
-          }
-        } catch (rpcErr) {
-          console.warn("Secure fallback lookup failed:", rpcErr);
-        }
+      if (baseBooking.user_id) {
+        linkedQuery = linkedQuery.eq("user_id", baseBooking.user_id);
+      } else {
+        linkedQuery = linkedQuery.eq("guest_phone", baseBooking.guest_phone);
       }
 
-      setBooking(bookingData);
+      const { data: linkedData, error: linkedError } = await linkedQuery;
 
-      // 2. Fetch Payment Logs Ledger
+      if (linkedError) throw linkedError;
+
+      // Ensure we have at least the current booking in the list
+      const allLinkedBookings = linkedData && linkedData.length > 0 ? linkedData : [baseBooking];
+
+      // 3. Aggregate data
+      const totalAmount = allLinkedBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
+      const paidAmount = allLinkedBookings.reduce((sum, b) => sum + Number(b.paid_amount), 0);
+      const discountAmount = allLinkedBookings.reduce(
+        (sum, b) => sum + Number(b.discount_amount || 0),
+        0,
+      );
+
+      // Combine the booking details
+      const aggregatedBooking = {
+        ...baseBooking,
+        total_amount: totalAmount,
+        paid_amount: paidAmount,
+        discount_amount: discountAmount,
+        // Create a combined time string (e.g., 9 AM - 11 AM)
+        combined_time: `${formatHour(baseBooking.sports_slots.start_time)} - ${formatHour(
+          allLinkedBookings[allLinkedBookings.length - 1].sports_slots.end_time,
+        )}`,
+      };
+
+      setBooking(aggregatedBooking);
+
+      // 4. Fetch Payment Logs Ledger
       const { data: logsData, error: logsError } = await supabase
         .from("offline_payment_logs")
         .select("id, amount, payment_mode, note, created_at")
@@ -105,21 +123,21 @@ export const useBookingDetails = (bookingId: string) => {
         console.warn("Could not fetch payment logs:", logsError);
       }
 
-      // 3. Reconstruct Initial Advance Payment
+      // 5. Reconstruct Initial Advance Payment
       const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
-      const totalPaidAmount = Number(bookingData.paid_amount) || 0;
+      const totalPaidAmount = Number(baseBooking.paid_amount) || 0;
 
       // If the total paid on the booking is greater than what's in the logs,
       // the difference is the initial advance payment.
       if (totalPaidAmount > totalLoggedAmount) {
         const initialAmount = totalPaidAmount - totalLoggedAmount;
         const initialLog: PaymentLog = {
-          id: `initial-${bookingData.id}`,
+          id: `initial-${baseBooking.id}`,
           amount: initialAmount,
           // Assume Online/UPI if user_id exists (app booking), otherwise Cash for manual
-          payment_mode: bookingData.user_id ? "online" : "cash",
+          payment_mode: baseBooking.user_id ? "online" : "cash",
           note: "Initial Advance Payment",
-          created_at: bookingData.created_at,
+          created_at: baseBooking.created_at,
           isInitial: true,
         };
 
@@ -182,9 +200,9 @@ export const useBookingDetails = (bookingId: string) => {
       const { error: bookingError } = await supabase
         .from("sports_bookings")
         .update({ booking_status: "cancelled" })
-        .eq("id", bookingId)
-        .select()
-        .single();
+        .eq("id", bookingId);
+      // .select()
+      // .single();
 
       if (bookingError) {
         console.error("Booking Error:", bookingError);
@@ -194,9 +212,9 @@ export const useBookingDetails = (bookingId: string) => {
       const { error: slotError } = await supabase
         .from("sports_slots")
         .update({ status: "available" })
-        .eq("id", booking.slot_id)
-        .select()
-        .maybeSingle();
+        .eq("id", booking.slot_id);
+      // .select()
+      // .maybeSingle();
 
       if (slotError) console.warn("Slot update issue:", slotError);
 

@@ -11,7 +11,7 @@ import {
   RefreshControl,
   Alert,
 } from "react-native";
-import { Text, PillTabs } from "@/components/ui";
+import { Text } from "@/components/ui";
 import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
@@ -35,21 +35,25 @@ type ListEntry =
 export const StaycationResortContent = ({ initialVenueId }: StaycationResortContentProps) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const activeRoomType = "All";
 
-  // PASS SELECTED DATE TO HOOK
+  // CRITICAL FIX: Passed activeRoomType to the hook so occupancy updates dynamically!
   const {
     isLoading,
+    closedDates,
     groupedBookings,
     refetch,
     venues,
     activeVenue,
-    setActiveVenueId,
-    rooms,
     roomsFilled,
     cancelBooking,
-  } = useStaycationResort(initialVenueId, selectedDate);
+  } = useStaycationResort(initialVenueId, selectedDate, activeRoomType);
 
-  const [activeRoomType, setActiveRoomType] = useState<string>("All");
+  const isDateClosed = useMemo(() => {
+    const dStr = selectedDate.toISOString().split("T")[0];
+    return closedDates.has(dStr);
+  }, [selectedDate, closedDates]);
+
   const [activeRoomStatus, setActiveRoomStatus] = useState<"Check Outs" | "Bookings">("Check Outs");
   const [isOfflineSheetVisible, setIsOfflineSheetVisible] = useState(false);
 
@@ -71,19 +75,6 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
     ]);
   };
 
-  const roomTypeOptions = useMemo(() => {
-    const types = new Set<string>(["All"]);
-    rooms.forEach(r => {
-      const nameParts = r.room_name.split(" ");
-      if (nameParts.length > 1) {
-        types.add(nameParts[0]);
-      } else {
-        types.add(r.room_name);
-      }
-    });
-    return Array.from(types);
-  }, [rooms]);
-
   const flatListData = useMemo(() => {
     const data: ListEntry[] = [];
 
@@ -94,9 +85,6 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
         filteredBookings = filteredBookings.filter(b => b.roomName?.includes(activeRoomType));
       }
 
-      // Determine which sections to show based on the active tab (Today vs Upcoming)
-      // "Check Outs" status represents the "Today" tab
-      // "Bookings" status represents the "Upcoming" tab
       const isTargetSection =
         section.title.includes("Today") || section.title.includes("Bookings for");
       const isCheckOutSection = section.title.toLowerCase().includes("check out");
@@ -104,10 +92,8 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
       let shouldShow = false;
       if (activeRoomStatus === "Check Outs") {
-        // Today tab: Show Check-outs and Today's Bookings (Check-ins)
         shouldShow = isCheckOutSection || isTargetSection;
       } else {
-        // Upcoming tab: Show only Upcoming Bookings
         shouldShow = isUpcomingSection;
       }
 
@@ -124,7 +110,6 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
   const renderItem = ({ item }: { item: ListEntry }) => {
     if (item.type === "header") {
-      // Map backend titles to Figma design titles
       let displayTitle = item.title;
       if (item.title.toLowerCase().includes("check out")) {
         displayTitle = "Check-Out";
@@ -147,18 +132,19 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
     return (
       <StaycationBookingCard
-        bookingId={item.data.id}
+        // CRITICAL FIX: Pass the real dbId if available, fallback to id
+        bookingId={item.data.dbId || item.data.id}
         isFarmhouse={false}
         isUpcoming={isUpcoming}
-        onCancelPress={handleCancel}
+        onCancelPress={() => handleCancel(item.data.dbId || item.data.id)}
         {...item.data}
         checkIn={isCheckOutSection ? item.data.checkOut : item.data.checkIn}
+        roomName={item.data.roomName}
       />
     );
   };
 
   const listHeader = useMemo(() => {
-    // Determine label for the date picker
     const isToday = new Date().toDateString() === selectedDate.toDateString();
     const dateLabel = isToday ? "(Today)" : "";
 
@@ -172,62 +158,7 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
           }
         />
 
-        <View style={styles.bookingsTabsRow}>
-          <Text weight="bold" style={styles.bookingsHeaderText}>
-            Bookings
-          </Text>
-          <PillTabs
-            variant="dark"
-            tabs={venues.map(v => v.tabLabel || v.name)}
-            activeTab={activeVenue?.tabLabel || ""}
-            onTabChange={label => {
-              const selected = venues.find(v => v.tabLabel === label);
-              if (selected) setActiveVenueId(selected.id);
-            }}
-            style={styles.typeTabs}
-          />
-        </View>
-
         <View style={styles.roomsFiltersContainer}>
-          <View style={styles.typesToggleContainer}>
-            <Text weight="bold" style={styles.typesToggleLabel}>
-              Types
-            </Text>
-            <View style={styles.typesSegmentedControl}>
-              {roomTypeOptions.map(type => {
-                const isActive = activeRoomType === type;
-                const label = type === "All" ? "All" : `${type} Rooms`;
-                const textLines = label.split(" ");
-                return (
-                  <TouchableOpacity
-                    key={type}
-                    activeOpacity={0.8}
-                    onPress={() => setActiveRoomType(type)}
-                    style={[
-                      styles.typeSegment,
-                      isActive ? styles.typeSegmentActive : styles.typeSegmentInactive,
-                    ]}>
-                    <View style={styles.typeTextWrapper}>
-                      {textLines.map((line, idx) => (
-                        <Text
-                          key={idx}
-                          weight="semiBold"
-                          style={[
-                            styles.typeSegmentText,
-                            isActive
-                              ? styles.typeSegmentTextActive
-                              : styles.typeSegmentTextInactive,
-                          ]}>
-                          {line}
-                        </Text>
-                      ))}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
           <View style={styles.statusDateRow}>
             <View style={styles.statusPills}>
               {(["Check Outs", "Bookings"] as const).map(status => {
@@ -281,6 +212,14 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
           </View>
         </View>
 
+        {isDateClosed && (
+          <View style={styles.closedDateContainer}>
+            <Text weight="bold" style={styles.closedDateText}>
+              This date is closed
+            </Text>
+          </View>
+        )}
+
         {showDatePicker && (
           <DateTimePicker
             value={selectedDate}
@@ -291,17 +230,7 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
         )}
       </View>
     );
-  }, [
-    venues,
-    activeVenue,
-    activeRoomType,
-    activeRoomStatus,
-    roomTypeOptions,
-    roomsFilled,
-    selectedDate,
-    showDatePicker,
-    setActiveVenueId,
-  ]);
+  }, [activeVenue, activeRoomStatus, roomsFilled, selectedDate, showDatePicker, isDateClosed]);
 
   return (
     <View style={styles.root}>
@@ -349,42 +278,11 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
   );
 };
 
-// ... keep your existing styles ...
+// ... keep your existing styles below ...
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   headerContainer: { paddingTop: vs(10) },
-  bookingsTabsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: vs(15),
-    gap: hs(10),
-    minHeight: vs(40),
-  },
-  bookingsHeaderText: { fontSize: fs(16), color: COLORS.text.primary, marginRight: hs(10) },
-  typeTabs: { flex: 1, marginVertical: 0 },
   roomsFiltersContainer: { gap: vs(12), marginBottom: vs(10) },
-  typesToggleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: vs(4),
-  },
-  typesToggleLabel: { fontSize: fs(16), color: COLORS.text.primary },
-  typesSegmentedControl: { flexDirection: "row", gap: hs(6) },
-  typeSegment: {
-    borderRadius: ms(10),
-    paddingHorizontal: hs(14),
-    paddingVertical: vs(8),
-    justifyContent: "center",
-    alignItems: "center",
-    minWidth: hs(50),
-  },
-  typeSegmentActive: { backgroundColor: "#282828" },
-  typeSegmentInactive: { backgroundColor: "#F4F7FC" },
-  typeTextWrapper: { alignItems: "center", justifyContent: "center" },
-  typeSegmentText: { fontSize: fs(12) },
-  typeSegmentTextActive: { color: "white" },
-  typeSegmentTextInactive: { color: "#8C8C8C" },
   statusDateRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -416,6 +314,21 @@ const styles = StyleSheet.create({
   },
   roomsFilledLabel: { fontSize: fs(14), color: COLORS.text.primary },
   roomsFilledValue: { fontSize: fs(14), color: COLORS.text.primary },
+  closedDateContainer: {
+    backgroundColor: "#FEF2F2",
+    paddingVertical: vs(10),
+    paddingHorizontal: hs(12),
+    borderRadius: ms(8),
+    marginBottom: vs(12),
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+    marginTop: vs(4),
+  },
+  closedDateText: {
+    fontSize: fs(14),
+    color: COLORS.danger,
+    textAlign: "center",
+  },
   sectionHeader: { marginTop: vs(10), marginBottom: vs(5) },
   headerRow: {
     flexDirection: "row",
@@ -436,7 +349,7 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: hs(16),
-    bottom: vs(65),
+    bottom: vs(110),
     width: ms(60),
     height: ms(60),
     borderRadius: ms(30),
@@ -444,5 +357,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
+    zIndex: 10,
   },
 });

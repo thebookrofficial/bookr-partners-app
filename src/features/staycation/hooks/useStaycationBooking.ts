@@ -25,6 +25,7 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
         .select(
           `
           id,
+          user_id,
           booking_type,
           booking_status,
           platform_fee,
@@ -50,8 +51,7 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
 
         // Consistent logic with Details screen: platform_fee > 0 means Online
         // OR booking_type is online
-        const isOnline =
-          bookingData.booking_type === "online" || (parseFloat(bookingData.platform_fee) || 0) > 0;
+        const isOnline = !!bookingData.user_id;
 
         // Determine Status logic for UI
         let statusTag: StaycationBooking["status"] = isOnline ? "Online" : "Offline";

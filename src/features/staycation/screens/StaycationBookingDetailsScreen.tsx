@@ -29,7 +29,7 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useStaycationBookingDetails } from "../hooks/useStaycationBookingDetails";
-import { supabase } from "@/lib/supabase"; // <-- Add this for inline fetch
+import { supabase } from "@/lib/supabase";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -60,7 +60,7 @@ export const StaycationBookingDetailsScreen = () => {
   const { booking: initialBooking, isFromHistory } = route.params || {};
 
   const { isLoading, isUpdating, bookingDetails, updatePayment, cancelBooking } =
-    useStaycationBookingDetails(initialBooking?.id);
+    useStaycationBookingDetails(initialBooking?.dbId || initialBooking?.id);
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
@@ -109,17 +109,29 @@ export const StaycationBookingDetailsScreen = () => {
     );
   }
 
-  const totalPayment =
-    parseFloat(bookingDetails?.total_amount) || parseFloat(initialBooking?.amount) || 0;
-  const amountPaid = parseFloat(bookingDetails?.paid_amount) || 0;
+  // 1. Calculate split units exactly like the previous screen
+  const units = bookingDetails?.unit_count || 1;
+
+  const totalPayment = bookingDetails?.total_amount
+    ? parseFloat(bookingDetails.total_amount) / units
+    : parseFloat(initialBooking?.amount) || 0;
+
+  const discountAmount = bookingDetails?.discount_amount
+    ? parseFloat(bookingDetails.discount_amount) / units
+    : parseFloat(initialBooking?.discountAmount) || 0;
+
+  const amountPaid = bookingDetails?.paid_amount
+    ? parseFloat(bookingDetails.paid_amount) / units + discountAmount
+    : (parseFloat(initialBooking?.paidAmount) || 0) + discountAmount;
+
   const remainingAmount = Math.max(0, totalPayment - amountPaid);
 
-  const isOnline =
-    bookingDetails?.booking_type === "online" ||
-    (parseFloat(bookingDetails?.platform_fee) || 0) > 0;
+  // 2. The CORRECT way to check if a booking is online
+  const isOnline = !!bookingDetails?.user_id;
   const isCancelled = bookingDetails?.booking_status === "cancelled";
   const bookingType = isOnline ? "Online" : "Manual";
 
+  // 3. Assemble the data, prioritizing the "unrolled" data passed from the card
   const bookingData = {
     name:
       bookingDetails?.guest_name ||
@@ -134,18 +146,26 @@ export const StaycationBookingDetailsScreen = () => {
     avatarUrl: bookingDetails?.profiles?.avatar_url || initialBooking?.avatarUrl,
     checkIn: formatDate(bookingDetails?.check_in_date || initialBooking?.checkIn),
     checkOut: formatDate(bookingDetails?.check_out_date || initialBooking?.checkOut),
-    guestCount: bookingDetails?.guest_count || initialBooking?.guestCount || 0,
+
+    // Use initialBooking.guestCount to preserve the remainder math we did on the previous screen!
+    guestCount:
+      initialBooking?.guestCount || Math.floor((bookingDetails?.guest_count || 0) / units),
+
+    // Preserve the serial room name (e.g., DEL-101) passed from the card
+    roomName: initialBooking?.roomName || "Room Assigned",
+
     bookingType: isCancelled ? "Cancelled" : bookingType,
-    totalPayment: totalPayment.toString(),
-    remainingAmount: remainingAmount.toString(),
-    amountPaid: amountPaid.toString(),
+    realBookingType: bookingDetails?.booking_type, // "full_property" or "per_room"
+    totalPayment: totalPayment.toFixed(2), // Keep it clean
+    remainingAmount: remainingAmount.toFixed(2),
+    amountPaid: amountPaid.toFixed(2),
   };
 
-  // Native Share Handler with Dynamic Data
+  // Direct WhatsApp Share Handler
   const handleWhatsAppShare = async () => {
     let venueName = "our venue";
 
-    // 1. Dynamically fetch the venue name from the database using the booking ID
+    // 1. Dynamically fetch the venue name
     if (bookingDetails?.id) {
       try {
         const { data } = await supabase
@@ -160,7 +180,7 @@ export const StaycationBookingDetailsScreen = () => {
       }
     }
 
-    // 2. Build the dynamic template string using the screen's data
+    // 2. Build the message
     const shareMessage = `Booking Confirmed! 🎉
 Hi ${bookingData.name},
 Your slot at ${venueName} is locked in via Bookr.
@@ -171,7 +191,31 @@ Paid: ₹${bookingData.amountPaid}
 Due at Venue: ₹${bookingData.remainingAmount}
 Thank you for booking with Bookr!`;
 
-    // 3. Trigger Native Share
+    // 3. Try to open WhatsApp directly if we have a valid phone number
+    if (bookingData.phone && bookingData.phone !== "N/A") {
+      // Remove all non-numeric characters
+      let cleanPhone = bookingData.phone.replace(/\D/g, "");
+
+      // If it's a standard 10 digit Indian number, append the 91 country code
+      if (cleanPhone.length === 10) {
+        cleanPhone = `91${cleanPhone}`;
+      }
+
+      const encodedMessage = encodeURIComponent(shareMessage);
+      const whatsappUrl = `whatsapp://send?phone=${cleanPhone}&text=${encodedMessage}`;
+
+      try {
+        const canOpen = await Linking.canOpenURL(whatsappUrl);
+        if (canOpen) {
+          await Linking.openURL(whatsappUrl);
+          return; // Stop here if WhatsApp successfully opened
+        }
+      } catch (err) {
+        console.warn("Could not check/open WhatsApp URL", err);
+      }
+    }
+
+    // 4. Fallback to standard share if WhatsApp isn't installed or number is invalid
     try {
       await Share.share({
         message: shareMessage,
@@ -219,16 +263,16 @@ Thank you for booking with Bookr!`;
           <InfoBlock label="Check Out" value={bookingData.checkOut} icon={Clock} />
         </View>
 
-        {/* Guest / Booking Type Section */}
+        {/* Booking Type / Guest Section */}
         <View style={styles.row}>
-          <InfoBlock label="No Of Guest" value={bookingData.guestCount} icon={User} />
-          <View style={{ width: hs(20) }} />
           <InfoBlock
             label="Booking Type"
             value={bookingData.bookingType}
             icon={ClipboardList}
             valueColor={isCancelled ? COLORS.text.muted : "#63a1fd"}
           />
+          <View style={{ width: hs(20) }} />
+          <InfoBlock label="No Of Guest" value={bookingData.guestCount} icon={User} />
         </View>
 
         {/* Payment Card */}
@@ -256,18 +300,19 @@ Thank you for booking with Bookr!`;
                 ₹ {bookingData.amountPaid}
               </Text>
 
-              {remainingAmount > 0 && !isCancelled && (
-                <TouchableOpacity
-                  style={styles.addBtnRow}
-                  onPress={() => setIsAddingPayment(!isAddingPayment)}>
-                  <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
-                  {isAddingPayment ? (
-                    <Minus size={ms(20)} color="#e55959" />
-                  ) : (
-                    <Plus size={ms(20)} color="#00b562" />
-                  )}
-                </TouchableOpacity>
-              )}
+              {(remainingAmount > 0 || bookingData.realBookingType === "full_property") &&
+                !isCancelled && (
+                  <TouchableOpacity
+                    style={styles.addBtnRow}
+                    onPress={() => setIsAddingPayment(!isAddingPayment)}>
+                    <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
+                    {isAddingPayment ? (
+                      <Minus size={ms(20)} color="#e55959" />
+                    ) : (
+                      <Plus size={ms(20)} color="#00b562" />
+                    )}
+                  </TouchableOpacity>
+                )}
             </View>
           </View>
 
@@ -319,7 +364,8 @@ Thank you for booking with Bookr!`;
           <Share2 size={ms(18)} color="white" />
         </TouchableOpacity>
 
-        {!isFromHistory && !isOnline && !isCancelled && (
+        {/* Removed the !isOnline check so vendors can cancel ANY active booking */}
+        {!isFromHistory && !isCancelled && (
           <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} disabled={isUpdating}>
             <View style={styles.cancelContent}>
               {isUpdating ? (

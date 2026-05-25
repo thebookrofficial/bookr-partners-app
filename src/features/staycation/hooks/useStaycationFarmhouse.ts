@@ -34,6 +34,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
 
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [markedDates, setMarkedDates] = useState<any>({});
+  const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const [groupedBookings, setGroupedBookings] = useState<
@@ -49,6 +50,8 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
 
       // 1. Fetch Availability Blocks
       const newMarkedDates: any = {};
+      const newClosedDates = new Set<string>();
+
       const { data: blocks } = await supabase
         .from("staycation_availability")
         .select("date, is_blocked")
@@ -63,6 +66,31 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           },
         };
       });
+
+      // 1.5. Fetch Closed Dates
+      const { data: closedDatesData } = await supabase
+        .from("venue_closed_dates")
+        .select("start_date, end_date")
+        .eq("venue_id", activeVenue.venueId);
+
+      closedDatesData?.forEach(c => {
+        let curr = new Date(c.start_date);
+        const end = c.end_date ? new Date(c.end_date) : new Date(c.start_date);
+        // Include the end date for closed dates
+        while (curr <= end) {
+          const dStr = formatDate(curr);
+          newClosedDates.add(dStr);
+          newMarkedDates[dStr] = {
+            customStyles: {
+              container: { backgroundColor: COLORS.danger, borderRadius: 0, width: "100%" },
+              text: { color: "white" },
+            },
+          };
+          curr.setDate(curr.getDate() + 1);
+        }
+      });
+
+      setClosedDates(newClosedDates);
 
       // 2. Fetch Bookings
       const { data: bookingsData, error: bookingsError } = await supabase
@@ -123,7 +151,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
 
         // console.log(`[DEBUG] Final Display Name: ${finalDisplayName}`);
 
-        const isOnline = (parseFloat(b.platform_fee) || 0) > 0;
+        const isOnline = !!b.user_id;
         const rangeColor = isOnline ? COLORS.primary : COLORS.danger;
 
         // Calendar marking
@@ -148,7 +176,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           amount: b.total_amount.toString(),
           paidAmount: parseFloat(b.paid_amount) || 0,
           totalAmount: parseFloat(b.total_amount) || 0,
-          status: b.paid_amount >= b.total_amount ? "Online" : "Offline",
+          status: isOnline ? "Online" : "Offline",
           checkIn: b.check_in_date,
           checkOut: b.check_out_date,
           guestCount: b.guest_count,
@@ -178,34 +206,51 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
 
   const cancelBooking = async (bookingId: string) => {
     try {
+      // 1. Fetch current booking details needed for the RPC
       const { data: b, error: fetchErr } = await supabase
         .from("staycation_bookings")
-        .select("venue_id, check_in_date, check_out_date")
+        .select("venue_id, check_in_date, check_out_date, unit_count, room_id")
         .eq("id", bookingId)
         .single();
 
       if (fetchErr) throw fetchErr;
 
-      const { error: cancelErr } = await supabase
+      // 2. Attempt the update and DEMAND the row back using .select()
+      const { data: updatedRows, error: cancelErr } = await supabase
         .from("staycation_bookings")
         .update({ booking_status: "cancelled" })
-        .eq("id", bookingId);
+        .eq("id", bookingId)
+        .select();
+
+      // 3. Print the absolute truth to the console
+      // console.log("DEBUG - Updated Rows:", updatedRows);
+      // console.log("DEBUG - Cancel Error:", cancelErr);
 
       if (cancelErr) throw cancelErr;
 
-      const targetDates: string[] = [];
-      let curr = new Date(b.check_in_date);
-      const end = new Date(b.check_out_date);
-      while (curr < end) {
-        targetDates.push(formatDate(curr));
-        curr.setDate(curr.getDate() + 1);
+      // 4. Catch the Silent RLS Failure
+      if (!updatedRows || updatedRows.length === 0) {
+        Alert.alert(
+          "Debug",
+          "Database blocked the update (0 rows changed). This is an RLS failure.",
+        );
+        return;
       }
 
-      await supabase
-        .from("staycation_availability")
-        .update({ is_blocked: false, is_available: true })
-        .eq("venue_id", b.venue_id)
-        .in("date", targetDates);
+      // 5. Catch a rogue Database Trigger overriding us
+      if (updatedRows[0].booking_status !== "cancelled") {
+        Alert.alert("Debug", "A database trigger forced the status back to confirmed!");
+        return;
+      }
+
+      // 6. If it genuinely worked, release the dates via your RPC
+      await supabase.rpc("unblock_staycation_dates", {
+        p_venue_id: b.venue_id,
+        p_room_id: b.room_id || null,
+        p_start_date: b.check_in_date,
+        p_end_date: b.check_out_date,
+        p_unit_count: b.unit_count || 1,
+      });
 
       Alert.alert("Success", "Booking cancelled successfully.");
       fetchBookings();
@@ -241,6 +286,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
   return {
     isLoading: isVenuesLoading || isDataLoading,
     markedDates,
+    closedDates,
     groupedBookings: filteredBookings,
     refetch: fetchBookings,
     venues,

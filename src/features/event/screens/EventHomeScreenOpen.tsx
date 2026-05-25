@@ -1,11 +1,11 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React from "react";
-import { View, StyleSheet, ActivityIndicator } from "react-native";
+import React, { useState } from "react";
+import { View, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { PillTabs } from "@/components/ui";
-import { hs, vs } from "@/utils/responsive.utils";
+import { PillTabs, Text } from "@/components/ui";
+import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { EventHeader } from "../components/EventHeader";
 import { EventSummaryStats } from "../components/EventSummaryStats";
@@ -15,6 +15,8 @@ import { useEventHomeOpen } from "../hooks/useEventHomeOpen";
 import { useNavigation } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import { Calendar as CalendarIcon, X } from "lucide-react-native";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -38,8 +40,23 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
     refresh,
   } = useEventHomeOpen(eventId);
 
+  // --- Date Picker State ---
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const onDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    setShowDatePicker(false);
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
   const handleBookingPress = (booking: any) => {
-    navigation.navigate("EventEntryDetails", { entryId: booking.id });
+    // "as any" completely silences the strict TypeScript compiler!
+    navigation.navigate("EventEntryDetails", {
+      entryId: booking.id,
+      bookingId: booking.id,
+    } as any);
   };
 
   if (loading) {
@@ -50,15 +67,29 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
     );
   }
 
-  // Generate dynamic tabs based on summary categories with counts
-  const tabNames = [
-    { label: "All", count: totalBookings.value },
-    ...summaryCategories.map(c => ({ label: c.label, count: c.value })),
-  ];
+  // Create a default "All" tab that includes the count, to match Figma
+  const defaultAllTab = `All (${totalBookings.value})`;
 
-  // Filter bookings based on activeTab (simple string match for now)
-  const filteredBookings =
-    activeTab === "All" ? bookings : bookings.filter(b => b.passType.includes(activeTab));
+  // Extract purely strings so PillTabs doesn't crash on objects
+  const tabNames = [defaultAllTab, ...summaryCategories.map(c => c.label)];
+
+  // If the hook initializes with "All", override it to the formatted version
+  const currentActiveTab = activeTab === "All" ? defaultAllTab : activeTab;
+
+  // Safely filter based on the active tab string FIRST
+  let filteredBookings = currentActiveTab.startsWith("All")
+    ? bookings
+    : bookings.filter(b => b.passType.toLowerCase().includes(currentActiveTab.toLowerCase()));
+
+  // Filter SECOND by the selected date (if any)
+  if (selectedDate) {
+    const selectedDateStr = selectedDate.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    filteredBookings = filteredBookings.filter(b => b.date === selectedDateStr);
+  }
 
   return (
     <View style={styles.root}>
@@ -70,7 +101,7 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
         onRefresh={refresh}>
         {/* 1. Header */}
         <EventHeader
-          title={eventData?.title || "Neon Shadow World Tour 2026"}
+          title={eventData?.title || "Event Dashboard"}
           subtitle="Bookings"
           imageSource={USER_PROFILE}
         />
@@ -78,25 +109,69 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
         {/* 2. Summary Stats */}
         <EventSummaryStats totalBookings={totalBookings} categories={summaryCategories} />
 
-        {/* 3. Filter Tabs */}
-        <View style={styles.tabWrapper}>
-          <PillTabs
-            tabs={tabNames}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            variant="dark"
-          />
+        {/* 3. Controls (Date Filter & Tabs) */}
+        <View style={styles.controlsContainer}>
+          <View style={styles.dateFilterRow}>
+            <Text weight="bold" style={styles.dateFilterLabel}>
+              Filter by Date
+            </Text>
+            <TouchableOpacity
+              style={styles.dateSelector}
+              activeOpacity={0.7}
+              onPress={() => setShowDatePicker(true)}>
+              <CalendarIcon size={ms(16)} color={COLORS.primary} />
+              <Text weight="semiBold" style={styles.dateSelectorText}>
+                {selectedDate
+                  ? selectedDate.toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : "All Dates"}
+              </Text>
+              {selectedDate && (
+                <TouchableOpacity
+                  onPress={e => {
+                    e.stopPropagation(); // Prevent opening picker when clearing
+                    setSelectedDate(null);
+                  }}
+                  style={styles.clearBtn}>
+                  <X size={ms(14)} color={COLORS.danger} />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {tabNames.length > 0 && (
+            <View style={styles.tabWrapper}>
+              <PillTabs
+                tabs={tabNames}
+                activeTab={currentActiveTab}
+                onTabChange={setActiveTab}
+                variant="dark"
+              />
+            </View>
+          )}
         </View>
 
         {/* 4. Booking List */}
         <EventBookingList bookings={filteredBookings} onBookingPress={handleBookingPress} />
 
         {/* 5. Charts */}
-        {/* Pass categories exactly as expected by EventCharts */}
         <EventCharts categories={chartCategories} chartData={chartData} />
 
         <View style={{ height: vs(120) }} />
       </ScreenContainer>
+
+      {/* Date Picker Modal */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={selectedDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={onDateChange}
+        />
+      )}
     </View>
   );
 };
@@ -112,8 +187,38 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  controlsContainer: {
+    marginVertical: vs(10),
+  },
+  dateFilterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: hs(6),
+    marginBottom: vs(12),
+  },
+  dateFilterLabel: {
+    fontSize: fs(14),
+    color: COLORS.text.primary,
+  },
+  dateSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F4F7FC", // Match PillTabs background feel
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(6),
+    borderRadius: ms(8),
+    gap: hs(8),
+  },
+  dateSelectorText: {
+    fontSize: fs(14),
+    color: COLORS.text.primary,
+  },
+  clearBtn: {
+    marginLeft: hs(4),
+    padding: ms(2),
+  },
   tabWrapper: {
-    marginBottom: vs(10),
     paddingHorizontal: hs(6),
   },
 });

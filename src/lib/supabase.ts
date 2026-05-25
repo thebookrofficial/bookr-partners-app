@@ -21,10 +21,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey || "MISSING_KE
     detectSessionInUrl: false,
   },
   // 3. Explicitly force headers to ensure they pass through Cloudflare
-  global: {
-    headers: {
-      apikey: supabaseAnonKey || "",
-      Authorization: `Bearer ${supabaseAnonKey || ""}`,
-    },
-  },
+  // global: {
+  //   headers: {
+  //     apikey: supabaseAnonKey || "",
+  //     Authorization: `Bearer ${supabaseAnonKey || ""}`,
+  //   },
+  // },
 });
