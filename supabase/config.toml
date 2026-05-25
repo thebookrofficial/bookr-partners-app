@@ -1,0 +1,33 @@
+
+[functions.log-offline-payment]
+enabled = true
+verify_jwt = true
+import_map = "./functions/log-offline-payment/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/log-offline-payment/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/log-offline-payment/*.html" ]
+
+[functions.send-fcm-notification]
+enabled = true
+verify_jwt = true
+import_map = "./functions/send-fcm-notification/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/send-fcm-notification/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/send-fcm-notification/*.html" ]
+
+[functions.send-whatsapp-notification]
+enabled = true
+verify_jwt = true
+import_map = "./functions/send-whatsapp-notification/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/send-whatsapp-notification/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/send-whatsapp-notification/*.html" ]

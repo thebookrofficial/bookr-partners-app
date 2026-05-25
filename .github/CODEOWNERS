@@ -1,0 +1,14 @@
+# Bookr Business App - Global Code Owners
+# All PRs will require review from these owners by default.
+
+* @thebookrofficial
+
+# Core Infrastructure - Strict Review Required
+/package.json         @thebookrofficial
+/pnpm-lock.yaml       @thebookrofficial
+/.github/workflows/   @thebookrofficial
+
+# App Architecture
+/src/lib/             @thebookrofficial
+/src/services/        @thebookrofficial
+/src/store/           @thebookrofficial
