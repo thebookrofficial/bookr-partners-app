@@ -9,6 +9,7 @@ import { StaycationHeader } from "../components/StaycationHeader";
 import {
   Ban,
   Ticket,
+  Banknote,
   //  RefreshCw,
   ChevronRight,
 } from "lucide-react-native";
@@ -58,6 +59,8 @@ export const StaycationEssentialsScreen = () => {
       navigation.navigate("StaycationCloseDate", { serviceId });
     } else if (label === "Offers") {
       navigation.navigate("StaycationOffers", { serviceId });
+    } else if (label === "Payouts") {
+      navigation.navigate("Payouts", { venueId: serviceId });
     } else {
       // Handle other presses
     }
@@ -74,6 +77,7 @@ export const StaycationEssentialsScreen = () => {
       <View style={styles.listContainer}>
         <EssentialsItem label="Close date" Icon={Ban} onPress={() => handlePress("Close date")} />
         <EssentialsItem label="Offers" Icon={Ticket} onPress={() => handlePress("Offers")} />
+        <EssentialsItem label="Payouts" Icon={Banknote} onPress={() => handlePress("Payouts")} />
         {/* <EssentialsItem
           label="Update Venue Info"
           Icon={RefreshCw}

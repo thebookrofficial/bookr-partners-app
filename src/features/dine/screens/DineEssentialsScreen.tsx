@@ -6,7 +6,7 @@ import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "@/features/sports/components/ServiceHeader";
-import { Ban, Ticket, RefreshCw, ChevronRight } from "lucide-react-native";
+import { Ban, Ticket, RefreshCw, Banknote, ChevronRight } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
@@ -73,6 +73,13 @@ export const DineEssentialsScreen = () => {
           icon={Ticket}
           onPress={() => {
             navigation.navigate("DineOffers", { serviceId });
+          }}
+        />
+        <EssentialActionRow
+          title="Payouts"
+          icon={Banknote}
+          onPress={() => {
+            navigation.navigate("Payouts", { venueId: serviceId });
           }}
         />
         <EssentialActionRow
