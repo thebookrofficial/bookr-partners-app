@@ -64,6 +64,8 @@ import { EventScanConfirmationScreen } from "@/features/event/screens/EventScanC
 import { LegalViewScreen } from "@/features/settings/screens/LegalViewScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
+import { PayoutsScreen } from "@/features/finance/screens/PayoutsScreen";
+import { PayoutDetailsScreen } from "@/features/finance/screens/PayoutDetailsScreen";
 
 import { COLORS } from "@/constants/theme";
 import { vs, ms, fs, hs } from "@/utils/responsive.utils";
@@ -324,6 +326,8 @@ const MainNavigator = () => (
     <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
     <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />
     <MainStack.Screen name="BulkBookingDetails" component={BulkBookingDetailsScreen} />
+    <MainStack.Screen name="Payouts" component={PayoutsScreen} />
+    <MainStack.Screen name="PayoutDetails" component={PayoutDetailsScreen} />
   </MainStack.Navigator>
 );
 

@@ -6,7 +6,7 @@ import { View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "re
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
-import { ChevronRight, Files, Ban } from "lucide-react-native";
+import { ChevronRight, Files, Ban, Banknote } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
@@ -178,6 +178,15 @@ export const SportsEssentialsScreen = () => {
                 Alert.alert("No Ground Found", "We couldn't find a sports ground for this venue.");
               }
             }}
+          />
+          <EssentialActionRow
+            title="Payouts"
+            icon={Banknote}
+            onPress={() =>
+              navigation.navigate("Payouts", {
+                venueId: currentVenueId,
+              })
+            }
           />
           {/* 
           <EssentialActionRow title="Offers" icon={CalendarDays} onPress={() => {}} />
