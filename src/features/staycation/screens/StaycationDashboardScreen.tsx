@@ -75,7 +75,7 @@ const DonutChart = ({ size = ms(100), strokeWidth = 6, onlineRevenue, totalReven
       </Canvas>
       <View style={[StyleSheet.absoluteFill, styles.donutOverlay]}>
         <Text variant="body2" weight="bold" color="#00B562" style={styles.revenueAmountText}>
-          +₹{totalRevenue}
+          +₹{totalRevNum.toLocaleString("en-IN")}
         </Text>
         <Text variant="body2" color={COLORS.text.primary} style={styles.totalText}>
           Total
@@ -281,7 +281,7 @@ export const StaycationDashboardScreen = () => {
                     Online Revenue
                   </Text>
                   <Text variant="h2" weight="bold" color="#001C65">
-                    ₹{stats.onlineRevenue}
+                    ₹{parseFloat(stats.onlineRevenue).toLocaleString("en-IN")}
                   </Text>
                 </View>
                 <View style={styles.revenueItem}>
@@ -289,7 +289,7 @@ export const StaycationDashboardScreen = () => {
                     Offline Revenue
                   </Text>
                   <Text variant="h2" weight="bold" color="#63A1FD">
-                    ₹{stats.offlineRevenue}
+                    ₹{parseFloat(stats.offlineRevenue).toLocaleString("en-IN")}
                   </Text>
                 </View>
               </View>

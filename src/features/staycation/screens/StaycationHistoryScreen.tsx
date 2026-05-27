@@ -108,9 +108,8 @@ export const StaycationHistoryScreen = () => {
               bookingId={item.id}
               {...item}
               onPress={() =>
-                (navigation as any).navigate("StaycationBookingDetails", {
-                  booking: item,
-                  isFromHistory: true,
+                (navigation as any).navigate("StaycationInvoice", {
+                  bookingId: item.id,
                 })
               }
             />
@@ -127,7 +126,9 @@ export const StaycationHistoryScreen = () => {
               </View>
 
               <View style={styles.settlementRight}>
-                <Text style={styles.datePriceText}>₹{(section as any).settlement}</Text>
+                <Text style={styles.datePriceText}>
+                  ₹{Number((section as any).settlement).toLocaleString("en-IN")}
+                </Text>
                 <Text style={styles.dateSettlementLabel}>Total Payout</Text>
               </View>
             </View>

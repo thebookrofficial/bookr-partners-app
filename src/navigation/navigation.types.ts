@@ -71,6 +71,7 @@ export type MainStackParamList = {
   EventServiceTabs: NavigatorScreenParams<EventTabParamList>;
   BookingDetails: { bookingId: string };
   StaycationBookingDetails: { booking: any };
+  StaycationInvoice: { bookingId: string };
   StaycationCloseDate: { serviceId: string };
   StaycationOffers: { serviceId: string };
   DineBookingDetails: { bookingId: string; isFromPayment?: boolean };

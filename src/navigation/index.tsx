@@ -38,6 +38,7 @@ import { BlockUnblockScreen } from "@/features/sports/screens/BlockUnblockScreen
 import { BulkBookingScreen } from "@/features/sports/screens/BulkBookingScreen";
 import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingDetailsScreen";
 import { StaycationBookingDetailsScreen } from "@/features/staycation/screens/StaycationBookingDetailsScreen";
+import { StaycationInvoiceScreen } from "@/features/staycation/screens/StaycationInvoiceScreen";
 import { StaycationOffersScreen } from "@/features/staycation/screens/StaycationOffersScreen";
 import { StaycationHomeScreen } from "@/features/staycation/screens/StaycationHomeScreen";
 import { StaycationHistoryScreen } from "@/features/staycation/screens/StaycationHistoryScreen";
@@ -312,6 +313,7 @@ const MainNavigator = () => (
     <MainStack.Screen name="EventServiceTabs" component={EventTabNavigator} />
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
     <MainStack.Screen name="StaycationBookingDetails" component={StaycationBookingDetailsScreen} />
+    <MainStack.Screen name="StaycationInvoice" component={StaycationInvoiceScreen} />
     <MainStack.Screen name="StaycationOffers" component={StaycationOffersScreen} />
     <MainStack.Screen name="DineBookingDetails" component={DineBookingDetailsScreen} />
     <MainStack.Screen name="DinePaymentDetails" component={DinePaymentDetailsScreen} />

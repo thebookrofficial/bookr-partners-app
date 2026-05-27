@@ -43,9 +43,10 @@ export const SportsInvoiceScreen = () => {
 
   // Calculate fees based on 3.5% commission as requested
   const subtotal = Number(booking.subtotal) || 0;
+  const totalAmount = Number(booking.total_amount) || 0;
   const platformFee = subtotal * 0.035;
   const discountAmount = Number(booking.discount_amount) || 0;
-  const gatewayFee = Number(booking.gateway_fee) || 0;
+  const gatewayFee = totalAmount * 0.02;
   const estPayout = subtotal - discountAmount - platformFee - gatewayFee;
 
   const formatHour = (timeStr: string) => {
@@ -212,11 +213,11 @@ export const SportsInvoiceScreen = () => {
             <View style={styles.payoutRow}>
               <View style={styles.dashedUnderline}>
                 <Text variant="body2" weight="semiBold">
-                  Gateway Charges
+                  Gateway Charges (2%)
                 </Text>
               </View>
               <Text variant="body2" weight="medium" color="#E55959">
-                -₹{gatewayFee}
+                -₹{gatewayFee.toFixed(2)}
               </Text>
             </View>
 
