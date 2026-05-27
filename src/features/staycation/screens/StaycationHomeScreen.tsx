@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import { StyleSheet, View, ActivityIndicator, TouchableOpacity } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -12,10 +12,12 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
 import { StaycationFarmhouseContent } from "../components/StaycationFarmhouseContent";
 import { StaycationResortContent } from "../components/StaycationResortContent";
+import { useServiceStore } from "@/store/serviceStore";
 
 export const StaycationHomeScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationHome">>();
+  const { setActiveVenueName } = useServiceStore();
 
   let initialServiceId = route.params?.serviceId;
   if (!initialServiceId) {
@@ -26,6 +28,12 @@ export const StaycationHomeScreen = () => {
   }
 
   const { isLoading, venues, activeVenue, refetch } = useStaycationHome(initialServiceId);
+
+  useEffect(() => {
+    if (activeVenue?.name) {
+      setActiveVenueName(activeVenue.name);
+    }
+  }, [activeVenue?.name, setActiveVenueName]);
 
   const isFarmhouseLayout = useMemo(
     () =>

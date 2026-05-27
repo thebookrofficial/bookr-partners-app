@@ -96,7 +96,13 @@ export type MainStackParamList = {
     groundId: string;
   };
   Payouts: { venueId: string };
-  PayoutDetails: { payoutId: string; venueId: string };
+  PayoutDetails: {
+    venueId: string;
+    startDate: string;
+    endDate: string;
+    displayLabel: string;
+    totalBookings: number;
+  };
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

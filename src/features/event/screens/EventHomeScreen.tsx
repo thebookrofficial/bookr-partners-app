@@ -8,10 +8,12 @@ import { EventHomeScreenAssigned } from "./EventHomeScreenAssigned";
 import { supabase } from "@/lib/supabase";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { useServiceStore } from "@/store/serviceStore";
 
 export const EventHomeScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const { setActiveVenueName } = useServiceStore();
 
   const [loading, setLoading] = useState(true);
   const [eventData, setEventData] = useState<{
@@ -19,6 +21,12 @@ export const EventHomeScreen = () => {
     seating_type: string;
     title: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (eventData?.title) {
+      setActiveVenueName(eventData.title);
+    }
+  }, [eventData?.title, setActiveVenueName]);
 
   useEffect(() => {
     let isMounted = true;

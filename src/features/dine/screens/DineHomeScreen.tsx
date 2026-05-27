@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Modal } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
@@ -17,6 +17,7 @@ import { DineUpcomingList } from "../components/DineUpcomingList";
 import { DinePaymentsList } from "../components/DinePaymentsList";
 import { DineOfflineBookingSheet } from "../components/DineOfflineBookingSheet";
 import { useDineHome } from "../hooks/useDineHome";
+import { useServiceStore } from "@/store/serviceStore";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -27,6 +28,7 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 export const DineHomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<DineTabParamList, "DineHome">>();
+  const { setActiveVenueName } = useServiceStore();
 
   // Safely resolve serviceId from params or parent navigator
   let serviceId = route.params?.serviceId;
@@ -54,6 +56,12 @@ export const DineHomeScreen = () => {
     refreshBookings,
     refresh,
   } = useDineHome(serviceId);
+
+  useEffect(() => {
+    if (venue?.name) {
+      setActiveVenueName(venue.name);
+    }
+  }, [venue?.name, setActiveVenueName]);
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);

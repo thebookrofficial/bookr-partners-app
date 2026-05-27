@@ -1,11 +1,10 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import React from "react";
+import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
-import { ServiceHeader } from "@/features/sports/components/ServiceHeader";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -13,15 +12,18 @@ import { MainStackParamList } from "@/navigation/navigation.types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Calendar } from "lucide-react-native";
 import { useServiceStore } from "@/store/serviceStore";
+import { usePayouts } from "../hooks/usePayouts";
 
 const PendingPayoutCard = ({
   settlementDate,
   amount,
+  onPress,
 }: {
   settlementDate: string;
   amount: string;
+  onPress: () => void;
 }) => (
-  <View style={styles.pendingSection}>
+  <TouchableOpacity style={styles.pendingSection} activeOpacity={0.7} onPress={onPress}>
     <View style={styles.dateRow}>
       <Calendar size={ms(18)} color={COLORS.primary} />
       <Text variant="body2" weight="semiBold" style={styles.dateText}>
@@ -37,11 +39,11 @@ const PendingPayoutCard = ({
           {settlementDate}
         </Text>
         <Text variant="body2" weight="semiBold" color={COLORS.primary}>
-          +{amount}
+          +₹{amount}
         </Text>
       </View>
     </View>
-  </View>
+  </TouchableOpacity>
 );
 
 const PayoutListItem = ({
@@ -62,7 +64,7 @@ const PayoutListItem = ({
           Payout amount
         </Text>
         <Text variant="h3" weight="semiBold" color={COLORS.success} style={styles.amountText}>
-          +{amount}
+          +₹{amount}
         </Text>
       </View>
       <View style={styles.bookingsInfo}>
@@ -86,21 +88,70 @@ export const PayoutsScreen = () => {
   const { venueId } = route.params;
   const { activeVenueName } = useServiceStore();
 
-  const [activeTab, setActiveTab] = useState("week");
+  const { activeTab, setActiveTab, pendingPayouts, historicalPayouts, loading } =
+    usePayouts(venueId);
 
   const tabs = ["Day", "week", "Month", "Custom"];
 
+  const handlePayoutPress = (item: any, isPending: boolean = false) => {
+    let startDate = "";
+    let endDate = "";
+
+    if (isPending) {
+      startDate = item.date;
+      endDate = item.date;
+    } else {
+      startDate = item.payout_date;
+      // Calculate endDate based on interval
+      const start = new Date(startDate);
+      const end = new Date(start);
+
+      if (activeTab.toLowerCase() === "week") {
+        end.setDate(start.getDate() + 6);
+      } else if (activeTab.toLowerCase() === "month") {
+        end.setMonth(start.getMonth() + 1);
+        end.setDate(0); // Last day of month
+      }
+      endDate = end.toISOString().split("T")[0];
+    }
+
+    navigation.navigate("PayoutDetails", {
+      venueId,
+      startDate,
+      endDate,
+      displayLabel: isPending ? item.displayDate : item.display_label,
+      totalBookings: isPending ? item.count : item.booking_count,
+    });
+  };
+
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-      <ServiceHeader title={activeVenueName} subtitle="Payouts" />
+      <View style={styles.header}>
+        <Text variant="h3" weight="bold">
+          {activeVenueName}
+        </Text>
+        <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
+          Payouts
+        </Text>
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <Text variant="body1" weight="bold" style={styles.sectionTitle}>
           PENDING PAYOUT
         </Text>
 
-        <PendingPayoutCard settlementDate="26 April 2026" amount="₹7000" />
-        <PendingPayoutCard settlementDate="25 April 2026" amount="₹6700" />
+        {loading && pendingPayouts.length === 0 ? (
+          <ActivityIndicator color={COLORS.primary} style={{ marginVertical: vs(20) }} />
+        ) : (
+          pendingPayouts.map((item, index) => (
+            <PendingPayoutCard
+              key={index}
+              settlementDate={item.displayDate}
+              amount={item.amount.toString()}
+              onPress={() => handlePayoutPress(item, true)}
+            />
+          ))
+        )}
 
         <Text variant="body1" weight="bold" style={styles.sectionTitle}>
           PAYOUTS
@@ -114,30 +165,29 @@ export const PayoutsScreen = () => {
           style={styles.tabs}
         />
 
-        <PayoutListItem
-          amount="₹6700"
-          bookings={279}
-          dateRange="19 April - 25 April"
-          onPress={() => navigation.navigate("PayoutDetails", { venueId, payoutId: "1" })}
-        />
-        <PayoutListItem
-          amount="₹7700"
-          bookings={320}
-          dateRange="12 April - 18 April"
-          onPress={() => navigation.navigate("PayoutDetails", { venueId, payoutId: "2" })}
-        />
-        <PayoutListItem
-          amount="₹7400"
-          bookings={312}
-          dateRange="5 April - 11 April"
-          onPress={() => navigation.navigate("PayoutDetails", { venueId, payoutId: "3" })}
-        />
+        {loading && historicalPayouts.length === 0 ? (
+          <ActivityIndicator color={COLORS.primary} style={{ marginVertical: vs(20) }} />
+        ) : (
+          historicalPayouts.map((item, index) => (
+            <PayoutListItem
+              key={index}
+              amount={item.total_amount.toString()}
+              bookings={item.booking_count}
+              dateRange={item.display_label}
+              onPress={() => handlePayoutPress(item)}
+            />
+          ))
+        )}
       </ScrollView>
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
+  header: {
+    marginTop: vs(10),
+    marginBottom: vs(15),
+  },
   scrollContent: { paddingBottom: vs(20) },
   sectionTitle: { textTransform: "uppercase", marginTop: vs(15), marginBottom: vs(10) },
   pendingSection: { marginBottom: vs(15) },

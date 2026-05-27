@@ -2,10 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Button } from "@/components/ui";
-import { ServiceHeader } from "@/features/sports/components/ServiceHeader";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -13,6 +12,7 @@ import { MainStackParamList } from "@/navigation/navigation.types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useServiceStore } from "@/store/serviceStore";
+import { usePayoutDetails } from "../hooks/usePayoutDetails";
 
 const DetailRow = ({
   label,
@@ -80,39 +80,87 @@ const ExpandableSection = ({
 
 export const PayoutDetailsScreen = () => {
   const _navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
-  const _route = useRoute<RouteProp<MainStackParamList, "PayoutDetails">>();
+  const route = useRoute<RouteProp<MainStackParamList, "PayoutDetails">>();
+  const { venueId, startDate, endDate, displayLabel } = route.params;
   const { activeVenueName } = useServiceStore();
+
+  const { breakdown, loading } = usePayoutDetails(venueId, startDate, endDate);
+
+  if (loading && !breakdown) {
+    return (
+      <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
+        <View style={styles.header}>
+          <Text variant="h3" weight="bold">
+            {activeVenueName}
+          </Text>
+          <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
+            Payouts
+          </Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color={COLORS.primary} size="large" />
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  // Total online bookings from breakdown
+  const onlineCount = breakdown?.count || 0;
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-      <ServiceHeader title={activeVenueName} subtitle="Payouts" />
+      <View style={styles.header}>
+        <Text variant="h3" weight="bold">
+          {activeVenueName}
+        </Text>
+        <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
+          Payouts
+        </Text>
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.summaryHeader}>
           <Text variant="body1" weight="bold">
-            12 April - 19 April 2026
+            {displayLabel}
           </Text>
           <Text variant="body1" weight="bold">
-            279 Bookings
+            {onlineCount} Bookings
           </Text>
         </View>
 
         <View style={styles.detailsCard}>
-          <ExpandableSection title="Total Customer Paid" amount="₹7100" defaultExpanded>
-            <DetailRow label="Total Bookings amount" value="₹7600" weight="semiBold" />
-            <DetailRow label="Discount" value="-₹500" weight="semiBold" />
+          <ExpandableSection
+            title="Total Customer Paid"
+            amount={`+₹${breakdown?.totalPaid || 0}`}
+            defaultExpanded>
+            <DetailRow
+              label={`${breakdown?.full.count || 0} Full payments`}
+              value={`₹${breakdown?.full.total || 0}`}
+            />
+            <DetailRow
+              label={`${breakdown?.advance.count || 0} Advance payments`}
+              value={`₹${breakdown?.advance.total || 0}`}
+            />
           </ExpandableSection>
 
           <View style={styles.divider} />
 
-          <ExpandableSection title="Bookr fees" amount="-₹300">
-            <DetailRow label="Commission" value="-₹300" weight="semiBold" />
+          <ExpandableSection title="Bookr fees" amount={`-₹${breakdown?.commission || 0}`}>
+            <DetailRow
+              label={`Commission (${breakdown?.commissionRate})`}
+              value={`-₹${breakdown?.commission || 0}`}
+              weight="semiBold"
+            />
           </ExpandableSection>
 
           <View style={styles.divider} />
 
-          <ExpandableSection title="Payment Gateway" amount="-₹300">
-            <DetailRow label="Razerpay cut" value="-₹300" weight="semiBold" />
+          <ExpandableSection title="Payment Gateway" amount={`-₹${breakdown?.gateway || 0}`}>
+            <DetailRow
+              label="Razorpay cut (2%)"
+              value={`-₹${breakdown?.gateway || 0}`}
+              weight="semiBold"
+            />
           </ExpandableSection>
 
           <View style={styles.divider} />
@@ -122,7 +170,7 @@ export const PayoutDetailsScreen = () => {
               Final Payout
             </Text>
             <Text variant="body2" weight="bold" color={COLORS.success}>
-              ₹6500
+              ₹{breakdown?.finalPayout || 0}
             </Text>
           </View>
         </View>
@@ -142,6 +190,11 @@ export const PayoutDetailsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  header: {
+    marginTop: vs(10),
+    marginBottom: vs(15),
+  },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: { paddingBottom: vs(20) },
   summaryHeader: {
     flexDirection: "row",
