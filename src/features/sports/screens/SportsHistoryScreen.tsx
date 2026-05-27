@@ -21,9 +21,9 @@ import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.
 // ==========================================
 // 1. NEW HISTORY CARD
 // ==========================================
-const HistoryCard = ({ name, phone, time, price, status }: any) => {
+const HistoryCard = ({ name, phone, time, price, status, onPress }: any) => {
   return (
-    <View style={styles.cardContainer}>
+    <TouchableOpacity style={styles.cardContainer} activeOpacity={0.7} onPress={onPress}>
       <View style={styles.avatarCircle} />
       <View style={styles.cardInfoCol}>
         <View style={styles.cardHeaderRow}>
@@ -44,7 +44,7 @@ const HistoryCard = ({ name, phone, time, price, status }: any) => {
           <Text style={styles.cardTime}>{time}</Text>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -220,6 +220,9 @@ export const SportsHistoryScreen = () => {
                             time={booking.timeRanges}
                             price={`₹${booking.price}`}
                             status={booking.status}
+                            onPress={() =>
+                              navigation.navigate("SportsInvoice", { bookingId: booking.id })
+                            }
                           />
                         ))}
                     </View>

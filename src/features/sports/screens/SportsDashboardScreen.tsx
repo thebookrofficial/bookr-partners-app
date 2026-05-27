@@ -240,25 +240,37 @@ export const SportsDashboardScreen = () => {
 
             {/* Revenue Details Summary */}
             <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              ONLINE PAYOUT REVENUE
+              REVENUE DETAILS
             </Text>
             <View style={styles.onlineRevenueCard}>
-              <View style={styles.revenueRow}>
-                <Text variant="body2" weight="medium">
-                  Total Online Payout
-                </Text>
-                <Text variant="h2" weight="bold" color="#00B562">
-                  ₹{metrics.onlineRevenue.toLocaleString("en-IN")}
-                </Text>
-              </View>
               <View style={styles.revenueDonutWrapper}>
                 <View style={[styles.donutRing, styles.donutRingBase]} />
+                <View style={[styles.donutRing, styles.donutRingOver, styles.donutRingDark]} />
                 <View style={styles.donutInner}>
                   <Text variant="body2" weight="semiBold" color="#00B562">
-                    100%
+                    +₹{(metrics.onlineRevenue + metrics.offlineRevenue).toLocaleString("en-IN")}
                   </Text>
                   <Text variant="caption" weight="semiBold">
-                    Online
+                    Total
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.revenueSplitBlock}>
+                <View style={styles.revenueRow}>
+                  <Text variant="body2" weight="medium">
+                    Online Revenue
+                  </Text>
+                  <Text variant="body1" weight="bold" color="#001C65">
+                    ₹{metrics.onlineRevenue.toLocaleString("en-IN")}
+                  </Text>
+                </View>
+                <View style={styles.revenueRow}>
+                  <Text variant="body2" weight="medium">
+                    Offline Revenue
+                  </Text>
+                  <Text variant="body1" weight="bold" color={COLORS.primary}>
+                    ₹{metrics.offlineRevenue.toLocaleString("en-IN")}
                   </Text>
                 </View>
               </View>
@@ -371,7 +383,6 @@ const styles = StyleSheet.create({
     borderRadius: ms(10),
     padding: hs(12),
     marginBottom: vs(20),
-    justifyContent: "space-between",
   },
   revenueSummaryCard: { backgroundColor: "transparent", justifyContent: "center" },
   totalBlock: {
@@ -397,7 +408,8 @@ const styles = StyleSheet.create({
     height: ms(100),
     justifyContent: "center",
     alignItems: "center",
-    marginRight: hs(30),
+    marginRight: hs(20),
+    marginLeft: hs(10),
   },
   donutRing: {
     position: "absolute",

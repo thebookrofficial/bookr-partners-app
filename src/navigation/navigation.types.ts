@@ -103,6 +103,7 @@ export type MainStackParamList = {
     displayLabel: string;
     totalBookings: number;
   };
+  SportsInvoice: { bookingId: string };
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

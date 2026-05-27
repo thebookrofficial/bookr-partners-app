@@ -9,6 +9,7 @@ export interface DashboardMetrics {
   onlineBookings: number;
   offlineBookings: number;
   onlineRevenue: number;
+  offlineRevenue: number;
   bookingGraphData: BookingGraphItem[];
   revenueGraphData: RevenueGraphItem[];
   maxBookingValue: number;
@@ -45,6 +46,7 @@ export const useSportsDashboard = (
     onlineBookings: 0,
     offlineBookings: 0,
     onlineRevenue: 0,
+    offlineRevenue: 0,
     bookingGraphData: [],
     revenueGraphData: [],
     maxBookingValue: 0,
@@ -124,6 +126,7 @@ export const useSportsDashboard = (
       let onlineCount = 0;
       let offlineCount = 0;
       let totalOnlineRevenue = 0;
+      let totalOfflineRevenue = 0;
 
       const dailyData: Record<string, { bookings: number; revenue: number; day: string }> = {};
 
@@ -143,6 +146,7 @@ export const useSportsDashboard = (
         const isOffline = !b.user_id; // Reliable indicator for offline bookings
         if (isOffline) {
           offlineCount++;
+          totalOfflineRevenue += Number(b.total_amount || 0);
         } else {
           onlineCount++;
           totalOnlineRevenue += Number(b.vendor_payout || 0);
@@ -153,6 +157,8 @@ export const useSportsDashboard = (
           dailyData[dateKey].bookings += 1;
           if (!isOffline) {
             dailyData[dateKey].revenue += Number(b.vendor_payout || 0);
+          } else {
+            dailyData[dateKey].revenue += Number(b.total_amount || 0);
           }
         }
       });
@@ -185,6 +191,7 @@ export const useSportsDashboard = (
         onlineBookings: onlineCount,
         offlineBookings: offlineCount,
         onlineRevenue: totalOnlineRevenue,
+        offlineRevenue: totalOfflineRevenue,
         bookingGraphData,
         revenueGraphData,
         maxBookingValue,

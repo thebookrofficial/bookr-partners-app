@@ -66,6 +66,7 @@ import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
 import { PayoutsScreen } from "@/features/finance/screens/PayoutsScreen";
 import { PayoutDetailsScreen } from "@/features/finance/screens/PayoutDetailsScreen";
+import { SportsInvoiceScreen } from "@/features/sports/screens/SportsInvoiceScreen";
 
 import { COLORS } from "@/constants/theme";
 import { vs, ms, fs, hs } from "@/utils/responsive.utils";
@@ -328,6 +329,7 @@ const MainNavigator = () => (
     <MainStack.Screen name="BulkBookingDetails" component={BulkBookingDetailsScreen} />
     <MainStack.Screen name="Payouts" component={PayoutsScreen} />
     <MainStack.Screen name="PayoutDetails" component={PayoutDetailsScreen} />
+    <MainStack.Screen name="SportsInvoice" component={SportsInvoiceScreen} />
   </MainStack.Navigator>
 );
 
