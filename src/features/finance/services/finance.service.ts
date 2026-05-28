@@ -73,10 +73,30 @@ export const FinanceService = {
     const aggregation: Record<string, { amount: number; count: number }> = {};
     dates.forEach(date => (aggregation[date] = { amount: 0, count: 0 }));
 
+    // Grouping logic to match RPC aggregation (merge multi-slots and extensions)
+    const groupedBookings: Record<string, any> = {};
+
     rawData.forEach(b => {
+      // Filter: Only confirmed or completed bookings
+      const status = (b.booking_status || "").toLowerCase().trim();
+      if (status !== "confirmed" && status !== "completed") return;
+
+      const groupKey = b.booking_group_id || b.parent_booking_id || b.id;
+
+      if (!groupedBookings[groupKey]) {
+        groupedBookings[groupKey] = { ...b };
+      } else {
+        // Merge amounts for the same group
+        groupedBookings[groupKey].paid_amount += b.paid_amount;
+        groupedBookings[groupKey].total_amount += b.total_amount;
+        groupedBookings[groupKey].discount_amount =
+          (groupedBookings[groupKey].discount_amount || 0) + (b.discount_amount || 0);
+      }
+    });
+
+    Object.values(groupedBookings).forEach((b: any) => {
       const actualPaid = b.paid_amount;
-      const discount = b.discount_amount || 0;
-      const mainPrice = actualPaid + discount; // GROSS COLLECTION (Paid + Discount)
+      const totalAmount = b.total_amount;
 
       // Determine gateway fee base and rate
       let gateRate = 0.02; // Default
@@ -87,11 +107,11 @@ export const FinanceService = {
           gateRate = 0.015;
         }
       } else if (vertical === "staycation") {
-        gatewayBase = mainPrice;
+        gatewayBase = totalAmount;
       }
 
-      // Commission is % of the Gross Collection
-      const commission = mainPrice * commRate;
+      // Commission is % of the TOTAL PRICE (Option B - Correct for Advance Payments)
+      const commission = totalAmount * commRate;
       // Gateway fee
       const gateway = gatewayBase * gateRate;
       const payout = actualPaid - commission - gateway;
@@ -152,19 +172,39 @@ export const FinanceService = {
     const rawData = await strategy.getBreakdownRawData(venueId, startDate, endDate);
     const commRate = strategy.getCommissionRate();
 
-    const summary = rawData.reduce(
-      (acc, b) => {
+    // Grouping logic to match RPC aggregation (merge multi-slots and extensions)
+    const groupedBookings: Record<string, any> = {};
+
+    rawData.forEach(b => {
+      // Filter: Only confirmed or completed bookings
+      const status = (b.booking_status || "").toLowerCase().trim();
+      if (status !== "confirmed" && status !== "completed") return;
+
+      const groupKey = b.booking_group_id || b.parent_booking_id || b.id;
+
+      if (!groupedBookings[groupKey]) {
+        groupedBookings[groupKey] = { ...b };
+      } else {
+        // Merge amounts for the same group
+        groupedBookings[groupKey].paid_amount += b.paid_amount;
+        groupedBookings[groupKey].total_amount += b.total_amount;
+        groupedBookings[groupKey].discount_amount =
+          (groupedBookings[groupKey].discount_amount || 0) + (b.discount_amount || 0);
+      }
+    });
+
+    const summary = Object.values(groupedBookings).reduce(
+      (acc, b: any) => {
         const isFull = b.payment_type === "full";
         const actualPaid = b.paid_amount;
-        const discount = b.discount_amount || 0;
-        const mainPrice = actualPaid + discount; // GROSS PRICE FOR PAID BREAKDOWN
+        const totalAmount = b.total_amount;
 
         if (isFull) {
           acc.full.count += 1;
-          acc.full.total += mainPrice;
+          acc.full.total += actualPaid;
         } else {
           acc.advance.count += 1;
-          acc.advance.total += mainPrice;
+          acc.advance.total += actualPaid;
         }
 
         // Determine gateway fee base and rate
@@ -176,18 +216,18 @@ export const FinanceService = {
             gateRate = 0.015;
           }
         } else if (vertical === "staycation") {
-          gatewayBase = mainPrice;
+          gatewayBase = totalAmount;
         }
 
-        // Commission is % of Gross Collection (Paid + Discount)
-        const bCommission = mainPrice * commRate;
-        // Gateway fee
+        // Commission is % of TOTAL PRICE (Paid + Due + Discount)
+        const bCommission = totalAmount * commRate;
+        // Gateway fee is calculated on the actual amount paid through the gateway (or gross if staycation)
         const bGateway = gatewayBase * gateRate;
 
         acc.totalCommission += bCommission;
         acc.totalGateway += bGateway;
         acc.totalCashCollected += actualPaid;
-        acc.totalGross += mainPrice;
+        acc.totalGross += totalAmount;
         acc.count += 1;
         return acc;
       },
@@ -206,7 +246,7 @@ export const FinanceService = {
 
     return {
       count: summary.count,
-      totalPaid: Number(summary.totalGross.toFixed(2)), // UI section title
+      totalPaid: Number(summary.totalCashCollected.toFixed(2)), // UI section title: show what was collected online
       full: {
         count: summary.full.count,
         total: Number(summary.full.total.toFixed(2)),

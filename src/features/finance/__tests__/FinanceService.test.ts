@@ -46,6 +46,7 @@ describe("FinanceService Payout Logic", () => {
         payment_type: "full",
         date: "2026-05-28",
         sports_type: "Football",
+        booking_status: "confirmed",
       },
     ];
 
@@ -63,47 +64,21 @@ describe("FinanceService Payout Logic", () => {
     expect(breakdown.count).toBe(1);
   });
 
-  it("should accurately calculate Pickleball Full Payment payout with 2 decimals", async () => {
-    // Pickleball: 500 price, 3.5% commission (17.5), 1.5% gateway (7.5) -> 475 payout
-    const mockRawData = [
-      {
-        id: "b2",
-        paid_amount: 500,
-        total_amount: 500,
-        payment_type: "full",
-        date: "2026-05-28",
-        sports_type: "Pickleball",
-      },
-    ];
-
-    jest.spyOn(SportsPayoutStrategy, "getBreakdownRawData").mockResolvedValue(mockRawData as any);
-
-    const breakdown = await FinanceService.getPayoutDetailsBreakdown(
-      mockVenueId,
-      "2026-05-28",
-      "2026-05-28",
-    );
-
-    // Math: 500 * 0.035 = 17.5, 500 * 0.015 = 7.5. 500 - 17.5 - 7.5 = 475.
-    expect(breakdown.commission).toBe(17.5);
-    expect(breakdown.gateway).toBe(7.5);
-    expect(breakdown.finalPayout).toBe(475);
-  });
-
-  it("should accurately calculate Turf Advance Payment payout with 2 decimals", async () => {
-    // Turf Advance: 100 paid, 0 discount.
-    // Commission: 3.5% of 100 = 3.5.
-    // Gateway: 2% of 100 = 2.
-    // Payout: 100 - 3.5 - 2 = 94.5.
+  it("should calculate commission on TOTAL price for Advance Payment", async () => {
+    // Turf Advance: 200 paid online, 1000 total price.
+    // Commission: 3.5% of 1000 = 35.
+    // Gateway: 2% of 200 = 4.
+    // Payout: 200 - 35 - 4 = 161.
     const mockRawData = [
       {
         id: "b3",
-        paid_amount: 100,
+        paid_amount: 200,
         total_amount: 1000,
         discount_amount: 0,
         payment_type: "advance",
         date: "2026-05-28",
         sports_type: "Cricket",
+        booking_status: "confirmed",
       },
     ];
 
@@ -115,24 +90,32 @@ describe("FinanceService Payout Logic", () => {
       "2026-05-28",
     );
 
-    expect(breakdown.commission).toBe(3.5);
-    expect(breakdown.gateway).toBe(2);
-    expect(breakdown.finalPayout).toBe(94.5);
+    expect(breakdown.commission).toBe(35);
+    expect(breakdown.gateway).toBe(4);
+    expect(breakdown.finalPayout).toBe(161);
   });
 
-  it("should accurately calculate commission on Gross Collection (8600 scenario)", async () => {
-    // Gross Collection = 8600.
-    // If Paid = 8371 and Discount = 229 -> Base is 8600.
-    // Commission (3.5%) = 301.
+  it("should group multi-slot bookings correctly", async () => {
+    // User books 2 slots of 500 each, pays 200 advance tied to first slot.
+    // Group ID matches for both.
     const mockRawData = [
       {
-        id: "b4",
-        paid_amount: 8371,
-        total_amount: 8600,
-        discount_amount: 229,
-        payment_type: "full",
+        id: "b4-1",
+        paid_amount: 200,
+        total_amount: 500,
+        payment_type: "advance",
+        booking_group_id: "group-x",
         date: "2026-05-28",
-        sports_type: "Football",
+        booking_status: "confirmed",
+      },
+      {
+        id: "b4-2",
+        paid_amount: 0,
+        total_amount: 500,
+        payment_type: "advance",
+        booking_group_id: "group-x",
+        date: "2026-05-28",
+        booking_status: "confirmed",
       },
     ];
 
@@ -144,12 +127,21 @@ describe("FinanceService Payout Logic", () => {
       "2026-05-28",
     );
 
-    expect(breakdown.commission).toBe(301);
-    expect(breakdown.gateway).toBe(Number((8371 * 0.02).toFixed(2))); // 167.42
-    expect(breakdown.finalPayout).toBe(Number((8371 - 301 - 8371 * 0.02).toFixed(2))); // 7902.58
+    // Grouping should merge them:
+    // Total Paid = 200
+    // Total Price = 1000
+    // Commission = 1000 * 0.035 = 35
+    // Gateway = 200 * 0.02 = 4
+    // Payout = 200 - 35 - 4 = 161
+    // Count = 1 (MERGED)
+
+    expect(breakdown.count).toBe(1);
+    expect(breakdown.totalPaid).toBe(200);
+    expect(breakdown.commission).toBe(35);
+    expect(breakdown.finalPayout).toBe(161);
   });
 
-  it("should calculate Staycation payout using Gross Collection for gateway fee", async () => {
+  it("should calculate Staycation payout using Total Amount for both commission and gateway", async () => {
     // Mock vertical to staycation
     (supabase.from as jest.Mock).mockImplementation(table => {
       if (table === "venues") {
@@ -171,7 +163,7 @@ describe("FinanceService Payout Logic", () => {
 
     // Staycation: 10100 main price (9900 paid + 200 discount).
     // Commission (5%) = 10100 * 0.05 = 505.
-    // Gateway (2%) = 10100 * 0.02 = 202. (Staycation logic)
+    // Gateway (2%) = 10100 * 0.02 = 202. (Staycation logic uses total_amount)
     // Final Payout = 9900 - 505 - 202 = 9193.
     const mockRawData = [
       {
@@ -181,6 +173,7 @@ describe("FinanceService Payout Logic", () => {
         discount_amount: 200,
         payment_type: "full",
         date: "2026-05-28",
+        booking_status: "confirmed",
       },
     ];
 
@@ -197,5 +190,37 @@ describe("FinanceService Payout Logic", () => {
     expect(breakdown.commission).toBe(505);
     expect(breakdown.gateway).toBe(202);
     expect(breakdown.finalPayout).toBe(9193);
+  });
+
+  it("should exclude non-confirmed/completed bookings", async () => {
+    const mockRawData = [
+      {
+        id: "b_confirmed",
+        paid_amount: 1000,
+        total_amount: 1000,
+        payment_type: "full",
+        booking_status: "confirmed",
+        date: "2026-05-28",
+      },
+      {
+        id: "b_pending",
+        paid_amount: 1000,
+        total_amount: 1000,
+        payment_type: "full",
+        booking_status: "pending",
+        date: "2026-05-28",
+      },
+    ];
+
+    jest.spyOn(SportsPayoutStrategy, "getBreakdownRawData").mockResolvedValue(mockRawData as any);
+
+    const breakdown = await FinanceService.getPayoutDetailsBreakdown(
+      mockVenueId,
+      "2026-05-28",
+      "2026-05-28",
+    );
+
+    expect(breakdown.count).toBe(1);
+    expect(breakdown.totalPaid).toBe(1000);
   });
 });

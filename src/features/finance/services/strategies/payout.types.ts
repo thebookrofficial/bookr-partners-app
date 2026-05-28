@@ -9,6 +9,9 @@ export interface RawBooking {
   payment_type: "full" | "advance";
   date: string; // Unified date string (YYYY-MM-DD)
   sports_type?: string; // Optional field specifically for sports to determine gateway fees
+  booking_group_id?: string | null;
+  parent_booking_id?: string | null;
+  booking_status: string;
 }
 
 export interface PayoutStrategy {

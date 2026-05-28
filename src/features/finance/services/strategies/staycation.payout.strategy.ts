@@ -8,7 +8,9 @@ export const StaycationPayoutStrategy: PayoutStrategy = {
   async getPendingRawData(venueId, dates) {
     const { data, error } = await supabase
       .from("staycation_bookings")
-      .select(`id, paid_amount, total_amount, discount_amount, payment_type, check_in_date`)
+      .select(
+        `id, paid_amount, total_amount, discount_amount, payment_type, booking_status, check_in_date`,
+      )
       .eq("venue_id", venueId)
       .in("check_in_date", dates)
       .eq("booking_source", "online")
@@ -23,13 +25,16 @@ export const StaycationPayoutStrategy: PayoutStrategy = {
       discount_amount: Number(b.discount_amount || 0),
       payment_type: b.payment_type as "full" | "advance",
       date: b.check_in_date,
+      booking_status: b.booking_status,
     }));
   },
 
   async getBreakdownRawData(venueId, startDate, endDate) {
     const { data, error } = await supabase
       .from("staycation_bookings")
-      .select(`id, paid_amount, total_amount, discount_amount, payment_type, check_in_date`)
+      .select(
+        `id, paid_amount, total_amount, discount_amount, payment_type, booking_status, check_in_date`,
+      )
       .eq("venue_id", venueId)
       .gte("check_in_date", startDate)
       .lte("check_in_date", endDate)
@@ -45,6 +50,7 @@ export const StaycationPayoutStrategy: PayoutStrategy = {
       discount_amount: Number(b.discount_amount || 0),
       payment_type: b.payment_type as "full" | "advance",
       date: b.check_in_date,
+      booking_status: b.booking_status,
     }));
   },
 

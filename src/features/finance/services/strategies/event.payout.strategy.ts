@@ -9,7 +9,7 @@ export const EventPayoutStrategy: PayoutStrategy = {
     const { data, error } = await supabase
       .from("event_bookings")
       .select(
-        `id, paid_amount, total_amount, discount_amount, payment_type, created_at, events!inner(venue_id)`,
+        `id, paid_amount, total_amount, discount_amount, payment_type, booking_status, created_at, events!inner(venue_id)`,
       )
       .eq("events.venue_id", venueId)
       .eq("booking_source", "online")
@@ -26,6 +26,7 @@ export const EventPayoutStrategy: PayoutStrategy = {
         discount_amount: Number(b.discount_amount || 0),
         payment_type: b.payment_type as "full" | "advance",
         date: b.created_at.split("T")[0],
+        booking_status: b.booking_status,
       }));
   },
 
@@ -33,7 +34,7 @@ export const EventPayoutStrategy: PayoutStrategy = {
     const { data, error } = await supabase
       .from("event_bookings")
       .select(
-        `id, paid_amount, total_amount, discount_amount, payment_type, created_at, events!inner(venue_id)`,
+        `id, paid_amount, total_amount, discount_amount, payment_type, booking_status, created_at, events!inner(venue_id)`,
       )
       .eq("events.venue_id", venueId)
       .gte("created_at", `${startDate}T00:00:00`)
@@ -50,6 +51,7 @@ export const EventPayoutStrategy: PayoutStrategy = {
       discount_amount: Number(b.discount_amount || 0),
       payment_type: b.payment_type as "full" | "advance",
       date: b.created_at.split("T")[0],
+      booking_status: b.booking_status,
     }));
   },
 

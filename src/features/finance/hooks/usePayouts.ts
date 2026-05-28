@@ -40,9 +40,20 @@ export const usePayouts = (venueId: string) => {
       setPendingPayouts(pending);
 
       // 2. Determine Date Range for Historical Payouts
-      const endDate = new Date();
-      // Set startDate to May 1st, 2026 to ensure all May bookings (including 14th May) are shown
+      const now = new Date();
+      // Set startDate to May 1st, 2026 to ensure all May bookings are shown
       const startDate = new Date(2026, 4, 1); // Month is 0-indexed, so 4 is May
+
+      // For the current interval (week/month), we want to include all future bookings
+      // within that interval so the summary matches the detail breakdown.
+      let endDate = new Date(now);
+      if (activeTab.toLowerCase() === "week") {
+        const day = now.getDay();
+        const diff = day === 0 ? 0 : 7 - day;
+        endDate.setDate(now.getDate() + diff);
+      } else if (activeTab.toLowerCase() === "month") {
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      }
 
       let interval: "day" | "week" | "month" = "day";
 

@@ -18,7 +18,7 @@ export const SportsPayoutStrategy: PayoutStrategy = {
     const { data, error } = await supabase
       .from("sports_bookings")
       .select(
-        `id, paid_amount, total_amount, discount_amount, payment_type, sports_slots!inner(slot_date)`,
+        `id, paid_amount, total_amount, discount_amount, payment_type, booking_status, booking_group_id, parent_booking_id, sports_slots!inner(slot_date)`,
       )
       .eq("venue_id", venueId)
       .in("sports_slots.slot_date", dates)
@@ -35,6 +35,9 @@ export const SportsPayoutStrategy: PayoutStrategy = {
       payment_type: b.payment_type as "full" | "advance",
       date: (b.sports_slots as any).slot_date,
       sports_type: sportsType,
+      booking_status: b.booking_status,
+      booking_group_id: b.booking_group_id,
+      parent_booking_id: b.parent_booking_id,
     }));
   },
 
@@ -51,7 +54,7 @@ export const SportsPayoutStrategy: PayoutStrategy = {
     const { data, error } = await supabase
       .from("sports_bookings")
       .select(
-        `id, paid_amount, total_amount, discount_amount, payment_type, sports_slots!inner(slot_date)`,
+        `id, paid_amount, total_amount, discount_amount, payment_type, booking_status, booking_group_id, parent_booking_id, sports_slots!inner(slot_date)`,
       )
       .eq("venue_id", venueId)
       .gte("sports_slots.slot_date", startDate)
@@ -69,6 +72,9 @@ export const SportsPayoutStrategy: PayoutStrategy = {
       payment_type: b.payment_type as "full" | "advance",
       date: (b.sports_slots as any).slot_date,
       sports_type: sportsType,
+      booking_status: b.booking_status,
+      booking_group_id: b.booking_group_id,
+      parent_booking_id: b.parent_booking_id,
     }));
   },
 
