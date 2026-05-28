@@ -2,7 +2,14 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Button } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -13,6 +20,9 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useServiceStore } from "@/store/serviceStore";
 import { usePayoutDetails } from "../hooks/usePayoutDetails";
+import { DownloadPayoutsModal } from "../components/DownloadPayoutsModal";
+import { FinanceService } from "../services/finance.service";
+import { exportToExcel } from "../utils/excel.utils";
 
 const DetailRow = ({
   label,
@@ -84,7 +94,30 @@ export const PayoutDetailsScreen = () => {
   const { venueId, startDate, endDate, displayLabel } = route.params;
   const { activeVenueName } = useServiceStore();
 
+  const [modalVisible, setModalVisible] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+
   const { breakdown, loading } = usePayoutDetails(venueId, startDate, endDate);
+
+  const handleDownload = async (start: string, end: string) => {
+    setExportLoading(true);
+    try {
+      const data = await FinanceService.exportPayouts(venueId, start, end);
+      if (data.length <= 2) {
+        // Only header + spacing + empty total row means no data
+        Alert.alert("No Data", "There are no confirmed bookings in the selected range.");
+        return;
+      }
+      const fileName = `Payouts_${activeVenueName.replace(/\s+/g, "_")}_${start}_to_${end}`;
+      await exportToExcel(data, fileName);
+      setModalVisible(false);
+    } catch (error) {
+      console.error("[PayoutDetailsScreen] Export Error:", error);
+      Alert.alert("Export Failed", "Something went wrong while generating the Excel file.");
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
   if (loading && !breakdown) {
     return (
@@ -185,10 +218,17 @@ export const PayoutDetailsScreen = () => {
             variant="primary"
             style={styles.downloadBtn}
             textStyle={styles.downloadBtnText}
-            onPress={() => {}}
+            onPress={() => setModalVisible(true)}
           />
         </View>
       </ScrollView>
+
+      <DownloadPayoutsModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onDownload={handleDownload}
+        loading={exportLoading}
+      />
     </ScreenContainer>
   );
 };

@@ -8,6 +8,10 @@ export interface RawBooking {
   discount_amount?: number;
   payment_type: "full" | "advance";
   date: string; // Unified date string (YYYY-MM-DD)
+  start_time?: string;
+  end_time?: string;
+  user_name?: string;
+  user_phone?: string;
   sports_type?: string; // Optional field specifically for sports to determine gateway fees
   booking_group_id?: string | null;
   parent_booking_id?: string | null;
@@ -17,6 +21,7 @@ export interface RawBooking {
 export interface PayoutStrategy {
   getPendingRawData(venueId: string, dates: string[]): Promise<RawBooking[]>;
   getBreakdownRawData(venueId: string, startDate: string, endDate: string): Promise<RawBooking[]>;
+  getExportRawData(venueId: string, startDate: string, endDate: string): Promise<RawBooking[]>;
   getRpcName(): string;
   getCommissionRate(): number;
 }

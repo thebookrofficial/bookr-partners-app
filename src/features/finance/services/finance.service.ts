@@ -261,4 +261,93 @@ export const FinanceService = {
       commissionRate: `${commRate * 100}%`,
     };
   },
+
+  /**
+   * Generates formatted data for Excel export.
+   */
+  async exportPayouts(venueId: string, startDate: string, endDate: string) {
+    const vertical = await getVenueVertical(venueId);
+    if (!vertical) throw new Error("Venue not found.");
+
+    const strategy = getStrategy(vertical);
+    const rawData = await strategy.getExportRawData(venueId, startDate, endDate);
+    const commRate = strategy.getCommissionRate();
+
+    const groupedBookings: Record<string, any> = {};
+
+    rawData.forEach(b => {
+      const status = (b.booking_status || "").toLowerCase().trim();
+      if (status !== "confirmed" && status !== "completed") return;
+
+      const groupKey = b.booking_group_id || b.parent_booking_id || b.id;
+
+      if (!groupedBookings[groupKey]) {
+        groupedBookings[groupKey] = { ...b };
+      } else {
+        groupedBookings[groupKey].paid_amount += b.paid_amount;
+        groupedBookings[groupKey].total_amount += b.total_amount;
+      }
+    });
+
+    const rows = Object.values(groupedBookings).map((b: any) => {
+      let gateRate = 0.02;
+      let gatewayBase = b.paid_amount;
+
+      if (vertical === "sports" && b.sports_type) {
+        if (b.sports_type.toLowerCase().includes("pickleball")) {
+          gateRate = 0.015;
+        }
+      } else if (vertical === "staycation") {
+        gatewayBase = b.total_amount;
+      }
+
+      const commission = b.total_amount * commRate;
+      const gateway = gatewayBase * gateRate;
+
+      return {
+        "Booking Date": b.date,
+        "Start Time": b.start_time || "N/A",
+        "End Time": b.end_time || "N/A",
+        "User Name": b.user_name || "Guest",
+        "User Phone": b.user_phone || "N/A",
+        "Total Amount": Number(b.total_amount.toFixed(2)),
+        "Paid Amount": Number(b.paid_amount.toFixed(2)),
+        "Bookr Commission": Number(commission.toFixed(2)),
+        "Handling Fee": Number(gateway.toFixed(2)),
+        "Est. Payout": Number((b.paid_amount - commission - gateway).toFixed(2)),
+      };
+    });
+
+    // Calculate totals for summary row
+    const totals = rows.reduce(
+      (acc, row) => {
+        acc.totalAmount += row["Total Amount"];
+        acc.paidAmount += row["Paid Amount"];
+        acc.commission += row["Bookr Commission"];
+        acc.handling += row["Handling Fee"];
+        acc.payout += row["Est. Payout"];
+        return acc;
+      },
+      { totalAmount: 0, paidAmount: 0, commission: 0, handling: 0, payout: 0 },
+    );
+
+    // Add empty row for spacing
+    rows.push({} as any);
+
+    // Add summary row
+    rows.push({
+      "Booking Date": "TOTAL",
+      "Start Time": `Count: ${rows.length - 1}`,
+      "End Time": "",
+      "User Name": "",
+      "User Phone": "",
+      "Total Amount": Number(totals.totalAmount.toFixed(2)),
+      "Paid Amount": Number(totals.paidAmount.toFixed(2)),
+      "Bookr Commission": Number(totals.commission.toFixed(2)),
+      "Handling Fee": Number(totals.handling.toFixed(2)),
+      "Est. Payout": Number(totals.payout.toFixed(2)),
+    } as any);
+
+    return rows;
+  },
 };

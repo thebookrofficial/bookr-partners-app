@@ -72,12 +72,29 @@ export const usePayouts = (venueId: string) => {
           break;
       }
 
-      const historical = await FinanceService.getAggregatedPayouts({
+      let historical = await FinanceService.getAggregatedPayouts({
         venueId,
         startDate: startDate.toISOString().split("T")[0],
         endDate: endDate.toISOString().split("T")[0],
         interval,
       });
+
+      // Filter out the ongoing current week if active tab is week
+      if (activeTab.toLowerCase() === "week" && historical?.length > 0) {
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+
+        // Calculate the start of the current week (Sunday)
+        const currentWeekStart = new Date(today);
+        currentWeekStart.setDate(today.getDate() - dayOfWeek);
+        currentWeekStart.setHours(0, 0, 0, 0);
+
+        historical = historical.filter((item: PayoutItem) => {
+          const itemDate = new Date(item.payout_date);
+          // Only show weeks that started before the current Sunday
+          return itemDate.getTime() < currentWeekStart.getTime();
+        });
+      }
 
       setHistoricalPayouts(historical || []);
     } catch (err: any) {

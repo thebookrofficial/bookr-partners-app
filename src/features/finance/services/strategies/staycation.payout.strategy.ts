@@ -54,6 +54,18 @@ export const StaycationPayoutStrategy: PayoutStrategy = {
     }));
   },
 
+  async getExportRawData(venueId, startDate, endDate) {
+    // Stub implementation for staycation
+    const raw = await this.getBreakdownRawData(venueId, startDate, endDate);
+    return raw.map(b => ({
+      ...b,
+      start_time: "N/A",
+      end_time: "N/A",
+      user_name: "Guest",
+      user_phone: "N/A",
+    }));
+  },
+
   getRpcName() {
     return "get_staycation_payouts";
   },
