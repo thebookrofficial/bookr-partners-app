@@ -147,7 +147,7 @@ export const PayoutDetailsScreen = () => {
 
           <ExpandableSection title="Bookr fees" amount={`-₹${breakdown?.commission || 0}`}>
             <DetailRow
-              label={`Commission (${breakdown?.commissionRate})`}
+              label={`Commission`}
               value={`-₹${breakdown?.commission || 0}`}
               weight="semiBold"
             />
@@ -155,12 +155,8 @@ export const PayoutDetailsScreen = () => {
 
           <View style={styles.divider} />
 
-          <ExpandableSection title="Payment Gateway" amount={`-₹${breakdown?.gateway || 0}`}>
-            <DetailRow
-              label="Razorpay cut (2%)"
-              value={`-₹${breakdown?.gateway || 0}`}
-              weight="semiBold"
-            />
+          <ExpandableSection title="Handling Fees" amount={`-₹${breakdown?.gateway || 0}`}>
+            <DetailRow label="Charges" value={`-₹${breakdown?.gateway || 0}`} weight="semiBold" />
           </ExpandableSection>
 
           <View style={styles.divider} />

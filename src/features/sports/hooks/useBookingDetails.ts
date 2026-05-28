@@ -20,6 +20,7 @@ export interface BookingDetailData {
   created_at: string;
   profiles: { full_name: string; phone: string; avatar_url: string } | null;
   sports_slots: {
+    id: string;
     start_time: string;
     end_time: string;
     slot_date: string;
@@ -27,6 +28,13 @@ export interface BookingDetailData {
   };
   venues: { name: string; vertical: string };
   combined_time?: string;
+  idChain: string[];
+  slotIdChain: string[];
+  lastBookingId: string;
+  parent_booking_id?: string | null;
+  booking_group_id?: string | null;
+  sports_booking_type?: string;
+  sequence_number?: number;
 }
 
 export interface PaymentLog {
@@ -65,55 +73,72 @@ export const useBookingDetails = (bookingId: string) => {
 
       if (baseError) throw baseError;
 
-      // 2. Fetch ALL related bookings for this user/slot/date (including extensions)
-      // We filter by phone/user and date to catch the "Add On" records
+      // 2. Fetch ALL potentially related bookings for this user/slot/date
       let linkedQuery = supabase
         .from("sports_bookings")
         .select("*, sports_slots!inner(*)")
         .eq("sports_slots.slot_date", baseBooking.sports_slots.slot_date)
         .eq("sports_slots.ground_id", baseBooking.sports_slots.ground_id)
+        .neq("booking_status", "cancelled")
+        .neq("booking_status", "refunded")
         .order("created_at", { ascending: true });
 
-      if (baseBooking.user_id) {
-        linkedQuery = linkedQuery.eq("user_id", baseBooking.user_id);
+      // Only search for linked if it's part of a group or has a parent/child
+      if (baseBooking.booking_group_id) {
+        linkedQuery = linkedQuery.eq("booking_group_id", baseBooking.booking_group_id);
+      } else if (baseBooking.parent_booking_id) {
+        linkedQuery = linkedQuery.or(
+          `id.eq.${baseBooking.parent_booking_id},parent_booking_id.eq.${baseBooking.parent_booking_id}`,
+        );
       } else {
-        linkedQuery = linkedQuery.eq("guest_phone", baseBooking.guest_phone);
+        // It's a base booking, look for its extensions
+        linkedQuery = linkedQuery.or(
+          `id.eq.${baseBooking.id},parent_booking_id.eq.${baseBooking.id}`,
+        );
       }
 
       const { data: linkedData, error: linkedError } = await linkedQuery;
 
       if (linkedError) throw linkedError;
 
-      // Ensure we have at least the current booking in the list
-      const allLinkedBookings = linkedData && linkedData.length > 0 ? linkedData : [baseBooking];
-
-      // 3. Aggregate data
-      const totalAmount = allLinkedBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
-      const paidAmount = allLinkedBookings.reduce((sum, b) => sum + Number(b.paid_amount), 0);
-      const discountAmount = allLinkedBookings.reduce(
-        (sum, b) => sum + Number(b.discount_amount || 0),
-        0,
+      const finalChain = (linkedData || []).sort((a, b) =>
+        a.sports_slots.start_time.localeCompare(b.sports_slots.start_time),
       );
 
-      // Combine the booking details
-      const aggregatedBooking = {
+      // 4. Aggregate data
+      const totalAmount = finalChain.reduce((sum, b) => sum + Number(b.total_amount), 0);
+      const paidAmount = finalChain.reduce((sum, b) => sum + Number(b.paid_amount), 0);
+      const discountAmount = finalChain.reduce((sum, b) => sum + Number(b.discount_amount || 0), 0);
+
+      const firstBooking = finalChain[0];
+      const lastBooking = finalChain[finalChain.length - 1];
+
+      const aggregatedBooking: BookingDetailData = {
         ...baseBooking,
         total_amount: totalAmount,
         paid_amount: paidAmount,
         discount_amount: discountAmount,
-        // Create a combined time string (e.g., 9 AM - 11 AM)
-        combined_time: `${formatHour(baseBooking.sports_slots.start_time)} - ${formatHour(
-          allLinkedBookings[allLinkedBookings.length - 1].sports_slots.end_time,
+        sports_slots: {
+          ...baseBooking.sports_slots,
+          id: lastBooking.sports_slots.id, // Use the last slot ID for extension logic
+          start_time: firstBooking.sports_slots.start_time,
+          end_time: lastBooking.sports_slots.end_time,
+        },
+        combined_time: `${formatHour(firstBooking.sports_slots.start_time)} - ${formatHour(
+          lastBooking.sports_slots.end_time,
         )}`,
+        idChain: finalChain.map(b => b.id),
+        slotIdChain: finalChain.map(b => b.slot_id),
+        lastBookingId: lastBooking.id,
       };
 
       setBooking(aggregatedBooking);
 
-      // 4. Fetch Payment Logs Ledger
+      // 5. Fetch Payment Logs Ledger for ALL bookings in the chain
       const { data: logsData, error: logsError } = await supabase
         .from("offline_payment_logs")
         .select("id, amount, payment_mode, note, created_at")
-        .eq("booking_id", bookingId)
+        .in("booking_id", aggregatedBooking.idChain)
         .eq("booking_vertical", "sports")
         .order("created_at", { ascending: true });
 
@@ -123,25 +148,20 @@ export const useBookingDetails = (bookingId: string) => {
         console.warn("Could not fetch payment logs:", logsError);
       }
 
-      // 5. Reconstruct Initial Advance Payment
+      // 6. Reconstruct Initial Advance Payment
       const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
-      const totalPaidAmount = Number(baseBooking.paid_amount) || 0;
+      const totalPaidInChain = aggregatedBooking.paid_amount;
 
-      // If the total paid on the booking is greater than what's in the logs,
-      // the difference is the initial advance payment.
-      if (totalPaidAmount > totalLoggedAmount) {
-        const initialAmount = totalPaidAmount - totalLoggedAmount;
+      if (totalPaidInChain > totalLoggedAmount) {
+        const initialAmount = totalPaidInChain - totalLoggedAmount;
         const initialLog: PaymentLog = {
-          id: `initial-${baseBooking.id}`,
+          id: `initial-chain-${bookingId}`,
           amount: initialAmount,
-          // Assume Online/UPI if user_id exists (app booking), otherwise Cash for manual
           payment_mode: baseBooking.user_id ? "online" : "cash",
           note: "Initial Advance Payment",
           created_at: baseBooking.created_at,
           isInitial: true,
         };
-
-        // Unshift to put it at the very top of the list (earliest date)
         fetchedLogs.unshift(initialLog);
       }
 
@@ -170,6 +190,7 @@ export const useBookingDetails = (bookingId: string) => {
 
       const dbPaymentMode = mode === "online" ? "upi" : mode;
 
+      // Log payment against the main booking ID
       const { error } = await supabase.functions.invoke("log-offline-payment", {
         body: {
           bookingId: bookingId,
@@ -197,24 +218,22 @@ export const useBookingDetails = (bookingId: string) => {
     if (!booking) return false;
     setIsSaving(true);
     try {
+      // Cancel ALL bookings in the chain
       const { error: bookingError } = await supabase
         .from("sports_bookings")
         .update({ booking_status: "cancelled" })
-        .eq("id", bookingId);
-      // .select()
-      // .single();
+        .in("id", booking.idChain);
 
       if (bookingError) {
-        console.error("Booking Error:", bookingError);
-        throw new Error("You do not have permission to cancel this booking (RLS Blocked).");
+        console.error("Booking Cancellation Error:", bookingError);
+        throw new Error("You do not have permission to cancel this booking.");
       }
 
+      // Mark ALL slots in the chain as available
       const { error: slotError } = await supabase
         .from("sports_slots")
         .update({ status: "available" })
-        .eq("id", booking.slot_id);
-      // .select()
-      // .maybeSingle();
+        .in("id", booking.slotIdChain);
 
       if (slotError) console.warn("Slot update issue:", slotError);
 
@@ -233,6 +252,7 @@ export const useBookingDetails = (bookingId: string) => {
     if (!booking) return false;
     setIsSaving(true);
     try {
+      // Use the LAST booking in the chain to determine next start time
       const [h, m, s] = booking.sports_slots.end_time.split(":").map(Number);
       let date = new Date();
       date.setHours(h, m + additionalMinutes, s);
@@ -243,8 +263,8 @@ export const useBookingDetails = (bookingId: string) => {
         .padStart(2, "0")}:00`;
 
       await SportsService.extendBookingDuration({
-        slotId: booking.slot_id,
-        bookingId: booking.id,
+        slotId: booking.sports_slots.id, // This is the last slot's ID now
+        bookingId: booking.lastBookingId, // This is the last booking's ID
         newEndTime24,
         extraAmount: additionalCost,
       });

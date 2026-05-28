@@ -59,6 +59,7 @@ export const SportsService = {
       .select(
         `
         id, user_id, venue_id, slot_id, booking_status, subtotal, discount_amount, platform_fee, gateway_fee, total_amount, vendor_payout, paid_amount, guest_name, guest_phone, notes, created_at,
+        parent_booking_id, booking_group_id, sports_booking_type, sequence_number,
         profiles ( full_name, phone, avatar_url ),
         sports_slots!inner ( id, start_time, end_time, slot_date, status, ground_id )
       `,
@@ -326,6 +327,9 @@ export const SportsService = {
       platform_fee: 0,
       gateway_fee: 0,
       notes: `Extension of booking: ${params.bookingId}`,
+      parent_booking_id: originalBooking.parent_booking_id || originalBooking.id,
+      sports_booking_type: "extension",
+      sequence_number: (originalBooking.sequence_number || 1) + 1,
     });
 
     if (bookingError) {

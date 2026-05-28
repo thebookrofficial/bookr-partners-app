@@ -138,7 +138,13 @@ export const StaycationDashboardScreen = () => {
     activeTab,
   );
 
-  const roomTabs = useMemo(() => ["All Rooms", ...rooms.map(r => r.name)], [rooms]);
+  const roomTabs = useMemo(() => {
+    // Extract base names (e.g., "Deluxe" from "Deluxe-101")
+    const baseNames = rooms.map(r => r.name.split("-")[0].trim());
+    // Deduplicate base names
+    const uniqueBases = Array.from(new Set(baseNames));
+    return ["All Rooms", ...uniqueBases];
+  }, [rooms]);
 
   const toggleWeek = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

@@ -148,9 +148,13 @@ export const useStaycationDashboard = (
         .gte("check_out_date", startStr);
 
       if (selectedRoomName !== "All Rooms" && rooms.length > 0) {
-        const matchingRoom = rooms.find(r => r.name === selectedRoomName);
-        if (matchingRoom) {
-          query = query.eq("room_id", matchingRoom.id);
+        // Filter by base name (e.g., if "Deluxe" is selected, match all rooms like "Deluxe-101", "Deluxe-102")
+        const matchingRoomIds = rooms
+          .filter(r => r.name.startsWith(selectedRoomName))
+          .map(r => r.id);
+
+        if (matchingRoomIds.length > 0) {
+          query = query.in("room_id", matchingRoomIds);
         }
       }
 

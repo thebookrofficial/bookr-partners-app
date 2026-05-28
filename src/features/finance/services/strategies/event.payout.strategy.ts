@@ -8,7 +8,9 @@ export const EventPayoutStrategy: PayoutStrategy = {
   async getPendingRawData(venueId, dates) {
     const { data, error } = await supabase
       .from("event_bookings")
-      .select(`id, paid_amount, discount_amount, payment_type, created_at, events!inner(venue_id)`)
+      .select(
+        `id, paid_amount, total_amount, discount_amount, payment_type, created_at, events!inner(venue_id)`,
+      )
       .eq("events.venue_id", venueId)
       .eq("booking_source", "online")
       .in("booking_status", ["confirmed", "completed"]);
@@ -20,6 +22,7 @@ export const EventPayoutStrategy: PayoutStrategy = {
       .map(b => ({
         id: b.id,
         paid_amount: Number(b.paid_amount || 0),
+        total_amount: Number(b.total_amount || 0),
         discount_amount: Number(b.discount_amount || 0),
         payment_type: b.payment_type as "full" | "advance",
         date: b.created_at.split("T")[0],
@@ -29,7 +32,9 @@ export const EventPayoutStrategy: PayoutStrategy = {
   async getBreakdownRawData(venueId, startDate, endDate) {
     const { data, error } = await supabase
       .from("event_bookings")
-      .select(`id, paid_amount, discount_amount, payment_type, created_at, events!inner(venue_id)`)
+      .select(
+        `id, paid_amount, total_amount, discount_amount, payment_type, created_at, events!inner(venue_id)`,
+      )
       .eq("events.venue_id", venueId)
       .gte("created_at", `${startDate}T00:00:00`)
       .lte("created_at", `${endDate}T23:59:59`)
@@ -41,6 +46,7 @@ export const EventPayoutStrategy: PayoutStrategy = {
     return (data || []).map(b => ({
       id: b.id,
       paid_amount: Number(b.paid_amount || 0),
+      total_amount: Number(b.total_amount || 0),
       discount_amount: Number(b.discount_amount || 0),
       payment_type: b.payment_type as "full" | "advance",
       date: b.created_at.split("T")[0],

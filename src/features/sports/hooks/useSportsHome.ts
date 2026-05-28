@@ -39,6 +39,13 @@ export interface BookingData {
   isDisabled?: boolean;
   isPaymentPending?: boolean;
   startTimeRaw?: string;
+  endTimeRaw?: string;
+  notes?: string;
+  idChain: string[];
+  parent_booking_id?: string | null;
+  booking_group_id?: string | null;
+  sports_booking_type?: string;
+  sequence_number?: number;
 }
 
 const getLocalDateString = (date: Date) => {
@@ -268,37 +275,70 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             isDisabled,
             isPaymentPending: isDisabled && isUnpaid,
             startTimeRaw: b.start_time,
+            endTimeRaw: b.end_time,
+            notes: b.notes,
+            idChain: [b.id],
+            parent_booking_id: b.parent_booking_id,
+            booking_group_id: b.booking_group_id,
+            sports_booking_type: b.sports_booking_type,
+            sequence_number: b.sequence_number,
           };
         });
 
-      // Sort: Upcoming bookings first, Passed (isDisabled) bookings at the bottom.
-      // Maintain chronological order within each group.
+      // Sort chronological by start time
       const sortedBookings = [...formattedBookings].sort((a, b) => {
-        if (a.isDisabled !== b.isDisabled) {
-          return a.isDisabled ? 1 : -1; // non-disabled (upcoming) first
-        }
         return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
       });
 
-      // // Deduplicate ghost bookings by slot time
-      const uniqueBookings = Array.from(
-        new Map(sortedBookings.map(b => [b.startTimeRaw, b])).values(),
-      );
-      const merged = uniqueBookings.reduce((acc, current) => {
-        const existing = acc.find(b => b.phone === current.phone && b.date === current.date);
+      // Refined Merge: Use database-backed grouping IDs
+      const merged = sortedBookings.reduce((acc, current) => {
+        const existing = acc.find(b => {
+          // 1. Group by booking_group_id (User multi-slot)
+          if (
+            current.booking_group_id &&
+            b.booking_group_id === current.booking_group_id &&
+            b.date === current.date
+          ) {
+            return true;
+          }
+
+          // 2. Group by parent_booking_id (Vendor extension)
+          const existingParentId = b.parent_booking_id || b.id;
+          if (
+            current.parent_booking_id &&
+            existingParentId === current.parent_booking_id &&
+            b.date === current.date
+          ) {
+            return true;
+          }
+
+          return false;
+        });
+
         if (existing) {
           // Merge the time and price
+          // We assume sortedBookings is chronological, so we just update the end time
           existing.time = existing.time.replace(/ - .*/, "") + " - " + current.time.split(" - ")[1];
+          existing.endTimeRaw = current.endTimeRaw;
           existing.price = `₹${
             Number(existing.price.replace("₹", "")) + Number(current.price.replace("₹", ""))
           }`;
+          existing.idChain.push(current.id);
         } else {
           acc.push(current);
         }
         return acc;
       }, [] as BookingData[]);
 
-      setBookings(merged);
+      // Finally, sort by status (upcoming first)
+      const finalSorted = [...merged].sort((a, b) => {
+        if (a.isDisabled !== b.isDisabled) {
+          return a.isDisabled ? 1 : -1;
+        }
+        return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
+      });
+
+      setBookings(finalSorted);
     } catch (error) {
       console.error("Error fetching bookings:", error);
     } finally {

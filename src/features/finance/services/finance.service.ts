@@ -75,9 +75,21 @@ export const FinanceService = {
 
     rawData.forEach(b => {
       const actualPaid = b.paid_amount;
-      const gateRate = 0.02;
+      const discount = b.discount_amount || 0;
+      const collectionBase = actualPaid + discount; // GROSS COLLECTION (Paid + Discount)
 
-      const commission = actualPaid * commRate;
+      // SPORTS SPECIFIC: Determine gateway fee based on sports_type
+      let gateRate = 0.02; // Default
+      if (b.sports_type) {
+        const type = b.sports_type.toLowerCase();
+        if (type.includes("pickleball")) {
+          gateRate = 0.015;
+        }
+      }
+
+      // Commission is 3.5% of the Gross Collection (Option A)
+      const commission = collectionBase * commRate;
+      // Gateway fee is calculated on the actual amount paid online
       const gateway = actualPaid * gateRate;
       const payout = actualPaid - commission - gateway;
 
@@ -151,6 +163,22 @@ export const FinanceService = {
           acc.advance.total += mainPrice;
         }
 
+        // SPORTS SPECIFIC: Determine gateway fee based on sports_type
+        let gateRate = 0.02; // Default
+        if (b.sports_type) {
+          const type = b.sports_type.toLowerCase();
+          if (type.includes("pickleball")) {
+            gateRate = 0.015;
+          }
+        }
+
+        // Commission is 3.5% of Gross Collection (Paid + Discount)
+        const bCommission = mainPrice * commRate;
+        // Gateway fee is calculated on the actual amount paid through the gateway
+        const bGateway = actualPaid * gateRate;
+
+        acc.totalCommission += bCommission;
+        acc.totalGateway += bGateway;
         acc.totalCashCollected += actualPaid;
         acc.totalGross += mainPrice;
         acc.count += 1;
@@ -159,16 +187,15 @@ export const FinanceService = {
       {
         totalCashCollected: 0,
         totalGross: 0,
+        totalCommission: 0,
+        totalGateway: 0,
         count: 0,
         full: { count: 0, total: 0 },
         advance: { count: 0, total: 0 },
       },
     );
 
-    // STRICT CALCULATION on Total Cash Collected
-    const commission = summary.totalCashCollected * commRate;
-    const gateway = summary.totalCashCollected * 0.02;
-    const finalPayout = summary.totalCashCollected - commission - gateway;
+    const finalPayout = summary.totalCashCollected - summary.totalCommission - summary.totalGateway;
 
     return {
       count: summary.count,
@@ -181,8 +208,8 @@ export const FinanceService = {
         count: summary.advance.count,
         total: Math.round(summary.advance.total),
       },
-      commission: Math.round(commission),
-      gateway: Math.round(gateway),
+      commission: Math.round(summary.totalCommission),
+      gateway: Math.round(summary.totalGateway),
       finalPayout: Math.round(finalPayout),
       commissionRate: `${commRate * 100}%`,
     };
