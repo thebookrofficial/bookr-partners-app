@@ -15,8 +15,8 @@ import { LEGAL_TEXT } from "@/constants/legal";
 import AuthIllustration1 from "@/assets/images/auth_illustration_1.png";
 import AuthIllustration2 from "@/assets/images/auth_illustration_2.png";
 import WhiteBookrLogo from "@/assets/images/white_bookr_logo.png";
-import EmailIcon from "@/assets/icons/ic_email_outline.png";
-import DividerLine from "@/assets/icons/ic_divider_line.png";
+import EmailIcon from "@/assets/icons/ic_email_outline.svg";
+import DividerLine from "@/assets/icons/ic_divider_line.svg";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -71,7 +71,12 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.inputWrapper}>
-              <Image source={EmailIcon} style={styles.inputIcon} />
+              <EmailIcon
+                width={hs(20)}
+                height={vs(16)}
+                stroke={COLORS.text.muted}
+                style={styles.inputIcon}
+              />
               <AuthTextInput
                 placeholder="Email address"
                 value={email}
@@ -96,9 +101,19 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
           />
 
           <View style={styles.dividerContainer}>
-            <Image source={DividerLine} style={styles.dividerLine} resizeMode="stretch" />
+            <DividerLine
+              width={hs(70)}
+              height={1}
+              stroke={COLORS.text.muted}
+              style={styles.dividerLine}
+            />
             <Text style={styles.dividerText}>Or login with</Text>
-            <Image source={DividerLine} style={styles.dividerLine} resizeMode="stretch" />
+            <DividerLine
+              width={hs(70)}
+              height={1}
+              stroke={COLORS.text.muted}
+              style={styles.dividerLine}
+            />
           </View>
 
           <TouchableOpacity style={styles.socialButton} onPress={loginWithGoogle}>

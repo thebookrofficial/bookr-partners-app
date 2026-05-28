@@ -22,7 +22,7 @@ import { LEGAL_TEXT } from "@/constants/legal";
 import AuthIllustration1 from "@/assets/images/auth_illustration_1.png";
 import AuthIllustration2 from "@/assets/images/auth_illustration_2.png";
 import WhiteBookrLogo from "@/assets/images/white_bookr_logo.png";
-import DividerLine from "@/assets/icons/ic_divider_line.png";
+import DividerLine from "@/assets/icons/ic_divider_line.svg";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const OTP_LENGTH = 6;
@@ -162,9 +162,19 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
           />
 
           <View style={styles.dividerContainer}>
-            <Image source={DividerLine} style={styles.dividerLine} resizeMode="stretch" />
+            <DividerLine
+              width={hs(70)}
+              height={1}
+              stroke={COLORS.text.muted}
+              style={styles.dividerLine}
+            />
             <Text style={styles.dividerText}>Or login with</Text>
-            <Image source={DividerLine} style={styles.dividerLine} resizeMode="stretch" />
+            <DividerLine
+              width={hs(70)}
+              height={1}
+              stroke={COLORS.text.muted}
+              style={styles.dividerLine}
+            />
           </View>
 
           <TouchableOpacity style={styles.socialButton}>
