@@ -76,21 +76,24 @@ export const FinanceService = {
     rawData.forEach(b => {
       const actualPaid = b.paid_amount;
       const discount = b.discount_amount || 0;
-      const collectionBase = actualPaid + discount; // GROSS COLLECTION (Paid + Discount)
+      const mainPrice = actualPaid + discount; // GROSS COLLECTION (Paid + Discount)
 
-      // SPORTS SPECIFIC: Determine gateway fee based on sports_type
+      // Determine gateway fee base and rate
       let gateRate = 0.02; // Default
-      if (b.sports_type) {
-        const type = b.sports_type.toLowerCase();
-        if (type.includes("pickleball")) {
+      let gatewayBase = actualPaid;
+
+      if (vertical === "sports" && b.sports_type) {
+        if (b.sports_type.toLowerCase().includes("pickleball")) {
           gateRate = 0.015;
         }
+      } else if (vertical === "staycation") {
+        gatewayBase = mainPrice;
       }
 
-      // Commission is 3.5% of the Gross Collection (Option A)
-      const commission = collectionBase * commRate;
-      // Gateway fee is calculated on the actual amount paid online
-      const gateway = actualPaid * gateRate;
+      // Commission is % of the Gross Collection
+      const commission = mainPrice * commRate;
+      // Gateway fee
+      const gateway = gatewayBase * gateRate;
       const payout = actualPaid - commission - gateway;
 
       aggregation[b.date].amount += payout;
@@ -100,7 +103,7 @@ export const FinanceService = {
     return Object.entries(aggregation)
       .map(([date, stats]) => ({
         date,
-        amount: Math.round(stats.amount),
+        amount: Number(stats.amount.toFixed(2)),
         count: stats.count,
         displayDate: new Date(date).toLocaleDateString("en-GB", {
           day: "2-digit",
@@ -134,6 +137,7 @@ export const FinanceService = {
     });
 
     if (error) throw error;
+    // Note: RPC returns aggregated data, usually rounded at DB level or floats.
     return data;
   },
 
@@ -163,19 +167,22 @@ export const FinanceService = {
           acc.advance.total += mainPrice;
         }
 
-        // SPORTS SPECIFIC: Determine gateway fee based on sports_type
+        // Determine gateway fee base and rate
         let gateRate = 0.02; // Default
-        if (b.sports_type) {
-          const type = b.sports_type.toLowerCase();
-          if (type.includes("pickleball")) {
+        let gatewayBase = actualPaid;
+
+        if (vertical === "sports" && b.sports_type) {
+          if (b.sports_type.toLowerCase().includes("pickleball")) {
             gateRate = 0.015;
           }
+        } else if (vertical === "staycation") {
+          gatewayBase = mainPrice;
         }
 
-        // Commission is 3.5% of Gross Collection (Paid + Discount)
+        // Commission is % of Gross Collection (Paid + Discount)
         const bCommission = mainPrice * commRate;
-        // Gateway fee is calculated on the actual amount paid through the gateway
-        const bGateway = actualPaid * gateRate;
+        // Gateway fee
+        const bGateway = gatewayBase * gateRate;
 
         acc.totalCommission += bCommission;
         acc.totalGateway += bGateway;
@@ -199,18 +206,18 @@ export const FinanceService = {
 
     return {
       count: summary.count,
-      totalPaid: Math.round(summary.totalGross), // UI section title
+      totalPaid: Number(summary.totalGross.toFixed(2)), // UI section title
       full: {
         count: summary.full.count,
-        total: Math.round(summary.full.total),
+        total: Number(summary.full.total.toFixed(2)),
       },
       advance: {
         count: summary.advance.count,
-        total: Math.round(summary.advance.total),
+        total: Number(summary.advance.total.toFixed(2)),
       },
-      commission: Math.round(summary.totalCommission),
-      gateway: Math.round(summary.totalGateway),
-      finalPayout: Math.round(finalPayout),
+      commission: Number(summary.totalCommission.toFixed(2)),
+      gateway: Number(summary.totalGateway.toFixed(2)),
+      finalPayout: Number(finalPayout.toFixed(2)),
       commissionRate: `${commRate * 100}%`,
     };
   },

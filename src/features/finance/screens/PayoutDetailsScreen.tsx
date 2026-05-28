@@ -131,32 +131,40 @@ export const PayoutDetailsScreen = () => {
         <View style={styles.detailsCard}>
           <ExpandableSection
             title="Total Customer Paid"
-            amount={`+₹${breakdown?.totalPaid || 0}`}
+            amount={`+₹${(breakdown?.totalPaid || 0).toFixed(2)}`}
             defaultExpanded>
             <DetailRow
               label={`${breakdown?.full.count || 0} Full payments`}
-              value={`₹${breakdown?.full.total || 0}`}
+              value={`₹${(breakdown?.full.total || 0).toFixed(2)}`}
             />
             <DetailRow
               label={`${breakdown?.advance.count || 0} Advance payments`}
-              value={`₹${breakdown?.advance.total || 0}`}
+              value={`₹${(breakdown?.advance.total || 0).toFixed(2)}`}
             />
           </ExpandableSection>
 
           <View style={styles.divider} />
 
-          <ExpandableSection title="Bookr fees" amount={`-₹${breakdown?.commission || 0}`}>
+          <ExpandableSection
+            title="Bookr fees"
+            amount={`-₹${(breakdown?.commission || 0).toFixed(2)}`}>
             <DetailRow
               label={`Commission`}
-              value={`-₹${breakdown?.commission || 0}`}
+              value={`-₹${(breakdown?.commission || 0).toFixed(2)}`}
               weight="semiBold"
             />
           </ExpandableSection>
 
           <View style={styles.divider} />
 
-          <ExpandableSection title="Handling Fees" amount={`-₹${breakdown?.gateway || 0}`}>
-            <DetailRow label="Charges" value={`-₹${breakdown?.gateway || 0}`} weight="semiBold" />
+          <ExpandableSection
+            title="Handling Fees"
+            amount={`-₹${(breakdown?.gateway || 0).toFixed(2)}`}>
+            <DetailRow
+              label="Charges"
+              value={`-₹${(breakdown?.gateway || 0).toFixed(2)}`}
+              weight="semiBold"
+            />
           </ExpandableSection>
 
           <View style={styles.divider} />
@@ -166,7 +174,7 @@ export const PayoutDetailsScreen = () => {
               Final Payout
             </Text>
             <Text variant="body2" weight="bold" color={COLORS.success}>
-              ₹{breakdown?.finalPayout || 0}
+              ₹{(breakdown?.finalPayout || 0).toFixed(2)}
             </Text>
           </View>
         </View>

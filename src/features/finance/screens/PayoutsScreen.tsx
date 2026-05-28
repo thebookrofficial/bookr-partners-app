@@ -147,7 +147,7 @@ export const PayoutsScreen = () => {
             <PendingPayoutCard
               key={index}
               settlementDate={item.displayDate}
-              amount={item.amount.toString()}
+              amount={Number(item.amount).toFixed(2)}
               onPress={() => handlePayoutPress(item, true)}
             />
           ))
@@ -171,7 +171,7 @@ export const PayoutsScreen = () => {
           historicalPayouts.map((item, index) => (
             <PayoutListItem
               key={index}
-              amount={item.total_amount.toString()}
+              amount={Number(item.total_amount).toFixed(2)}
               bookings={item.booking_count}
               dateRange={item.display_label}
               onPress={() => handlePayoutPress(item)}

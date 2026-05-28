@@ -53,6 +53,6 @@ export const StaycationPayoutStrategy: PayoutStrategy = {
   },
 
   getCommissionRate() {
-    return 0.035;
+    return 0.05;
   },
 };
