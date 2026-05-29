@@ -2,7 +2,14 @@
 // Confidential and Proprietary.
 
 import React, { useState, useMemo } from "react";
-import { View, StyleSheet, SectionList, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  SectionList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
@@ -117,7 +124,16 @@ export const StaycationHistoryScreen = () => {
     // rooms,
     venue,
     getGroupedBookings,
+    refetch,
   } = useStaycationHistory(serviceId, dateFilter, customRange);
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
 
   // const displayLabel = useMemo(() => {
   //   return rooms.length > 0 ? "All Rooms" : "Farmhouse";
@@ -133,6 +149,14 @@ export const StaycationHistoryScreen = () => {
         sections={listData}
         stickySectionHeadersEnabled={false}
         keyExtractor={item => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
         ListHeaderComponent={
           <>
             <View style={{ paddingHorizontal: hs(12) }}>

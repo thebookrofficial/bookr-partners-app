@@ -49,13 +49,16 @@ export const StaycationInvoiceScreen = () => {
   // Logic for Online/Offline status
   const isOnline = !!booking.user_id;
 
-  // Calculate fees based on 5% commission as requested for staycation
-  const subtotal = Number(booking.subtotal) || 0;
-  const totalAmount = Number(booking.total_amount) || 0;
-  const platformFee = subtotal * 0.05;
-  const discountAmount = Number(booking.discount_amount) || 0;
-  const gatewayFee = totalAmount * 0.02;
-  const estPayout = subtotal - discountAmount - platformFee - gatewayFee;
+  const totalPaid = Number(booking.total_amount) || 0;
+  const inAppPayments = Number(booking.subtotal) || 0;
+  const discountAmount = 0; // Discounts not included for payout display
+
+  // Calculate fees based on 5% commission applied to the subtotal for staycation
+  const platformFee = inAppPayments * 0.05;
+  const gatewayFee = inAppPayments * 0.02;
+
+  // Est Payout: Total Paid - platform fee - gateway charges
+  const estPayout = totalPaid - platformFee - gatewayFee;
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "N/A";
@@ -156,17 +159,42 @@ export const StaycationInvoiceScreen = () => {
           </View>
         </View>
 
-        {/* Amount Paid Section */}
-        <View style={styles.fieldGroup}>
-          <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
-            Amount Paid
-          </Text>
-          <View style={styles.infoBox}>
-            <Text variant="body2" weight="semiBold" color="#00B562">
-              ₹ {booking.paid_amount}
-            </Text>
+        {/* Payments Section */}
+        {isOnline ? (
+          <View style={styles.fieldRow}>
+            <View style={[styles.fieldGroup, styles.flex1]}>
+              <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
+                Total Paid
+              </Text>
+              <View style={styles.infoBox}>
+                <Text variant="body2" weight="semiBold">
+                  ₹ {totalPaid}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.fieldGroup, styles.flex1]}>
+              <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
+                In App Payments
+              </Text>
+              <View style={styles.infoBox}>
+                <Text variant="body2" weight="semiBold" color="#00B562">
+                  ₹ {inAppPayments}
+                </Text>
+              </View>
+            </View>
           </View>
-        </View>
+        ) : (
+          <View style={styles.fieldGroup}>
+            <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
+              Amount Paid
+            </Text>
+            <View style={styles.infoBox}>
+              <Text variant="body2" weight="semiBold" color="#00B562">
+                ₹ {inAppPayments}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Previous History Link */}
         <TouchableOpacity
@@ -197,10 +225,21 @@ export const StaycationInvoiceScreen = () => {
 
             <View style={styles.payoutRow}>
               <Text variant="body2" weight="semiBold">
-                Original Amount
+                Total Paid
               </Text>
               <Text variant="body2" weight="medium">
-                ₹{subtotal}
+                ₹{totalPaid}
+              </Text>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.payoutRow}>
+              <Text variant="body2" weight="semiBold">
+                In App Payment
+              </Text>
+              <Text variant="body2" weight="medium">
+                ₹{inAppPayments}
               </Text>
             </View>
 
@@ -234,7 +273,6 @@ export const StaycationInvoiceScreen = () => {
                 -₹{gatewayFee.toFixed(2)}
               </Text>
             </View>
-
             <View style={styles.divider} />
 
             <View style={styles.payoutRow}>
@@ -298,6 +336,11 @@ const styles = StyleSheet.create({
     fontSize: fs(14),
   },
   fieldGroup: {
+    marginBottom: vs(16),
+  },
+  fieldRow: {
+    flexDirection: "row",
+    gap: hs(12),
     marginBottom: vs(16),
   },
   labelRow: {
