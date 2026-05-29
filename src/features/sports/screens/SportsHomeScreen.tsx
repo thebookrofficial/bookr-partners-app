@@ -271,6 +271,7 @@ export const SportsHomeScreen = () => {
           venueId={venue.id}
           _groundId={activeGroundId}
           selectedDate={selectedDate}
+          _sportsType={selectedCategory}
           onCheckHistory={() => {
             shouldReOpenSheet.current = true;
             setIsBottomSheetOpen(false);

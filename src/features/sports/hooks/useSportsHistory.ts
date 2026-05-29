@@ -93,7 +93,7 @@ export const useSportsHistory = (
         .select(
           `
           id, guest_name, guest_phone, total_amount, paid_amount, booking_status,
-          booking_group_id, parent_booking_id, sports_booking_type,
+          booking_group_id, parent_booking_id, sports_booking_type, booking_source,
           profiles(full_name, phone),
           sports_slots!inner(slot_date, start_time, end_time)
         `,
@@ -142,12 +142,18 @@ export const useSportsHistory = (
             phone,
             totalCost: 0,
             totalPaid: 0,
+            totalSubtotal: 0,
             slots: [],
+            rawBookingType: b.sports_booking_type,
+            rawBookingSource: b.booking_source,
           };
         }
 
         groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalCost += totalAmt;
         groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalPaid += paidAmt;
+        groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalSubtotal += Number(
+          b.subtotal || 0,
+        );
         groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].slots.push(
           b.sports_slots,
         );
@@ -192,15 +198,20 @@ export const useSportsHistory = (
             }
 
             let status: "Online" | "Offline" = "Offline";
-            if (u.totalPaid >= u.totalCost && u.totalCost > 0) status = "Online";
-            else if (u.totalPaid > 0) status = "Offline";
+            if (u.rawBookingSource === "online") {
+              status = "Online";
+            }
+
+            const isPickleball = category.toLowerCase() === "pickleball";
+            const displayPrice =
+              status === "Online" && isPickleball ? u.totalSubtotal : u.totalPaid;
 
             return {
               id: u.id,
               name: u.name,
               phone: u.phone,
               timeRanges,
-              price: u.totalCost,
+              price: displayPrice,
               status,
             };
           });
@@ -272,7 +283,7 @@ export const useSportsHistory = (
     } finally {
       setLoading(false);
     }
-  }, [currentVenueId, searchQuery, dateFilter, customRange]);
+  }, [currentVenueId, searchQuery, dateFilter, customRange, category]);
 
   useEffect(() => {
     resolveVenue();

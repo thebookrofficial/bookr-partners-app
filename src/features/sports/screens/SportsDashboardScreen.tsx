@@ -220,18 +220,18 @@ export const SportsDashboardScreen = () => {
               </View>
               <View style={styles.splitBlock}>
                 <View style={styles.splitRow}>
-                  <Text variant="body2" weight="medium" color="#001C65">
+                  <Text variant="body2" weight="medium" color={COLORS.primary}>
                     Online bookings
                   </Text>
-                  <Text variant="body1" weight="medium" color="#001C65">
+                  <Text variant="body1" weight="medium" color={COLORS.primary}>
                     {metrics.onlineBookings}
                   </Text>
                 </View>
                 <View style={styles.splitRow}>
-                  <Text variant="body2" weight="medium" color={COLORS.primary}>
+                  <Text variant="body2" weight="medium" color={COLORS.danger}>
                     Offline bookings
                   </Text>
-                  <Text variant="body1" weight="medium" color={COLORS.primary}>
+                  <Text variant="body1" weight="medium" color={COLORS.danger}>
                     {metrics.offlineBookings}
                   </Text>
                 </View>
@@ -245,7 +245,7 @@ export const SportsDashboardScreen = () => {
             <View style={styles.onlineRevenueCard}>
               <View style={styles.revenueDonutWrapper}>
                 <View style={[styles.donutRing, styles.donutRingBase]} />
-                <View style={[styles.donutRing, styles.donutRingOver, styles.donutRingDark]} />
+                <View style={[styles.donutRing, styles.donutRingOver, styles.donutRingOnline]} />
                 <View style={styles.donutInner}>
                   <Text variant="body2" weight="semiBold" color="#00B562">
                     +₹{(metrics.onlineRevenue + metrics.offlineRevenue).toLocaleString("en-IN")}
@@ -258,18 +258,18 @@ export const SportsDashboardScreen = () => {
 
               <View style={styles.revenueSplitBlock}>
                 <View style={styles.revenueRow}>
-                  <Text variant="body2" weight="medium">
+                  <Text variant="body2" weight="bold" color={COLORS.primary}>
                     Online Revenue
                   </Text>
-                  <Text variant="body1" weight="bold" color="#001C65">
+                  <Text variant="body1" weight="bold" color={COLORS.primary}>
                     ₹{metrics.onlineRevenue.toLocaleString("en-IN")}
                   </Text>
                 </View>
                 <View style={styles.revenueRow}>
-                  <Text variant="body2" weight="medium">
+                  <Text variant="body2" weight="bold" color={COLORS.danger}>
                     Offline Revenue
                   </Text>
-                  <Text variant="body1" weight="bold" color={COLORS.primary}>
+                  <Text variant="body1" weight="bold" color={COLORS.danger}>
                     ₹{metrics.offlineRevenue.toLocaleString("en-IN")}
                   </Text>
                 </View>
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
     borderRadius: ms(50),
     borderWidth: ms(4),
   },
-  donutRingBase: { borderColor: COLORS.primary },
+  donutRingBase: { borderColor: COLORS.danger },
   donutRingOver: {
     position: "absolute",
     width: ms(100),
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
     borderTopColor: "transparent",
     borderLeftColor: "transparent",
   },
-  donutRingDark: { borderColor: "#001C65", transform: [{ rotate: "45deg" }] },
+  donutRingOnline: { borderColor: COLORS.primary, transform: [{ rotate: "45deg" }] },
   donutInner: {
     width: ms(92),
     height: ms(92),

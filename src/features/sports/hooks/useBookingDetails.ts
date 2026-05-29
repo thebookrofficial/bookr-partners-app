@@ -12,6 +12,7 @@ export interface BookingDetailData {
   venue_id: string;
   total_amount: number;
   paid_amount: number;
+  subtotal_amount?: number;
   discount_amount: number;
   booking_status: string;
   guest_name: string | null;
@@ -26,7 +27,11 @@ export interface BookingDetailData {
     slot_date: string;
     ground_id: string;
   };
-  venues: { name: string; vertical: string };
+  venues: {
+    name: string;
+    vertical: string;
+    sports_venues: { sports_type: string }[];
+  };
   combined_time?: string;
   idChain: string[];
   slotIdChain: string[];
@@ -34,6 +39,8 @@ export interface BookingDetailData {
   parent_booking_id?: string | null;
   booking_group_id?: string | null;
   sports_booking_type?: string;
+  booking_source?: string;
+  payment_type?: string;
   sequence_number?: number;
 }
 
@@ -108,6 +115,7 @@ export const useBookingDetails = (bookingId: string) => {
       // 4. Aggregate data
       const totalAmount = finalChain.reduce((sum, b) => sum + Number(b.total_amount), 0);
       const paidAmount = finalChain.reduce((sum, b) => sum + Number(b.paid_amount), 0);
+      const subtotalAmount = finalChain.reduce((sum, b) => sum + Number(b.subtotal || 0), 0);
       const discountAmount = finalChain.reduce((sum, b) => sum + Number(b.discount_amount || 0), 0);
 
       const firstBooking = finalChain[0];
@@ -117,6 +125,7 @@ export const useBookingDetails = (bookingId: string) => {
         ...baseBooking,
         total_amount: totalAmount,
         paid_amount: paidAmount,
+        subtotal_amount: subtotalAmount, // NEW: Include aggregated subtotal
         discount_amount: discountAmount,
         sports_slots: {
           ...baseBooking.sports_slots,

@@ -46,6 +46,10 @@ export interface BookingData {
   booking_group_id?: string | null;
   sports_booking_type?: string;
   sequence_number?: number;
+  rawSubtotal?: number;
+  rawPaidAmount?: number;
+  isOnline?: boolean;
+  isPickleball?: boolean;
 }
 
 const getLocalDateString = (date: Date) => {
@@ -243,7 +247,9 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           });
 
           // DETERMINING OFFLINE VS ONLINE
-          const isOffline = !!b.guest_name && b.guest_name !== "null";
+          const isOnline = b.booking_source === "online";
+          const isOffline = !isOnline;
+          const isPickleball = category.toLowerCase() === "pickleball";
 
           // TIME CALCULATIONS (WITH MIDNIGHT FIX)
           let [endH, endM] = b.end_time.split(":").map(Number);
@@ -262,14 +268,18 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           const finalName = isOffline ? b.guest_name : b.full_name || "Guest User";
           const finalPhone = isOffline ? b.guest_phone || "" : b.phone || "";
 
+          // For online Pickleball, use subtotal. Otherwise use paid_amount.
+          const displayPrice =
+            isOnline && isPickleball ? Number(b.subtotal || 0) : Number(b.paid_amount || 0);
+
           return {
             id: b.id,
             name: finalName,
             phone: finalPhone,
             date: formattedDate,
             time: `${formatTime(b.start_time)} - ${formatTime(b.end_time)}`,
-            price: `₹${b.paid_amount || 0}`,
-            status: isOffline ? "Offline" : "Online",
+            price: `₹${displayPrice}`,
+            status: isOnline ? "Online" : "Offline",
             avatarUrl: b.avatar_url,
             isOfflineRecord: isOffline,
             isDisabled,
@@ -282,6 +292,10 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             booking_group_id: b.booking_group_id,
             sports_booking_type: b.sports_booking_type,
             sequence_number: b.sequence_number,
+            rawSubtotal: Number(b.subtotal || 0), // Keep raw values for merged calculation
+            rawPaidAmount: Number(b.paid_amount || 0),
+            isOnline,
+            isPickleball,
           };
         });
 
@@ -320,9 +334,20 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           // We assume sortedBookings is chronological, so we just update the end time
           existing.time = existing.time.replace(/ - .*/, "") + " - " + current.time.split(" - ")[1];
           existing.endTimeRaw = current.endTimeRaw;
-          existing.price = `₹${
-            Number(existing.price.replace("₹", "")) + Number(current.price.replace("₹", ""))
-          }`;
+
+          const isOnlinePickleball = existing.isOnline && existing.isPickleball;
+
+          // Recalculate summed amounts
+          const newSumSubtotal = (existing.rawSubtotal || 0) + (current.rawSubtotal || 0);
+          const newSumPaid = (existing.rawPaidAmount || 0) + (current.rawPaidAmount || 0);
+
+          existing.rawSubtotal = newSumSubtotal;
+          existing.rawPaidAmount = newSumPaid;
+
+          // Update display price based on logic
+          const finalDisplayPrice = isOnlinePickleball ? newSumSubtotal : newSumPaid;
+          existing.price = `₹${finalDisplayPrice}`;
+
           existing.idChain.push(current.id);
         } else {
           acc.push(current);
@@ -344,7 +369,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     } finally {
       setBookingsLoading(false);
     }
-  }, [currentVenueId, activeGroundId, selectedDate]);
+  }, [currentVenueId, activeGroundId, selectedDate, category]);
 
   useEffect(() => {
     if (initialVenueId) fetchVenueDetails();

@@ -2,7 +2,14 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, TextInput } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -22,6 +29,9 @@ import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.
 // 1. NEW HISTORY CARD
 // ==========================================
 const HistoryCard = ({ name, phone, time, price, status, onPress }: any) => {
+  const isOnline = status === "Online";
+  const statusColor = isOnline ? COLORS.primary : COLORS.danger;
+
   return (
     <TouchableOpacity style={styles.cardContainer} activeOpacity={0.7} onPress={onPress}>
       <View style={styles.avatarCircle} />
@@ -36,7 +46,7 @@ const HistoryCard = ({ name, phone, time, price, status, onPress }: any) => {
           </View>
           <View style={styles.priceStatusCol}>
             <Text style={styles.cardPrice}>{price}</Text>
-            <Text style={styles.cardStatus}>{status}</Text>
+            <Text style={[styles.cardStatus, { color: statusColor }]}>{status}</Text>
           </View>
         </View>
         <View style={styles.timeRow}>
@@ -148,7 +158,7 @@ export const SportsHistoryScreen = () => {
   };
 
   // Pass dynamic IDs and filters to the updated hook
-  const { currentVenueId, historyGroups, loading } = useSportsHistory(
+  const { currentVenueId, historyGroups, loading, refetch } = useSportsHistory(
     serviceId,
     selectedCategory,
     searchQuery,
@@ -157,9 +167,27 @@ export const SportsHistoryScreen = () => {
   );
   const { activeVenueName } = useServiceStore();
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
+
   return (
-    <ScreenContainer backgroundColor={COLORS.background}>
-      <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[1]}>
+    <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={0}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[1]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }>
         {/* Header */}
         <View style={styles.headerZIndex}>
           <ServiceHeader title={activeVenueName} subtitle="History" />

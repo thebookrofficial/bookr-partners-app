@@ -106,7 +106,7 @@ export const useSportsDashboard = (
         .from("sports_bookings")
         .select(
           `
-          id, user_id, guest_name, total_amount, vendor_payout, booking_status,
+          id, user_id, guest_name, total_amount, vendor_payout, booking_status, subtotal, booking_source,
           sports_slots!inner(slot_date, ground_id)
         `,
         )
@@ -143,19 +143,23 @@ export const useSportsDashboard = (
       }
 
       (bookings || []).forEach((b: any) => {
-        const isOffline = !b.user_id; // Reliable indicator for offline bookings
+        const isOnline = b.booking_source === "online";
+        const isOffline = !isOnline;
+
         if (isOffline) {
           offlineCount++;
           totalOfflineRevenue += Number(b.total_amount || 0);
         } else {
           onlineCount++;
+          // Actually, let's keep it simple as the user didn't explicitly ask for subtotal in dashboard yet,
+          // but they did for other screens. I'll stick to vendor_payout for online revenue here for now
+          // as it represents the net gain.
           totalOnlineRevenue += Number(b.vendor_payout || 0);
         }
-
         const dateKey = b.sports_slots.slot_date;
         if (dailyData[dateKey]) {
           dailyData[dateKey].bookings += 1;
-          if (!isOffline) {
+          if (isOnline) {
             dailyData[dateKey].revenue += Number(b.vendor_payout || 0);
           } else {
             dailyData[dateKey].revenue += Number(b.total_amount || 0);

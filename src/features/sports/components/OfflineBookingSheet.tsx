@@ -39,6 +39,7 @@ interface OfflineBookingSheetProps {
   selectedDate: Date;
   onSuccess: () => void;
   onCheckHistory?: () => void;
+  _sportsType: string;
 }
 
 const offlineBookingSchema = z.object({
@@ -86,6 +87,7 @@ export const OfflineBookingSheet = ({
   selectedDate: initialDate,
   onSuccess,
   onCheckHistory,
+  _sportsType,
 }: OfflineBookingSheetProps) => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 
@@ -297,19 +299,24 @@ export const OfflineBookingSheet = ({
       const startTime24 = parseTimeTo24Hour(fromTime);
       const endTime24 = parseTimeTo24Hour(toTime);
       const numericTotal = parseFloat(totalPayment);
+      const numericAdvance = parseFloat(advancePaid || "0");
 
-      // CRITICAL FIX: Removed profile lookup and userId passing
-      await SportsService.createOfflineBooking({
+      const bookingParams = {
         venueId,
         groundId: _groundId,
         dateStr: formattedDate,
         startTime24,
         endTime24,
         numericTotal,
-        advancePaid: parseFloat(advancePaid || "0"),
+        advancePaid: numericAdvance,
         guestName: name.trim(),
         guestPhone: cleanMobile,
-      });
+        bookingSource: "offline",
+        sportsBookingType: "offline",
+      };
+
+      // CRITICAL FIX: Removed profile lookup and userId passing
+      await SportsService.createOfflineBooking(bookingParams);
 
       Alert.alert("Success", "Booking Saved!");
       resetForm();

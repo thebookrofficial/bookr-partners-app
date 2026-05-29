@@ -134,10 +134,20 @@ export const BookingDetailsScreen = () => {
   const currentPaid = Number(booking.paid_amount) || 0;
   const totalDiscount = Number(booking.discount_amount) || 0;
 
+  // IDENTIFY PICKLEBALL & ONLINE STATUS
+  const isPickleball =
+    booking.venues?.sports_venues?.[0]?.sports_type?.toLowerCase() === "pickleball";
+  const isOnline = booking.booking_source === "online";
+
   // The vendor wants to see the "Gross" amount (Value before discount)
-  const displayTotalAmount = totalAmount + totalDiscount;
+  // For online Pickleball, we use subtotal as requested
+  const displayTotalAmount =
+    isOnline && isPickleball ? Number(booking.subtotal_amount || 0) : totalAmount + totalDiscount;
+
   // The vendor wants to see the "Credit" (Cash + Discount) as the total amount paid
-  const displayAmountPaid = currentPaid + totalDiscount;
+  // For online Pickleball, we use subtotal as requested
+  const displayAmountPaid =
+    isOnline && isPickleball ? Number(booking.subtotal_amount || 0) : currentPaid + totalDiscount;
 
   // Remaining Amount is what is still due at the venue
   const remainingAmount = Math.max(0, totalAmount - currentPaid);

@@ -12,7 +12,15 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
-import { ArrowLeft, Phone, Calendar, Clock, FileText, ChevronRight } from "lucide-react-native";
+import {
+  ArrowLeft,
+  Phone,
+  Calendar,
+  Clock,
+  FileText,
+  ChevronRight,
+  MapPin,
+} from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -39,24 +47,27 @@ export const SportsInvoiceScreen = () => {
   const guestPhone = booking.guest_phone || profileData?.phone || "N/A";
 
   // Logic for Online/Offline status
-  const isOnline = booking.paid_amount >= booking.total_amount && booking.total_amount > 0;
+  const isOnline = booking.booking_source === "online";
+  const isAdvance = isOnline && booking.payment_type === "advance";
 
-  // Calculate fees based on 3.5% commission as requested
-  const subtotal = Number(booking.subtotal) || 0;
-  const totalAmount = Number(booking.total_amount) || 0;
-  const platformFee = subtotal * 0.035;
+  // Identify if it's a Pickleball service
+  const sportsType = booking.venues?.sports_venues?.[0]?.sports_type || "";
+  const isPickleball = sportsType.toLowerCase() === "pickleball";
+
+  // Calculate fees based on user requirements
+  const totalPaid = Number(booking.total_amount) || 0;
+  const inAppPayments = Number(booking.subtotal) || 0;
   const discountAmount = Number(booking.discount_amount) || 0;
-  const gatewayFee = totalAmount * 0.02;
-  const estPayout = subtotal - discountAmount - platformFee - gatewayFee;
 
-  const formatHour = (timeStr: string) => {
-    if (!timeStr) return "";
-    const [h] = timeStr.split(":");
-    const hourInt = parseInt(h, 10);
-    const ampm = hourInt >= 12 ? "PM" : "AM";
-    const displayHour = hourInt % 12 || 12;
-    return `${displayHour} ${ampm}`;
-  };
+  // Platform Fee: 35% if advance, 3.5% if full. 0 if Pickleball.
+  const platformFeeRate = isAdvance ? 0.35 : 0.035;
+  const platformFee = isPickleball ? 0 : inAppPayments * platformFeeRate;
+
+  // Gateway Charges: 2% (Applied to the subtotal/inAppPayments)
+  const gatewayFee = inAppPayments * 0.02;
+
+  // Est Payout: Total Paid - platform fee - gateway charges
+  const estPayout = totalPaid - platformFee - gatewayFee;
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -66,6 +77,46 @@ export const SportsInvoiceScreen = () => {
       year: "numeric",
     });
   };
+
+  const formatTime = (t: string) => {
+    const [h, m] = t.split(":");
+    const hour = parseInt(h, 10);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 || 12;
+    const displayMins = m === "00" ? "" : `:${m}`;
+    return `${displayHour}${displayMins} ${ampm}`;
+  };
+
+  const getTimeRanges = () => {
+    const slots = booking.all_slots || [];
+    if (slots.length === 0) return "N/A";
+
+    const sortedSlots = [...slots].sort((a: any, b: any) =>
+      a.start_time.localeCompare(b.start_time),
+    );
+
+    let currentStart = sortedSlots[0].start_time;
+    let currentEnd = sortedSlots[0].end_time;
+    const blocks = [];
+
+    for (let i = 1; i < sortedSlots.length; i++) {
+      if (sortedSlots[i].start_time === currentEnd) {
+        currentEnd = sortedSlots[i].end_time;
+      } else {
+        blocks.push(`${formatTime(currentStart)} - ${formatTime(currentEnd)}`);
+        currentStart = sortedSlots[i].start_time;
+        currentEnd = sortedSlots[i].end_time;
+      }
+    }
+    blocks.push(`${formatTime(currentStart)} - ${formatTime(currentEnd)}`);
+    return blocks.join("  |  ");
+  };
+
+  const groundName =
+    booking.all_slots?.[0]?.sports_grounds?.name ||
+    booking.sports_slots?.sports_grounds?.name ||
+    "N/A";
+  const slotDate = booking.all_slots?.[0]?.slot_date || booking.sports_slots?.slot_date;
 
   return (
     <ScreenContainer backgroundColor={COLORS.background}>
@@ -120,39 +171,93 @@ export const SportsInvoiceScreen = () => {
           </View>
           <View style={styles.infoBox}>
             <Text variant="body2" weight="semiBold">
-              {formatDate(booking.sports_slots.slot_date)}
+              {slotDate ? formatDate(slotDate) : "N/A"}
             </Text>
           </View>
         </View>
 
-        {/* Time Slots Section */}
-        <View style={styles.fieldGroup}>
-          <View style={styles.labelRow}>
-            <Clock size={ms(18)} color={COLORS.text.primary} />
-            <Text variant="body2" weight="bold" style={styles.labelText}>
-              Time Slots
-            </Text>
+        {/* Time Slots / Ground Section */}
+        {isOnline ? (
+          <View style={styles.fieldRow}>
+            <View style={[styles.fieldGroup, styles.flex1]}>
+              <View style={styles.labelRow}>
+                <MapPin size={ms(18)} color={COLORS.text.primary} />
+                <Text variant="body2" weight="bold" style={styles.labelText}>
+                  Ground
+                </Text>
+              </View>
+              <View style={styles.infoBox}>
+                <Text variant="body2" weight="semiBold">
+                  {groundName}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.fieldGroup, styles.flex1]}>
+              <View style={styles.labelRow}>
+                <Clock size={ms(18)} color={COLORS.text.primary} />
+                <Text variant="body2" weight="bold" style={styles.labelText}>
+                  Time Slots
+                </Text>
+              </View>
+              <View style={styles.infoBox}>
+                <Text variant="body2" weight="semiBold">
+                  {getTimeRanges()}
+                </Text>
+              </View>
+            </View>
           </View>
-          <View style={styles.infoBox}>
-            <Text variant="body2" weight="semiBold">
-              {`${formatHour(booking.sports_slots.start_time)} - ${formatHour(
-                booking.sports_slots.end_time,
-              )}`}
-            </Text>
+        ) : (
+          <View style={styles.fieldGroup}>
+            <View style={styles.labelRow}>
+              <Clock size={ms(18)} color={COLORS.text.primary} />
+              <Text variant="body2" weight="bold" style={styles.labelText}>
+                Time Slots
+              </Text>
+            </View>
+            <View style={styles.infoBox}>
+              <Text variant="body2" weight="semiBold">
+                {getTimeRanges()}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
-        {/* Amount Paid Section */}
-        <View style={styles.fieldGroup}>
-          <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
-            Amount Paid
-          </Text>
-          <View style={styles.infoBox}>
-            <Text variant="body2" weight="semiBold" color="#00B562">
-              ₹ {booking.paid_amount}
-            </Text>
+        {/* Payments Section */}
+        {isOnline ? (
+          <View style={styles.fieldRow}>
+            <View style={[styles.fieldGroup, styles.flex1]}>
+              <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
+                Total Paid
+              </Text>
+              <View style={styles.infoBox}>
+                <Text variant="body2" weight="semiBold">
+                  ₹ {totalPaid}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.fieldGroup, styles.flex1]}>
+              <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
+                In app payments
+              </Text>
+              <View style={styles.infoBox}>
+                <Text variant="body2" weight="semiBold" color="#00B562">
+                  ₹ {inAppPayments}
+                </Text>
+              </View>
+            </View>
           </View>
-        </View>
+        ) : (
+          <View style={styles.fieldGroup}>
+            <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
+              Amount Paid
+            </Text>
+            <View style={styles.infoBox}>
+              <Text variant="body2" weight="semiBold" color="#00B562">
+                ₹ {inAppPayments}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Previous History Link */}
         <TouchableOpacity
@@ -183,32 +288,47 @@ export const SportsInvoiceScreen = () => {
 
             <View style={styles.payoutRow}>
               <Text variant="body2" weight="semiBold">
-                Original Amount
+                Total Paid
               </Text>
               <Text variant="body2" weight="medium">
-                ₹{subtotal}
+                ₹{totalPaid}
               </Text>
             </View>
+
+            <View style={styles.divider} />
 
             <View style={styles.payoutRow}>
               <Text variant="body2" weight="semiBold">
-                Discount
+                In App Payout
               </Text>
-              <Text variant="body2" weight="medium" color="#E55959">
-                -₹{discountAmount}
+              <Text variant="body2" weight="medium">
+                ₹{inAppPayments}
               </Text>
             </View>
 
-            <View style={styles.payoutRow}>
-              <View style={styles.dashedUnderline}>
+            {discountAmount > 0 && (
+              <View style={styles.payoutRow}>
                 <Text variant="body2" weight="semiBold">
-                  Platform (3.5%)
+                  Discount
+                </Text>
+                <Text variant="body2" weight="medium" color="#E55959">
+                  -₹{discountAmount}
                 </Text>
               </View>
-              <Text variant="body2" weight="medium" color="#E55959">
-                -₹{platformFee.toFixed(2)}
-              </Text>
-            </View>
+            )}
+
+            {!isPickleball && (
+              <View style={styles.payoutRow}>
+                <View style={styles.dashedUnderline}>
+                  <Text variant="body2" weight="semiBold">
+                    Platform ({isAdvance ? "35%" : "3.5%"})
+                  </Text>
+                </View>
+                <Text variant="body2" weight="medium" color="#E55959">
+                  -₹{platformFee.toFixed(2)}
+                </Text>
+              </View>
+            )}
 
             <View style={styles.payoutRow}>
               <View style={styles.dashedUnderline}>
@@ -249,6 +369,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  flex1: {
+    flex: 1,
+  },
   scrollContent: {
     paddingHorizontal: hs(12),
     paddingTop: vs(20),
@@ -284,6 +407,11 @@ const styles = StyleSheet.create({
     fontSize: fs(14),
   },
   fieldGroup: {
+    marginBottom: vs(16),
+  },
+  fieldRow: {
+    flexDirection: "row",
+    gap: hs(12),
     marginBottom: vs(16),
   },
   labelRow: {
