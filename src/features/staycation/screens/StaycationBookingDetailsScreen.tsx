@@ -151,9 +151,9 @@ export const StaycationBookingDetailsScreen = () => {
   const groupType = getGroupType(bookingDetails?.special_requests);
 
   // 2. The CORRECT way to check if a booking is online
-  const isOnline = !!bookingDetails?.user_id;
+  const isOnline = bookingDetails?.booking_source === "online" || !!bookingDetails?.user_id;
   const isCancelled = bookingDetails?.booking_status === "cancelled";
-  const bookingType = isOnline ? "Online" : "Manual";
+  const bookingType = isOnline ? "Online" : "Offline";
 
   // 3. Assemble the data, prioritizing the "unrolled" data passed from the card
   const bookingData = {

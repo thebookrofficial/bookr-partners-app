@@ -93,6 +93,7 @@ export const useSportsHistory = (
         .select(
           `
           id, guest_name, guest_phone, total_amount, paid_amount, booking_status,
+          booking_group_id, parent_booking_id, sports_booking_type,
           profiles(full_name, phone),
           sports_slots!inner(slot_date, start_time, end_time)
         `,
@@ -119,12 +120,12 @@ export const useSportsHistory = (
 
         const name = b.guest_name || b.profiles?.full_name || "Guest";
         const phone = b.profiles?.phone || b.guest_phone || "N/A";
-        const userKey = `${name}-${phone}`;
+        const transactionKey = b.booking_group_id || b.parent_booking_id || b.id;
 
         if (!groupedByMonth[monthStr])
           groupedByMonth[monthStr] = { rawMonth, totalSettlement: 0, days: {} };
         if (!groupedByMonth[monthStr].days[dateStr])
-          groupedByMonth[monthStr].days[dateStr] = { rawDate, settlement: 0, users: {} };
+          groupedByMonth[monthStr].days[dateStr] = { rawDate, settlement: 0, transactions: {} };
 
         // CRITICAL FIX: Sum the 'total_amount' instead of 'paid_amount' so the day/month
         // headers reflect the overall cost of all bookings for that period.
@@ -134,8 +135,8 @@ export const useSportsHistory = (
         groupedByMonth[monthStr].totalSettlement += totalAmt;
         groupedByMonth[monthStr].days[dateStr].settlement += totalAmt;
 
-        if (!groupedByMonth[monthStr].days[dateStr].users[userKey]) {
-          groupedByMonth[monthStr].days[dateStr].users[userKey] = {
+        if (!groupedByMonth[monthStr].days[dateStr].transactions[transactionKey]) {
+          groupedByMonth[monthStr].days[dateStr].transactions[transactionKey] = {
             id: b.id,
             name,
             phone,
@@ -145,9 +146,11 @@ export const useSportsHistory = (
           };
         }
 
-        groupedByMonth[monthStr].days[dateStr].users[userKey].totalCost += totalAmt;
-        groupedByMonth[monthStr].days[dateStr].users[userKey].totalPaid += paidAmt;
-        groupedByMonth[monthStr].days[dateStr].users[userKey].slots.push(b.sports_slots);
+        groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalCost += totalAmt;
+        groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalPaid += paidAmt;
+        groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].slots.push(
+          b.sports_slots,
+        );
       });
 
       const formatTime = (t: string) => {
@@ -163,7 +166,7 @@ export const useSportsHistory = (
         const monthData = groupedByMonth[monthStr];
         const dailyGroups: DailyGroup[] = Object.keys(monthData.days).map(dateStr => {
           const dayData = monthData.days[dateStr];
-          const aggregatedBookings = Object.values(dayData.users).map((u: any) => {
+          const aggregatedBookings = Object.values(dayData.transactions).map((u: any) => {
             const sortedSlots = u.slots.sort((a: any, b: any) =>
               a.start_time.localeCompare(b.start_time),
             );

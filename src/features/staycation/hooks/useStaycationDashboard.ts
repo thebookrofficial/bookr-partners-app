@@ -137,6 +137,8 @@ export const useStaycationDashboard = (
           total_amount,
           platform_fee,
           booking_type,
+          booking_source,
+          user_id,
           check_in_date,
           check_out_date,
           room_id,
@@ -175,15 +177,10 @@ export const useStaycationDashboard = (
         return;
       }
 
-      // Filter out cancelled for counts and revenue to match typical dashboard behavior,
-      // but we could include them in a 'total' if we wanted to match the Home list perfectly.
-      // However, the Home list 'Recent Bookings' shows Today+Future.
-      // If we want to match 'Current Activity', we should probably stick to non-cancelled.
+      // Filter out cancelled for consistency across all metrics
       const activeBookings = bookings.filter(b => b.booking_status !== "cancelled");
 
-      // Match Home Screen: Total bookings should include all bookings in the period, even cancelled ones,
-      // so the top-level number matches expectations when comparing lists.
-      let totalBookings = bookings.length;
+      let totalBookings = activeBookings.length;
       let onlineBookings = 0;
       let offlineBookings = 0;
       let totalRevenue = 0;
@@ -203,23 +200,31 @@ export const useStaycationDashboard = (
       // For Revenue and Online/Offline counts, we only count ACTIVE (non-cancelled) bookings.
       activeBookings.forEach(b => {
         const amount = parseFloat(b.total_amount) || 0;
-        const platformFee = parseFloat(b.platform_fee) || 0;
-        const isOnline = b.booking_type === "online" || platformFee > 0;
+        const isOnline = b.booking_source === "online" || !!b.user_id;
 
-        totalRevenue += amount;
         if (isOnline) {
+          // ONLINE: Deduct 7% (5% commission + 2% handling fee) for estimated payout
+          const netPayout = amount * 0.93;
           onlineBookings++;
-          onlineRevenue += amount;
+          onlineRevenue += netPayout;
+          totalRevenue += netPayout;
+
+          // For revenue graph, attribute net payout to check_in_date
+          const dateKey = b.check_in_date;
+          if (revenueByDate[dateKey] !== undefined) {
+            revenueByDate[dateKey] += netPayout;
+          }
         } else {
+          // OFFLINE: Use gross amount (no platform commission)
           offlineBookings++;
           offlineRevenue += amount;
-        }
+          totalRevenue += amount;
 
-        // For revenue graph, we still attribute to check_in_date
-        // but only if it falls within our current display range
-        const dateKey = b.check_in_date;
-        if (revenueByDate[dateKey] !== undefined) {
-          revenueByDate[dateKey] += amount;
+          // For revenue graph, attribute gross amount to check_in_date
+          const dateKey = b.check_in_date;
+          if (revenueByDate[dateKey] !== undefined) {
+            revenueByDate[dateKey] += amount;
+          }
         }
       });
 

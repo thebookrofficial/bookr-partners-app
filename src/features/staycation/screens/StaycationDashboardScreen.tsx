@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, PillTabs } from "@/components/ui";
+import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import { Calendar, ChevronRight, ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -101,7 +101,6 @@ export const StaycationDashboardScreen = () => {
   const { activeVenue: venue } = useStaycationHome(serviceId);
 
   const [selection, setSelection] = useState("This Month");
-  const [activeTab, setActiveTab] = useState("All Rooms");
   const [expandedWeek, setExpandedWeek] = useState<string | null>(null);
   const [isCustomSheetVisible, setIsCustomSheetVisible] = useState(false);
 
@@ -131,20 +130,12 @@ export const StaycationDashboardScreen = () => {
 
   const SELECTION_TABS = ["This Month", "Last Month", "Custom"];
 
-  const { isLoading, rooms, stats } = useStaycationDashboard(
+  const { isLoading, stats } = useStaycationDashboard(
     serviceId || "",
     dateRange.start,
     dateRange.end,
-    activeTab,
+    "All Rooms",
   );
-
-  const roomTabs = useMemo(() => {
-    // Extract base names (e.g., "Deluxe" from "Deluxe-101")
-    const baseNames = rooms.map(r => r.name.split("-")[0].trim());
-    // Deduplicate base names
-    const uniqueBases = Array.from(new Set(baseNames));
-    return ["All Rooms", ...uniqueBases];
-  }, [rooms]);
 
   const toggleWeek = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -210,22 +201,6 @@ export const StaycationDashboardScreen = () => {
         initialRange={customRange}
       />
 
-      {/* Bookings Filter Tabs */}
-      <View style={styles.bookingTabRow}>
-        <Text variant="body1" weight="bold" style={styles.bookingsLabel}>
-          Bookings
-        </Text>
-        {roomTabs.length > 0 && (
-          <PillTabs
-            tabs={roomTabs}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            variant="dark"
-            style={styles.pillTabs}
-          />
-        )}
-      </View>
-
       {isLoading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
@@ -244,7 +219,7 @@ export const StaycationDashboardScreen = () => {
                     {stats.totalBookings}
                   </Text>
                   <Text variant="body2" weight="semiBold" color="#00B562" style={styles.smallTotal}>
-                    {stats.totalBookings}
+                    +₹{parseFloat(stats.totalRevenue).toLocaleString("en-IN")}
                   </Text>
                 </View>
                 <Text variant="body1" color={COLORS.text.primary} style={styles.totalLabel}>
@@ -452,20 +427,6 @@ const styles = StyleSheet.create({
   },
   activeSelectionTabText: {
     color: COLORS.text.inverse,
-  },
-  bookingTabRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(10),
-    marginBottom: vs(16),
-    height: vs(40),
-  },
-  bookingsLabel: {
-    fontSize: fs(16),
-  },
-  pillTabs: {
-    flex: 1,
-    marginVertical: 0,
   },
   sectionContainer: {
     marginTop: vs(24),

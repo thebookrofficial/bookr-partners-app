@@ -28,6 +28,7 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
           user_id,
           booking_type,
           booking_status,
+          booking_source,
           platform_fee,
           check_in_date,
           check_out_date,
@@ -49,8 +50,8 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
           ? bookingData.profiles[0]
           : (bookingData.profiles as any);
 
-        // Consistent logic with Details screen: user_id present means Online
-        const isOnline = !!bookingData.user_id;
+        // Consistent logic with History/Details screen
+        const isOnline = bookingData.booking_source === "online" || !!bookingData.user_id;
 
         // Determine Status logic for UI
         let statusTag: StaycationBooking["status"] = isOnline ? "Online" : "Offline";
@@ -61,14 +62,6 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
         // Priority 1: Cancelled
         if (bookingData.booking_status === "cancelled") {
           statusTag = "Cancelled";
-        }
-        // Priority 2: Completed (Past date)
-        else {
-          const todayStr = new Date().toISOString().split("T")[0];
-          if (bookingData.check_out_date < todayStr) {
-            statusTag = "Complete";
-          }
-          // Priority 3: Keep the Online/Offline source label
         }
 
         const formattedBooking: StaycationBooking = {
