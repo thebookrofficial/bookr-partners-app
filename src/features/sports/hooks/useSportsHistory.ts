@@ -92,7 +92,7 @@ export const useSportsHistory = (
         .from("sports_bookings")
         .select(
           `
-          id, guest_name, guest_phone, total_amount, paid_amount, subtotal, booking_status,
+          id, guest_name, guest_phone, total_amount, paid_amount, subtotal, discount_amount, booking_status,
           booking_group_id, parent_booking_id, sports_booking_type, booking_source,
           profiles(full_name, phone),
           sports_slots!inner(slot_date, start_time, end_time)
@@ -131,6 +131,7 @@ export const useSportsHistory = (
         // headers reflect the overall cost of all bookings for that period.
         const totalAmt = Number(b.total_amount || 0);
         const paidAmt = Number(b.paid_amount || 0);
+        const discountAmt = Number(b.discount_amount || 0);
 
         groupedByMonth[monthStr].totalSettlement += totalAmt;
         groupedByMonth[monthStr].days[dateStr].settlement += totalAmt;
@@ -142,6 +143,7 @@ export const useSportsHistory = (
             phone,
             totalCost: 0,
             totalPaid: 0,
+            totalDiscount: 0,
             totalSubtotal: 0,
             slots: [],
             rawBookingType: b.sports_booking_type,
@@ -151,6 +153,8 @@ export const useSportsHistory = (
 
         groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalCost += totalAmt;
         groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalPaid += paidAmt;
+        groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalDiscount +=
+          discountAmt;
         groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalSubtotal += Number(
           b.subtotal || 0,
         );
@@ -202,8 +206,8 @@ export const useSportsHistory = (
               status = "Online";
             }
 
-            // Show subtotal for all online bookings, paid amount for offline
-            const displayPrice = status === "Online" ? u.totalSubtotal : u.totalPaid;
+            // Show Gross Paid (Paid + Discount) for the card price
+            const displayPrice = u.totalPaid + u.totalDiscount;
 
             return {
               id: u.id,

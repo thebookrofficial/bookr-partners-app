@@ -57,22 +57,24 @@ export const SportsInvoiceScreen = () => {
   // Calculate fees based on user requirements
   const rawSubtotal = Number(booking.subtotal) || 0;
   const dbPlatformFee = Number(booking.platform_fee) || 0;
+  const dbDiscount = Number(booking.discount_amount) || 0;
 
-  // Total Paid: The final price of the service (total_amount in DB)
-  const totalPaid = Number(booking.total_amount) || 0;
+  // servicePrice: The full price of the service (total_amount in DB)
+  // totalPaid: The 'Gross' amount paid (Actual cash/online + Discount)
+  const servicePrice = Number(booking.total_amount) || 0;
+  const totalPaid = (Number(booking.paid_amount) || 0) + dbDiscount;
 
   // In App Payments: Use DB subtotal strictly for online bookings
   // For Pickleball, we subtract the convenience fee (dbPlatformFee) from the subtotal
   const inAppPayments = isOnline
     ? rawSubtotal - (isPickleball ? dbPlatformFee : 0)
-    : Number(booking.paid_amount) || 0;
+    : totalPaid;
 
   const discountAmount = 0; // Hardcoded to 0 for display as platform subsidizes it
 
-  // Platform Fee: 35% if advance, 3.5% if full. 0 if Pickleball.
-  // Applied strictly to the inAppPayments as requested.
-  const platformFeeRate = isAdvance ? 0.35 : 0.035;
-  const platformFee = isPickleball ? 0 : inAppPayments * platformFeeRate;
+  // Platform Fee: Always 3.5% of the total service price. 0 if Pickleball.
+  const platformFeeRate = 0.035;
+  const platformFee = isPickleball ? 0 : servicePrice * platformFeeRate;
 
   // Gateway Charges: 2% (Applied strictly to the inAppPayments)
   const gatewayFee = inAppPayments * 0.02;

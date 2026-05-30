@@ -370,6 +370,7 @@ export const SportsService = {
       notes: `Extension of booking: ${params.bookingId}`,
       parent_booking_id: originalBooking.parent_booking_id || originalBooking.id,
       sports_booking_type: "extension",
+      booking_source: originalBooking.booking_source,
       sequence_number: (originalBooking.sequence_number || 1) + 1,
     });
 

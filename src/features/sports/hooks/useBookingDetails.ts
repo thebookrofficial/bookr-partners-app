@@ -127,6 +127,7 @@ export const useBookingDetails = (bookingId: string) => {
         paid_amount: paidAmount,
         subtotal_amount: subtotalAmount, // NEW: Include aggregated subtotal
         discount_amount: discountAmount,
+        booking_source: firstBooking.booking_source, // ENSURE consistency for the whole chain
         sports_slots: {
           ...baseBooking.sports_slots,
           id: lastBooking.sports_slots.id, // Use the last slot ID for extension logic
