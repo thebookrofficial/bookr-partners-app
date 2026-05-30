@@ -48,7 +48,6 @@ export const SportsInvoiceScreen = () => {
 
   // Logic for Online/Offline status
   const isOnline = booking.booking_source === "online";
-  const isAdvance = isOnline && booking.payment_type === "advance";
 
   // Identify if it's a Pickleball service
   const sportsType = booking.venues?.sports_venues?.[0]?.sports_type || "";
@@ -66,9 +65,7 @@ export const SportsInvoiceScreen = () => {
 
   // In App Payments: Use DB subtotal strictly for online bookings
   // For Pickleball, we subtract the convenience fee (dbPlatformFee) from the subtotal
-  const inAppPayments = isOnline
-    ? rawSubtotal - (isPickleball ? dbPlatformFee : 0)
-    : totalPaid;
+  const inAppPayments = isOnline ? rawSubtotal - (isPickleball ? dbPlatformFee : 0) : totalPaid;
 
   const discountAmount = 0; // Hardcoded to 0 for display as platform subsidizes it
 
