@@ -92,7 +92,7 @@ export const useSportsHistory = (
         .from("sports_bookings")
         .select(
           `
-          id, guest_name, guest_phone, total_amount, paid_amount, booking_status,
+          id, guest_name, guest_phone, total_amount, paid_amount, subtotal, booking_status,
           booking_group_id, parent_booking_id, sports_booking_type, booking_source,
           profiles(full_name, phone),
           sports_slots!inner(slot_date, start_time, end_time)
@@ -202,9 +202,8 @@ export const useSportsHistory = (
               status = "Online";
             }
 
-            const isPickleball = category.toLowerCase() === "pickleball";
-            const displayPrice =
-              status === "Online" && isPickleball ? u.totalSubtotal : u.totalPaid;
+            // Show subtotal for all online bookings, paid amount for offline
+            const displayPrice = status === "Online" ? u.totalSubtotal : u.totalPaid;
 
             return {
               id: u.id,
@@ -283,7 +282,7 @@ export const useSportsHistory = (
     } finally {
       setLoading(false);
     }
-  }, [currentVenueId, searchQuery, dateFilter, customRange, category]);
+  }, [currentVenueId, searchQuery, dateFilter, customRange]);
 
   useEffect(() => {
     resolveVenue();

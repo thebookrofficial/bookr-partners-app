@@ -55,15 +55,26 @@ export const SportsInvoiceScreen = () => {
   const isPickleball = sportsType.toLowerCase() === "pickleball";
 
   // Calculate fees based on user requirements
+  const rawSubtotal = Number(booking.subtotal) || 0;
+  const dbPlatformFee = Number(booking.platform_fee) || 0;
+
+  // Total Paid: The final price of the service (total_amount in DB)
   const totalPaid = Number(booking.total_amount) || 0;
-  const inAppPayments = Number(booking.subtotal) || 0;
-  const discountAmount = Number(booking.discount_amount) || 0;
+
+  // In App Payments: Use DB subtotal strictly for online bookings
+  // For Pickleball, we subtract the convenience fee (dbPlatformFee) from the subtotal
+  const inAppPayments = isOnline
+    ? rawSubtotal - (isPickleball ? dbPlatformFee : 0)
+    : Number(booking.paid_amount) || 0;
+
+  const discountAmount = 0; // Hardcoded to 0 for display as platform subsidizes it
 
   // Platform Fee: 35% if advance, 3.5% if full. 0 if Pickleball.
+  // Applied strictly to the inAppPayments as requested.
   const platformFeeRate = isAdvance ? 0.35 : 0.035;
   const platformFee = isPickleball ? 0 : inAppPayments * platformFeeRate;
 
-  // Gateway Charges: 2% (Applied to the subtotal/inAppPayments)
+  // Gateway Charges: 2% (Applied strictly to the inAppPayments)
   const gatewayFee = inAppPayments * 0.02;
 
   // Est Payout: Total Paid - platform fee - gateway charges
@@ -306,22 +317,20 @@ export const SportsInvoiceScreen = () => {
               </Text>
             </View>
 
-            {discountAmount > 0 && (
-              <View style={styles.payoutRow}>
-                <Text variant="body2" weight="semiBold">
-                  Discount
-                </Text>
-                <Text variant="body2" weight="medium" color="#E55959">
-                  -₹{discountAmount}
-                </Text>
-              </View>
-            )}
+            <View style={styles.payoutRow}>
+              <Text variant="body2" weight="semiBold">
+                Discount
+              </Text>
+              <Text variant="body2" weight="medium" color="#E55959">
+                -₹{discountAmount}
+              </Text>
+            </View>
 
             {!isPickleball && (
               <View style={styles.payoutRow}>
                 <View style={styles.dashedUnderline}>
                   <Text variant="body2" weight="semiBold">
-                    Platform ({isAdvance ? "35%" : "3.5%"})
+                    Platform Fee
                   </Text>
                 </View>
                 <Text variant="body2" weight="medium" color="#E55959">
@@ -333,7 +342,7 @@ export const SportsInvoiceScreen = () => {
             <View style={styles.payoutRow}>
               <View style={styles.dashedUnderline}>
                 <Text variant="body2" weight="semiBold">
-                  Gateway Charges (2%)
+                  Handling Fees
                 </Text>
               </View>
               <Text variant="body2" weight="medium" color="#E55959">

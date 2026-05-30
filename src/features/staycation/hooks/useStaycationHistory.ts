@@ -91,6 +91,8 @@ export const useStaycationHistory = (
           booking_status,
           booking_source,
           platform_fee,
+          discount_amount,
+          subtotal,
           check_in_date,
           check_out_date,
           guest_count,
@@ -164,6 +166,9 @@ export const useStaycationHistory = (
           statusTag = "Cancelled";
         }
 
+        const rawSubtotal = parseFloat(booking.subtotal) || 0;
+        const rawPaid = parseFloat(booking.paid_amount) || 0;
+
         formattedBookings.push({
           id: booking.id,
           name: booking.guest_name || profile?.full_name || "Guest",
@@ -176,7 +181,7 @@ export const useStaycationHistory = (
           guestCount: booking.guest_count,
           roomId: booking.room_id,
           vendorPayout: parseFloat(booking.vendor_payout) || 0,
-          paidAmount: parseFloat(booking.paid_amount) || 0,
+          paidAmount: isOnline ? rawSubtotal : rawPaid,
         });
       });
 

@@ -49,11 +49,17 @@ export const StaycationInvoiceScreen = () => {
   // Logic for Online/Offline status
   const isOnline = !!booking.user_id;
 
-  const totalPaid = Number(booking.total_amount) || 0;
-  const inAppPayments = Number(booking.subtotal) || 0;
-  const discountAmount = 0; // Discounts not included for payout display
+  const rawSubtotal = Number(booking.subtotal) || 0;
 
-  // Calculate fees based on 5% commission applied to the subtotal for staycation
+  // Total Paid: The final price of the service (total_amount in DB)
+  const totalPaid = Number(booking.total_amount) || 0;
+
+  // In App Payments: Use DB subtotal strictly for online bookings
+  const inAppPayments = isOnline ? rawSubtotal : Number(booking.paid_amount) || 0;
+
+  const discountAmount = 0; // Hardcoded to 0 for display as platform subsidizes it
+
+  // Calculate fees based on 5% commission applied strictly to the inAppPayments amount
   const platformFee = inAppPayments * 0.05;
   const gatewayFee = inAppPayments * 0.02;
 
