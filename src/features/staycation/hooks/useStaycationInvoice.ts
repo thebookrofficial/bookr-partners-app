@@ -39,10 +39,14 @@ export const useStaycationInvoice = (bookingId: string) => {
               avatar_url
             ),
             venues (
-              name
+              name,
+              staycation_venues (
+                property_type
+              )
             ),
             staycation_rooms (
-              room_name
+              room_name,
+              room_number
             )
           `,
           )

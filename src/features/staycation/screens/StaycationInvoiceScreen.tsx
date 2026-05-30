@@ -20,6 +20,7 @@ import {
   FileText,
   ChevronRight,
   User,
+  Home,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -65,6 +66,8 @@ export const StaycationInvoiceScreen = () => {
 
   // Est Payout: Total Paid - platform fee - gateway charges
   const estPayout = totalPaid - platformFee - gatewayFee;
+
+  const isResort = booking.venues?.staycation_venues?.[0]?.property_type === "resort";
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "N/A";
@@ -164,6 +167,25 @@ export const StaycationInvoiceScreen = () => {
             </View>
           </View>
         </View>
+
+        {/* Room Details Section (Resort Only) */}
+        {isResort && (
+          <View style={styles.fieldGroup}>
+            <View style={styles.labelRow}>
+              <Home size={ms(18)} color={COLORS.text.primary} />
+              <Text variant="body2" weight="bold" style={styles.labelText}>
+                Room Name & Number
+              </Text>
+            </View>
+            <View style={styles.infoBox}>
+              <Text variant="body2" weight="semiBold">
+                {`${booking.staycation_rooms?.room_name || "N/A"} - ${
+                  booking.staycation_rooms?.room_number || "N/A"
+                }`}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Payments Section */}
         {isOnline ? (
