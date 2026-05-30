@@ -48,6 +48,7 @@ export interface BookingData {
   sequence_number?: number;
   rawSubtotal?: number;
   rawPaidAmount?: number;
+  rawDiscountAmount?: number;
   isOnline?: boolean;
   isPickleball?: boolean;
 }
@@ -268,9 +269,11 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           const finalName = isOffline ? b.guest_name : b.full_name || "Guest User";
           const finalPhone = isOffline ? b.guest_phone || "" : b.phone || "";
 
-          // For online Pickleball, use subtotal. Otherwise use paid_amount.
+          // For online Pickleball, use subtotal. Otherwise use paid_amount + discount_amount.
           const displayPrice =
-            isOnline && isPickleball ? Number(b.subtotal || 0) : Number(b.paid_amount || 0);
+            isOnline && isPickleball
+              ? Number(b.subtotal || 0)
+              : Number(b.paid_amount || 0) + Number(b.discount_amount || 0);
 
           return {
             id: b.id,
@@ -294,6 +297,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             sequence_number: b.sequence_number,
             rawSubtotal: Number(b.subtotal || 0), // Keep raw values for merged calculation
             rawPaidAmount: Number(b.paid_amount || 0),
+            rawDiscountAmount: Number(b.discount_amount || 0),
             isOnline,
             isPickleball,
           };
@@ -340,12 +344,17 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           // Recalculate summed amounts
           const newSumSubtotal = (existing.rawSubtotal || 0) + (current.rawSubtotal || 0);
           const newSumPaid = (existing.rawPaidAmount || 0) + (current.rawPaidAmount || 0);
+          const newSumDiscount =
+            (existing.rawDiscountAmount || 0) + (current.rawDiscountAmount || 0);
 
           existing.rawSubtotal = newSumSubtotal;
           existing.rawPaidAmount = newSumPaid;
+          existing.rawDiscountAmount = newSumDiscount;
 
           // Update display price based on logic
-          const finalDisplayPrice = isOnlinePickleball ? newSumSubtotal : newSumPaid;
+          const finalDisplayPrice = isOnlinePickleball
+            ? newSumSubtotal
+            : newSumPaid + newSumDiscount;
           existing.price = `₹${finalDisplayPrice}`;
 
           existing.idChain.push(current.id);

@@ -14,6 +14,8 @@ export interface BookingDetailData {
   paid_amount: number;
   subtotal_amount?: number;
   discount_amount: number;
+  platform_fee: number;
+  gateway_fee: number;
   booking_status: string;
   guest_name: string | null;
   guest_phone: string | null;
@@ -117,6 +119,8 @@ export const useBookingDetails = (bookingId: string) => {
       const paidAmount = finalChain.reduce((sum, b) => sum + Number(b.paid_amount), 0);
       const subtotalAmount = finalChain.reduce((sum, b) => sum + Number(b.subtotal || 0), 0);
       const discountAmount = finalChain.reduce((sum, b) => sum + Number(b.discount_amount || 0), 0);
+      const platformFee = finalChain.reduce((sum, b) => sum + Number(b.platform_fee || 0), 0);
+      const gatewayFee = finalChain.reduce((sum, b) => sum + Number(b.gateway_fee || 0), 0);
 
       const firstBooking = finalChain[0];
       const lastBooking = finalChain[finalChain.length - 1];
@@ -125,9 +129,11 @@ export const useBookingDetails = (bookingId: string) => {
         ...baseBooking,
         total_amount: totalAmount,
         paid_amount: paidAmount,
-        subtotal_amount: subtotalAmount, // NEW: Include aggregated subtotal
+        subtotal_amount: subtotalAmount,
         discount_amount: discountAmount,
-        booking_source: firstBooking.booking_source, // ENSURE consistency for the whole chain
+        platform_fee: platformFee,
+        gateway_fee: gatewayFee,
+        booking_source: firstBooking.booking_source,
         sports_slots: {
           ...baseBooking.sports_slots,
           id: lastBooking.sports_slots.id, // Use the last slot ID for extension logic
