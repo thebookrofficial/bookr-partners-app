@@ -90,6 +90,16 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
   const [bookings, setBookings] = useState<BookingData[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
 
+  // Reset state when venue or category changes to avoid stale data leakage
+  useEffect(() => {
+    setLoading(true);
+    setVenue(null);
+    setGrounds([]);
+    setActiveGroundId("");
+    setSlots([]);
+    setBookings([]);
+  }, [initialVenueId, category]);
+
   // Auto-select the first available category if the current one isn't valid for this vendor
   useEffect(() => {
     if (availableCategories.length > 0 && !availableCategories.includes(category)) {

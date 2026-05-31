@@ -29,33 +29,31 @@ import { Calendar } from "react-native-calendars";
 export const SportsHomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<any, any>>();
-  let serviceId = route.params?.serviceId;
-  let initialCategory = route.params?.category;
 
-  if (!serviceId) {
-    const parentState = navigation.getParent()?.getState();
-    const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
-    const params = (tabRoute?.params as any) || {};
-    serviceId = params.serviceId || params.params?.serviceId || "";
-    initialCategory = initialCategory || params.category || params.params?.category;
-  }
+  const { selectedCategories, setServiceCategory, activeServiceId, setActiveServiceId } =
+    useServiceStore();
 
-  const { selectedCategories, setServiceCategory } = useServiceStore();
-  const lastInitialCategory = React.useRef<string | undefined>(undefined);
+  // 1. Get Service ID (Priority: Route -> Store)
+  const serviceId = route.params?.serviceId || activeServiceId;
 
-  // CRITICAL FIX: Put initialCategory FIRST.
-  // Prioritize the route parameter (what was clicked), THEN the stored value, THEN fallback to Football.
-  const selectedCategory = initialCategory || selectedCategories[serviceId] || "Football";
+  // 2. Get Category (Priority: Route -> Store)
+  const routeCategory = route.params?.category;
+  const storedCategory = selectedCategories[serviceId];
+  const selectedCategory = routeCategory || storedCategory || "Football";
 
-  // Force the store to update ONLY if we came in via a NEW specific category navigation
+  // Sync activeServiceId with store
   useEffect(() => {
-    if (initialCategory && initialCategory !== lastInitialCategory.current) {
-      lastInitialCategory.current = initialCategory;
-      if (selectedCategories[serviceId] !== initialCategory) {
-        setServiceCategory(serviceId, initialCategory);
-      }
+    if (serviceId && serviceId !== activeServiceId) {
+      setActiveServiceId(serviceId);
     }
-  }, [initialCategory, selectedCategories, serviceId, setServiceCategory]);
+  }, [serviceId, activeServiceId, setActiveServiceId]);
+
+  // Sync route param with store if we arrived via a deep link or specific tab click
+  useEffect(() => {
+    if (routeCategory && routeCategory !== storedCategory) {
+      setServiceCategory(serviceId, routeCategory);
+    }
+  }, [routeCategory, serviceId, storedCategory, setServiceCategory]);
 
   const {
     venue,

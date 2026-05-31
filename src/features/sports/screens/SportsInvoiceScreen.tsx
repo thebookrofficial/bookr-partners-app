@@ -54,7 +54,7 @@ export const SportsInvoiceScreen = () => {
   const sportsType = Array.isArray(sportsVenues)
     ? sportsVenues[0]?.sports_type || ""
     : (sportsVenues as any)?.sports_type || "";
-  const _isPickleball = sportsType.toLowerCase().includes("pickleball");
+  const isPickleball = sportsType.toLowerCase().includes("pickleball");
 
   // Calculate fees based on user requirements
   const rawSubtotal = Number(booking.subtotal) || 0;
@@ -63,9 +63,10 @@ export const SportsInvoiceScreen = () => {
 
   // servicePrice: The full price of the service (total_amount in DB)
   // totalPaid: Formula provided by user: paid_amount + discount - platform_fee
-  // We apply this globally for sports history consistency.
+  // Note: Platform fee subtraction is applied ONLY to Pickleball as requested.
   const servicePrice = Number(booking.total_amount) || 0;
-  const totalPaid = (Number(booking.paid_amount) || 0) + dbDiscount - dbPlatformFee;
+  const totalPaid =
+    (Number(booking.paid_amount) || 0) + dbDiscount - (isPickleball ? dbPlatformFee : 0);
 
   // In App Payments: Use DB subtotal strictly for online bookings
   const inAppPayments = isOnline ? rawSubtotal : totalPaid;

@@ -11,9 +11,8 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
 // Navigation & DB Imports
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
+import { RouteProp, useRoute } from "@react-navigation/native";
+import { SportsTabParamList } from "@/navigation/navigation.types";
 import { supabase } from "@/lib/supabase";
 
 import { useServiceStore } from "@/store/serviceStore";
@@ -36,38 +35,27 @@ const FilterTab = ({ label, isActive, onPress, icon }: any) => (
 );
 
 export const SportsDashboardScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, any>>();
 
-  // Extract initial serviceId and category
-  let serviceId = route.params?.serviceId;
-  let routeCategory = route.params?.category;
+  const { selectedCategories, setServiceCategory, activeServiceId } = useServiceStore();
 
-  if (!serviceId) {
-    const parentState = navigation.getParent()?.getState();
-    const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
-    const params = (tabRoute?.params as any) || {};
-    serviceId = params.serviceId || params.params?.serviceId || "";
-    routeCategory = routeCategory || params.category || params.params?.category;
-  }
+  // 1. Get Service ID (Priority: Route -> Store)
+  const serviceId = route.params?.serviceId || activeServiceId;
+
+  // 2. Get Category (Priority: Route -> Store)
+  const routeCategory = route.params?.category;
+  const storedCategory = selectedCategories[serviceId];
+  const selectedCategory = routeCategory || storedCategory || "Football";
 
   const [timeFilter, setTimeFilter] = useState("Today");
   const [groundFilter, setGroundFilter] = useState("Overall");
 
-  const { selectedCategories, setServiceCategory } = useServiceStore();
-
-  const lastRouteCategory = React.useRef<string | undefined>(undefined);
-
+  // Sync route param with store if we arrived via a deep link or specific tab click
   useEffect(() => {
-    if (routeCategory && routeCategory !== lastRouteCategory.current) {
-      lastRouteCategory.current = routeCategory;
-      if (selectedCategories[serviceId] !== routeCategory) {
-        setServiceCategory(serviceId, routeCategory);
-      }
+    if (routeCategory && routeCategory !== storedCategory) {
+      setServiceCategory(serviceId, routeCategory);
     }
-  }, [routeCategory, serviceId, setServiceCategory, selectedCategories]);
-
-  const selectedCategory = selectedCategories[serviceId] || routeCategory || "Football";
+  }, [routeCategory, serviceId, storedCategory, setServiceCategory]);
 
   // Dynamic Venue Resolution State
   const [currentVenueId, setCurrentVenueId] = useState<string>("");

@@ -135,12 +135,17 @@ export const BookingDetailsScreen = () => {
   const totalDiscount = Number(booking.discount_amount) || 0;
   const totalFees = booking.platform_fee || 0;
 
+  // Identify if it's a Pickleball service
+  const sportsType = booking.venues?.sports_venues?.[0]?.sports_type || "";
+  const isPickleball = sportsType.toLowerCase().includes("pickleball");
+
   // The vendor wants to see the "Total Payment"
   const displayTotalAmount = totalAmount;
 
   // The vendor wants to see the "Credit" (Cash + Discount - Fees) as the total amount paid
   // Formula: paid_amount + discount - platform_fee
-  const displayAmountPaid = currentPaid + totalDiscount - totalFees;
+  // Note: Platform fee subtraction is applied ONLY to Pickleball as requested.
+  const displayAmountPaid = currentPaid + totalDiscount - (isPickleball ? totalFees : 0);
 
   // Remaining Amount is what is still due at the venue
   const remainingAmount = Math.max(0, displayTotalAmount - displayAmountPaid);

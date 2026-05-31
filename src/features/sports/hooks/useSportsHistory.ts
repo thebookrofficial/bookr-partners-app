@@ -217,7 +217,11 @@ export const useSportsHistory = (
             }
 
             // User Formula: paid_amount + discount - platform_fee
-            const displayPrice = u.totalPaid + u.totalDiscount - u.totalPlatformFee;
+            // Applied ONLY to Pickleball as requested
+            const isPickleball = category.toLowerCase().includes("pickleball");
+            const displayPrice = isPickleball
+              ? u.totalPaid + u.totalDiscount - u.totalPlatformFee
+              : u.totalPaid + u.totalDiscount;
 
             return {
               id: u.id,
@@ -307,7 +311,12 @@ export const useSportsHistory = (
     } finally {
       setLoading(false);
     }
-  }, [currentVenueId, searchQuery, dateFilter, customRange]);
+  }, [currentVenueId, searchQuery, dateFilter, customRange, category]);
+
+  useEffect(() => {
+    setHistoryGroups([]);
+    setLoading(true);
+  }, [initialVenueId, category]);
 
   useEffect(() => {
     resolveVenue();

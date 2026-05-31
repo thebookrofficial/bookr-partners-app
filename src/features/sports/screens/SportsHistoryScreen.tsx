@@ -97,32 +97,22 @@ export const SportsHistoryScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, any>>();
 
-  // Extract initial serviceId and category gracefully
-  let serviceId = route.params?.serviceId;
-  let routeCategory = route.params?.category;
+  const { selectedCategories, setServiceCategory, activeServiceId } = useServiceStore();
 
-  if (!serviceId) {
-    const parentState = navigation.getParent()?.getState();
-    const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
-    const params = (tabRoute?.params as any) || {};
-    serviceId = params.serviceId || params.params?.serviceId || "";
-    routeCategory = routeCategory || params.category || params.params?.category;
-  }
+  // 1. Get Service ID (Priority: Route -> Store)
+  const serviceId = route.params?.serviceId || activeServiceId;
 
-  const { selectedCategories, setServiceCategory } = useServiceStore();
+  // 2. Get Category (Priority: Route -> Store)
+  const routeCategory = route.params?.category;
+  const storedCategory = selectedCategories[serviceId];
+  const selectedCategory = routeCategory || storedCategory || "Football";
 
-  const lastRouteCategory = React.useRef<string | undefined>(undefined);
-
+  // Sync route param with store if we arrived via a deep link or specific tab click
   React.useEffect(() => {
-    if (routeCategory && routeCategory !== lastRouteCategory.current) {
-      lastRouteCategory.current = routeCategory;
-      if (selectedCategories[serviceId] !== routeCategory) {
-        setServiceCategory(serviceId, routeCategory);
-      }
+    if (routeCategory && routeCategory !== storedCategory) {
+      setServiceCategory(serviceId, routeCategory);
     }
-  }, [routeCategory, serviceId, setServiceCategory, selectedCategories]);
-
-  const selectedCategory = selectedCategories[serviceId] || routeCategory || "Football";
+  }, [routeCategory, serviceId, storedCategory, setServiceCategory]);
 
   const [searchQuery, setSearchQuery] = useState("");
 

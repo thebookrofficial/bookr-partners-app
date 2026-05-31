@@ -209,6 +209,23 @@ export const useSportsDashboard = (
   }, [venueId, timeFilter, groundFilter, customRange]);
 
   useEffect(() => {
+    setLoading(true);
+    setGrounds([]);
+    // Reset metrics to defaults
+    setMetrics({
+      totalBookings: 0,
+      onlineBookings: 0,
+      offlineBookings: 0,
+      onlineRevenue: 0,
+      offlineRevenue: 0,
+      bookingGraphData: [],
+      revenueGraphData: [],
+      maxBookingValue: 0,
+      dateRangeLabel: "",
+    });
+  }, [venueId, timeFilter, groundFilter]);
+
+  useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
