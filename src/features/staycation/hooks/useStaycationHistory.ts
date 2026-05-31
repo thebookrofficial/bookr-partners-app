@@ -9,7 +9,13 @@ import { StaycationBooking } from "../types/staycation.types";
 // Helper to format Date to YYYY-MM-DD
 const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
-export type DateFilterOption = "all" | "3_months" | "6_months" | "9_months" | "custom";
+export type DateFilterOption =
+  | "all"
+  | "yesterday"
+  | "3_months"
+  | "6_months"
+  | "9_months"
+  | "custom";
 export const useStaycationHistory = (
   serviceId?: string,
   dateFilter: DateFilterOption = "all",
@@ -81,6 +87,9 @@ export const useStaycationHistory = (
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const yesterdayStr = formatDate(yesterday);
 
       let query = supabase
         .from("staycation_bookings")
@@ -105,7 +114,8 @@ export const useStaycationHistory = (
           profiles:user_id ( full_name, phone, avatar_url )
         `,
         )
-        .eq("venue_id", venueData.id);
+        .eq("venue_id", venueData.id)
+        .lte("check_in_date", yesterdayStr);
 
       // Base History Filter: Show all bookings except cancelled ones
       const historyFilterStr = `booking_status.neq.cancelled`;
@@ -113,9 +123,12 @@ export const useStaycationHistory = (
       // Apply Date Range Filters
       if (dateFilter !== "all") {
         let fromDate = new Date();
-        let toDate = new Date();
+        let toDate = new Date(yesterday); // Default end range to yesterday for history
 
-        if (dateFilter === "3_months") {
+        if (dateFilter === "yesterday") {
+          fromDate = new Date(yesterday);
+          toDate = new Date(yesterday);
+        } else if (dateFilter === "3_months") {
           fromDate.setMonth(fromDate.getMonth() - 3);
         } else if (dateFilter === "6_months") {
           fromDate.setMonth(fromDate.getMonth() - 6);
@@ -130,8 +143,6 @@ export const useStaycationHistory = (
         const toStr = formatDate(toDate);
 
         // Apply AND condition using method chaining correctly
-        // We use or() to ensure it's a history booking, AND gte/lte for date ranges
-        // Note: Chaining .or() with .gte()/.lte() forms an implicit AND at the root level in PostgREST.
         query = query
           .or(historyFilterStr)
           .gte("check_in_date", fromStr)
