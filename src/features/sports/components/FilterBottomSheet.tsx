@@ -8,6 +8,7 @@ import { X, Calendar } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import DateTimePicker from "@react-native-community/datetimepicker";
+// import { tr } from "zod/v4/locales";
 
 export type DateFilterOption =
   | "all"
@@ -64,7 +65,12 @@ export const FilterBottomSheet = ({
     d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent={true}>
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
 

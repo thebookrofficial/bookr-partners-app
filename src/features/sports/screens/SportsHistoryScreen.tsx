@@ -61,30 +61,18 @@ const HistoryCard = ({ name, phone, time, price, status, onPress }: any) => {
 // ==========================================
 // 2. HEADERS
 // ==========================================
-const MonthSectionHeader = ({
-  month,
-  totalSettlement,
-}: {
-  month: string;
-  totalSettlement: number;
-}) => (
+const MonthSectionHeader = ({ month }: { month: string }) => (
   <View style={styles.monthHeaderRow}>
     <Text style={styles.monthText}>{month}</Text>
-    <View style={styles.monthSettlementContainer}>
-      <Text style={styles.monthSettlementLabel}>Total:</Text>
-      <Text style={styles.monthSettlementAmount}>₹{totalSettlement}</Text>
-    </View>
   </View>
 );
 
 const DateSectionHeader = ({
   date,
-  settlement,
   isExpanded,
   onToggle,
 }: {
   date: string;
-  settlement: number;
   isExpanded: boolean;
   onToggle: () => void;
 }) => (
@@ -99,11 +87,6 @@ const DateSectionHeader = ({
         style={{ transform: [{ rotate: isExpanded ? "180deg" : "0deg" }] }}
       />
     </TouchableOpacity>
-
-    <View style={styles.settlementRight}>
-      <Text style={styles.datePriceText}>₹{settlement}</Text>
-      <Text style={styles.dateSettlementLabel}>Settlement</Text>
-    </View>
   </View>
 );
 
@@ -144,7 +127,7 @@ export const SportsHistoryScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState<DateFilterOption>("yesterday");
+  const [dateFilter, setDateFilter] = useState<DateFilterOption>("all");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>();
 
   // NEW: State to track which dates are collapsed (Accordion logic)
@@ -223,10 +206,7 @@ export const SportsHistoryScreen = () => {
           ) : (
             historyGroups.map((monthGroup, mIndex) => (
               <View key={`month-${mIndex}`} style={styles.monthGroupContainer}>
-                <MonthSectionHeader
-                  month={monthGroup.month}
-                  totalSettlement={monthGroup.totalSettlement}
-                />
+                <MonthSectionHeader month={monthGroup.month} />
 
                 {monthGroup.days.map((dayGroup, dIndex) => {
                   const isCollapsed = !!collapsedDates[dayGroup.date];
@@ -234,7 +214,6 @@ export const SportsHistoryScreen = () => {
                     <View key={`day-${dIndex}`}>
                       <DateSectionHeader
                         date={dayGroup.date}
-                        settlement={dayGroup.settlement}
                         isExpanded={!isCollapsed}
                         onToggle={() => toggleDateAccordion(dayGroup.date)}
                       />

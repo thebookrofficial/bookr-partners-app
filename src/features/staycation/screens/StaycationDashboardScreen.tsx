@@ -50,14 +50,14 @@ const DonutChart = ({ size = ms(100), strokeWidth = 6, onlineRevenue, totalReven
           <>
             <Path
               path={onlinePath}
-              color="#001C65"
+              color={COLORS.primary}
               style="stroke"
               strokeWidth={strokeWidth}
               strokeCap="round"
             />
             <Path
               path={offlinePath}
-              color="#63A1FD"
+              color={COLORS.danger}
               style="stroke"
               strokeWidth={strokeWidth}
               strokeCap="round"
@@ -229,18 +229,18 @@ export const StaycationDashboardScreen = () => {
 
               <View style={styles.onlineOfflineCol}>
                 <View style={styles.badgeBox}>
-                  <Text variant="body2" color="#001C65" style={styles.badgeText}>
+                  <Text variant="body2" color={COLORS.text.primary} style={styles.badgeText}>
                     Online bookings
                   </Text>
-                  <Text variant="body1" weight="bold" color="#001C65">
+                  <Text variant="body1" weight="bold" color={COLORS.primary}>
                     {stats.onlineBookings}
                   </Text>
                 </View>
                 <View style={styles.badgeBox}>
-                  <Text variant="body2" color="#63A1FD" style={styles.badgeText}>
+                  <Text variant="body2" color={COLORS.text.primary} style={styles.badgeText}>
                     Offline bookings
                   </Text>
-                  <Text variant="body1" weight="bold" color="#63A1FD">
+                  <Text variant="body1" weight="bold" color={COLORS.danger}>
                     {stats.offlineBookings}
                   </Text>
                 </View>
@@ -261,7 +261,7 @@ export const StaycationDashboardScreen = () => {
                   <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
                     Online Revenue
                   </Text>
-                  <Text variant="h2" weight="bold" color="#001C65">
+                  <Text variant="h2" weight="bold" color={COLORS.primary}>
                     ₹{parseFloat(stats.onlineRevenue).toLocaleString("en-IN")}
                   </Text>
                 </View>
@@ -269,7 +269,7 @@ export const StaycationDashboardScreen = () => {
                   <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
                     Offline Revenue
                   </Text>
-                  <Text variant="h2" weight="bold" color="#63A1FD">
+                  <Text variant="h2" weight="bold" color={COLORS.danger}>
                     ₹{parseFloat(stats.offlineRevenue).toLocaleString("en-IN")}
                   </Text>
                 </View>

@@ -92,7 +92,7 @@ export const useSportsHistory = (
         .from("sports_bookings")
         .select(
           `
-          id, guest_name, guest_phone, total_amount, paid_amount, subtotal, discount_amount, booking_status,
+          id, guest_name, guest_phone, total_amount, paid_amount, subtotal, discount_amount, platform_fee, booking_status,
           booking_group_id, parent_booking_id, sports_booking_type, booking_source,
           profiles(full_name, phone),
           sports_slots!inner(slot_date, start_time, end_time)
@@ -109,6 +109,12 @@ export const useSportsHistory = (
       (bookings || []).forEach((b: any) => {
         const slotDate = b.sports_slots.slot_date;
         const dateObj = new Date(slotDate);
+
+        // RESTRICTION: Show only yesterday and before. Exclude Today and Future.
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (dateObj.getTime() >= today.getTime()) return;
+
         const monthStr = dateObj.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
         const rawMonth = new Date(dateObj.getFullYear(), dateObj.getMonth(), 1).getTime();
         const dateStr = dateObj.toLocaleDateString("en-GB", {
@@ -132,6 +138,7 @@ export const useSportsHistory = (
         const totalAmt = Number(b.total_amount || 0);
         const paidAmt = Number(b.paid_amount || 0);
         const discountAmt = Number(b.discount_amount || 0);
+        const platformFeeAmt = Number(b.platform_fee || 0);
 
         groupedByMonth[monthStr].totalSettlement += totalAmt;
         groupedByMonth[monthStr].days[dateStr].settlement += totalAmt;
@@ -145,6 +152,7 @@ export const useSportsHistory = (
             totalPaid: 0,
             totalDiscount: 0,
             totalSubtotal: 0,
+            totalPlatformFee: 0,
             slots: [],
             rawBookingType: b.sports_booking_type,
             rawBookingSource: b.booking_source,
@@ -155,6 +163,8 @@ export const useSportsHistory = (
         groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalPaid += paidAmt;
         groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalDiscount +=
           discountAmt;
+        groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalPlatformFee +=
+          platformFeeAmt;
         groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].totalSubtotal += Number(
           b.subtotal || 0,
         );
@@ -206,8 +216,8 @@ export const useSportsHistory = (
               status = "Online";
             }
 
-            // Show Gross Paid (Paid + Discount) for the card price
-            const displayPrice = u.totalPaid + u.totalDiscount;
+            // User Formula: paid_amount + discount - platform_fee
+            const displayPrice = u.totalPaid + u.totalDiscount - u.totalPlatformFee;
 
             return {
               id: u.id,

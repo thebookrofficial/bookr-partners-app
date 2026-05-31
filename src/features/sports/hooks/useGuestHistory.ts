@@ -105,7 +105,6 @@ export const useGuestHistory = (identifier: string, vertical: string) => {
         results = data;
       }
 
-      const now = new Date();
       let pastCount = 0,
         upcomingCount = 0,
         cancelledCount = 0;
@@ -116,12 +115,13 @@ export const useGuestHistory = (identifier: string, vertical: string) => {
         let rawDate, displayDate, displayTime, vName, isOnline;
 
         if (vertical === "sports") {
-          rawDate = b.sports_slots.slot_date;
+          const slot = Array.isArray(b.sports_slots) ? b.sports_slots[0] : b.sports_slots;
+          if (!slot) return;
+
+          rawDate = slot.slot_date;
           displayDate = formatDisplayDate(rawDate);
-          displayTime = `${formatTime(b.sports_slots.start_time)} - ${formatTime(
-            b.sports_slots.end_time,
-          )}`;
-          vName = b.sports_slots.sports_grounds?.name || "Sports Ground";
+          displayTime = `${formatTime(slot.start_time)} - ${formatTime(slot.end_time)}`;
+          vName = slot.sports_grounds?.name || "Sports Ground";
           isOnline = b.platform_fee > 0;
         } else {
           rawDate = b.check_in_date;
@@ -130,18 +130,30 @@ export const useGuestHistory = (identifier: string, vertical: string) => {
           )}`;
           displayTime = "Staycation";
           vName = b.venues?.name || "Staycation Venue";
-          isOnline = parseFloat(b.platform_fee) > 0;
+          isOnline = b.platform_fee && parseFloat(b.platform_fee) > 0;
         }
 
         const bookingDate = new Date(rawDate);
+        bookingDate.setHours(0, 0, 0, 0);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         let type: "past" | "upcoming" | "cancelled" = "past";
 
         if (isCancelled) {
           type = "cancelled";
           cancelledCount++;
-        } else if (bookingDate > now) {
-          type = "upcoming";
-          upcomingCount++;
+        } else if (bookingDate >= today) {
+          // If it's today or in the future, and not cancelled, it's upcoming
+          // (Unless it's explicitly 'completed', but we mostly rely on date)
+          if (bookingDate.getTime() === today.getTime() && b.booking_status === "completed") {
+            type = "past";
+            pastCount++;
+          } else {
+            type = "upcoming";
+            upcomingCount++;
+          }
         } else {
           type = "past";
           pastCount++;

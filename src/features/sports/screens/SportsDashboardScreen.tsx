@@ -220,7 +220,7 @@ export const SportsDashboardScreen = () => {
               </View>
               <View style={styles.splitBlock}>
                 <View style={styles.splitRow}>
-                  <Text variant="body2" weight="medium" color={COLORS.primary}>
+                  <Text variant="body2" weight="medium" color={COLORS.text.primary}>
                     Online bookings
                   </Text>
                   <Text variant="body1" weight="medium" color={COLORS.primary}>
@@ -228,7 +228,7 @@ export const SportsDashboardScreen = () => {
                   </Text>
                 </View>
                 <View style={styles.splitRow}>
-                  <Text variant="body2" weight="medium" color={COLORS.danger}>
+                  <Text variant="body2" weight="medium" color={COLORS.text.primary}>
                     Offline bookings
                   </Text>
                   <Text variant="body1" weight="medium" color={COLORS.danger}>
@@ -240,7 +240,7 @@ export const SportsDashboardScreen = () => {
 
             {/* Revenue Details Summary */}
             <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              REVENUE DETAILS
+              GROSS PROFIT DETAILS
             </Text>
             <View style={styles.onlineRevenueCard}>
               <View style={styles.revenueDonutWrapper}>
@@ -258,16 +258,16 @@ export const SportsDashboardScreen = () => {
 
               <View style={styles.revenueSplitBlock}>
                 <View style={styles.revenueRow}>
-                  <Text variant="body2" weight="bold" color={COLORS.primary}>
-                    Online Revenue
+                  <Text variant="body2" weight="bold" color={COLORS.text.primary}>
+                    Online Collections
                   </Text>
                   <Text variant="body1" weight="bold" color={COLORS.primary}>
                     ₹{metrics.onlineRevenue.toLocaleString("en-IN")}
                   </Text>
                 </View>
                 <View style={styles.revenueRow}>
-                  <Text variant="body2" weight="bold" color={COLORS.danger}>
-                    Offline Revenue
+                  <Text variant="body2" weight="bold" color={COLORS.text.primary}>
+                    Offline Collections
                   </Text>
                   <Text variant="body1" weight="bold" color={COLORS.danger}>
                     ₹{metrics.offlineRevenue.toLocaleString("en-IN")}

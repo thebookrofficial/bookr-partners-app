@@ -50,8 +50,11 @@ export const SportsInvoiceScreen = () => {
   const isOnline = booking.booking_source === "online";
 
   // Identify if it's a Pickleball service
-  const sportsType = booking.venues?.sports_venues?.[0]?.sports_type || "";
-  const isPickleball = sportsType.toLowerCase() === "pickleball";
+  const sportsVenues = booking.venues?.sports_venues;
+  const sportsType = Array.isArray(sportsVenues)
+    ? sportsVenues[0]?.sports_type || ""
+    : (sportsVenues as any)?.sports_type || "";
+  const _isPickleball = sportsType.toLowerCase().includes("pickleball");
 
   // Calculate fees based on user requirements
   const rawSubtotal = Number(booking.subtotal) || 0;
@@ -59,19 +62,19 @@ export const SportsInvoiceScreen = () => {
   const dbDiscount = Number(booking.discount_amount) || 0;
 
   // servicePrice: The full price of the service (total_amount in DB)
-  // totalPaid: The 'Gross' amount paid (Actual cash/online + Discount)
+  // totalPaid: Formula provided by user: paid_amount + discount - platform_fee
+  // We apply this globally for sports history consistency.
   const servicePrice = Number(booking.total_amount) || 0;
-  const totalPaid = (Number(booking.paid_amount) || 0) + dbDiscount;
+  const totalPaid = (Number(booking.paid_amount) || 0) + dbDiscount - dbPlatformFee;
 
   // In App Payments: Use DB subtotal strictly for online bookings
-  // For Pickleball, we subtract the convenience fee (dbPlatformFee) from the subtotal
-  const inAppPayments = isOnline ? rawSubtotal - (isPickleball ? dbPlatformFee : 0) : totalPaid;
+  const inAppPayments = isOnline ? rawSubtotal : totalPaid;
 
   const discountAmount = 0; // Hardcoded to 0 for display as platform subsidizes it
 
-  // Platform Fee: Always 3.5% of the total service price. 0 if Pickleball.
+  // Platform Fee: Always 3.5% of the total service price.
   const platformFeeRate = 0.035;
-  const platformFee = isPickleball ? 0 : servicePrice * platformFeeRate;
+  const platformFee = servicePrice * platformFeeRate;
 
   // Gateway Charges: 2% (Applied strictly to the inAppPayments)
   const gatewayFee = inAppPayments * 0.02;
@@ -325,18 +328,16 @@ export const SportsInvoiceScreen = () => {
               </Text>
             </View>
 
-            {!isPickleball && (
-              <View style={styles.payoutRow}>
-                <View style={styles.dashedUnderline}>
-                  <Text variant="body2" weight="semiBold">
-                    Platform Fee
-                  </Text>
-                </View>
-                <Text variant="body2" weight="medium" color="#E55959">
-                  -₹{platformFee.toFixed(2)}
+            <View style={styles.payoutRow}>
+              <View style={styles.dashedUnderline}>
+                <Text variant="body2" weight="semiBold">
+                  Platform Fee
                 </Text>
               </View>
-            )}
+              <Text variant="body2" weight="medium" color="#E55959">
+                -₹{platformFee.toFixed(2)}
+              </Text>
+            </View>
 
             <View style={styles.payoutRow}>
               <View style={styles.dashedUnderline}>
