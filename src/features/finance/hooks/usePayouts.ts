@@ -23,6 +23,8 @@ interface PendingPayout {
  */
 export const usePayouts = (venueId: string) => {
   const [activeTab, setActiveTab] = useState("week");
+  const [customStartDate, setCustomStartDate] = useState<Date>(new Date());
+  const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
   const [pendingPayouts, setPendingPayouts] = useState<PendingPayout[]>([]);
   const [historicalPayouts, setHistoricalPayouts] = useState<PayoutItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,59 +43,77 @@ export const usePayouts = (venueId: string) => {
 
       // 2. Determine Date Range for Historical Payouts
       const now = new Date();
-      // Set startDate to May 1st, 2026 to ensure all May bookings are shown
-      const startDate = new Date(2026, 4, 1); // Month is 0-indexed, so 4 is May
-
-      // For the current interval (week/month), we want to include all future bookings
-      // within that interval so the summary matches the detail breakdown.
-      let endDate = new Date(now);
-      if (activeTab.toLowerCase() === "week") {
-        const day = now.getDay();
-        const diff = day === 0 ? 0 : 7 - day;
-        endDate.setDate(now.getDate() + diff);
-      } else if (activeTab.toLowerCase() === "month") {
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      }
-
+      let startDateStr = "";
+      let endDateStr = "";
       let interval: "day" | "week" | "month" = "day";
 
-      switch (activeTab.toLowerCase()) {
-        case "day":
-          interval = "day";
-          break;
-        case "week":
+      if (activeTab.toLowerCase() === "custom") {
+        startDateStr = customStartDate.toISOString().split("T")[0];
+        endDateStr = customEndDate.toISOString().split("T")[0];
+        interval = "day";
+      } else {
+        // Set startDate to May 1st, 2026 to ensure all May bookings are shown
+        const startDate = new Date(2026, 4, 1); // Month is 0-indexed, so 4 is May
+        startDateStr = startDate.toISOString().split("T")[0];
+
+        // For the current interval (week/month), we want to include all future bookings
+        // within that interval so the summary matches the detail breakdown.
+        let endDate = new Date(now);
+        if (activeTab.toLowerCase() === "week") {
+          const day = now.getDay();
+          const diff = day === 0 ? 0 : 7 - day;
+          endDate.setDate(now.getDate() + diff);
           interval = "week";
-          break;
-        case "month":
+        } else if (activeTab.toLowerCase() === "month") {
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
           interval = "month";
-          break;
-        case "custom":
+        } else if (activeTab.toLowerCase() === "day") {
           interval = "day";
-          break;
+        }
+        endDateStr = endDate.toISOString().split("T")[0];
       }
 
       let historical = await FinanceService.getAggregatedPayouts({
         venueId,
-        startDate: startDate.toISOString().split("T")[0],
-        endDate: endDate.toISOString().split("T")[0],
+        startDate: startDateStr,
+        endDate: endDateStr,
         interval,
       });
 
-      // Filter out the ongoing current week if active tab is week
-      if (activeTab.toLowerCase() === "week" && historical?.length > 0) {
+      // 3. Filter out ongoing periods (Day, Week, Month) and Pending dates
+      if (historical?.length > 0) {
         const today = new Date();
-        const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+        const tab = activeTab.toLowerCase();
+        const pendingDates = pending.map(p => p.date);
+        const todayStr = today.toISOString().split("T")[0];
 
-        // Calculate the start of the current week (Sunday)
-        const currentWeekStart = new Date(today);
-        currentWeekStart.setDate(today.getDate() - dayOfWeek);
-        currentWeekStart.setHours(0, 0, 0, 0);
+        if (tab === "day" || tab === "custom") {
+          historical = historical.filter((item: PayoutItem) => {
+            return item.payout_date !== todayStr && !pendingDates.includes(item.payout_date);
+          });
+        } else if (tab === "week") {
+          const dayOfWeek = today.getDay();
+          const currentWeekStart = new Date(today);
+          currentWeekStart.setDate(today.getDate() - dayOfWeek);
+          currentWeekStart.setHours(0, 0, 0, 0);
 
-        historical = historical.filter((item: PayoutItem) => {
-          const itemDate = new Date(item.payout_date);
-          // Only show weeks that started before the current Sunday
-          return itemDate.getTime() < currentWeekStart.getTime();
-        });
+          historical = historical.filter((item: PayoutItem) => {
+            const itemDate = new Date(item.payout_date);
+            return itemDate.getTime() < currentWeekStart.getTime();
+          });
+        } else if (tab === "month") {
+          const currentYear = today.getFullYear();
+          const currentMonth = today.getMonth();
+
+          historical = historical.filter((item: PayoutItem) => {
+            const itemDate = new Date(item.payout_date);
+            const itemYear = itemDate.getFullYear();
+            const itemMonth = itemDate.getMonth();
+
+            // Only show months that are strictly before the current year/month
+            return itemYear < currentYear || (itemYear === currentYear && itemMonth < currentMonth);
+          });
+        }
       }
 
       setHistoricalPayouts(historical || []);
@@ -103,7 +123,7 @@ export const usePayouts = (venueId: string) => {
     } finally {
       setLoading(false);
     }
-  }, [venueId, activeTab]);
+  }, [venueId, activeTab, customStartDate, customEndDate]);
 
   useEffect(() => {
     fetchData();
@@ -112,6 +132,10 @@ export const usePayouts = (venueId: string) => {
   return {
     activeTab,
     setActiveTab,
+    customStartDate,
+    setCustomStartDate,
+    customEndDate,
+    setCustomEndDate,
     pendingPayouts,
     historicalPayouts,
     loading,

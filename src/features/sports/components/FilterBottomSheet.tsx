@@ -9,7 +9,13 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-export type DateFilterOption = "all" | "3_months" | "6_months" | "9_months" | "custom";
+export type DateFilterOption =
+  | "all"
+  | "yesterday"
+  | "3_months"
+  | "6_months"
+  | "9_months"
+  | "custom";
 
 interface FilterBottomSheetProps {
   visible: boolean;
@@ -47,6 +53,7 @@ export const FilterBottomSheet = ({
 
   const filterOptions: { label: string; value: DateFilterOption }[] = [
     { label: "All Time", value: "all" },
+    { label: "Yesterday", value: "yesterday" },
     { label: "3 Months", value: "3_months" },
     { label: "6 Months", value: "6_months" },
     { label: "9 Months", value: "9_months" },

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
@@ -10,9 +10,10 @@ import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Calendar } from "lucide-react-native";
+import { Calendar as CalendarIcon } from "lucide-react-native";
 import { useServiceStore } from "@/store/serviceStore";
 import { usePayouts } from "../hooks/usePayouts";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 const PendingPayoutCard = ({
   settlementDate,
@@ -25,7 +26,7 @@ const PendingPayoutCard = ({
 }) => (
   <TouchableOpacity style={styles.pendingSection} activeOpacity={0.7} onPress={onPress}>
     <View style={styles.dateRow}>
-      <Calendar size={ms(18)} color={COLORS.primary} />
+      <CalendarIcon size={ms(18)} color={COLORS.primary} />
       <Text variant="body2" weight="semiBold" style={styles.dateText}>
         {settlementDate}
       </Text>
@@ -88,10 +89,29 @@ export const PayoutsScreen = () => {
   const { venueId } = route.params;
   const { activeVenueName } = useServiceStore();
 
-  const { activeTab, setActiveTab, pendingPayouts, historicalPayouts, loading } =
-    usePayouts(venueId);
+  const {
+    activeTab,
+    setActiveTab,
+    customStartDate,
+    setCustomStartDate,
+    customEndDate,
+    setCustomEndDate,
+    pendingPayouts,
+    historicalPayouts,
+    loading,
+  } = usePayouts(venueId);
+
+  const [showPicker, setShowPicker] = useState<"start" | "end" | null>(null);
 
   const tabs = ["Day", "week", "Month", "Custom"];
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
 
   const handlePayoutPress = (item: any, isPending: boolean = false) => {
     let startDate = "";
@@ -165,6 +185,58 @@ export const PayoutsScreen = () => {
           style={styles.tabs}
         />
 
+        {activeTab.toLowerCase() === "custom" && (
+          <View style={styles.customRangeContainer}>
+            <TouchableOpacity
+              style={styles.dateSelector}
+              onPress={() => setShowPicker("start")}
+              activeOpacity={0.7}>
+              <Text variant="caption" color={COLORS.text.muted}>
+                From
+              </Text>
+              <View style={styles.dateValueRow}>
+                <CalendarIcon size={ms(16)} color={COLORS.primary} />
+                <Text variant="body2" weight="semiBold">
+                  {formatDate(customStartDate)}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.dateSelector}
+              onPress={() => setShowPicker("end")}
+              activeOpacity={0.7}>
+              <Text variant="caption" color={COLORS.text.muted}>
+                To
+              </Text>
+              <View style={styles.dateValueRow}>
+                <CalendarIcon size={ms(16)} color={COLORS.primary} />
+                <Text variant="body2" weight="semiBold">
+                  {formatDate(customEndDate)}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {showPicker && (
+          <DateTimePicker
+            value={showPicker === "start" ? customStartDate : customEndDate}
+            mode="date"
+            display="default"
+            onChange={(event, selectedDate) => {
+              setShowPicker(null);
+              if (selectedDate) {
+                if (showPicker === "start") {
+                  setCustomStartDate(selectedDate);
+                } else {
+                  setCustomEndDate(selectedDate);
+                }
+              }
+            }}
+          />
+        )}
+
         {loading && historicalPayouts.length === 0 ? (
           <ActivityIndicator color={COLORS.primary} style={{ marginVertical: vs(20) }} />
         ) : (
@@ -220,4 +292,22 @@ const styles = StyleSheet.create({
   amountText: { fontSize: fs(24), marginTop: vs(4) },
   bookingsInfo: { alignItems: "flex-end" },
   bookingsCount: { fontSize: fs(20), marginTop: vs(4) },
+  customRangeContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: hs(10),
+    marginVertical: vs(10),
+  },
+  dateSelector: {
+    flex: 1,
+    backgroundColor: COLORS.surface.primary,
+    borderRadius: ms(10),
+    padding: ms(10),
+    gap: vs(4),
+  },
+  dateValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+  },
 });

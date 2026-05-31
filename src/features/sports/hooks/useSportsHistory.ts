@@ -29,7 +29,7 @@ export const useSportsHistory = (
   initialVenueId: string,
   category: string,
   searchQuery: string,
-  dateFilter: "all" | "3_months" | "6_months" | "9_months" | "custom" = "all",
+  dateFilter: "all" | "yesterday" | "3_months" | "6_months" | "9_months" | "custom" = "all",
   customRange?: { start: Date; end: Date },
 ) => {
   const [currentVenueId, setCurrentVenueId] = useState<string>(initialVenueId);
@@ -237,9 +237,17 @@ export const useSportsHistory = (
       if (dateFilter !== "all") {
         const now = new Date().getTime();
         let cutoff = 0;
+        let maxCutoff = Infinity;
+
         if (dateFilter === "3_months") cutoff = now - 90 * 24 * 60 * 60 * 1000;
         else if (dateFilter === "6_months") cutoff = now - 180 * 24 * 60 * 60 * 1000;
         else if (dateFilter === "9_months") cutoff = now - 270 * 24 * 60 * 60 * 1000;
+        else if (dateFilter === "yesterday") {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          cutoff = yesterday.setHours(0, 0, 0, 0);
+          maxCutoff = yesterday.setHours(23, 59, 59, 999);
+        }
 
         finalGroups = finalGroups
           .map(monthGroup => {
@@ -248,6 +256,9 @@ export const useSportsHistory = (
                 const start = customRange.start.getTime();
                 const end = new Date(customRange.end).setHours(23, 59, 59, 999);
                 return dayGroup.rawDate >= start && dayGroup.rawDate <= end;
+              }
+              if (dateFilter === "yesterday") {
+                return dayGroup.rawDate >= cutoff && dayGroup.rawDate <= maxCutoff;
               }
               return dayGroup.rawDate >= cutoff;
             });

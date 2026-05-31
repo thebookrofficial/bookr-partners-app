@@ -144,7 +144,7 @@ export const SportsHistoryScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState<DateFilterOption>("all");
+  const [dateFilter, setDateFilter] = useState<DateFilterOption>("yesterday");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>();
 
   // NEW: State to track which dates are collapsed (Accordion logic)
