@@ -48,24 +48,9 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
       setIsDataLoading(true);
       const todayStr = formatDate(new Date());
 
-      // 1. Fetch Availability Blocks
+      // 1. Fetch Availability Blocks - REMOVED: We only show black for explicitly closed dates
       const newMarkedDates: any = {};
       const newClosedDates = new Set<string>();
-
-      const { data: blocks } = await supabase
-        .from("staycation_availability")
-        .select("date, is_blocked")
-        .eq("venue_id", activeVenue.venueId)
-        .eq("is_blocked", true);
-
-      blocks?.forEach(b => {
-        newMarkedDates[b.date] = {
-          customStyles: {
-            container: { backgroundColor: "black", borderRadius: 4, width: "100%" },
-            text: { color: "white" },
-          },
-        };
-      });
 
       // 1.5. Fetch Closed Dates
       const { data: closedDatesData } = await supabase
