@@ -147,9 +147,9 @@ export const SportsDashboardScreen = () => {
                   onPress={() => setTimeFilter("Last week")}
                 />
                 <FilterTab
-                  label={"This\nMonth"}
-                  isActive={timeFilter === "This Month"}
-                  onPress={() => setTimeFilter("This Month")}
+                  label={"Last\nMonth"}
+                  isActive={timeFilter === "Last Month"}
+                  onPress={() => setTimeFilter("Last Month")}
                 />
                 <FilterTab
                   label="Custom"

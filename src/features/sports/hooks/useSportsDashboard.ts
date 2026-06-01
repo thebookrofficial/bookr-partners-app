@@ -99,8 +99,10 @@ export const useSportsDashboard = (
       } else if (timeFilter === "Last week") {
         startDate.setDate(startDate.getDate() - 7);
         endDate.setDate(endDate.getDate() - 1);
-      } else if (timeFilter === "This Month") {
-        startDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      } else if (timeFilter === "Last Month") {
+        startDate = new Date(startDate.getFullYear(), startDate.getMonth() - 1, 1);
+        endDate = new Date(endDate.getFullYear(), endDate.getMonth(), 0);
+        endDate.setHours(23, 59, 59, 999);
       } else if (timeFilter === "Custom" && customRange) {
         startDate = new Date(customRange.start);
         startDate.setHours(0, 0, 0, 0);
