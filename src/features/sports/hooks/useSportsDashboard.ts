@@ -97,7 +97,8 @@ export const useSportsDashboard = (
         startDate.setDate(startDate.getDate() - 1);
         endDate.setDate(endDate.getDate() - 1);
       } else if (timeFilter === "Last week") {
-        startDate.setDate(startDate.getDate() - 6);
+        startDate.setDate(startDate.getDate() - 7);
+        endDate.setDate(endDate.getDate() - 1);
       } else if (timeFilter === "This Month") {
         startDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
       } else if (timeFilter === "Custom" && customRange) {

@@ -259,7 +259,7 @@ export const StaycationDashboardScreen = () => {
               <View style={styles.revenueCol}>
                 <View style={styles.revenueItem}>
                   <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
-                    Online Revenue
+                    Est. Payout
                   </Text>
                   <Text variant="h2" weight="bold" color={COLORS.primary}>
                     ₹{parseFloat(stats.onlineRevenue).toLocaleString("en-IN")}

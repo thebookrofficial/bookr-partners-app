@@ -215,8 +215,8 @@ export const useStaycationDashboard = (
           // 1. Total Paid = paid_amount + discount
           const totalPaid = sumPaid + sumDiscount;
 
-          // 2. Bookr Commission = 3.5% of Total Price
-          const commission = Number((sumTotalAmt * 0.035).toFixed(2));
+          // 2. Bookr Commission = 5% of Total Price (Staycation specific)
+          const commission = Number((sumTotalAmt * 0.05).toFixed(2));
 
           // 3. Gateway Fee = 2% of Subtotal
           const gateway = Number((sumSubtotal * 0.02).toFixed(2));
