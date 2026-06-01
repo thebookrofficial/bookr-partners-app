@@ -270,21 +270,24 @@ export const SportsDashboardScreen = () => {
             </Text>
             <View style={styles.graphContainer}>
               <View style={styles.yAxis}>
-                {Array.from({ length: 9 }, (_, i) =>
-                  Math.round((metrics.maxBookingValue / 8) * (8 - i)),
+                {Array.from({ length: 5 }, (_, i) =>
+                  Math.round((metrics.maxBookingValue / 4) * (4 - i)),
                 ).map((val, idx) => (
-                  <Text key={idx} variant="body2" weight="medium" style={styles.yAxisText}>
+                  <Text key={idx} variant="caption" weight="medium" style={styles.yAxisText}>
                     {val}
                   </Text>
                 ))}
               </View>
-              <View style={styles.chartArea}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chartArea}>
                 {metrics.bookingGraphData.map((item, index) => {
                   const heightPct = (item.value / (metrics.maxBookingValue || 1)) * 100;
                   return (
                     <View key={index} style={styles.barColumn}>
                       <View style={styles.barTrack}>
-                        <View style={[styles.barFill, { height: `${heightPct}%` }]} />
+                        <View style={[styles.barFill, { height: `${Math.max(heightPct, 2)}%` }]} />
                       </View>
                       <Text variant="caption" weight="medium" style={styles.xLabelDate}>
                         {item.date}
@@ -299,7 +302,7 @@ export const SportsDashboardScreen = () => {
                     </View>
                   );
                 })}
-              </View>
+              </ScrollView>
             </View>
 
             {/* Revenue Graph */}
@@ -307,23 +310,27 @@ export const SportsDashboardScreen = () => {
               REVENUE GRAPH
             </Text>
             <View style={styles.revenueGraphContainer}>
-              {metrics.revenueGraphData.map((item, index) => (
-                <View key={index} style={styles.revenueGraphRow}>
-                  <Text variant="body2" weight="semiBold" style={styles.revenueDateLabel}>
-                    {item.date}
-                  </Text>
-                  <View style={styles.revenueBarContainer}>
-                    <View style={[styles.revenueBarTrack, { width: item.fillPct as any }]}>
-                      <Text
-                        variant="caption"
-                        weight="semiBold"
-                        color={item.isBlue ? COLORS.primary : "#00B562"}>
-                        {item.value}
-                      </Text>
+              {metrics.revenueGraphData.length > 0 ? (
+                metrics.revenueGraphData.map((item, index) => (
+                  <View key={index} style={styles.revenueGraphRow}>
+                    <Text variant="caption" weight="semiBold" style={styles.revenueDateLabel}>
+                      {item.date}
+                    </Text>
+                    <View style={styles.revenueBarContainer}>
+                      <View style={[styles.revenueBarTrack, { width: item.fillPct as any }]}>
+                        <Text
+                          variant="caption"
+                          weight="semiBold"
+                          color={item.isBlue ? COLORS.primary : "#00B562"}>
+                          ₹{item.rawAmount}
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                ))
+              ) : (
+                <Text style={styles.emptyStateText}>No revenue data available for this range.</Text>
+              )}
             </View>
           </>
         )}
@@ -434,15 +441,16 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: COLORS.border.navBar,
     height: vs(200),
+    paddingBottom: vs(40), // Offset for x-axis labels
   },
-  yAxisText: { textAlign: "right", fontSize: fs(12) },
+  yAxisText: { textAlign: "right", fontSize: fs(10), minWidth: hs(20) },
   chartArea: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
     paddingLeft: hs(14),
+    paddingRight: hs(20),
+    flexDirection: "row",
+    gap: hs(12),
   },
-  barColumn: { alignItems: "center", width: hs(28) },
+  barColumn: { alignItems: "center", width: hs(35) },
   barTrack: { width: "100%", height: vs(200), justifyContent: "flex-end" },
   barFill: { width: "100%", backgroundColor: COLORS.primary, borderRadius: ms(4) },
   xLabelDate: { marginTop: vs(8), fontSize: fs(10) },
