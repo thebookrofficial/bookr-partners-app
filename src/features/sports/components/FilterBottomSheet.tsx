@@ -53,8 +53,6 @@ export const FilterBottomSheet = ({
   };
 
   const filterOptions: { label: string; value: DateFilterOption }[] = [
-    { label: "All Time", value: "all" },
-    { label: "Yesterday", value: "yesterday" },
     { label: "3 Months", value: "3_months" },
     { label: "6 Months", value: "6_months" },
     { label: "9 Months", value: "9_months" },

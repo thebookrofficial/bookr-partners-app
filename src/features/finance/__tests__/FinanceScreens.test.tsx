@@ -102,7 +102,7 @@ describe("Finance UI Tests", () => {
 
       // Expand commission section
       fireEvent.press(getByText("Bookr fees"));
-      expect(getByText("Commission")).toBeTruthy();
+      expect(getByText(/₹28.02 × 1 Bookings/)).toBeTruthy();
       expect(getAllByText("-₹28.02").length).toBe(2); // One in header, one in detail row
     });
   });

@@ -116,7 +116,7 @@ export const StaycationHistoryScreen = () => {
   }
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState<DateFilterOption>("yesterday");
+  const [dateFilter, setDateFilter] = useState<DateFilterOption>("all");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>();
 
   const {
@@ -180,9 +180,7 @@ export const StaycationHistoryScreen = () => {
               <View style={styles.filterRow}>
                 <Text variant="body2" weight="semiBold" style={styles.monthText}>
                   {dateFilter === "all"
-                    ? "All Time"
-                    : dateFilter === "yesterday"
-                    ? "Yesterday"
+                    ? "Past History"
                     : dateFilter === "3_months"
                     ? "Last 3 Months"
                     : dateFilter === "6_months"

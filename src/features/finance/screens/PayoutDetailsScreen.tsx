@@ -182,7 +182,13 @@ export const PayoutDetailsScreen = () => {
             title="Bookr fees"
             amount={`-₹${(breakdown?.commission || 0).toFixed(2)}`}>
             <DetailRow
-              label={`Commission`}
+              label={
+                onlineCount > 0
+                  ? `₹${((breakdown?.commission || 0) / onlineCount).toFixed(
+                      2,
+                    )} × ${onlineCount} Bookings`
+                  : "Commission"
+              }
               value={`-₹${(breakdown?.commission || 0).toFixed(2)}`}
               weight="semiBold"
             />

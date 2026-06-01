@@ -9,7 +9,7 @@ export const StaycationPayoutStrategy: PayoutStrategy = {
     const { data, error } = await supabase
       .from("staycation_bookings")
       .select(
-        `id, paid_amount, total_amount, discount_amount, payment_type, booking_status, check_in_date`,
+        `id, paid_amount, subtotal, platform_fee, total_amount, discount_amount, payment_type, booking_status, check_in_date, check_out_date, unit_count`,
       )
       .eq("venue_id", venueId)
       .in("check_in_date", dates)
@@ -21,10 +21,14 @@ export const StaycationPayoutStrategy: PayoutStrategy = {
     return (data || []).map(b => ({
       id: b.id,
       paid_amount: Number(b.paid_amount || 0),
+      subtotal: Number(b.subtotal || 0),
+      platform_fee: Number(b.platform_fee || 0),
       total_amount: Number(b.total_amount || 0),
       discount_amount: Number(b.discount_amount || 0),
+      unit_count: Number(b.unit_count || 1),
       payment_type: b.payment_type as "full" | "advance",
       date: b.check_in_date,
+      check_out_date: b.check_out_date,
       booking_status: b.booking_status,
     }));
   },
@@ -33,7 +37,7 @@ export const StaycationPayoutStrategy: PayoutStrategy = {
     const { data, error } = await supabase
       .from("staycation_bookings")
       .select(
-        `id, paid_amount, total_amount, discount_amount, payment_type, booking_status, check_in_date`,
+        `id, paid_amount, subtotal, platform_fee, total_amount, discount_amount, payment_type, booking_status, check_in_date, check_out_date, unit_count`,
       )
       .eq("venue_id", venueId)
       .gte("check_in_date", startDate)
@@ -46,10 +50,14 @@ export const StaycationPayoutStrategy: PayoutStrategy = {
     return (data || []).map(b => ({
       id: b.id,
       paid_amount: Number(b.paid_amount || 0),
+      subtotal: Number(b.subtotal || 0),
+      platform_fee: Number(b.platform_fee || 0),
       total_amount: Number(b.total_amount || 0),
       discount_amount: Number(b.discount_amount || 0),
+      unit_count: Number(b.unit_count || 1),
       payment_type: b.payment_type as "full" | "advance",
       date: b.check_in_date,
+      check_out_date: b.check_out_date,
       booking_status: b.booking_status,
     }));
   },

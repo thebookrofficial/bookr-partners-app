@@ -44,6 +44,16 @@ const getStrategy = (vertical: Vertical): PayoutStrategy => {
 };
 
 /**
+ * Helper to get YYYY-MM-DD in local timezone
+ */
+const getLocalISODate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+/**
  * Unified Finance Service - Modularized Orchestrator
  */
 export const FinanceService = {
@@ -62,10 +72,7 @@ export const FinanceService = {
     const dayBeforeYesterday = new Date(today);
     dayBeforeYesterday.setDate(today.getDate() - 2);
 
-    const dates = [
-      yesterday.toISOString().split("T")[0],
-      dayBeforeYesterday.toISOString().split("T")[0],
-    ];
+    const dates = [getLocalISODate(yesterday), getLocalISODate(dayBeforeYesterday)];
 
     const rawData = await strategy.getPendingRawData(venueId, dates);
     const commRate = strategy.getCommissionRate();
@@ -84,18 +91,26 @@ export const FinanceService = {
       const groupKey = b.booking_group_id || b.parent_booking_id || b.id;
 
       if (!groupedBookings[groupKey]) {
-        groupedBookings[groupKey] = { ...b };
+        groupedBookings[groupKey] = { ...b, merged_count: 1 };
       } else {
         // Merge amounts for the same group
         groupedBookings[groupKey].paid_amount += b.paid_amount;
+        groupedBookings[groupKey].subtotal =
+          (groupedBookings[groupKey].subtotal || 0) + (b.subtotal || 0);
+        groupedBookings[groupKey].platform_fee =
+          (groupedBookings[groupKey].platform_fee || 0) + (b.platform_fee || 0);
         groupedBookings[groupKey].total_amount += b.total_amount;
         groupedBookings[groupKey].discount_amount =
           (groupedBookings[groupKey].discount_amount || 0) + (b.discount_amount || 0);
+        groupedBookings[groupKey].merged_count += 1;
+        groupedBookings[groupKey].unit_count =
+          (groupedBookings[groupKey].unit_count || 0) + (b.unit_count || 1);
       }
     });
 
     Object.values(groupedBookings).forEach((b: any) => {
-      const actualPaid = b.paid_amount;
+      // Use subtotal (what user paid online) as the base for payout
+      const actualPaid = b.subtotal || b.paid_amount;
       const totalAmount = b.total_amount;
 
       // Determine gateway fee base and rate
@@ -110,14 +125,15 @@ export const FinanceService = {
         gatewayBase = totalAmount;
       }
 
-      // Commission is % of the TOTAL PRICE (Option B - Correct for Advance Payments)
+      // Commission is % of the TOTAL PRICE (including merged slots)
       const commission = totalAmount * commRate;
+
       // Gateway fee
       const gateway = gatewayBase * gateRate;
       const payout = actualPaid - commission - gateway;
 
       aggregation[b.date].amount += payout;
-      aggregation[b.date].count += 1;
+      aggregation[b.date].count += vertical === "staycation" ? b.unit_count || 1 : 1;
     });
 
     return Object.entries(aggregation)
@@ -170,6 +186,7 @@ export const FinanceService = {
 
     const strategy = getStrategy(vertical);
     const rawData = await strategy.getBreakdownRawData(venueId, startDate, endDate);
+
     const commRate = strategy.getCommissionRate();
 
     // Grouping logic to match RPC aggregation (merge multi-slots and extensions)
@@ -183,27 +200,37 @@ export const FinanceService = {
       const groupKey = b.booking_group_id || b.parent_booking_id || b.id;
 
       if (!groupedBookings[groupKey]) {
-        groupedBookings[groupKey] = { ...b };
+        groupedBookings[groupKey] = { ...b, merged_count: 1 };
       } else {
         // Merge amounts for the same group
         groupedBookings[groupKey].paid_amount += b.paid_amount;
+        groupedBookings[groupKey].subtotal =
+          (groupedBookings[groupKey].subtotal || 0) + (b.subtotal || 0);
+        groupedBookings[groupKey].platform_fee =
+          (groupedBookings[groupKey].platform_fee || 0) + (b.platform_fee || 0);
         groupedBookings[groupKey].total_amount += b.total_amount;
         groupedBookings[groupKey].discount_amount =
           (groupedBookings[groupKey].discount_amount || 0) + (b.discount_amount || 0);
+        groupedBookings[groupKey].merged_count += 1;
+        groupedBookings[groupKey].unit_count =
+          (groupedBookings[groupKey].unit_count || 0) + (b.unit_count || 1);
       }
     });
 
     const summary = Object.values(groupedBookings).reduce(
       (acc, b: any) => {
         const isFull = b.payment_type === "full";
-        const actualPaid = b.paid_amount;
+        // Use subtotal (what user paid online) as the base for payout
+        const actualPaid = b.subtotal || b.paid_amount;
         const totalAmount = b.total_amount;
 
+        const bCount = vertical === "staycation" ? b.unit_count || 1 : 1;
+
         if (isFull) {
-          acc.full.count += 1;
+          acc.full.count += bCount;
           acc.full.total += actualPaid;
         } else {
-          acc.advance.count += 1;
+          acc.advance.count += bCount;
           acc.advance.total += actualPaid;
         }
 
@@ -221,6 +248,7 @@ export const FinanceService = {
 
         // Commission is % of TOTAL PRICE (Paid + Due + Discount)
         const bCommission = totalAmount * commRate;
+
         // Gateway fee is calculated on the actual amount paid through the gateway (or gross if staycation)
         const bGateway = gatewayBase * gateRate;
 
@@ -228,7 +256,7 @@ export const FinanceService = {
         acc.totalGateway += bGateway;
         acc.totalCashCollected += actualPaid;
         acc.totalGross += totalAmount;
-        acc.count += 1;
+        acc.count += bCount;
         return acc;
       },
       {
@@ -282,16 +310,21 @@ export const FinanceService = {
       const groupKey = b.booking_group_id || b.parent_booking_id || b.id;
 
       if (!groupedBookings[groupKey]) {
-        groupedBookings[groupKey] = { ...b };
+        groupedBookings[groupKey] = { ...b, merged_count: 1 };
       } else {
         groupedBookings[groupKey].paid_amount += b.paid_amount;
+        groupedBookings[groupKey].subtotal =
+          (groupedBookings[groupKey].subtotal || 0) + (b.subtotal || 0);
         groupedBookings[groupKey].total_amount += b.total_amount;
+        groupedBookings[groupKey].merged_count += 1;
       }
     });
 
     const rows = Object.values(groupedBookings).map((b: any) => {
       let gateRate = 0.02;
-      let gatewayBase = b.paid_amount;
+      // Use subtotal (what user paid online) as the base for payout
+      const actualPaid = b.subtotal || b.paid_amount;
+      let gatewayBase = actualPaid;
 
       if (vertical === "sports" && b.sports_type) {
         if (b.sports_type.toLowerCase().includes("pickleball")) {
@@ -301,6 +334,7 @@ export const FinanceService = {
         gatewayBase = b.total_amount;
       }
 
+      // Commission per booking (total for group)
       const commission = b.total_amount * commRate;
       const gateway = gatewayBase * gateRate;
 
@@ -311,10 +345,10 @@ export const FinanceService = {
         "User Name": b.user_name || "Guest",
         "User Phone": b.user_phone || "N/A",
         "Total Amount": Number(b.total_amount.toFixed(2)),
-        "Paid Amount": Number(b.paid_amount.toFixed(2)),
+        "Paid Amount": Number(actualPaid.toFixed(2)),
         "Bookr Commission": Number(commission.toFixed(2)),
         "Handling Fee": Number(gateway.toFixed(2)),
-        "Est. Payout": Number((b.paid_amount - commission - gateway).toFixed(2)),
+        "Est. Payout": Number((actualPaid - commission - gateway).toFixed(2)),
       };
     });
 

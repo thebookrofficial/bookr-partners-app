@@ -137,6 +137,11 @@ export const useStaycationHistory = (
         } else if (dateFilter === "custom" && customRange) {
           fromDate = customRange.start;
           toDate = customRange.end;
+
+          // CAP to yesterday to prevent future bookings showing in history
+          if (toDate > yesterday) {
+            toDate = new Date(yesterday);
+          }
         }
 
         const fromStr = formatDate(fromDate);
@@ -148,7 +153,7 @@ export const useStaycationHistory = (
           .gte("check_in_date", fromStr)
           .lte("check_in_date", toStr);
       } else {
-        // No date range applied, just the base History filter
+        // No date range applied, but base LTE condition on check_in_date already restricts to yesterday
         query = query.or(historyFilterStr);
       }
 

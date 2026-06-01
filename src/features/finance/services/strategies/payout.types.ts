@@ -4,10 +4,14 @@
 export interface RawBooking {
   id: string;
   paid_amount: number;
+  subtotal?: number;
+  platform_fee?: number;
   total_amount: number;
   discount_amount?: number;
+  unit_count?: number;
   payment_type: "full" | "advance";
   date: string; // Unified date string (YYYY-MM-DD)
+  check_out_date?: string;
   start_time?: string;
   end_time?: string;
   user_name?: string;

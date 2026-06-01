@@ -60,8 +60,8 @@ export const StaycationInvoiceScreen = () => {
 
   const discountAmount = 0; // Hardcoded to 0 for display as platform subsidizes it
 
-  // Calculate fees based on 5% commission applied strictly to the inAppPayments amount
-  const platformFee = inAppPayments * 0.05;
+  // Calculate fees based on 5% commission applied strictly to the total_amount (Total Paid)
+  const platformFee = totalPaid * 0.05;
   const gatewayFee = inAppPayments * 0.02;
 
   // Est Payout: Total Paid - platform fee - gateway charges
