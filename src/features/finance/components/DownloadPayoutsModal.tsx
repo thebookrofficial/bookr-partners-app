@@ -81,7 +81,7 @@ export const DownloadPayoutsModal = ({
           </View>
 
           <Text variant="body2" color={COLORS.text.muted} style={styles.instruction}>
-            Select a date range to download the payout report in Excel format.
+            Select a date range to download the payout report in PDF format.
           </Text>
 
           <Calendar
@@ -120,7 +120,7 @@ export const DownloadPayoutsModal = ({
             </View>
 
             <Button
-              title={loading ? "" : "Generate Excel"}
+              title={loading ? "" : "Download PDF"}
               onPress={handleDownload}
               disabled={!range.start || !range.end || loading}
               style={styles.downloadBtn}>

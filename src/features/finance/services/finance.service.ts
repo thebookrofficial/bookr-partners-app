@@ -246,8 +246,8 @@ export const FinanceService = {
           gatewayBase = totalAmount;
         }
 
-        // Commission is % of TOTAL PRICE (Paid + Due + Discount)
-        const bCommission = totalAmount * commRate;
+        // Commission is % of unit price, once per transaction group
+        const bCommission = (totalAmount / (b.merged_count || 1)) * commRate;
 
         // Gateway fee is calculated on the actual amount paid through the gateway (or gross if staycation)
         const bGateway = gatewayBase * gateRate;
@@ -334,8 +334,8 @@ export const FinanceService = {
         gatewayBase = b.total_amount;
       }
 
-      // Commission per booking (total for group)
-      const commission = b.total_amount * commRate;
+      // Commission per transaction (unit price)
+      const commission = (b.total_amount / (b.merged_count || 1)) * commRate;
       const gateway = gatewayBase * gateRate;
 
       return {
@@ -360,9 +360,10 @@ export const FinanceService = {
         acc.commission += row["Bookr Commission"];
         acc.handling += row["Handling Fee"];
         acc.payout += row["Est. Payout"];
+        acc.totalBookings += 1;
         return acc;
       },
-      { totalAmount: 0, paidAmount: 0, commission: 0, handling: 0, payout: 0 },
+      { totalAmount: 0, paidAmount: 0, commission: 0, handling: 0, payout: 0, totalBookings: 0 },
     );
 
     // Add empty row for spacing
@@ -371,7 +372,7 @@ export const FinanceService = {
     // Add summary row
     rows.push({
       "Booking Date": "TOTAL",
-      "Start Time": `Count: ${rows.length - 1}`,
+      "Start Time": `Count: ${totals.totalBookings}`,
       "End Time": "",
       "User Name": "",
       "User Phone": "",
@@ -383,5 +384,27 @@ export const FinanceService = {
     } as any);
 
     return rows;
+  },
+
+  /**
+   * Generates a presentable PDF via Supabase Edge Function.
+   */
+  async exportPayoutsPdf(venueName: string, venueId: string, startDate: string, endDate: string) {
+    const data = await this.exportPayouts(venueId, startDate, endDate);
+    if (data.length <= 2) {
+      return null;
+    }
+
+    const { data: blob, error } = await supabase.functions.invoke("export-payout-pdf", {
+      body: {
+        venueName,
+        startDate,
+        endDate,
+        data,
+      },
+    });
+
+    if (error) throw error;
+    return blob;
   },
 };

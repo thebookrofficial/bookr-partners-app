@@ -129,16 +129,17 @@ describe("FinanceService Payout Logic", () => {
 
     // Grouping should merge them:
     // Total Paid = 200
-    // Total Price = 1000
-    // Commission = 1000 * 0.035 = 35
+    // Total Price = 1000 (across 2 slots)
+    // Unit Price = 500 (1000 / 2)
+    // Commission = 500 * 0.035 = 17.5 (Per transaction group)
     // Gateway = 200 * 0.02 = 4
-    // Payout = 200 - 35 - 4 = 161
+    // Payout = 200 - 17.5 - 4 = 178.5
     // Count = 1 (MERGED)
 
     expect(breakdown.count).toBe(1);
     expect(breakdown.totalPaid).toBe(200);
-    expect(breakdown.commission).toBe(35);
-    expect(breakdown.finalPayout).toBe(161);
+    expect(breakdown.commission).toBe(17.5);
+    expect(breakdown.finalPayout).toBe(178.5);
   });
 
   it("should calculate Staycation payout using Total Amount for both commission and gateway", async () => {

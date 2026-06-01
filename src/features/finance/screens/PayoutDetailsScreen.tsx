@@ -9,7 +9,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
+import ReactNativeBlobUtil from "react-native-blob-util";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Button } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -22,7 +24,6 @@ import { useServiceStore } from "@/store/serviceStore";
 import { usePayoutDetails } from "../hooks/usePayoutDetails";
 import { DownloadPayoutsModal } from "../components/DownloadPayoutsModal";
 import { FinanceService } from "../services/finance.service";
-import { exportToExcel } from "../utils/excel.utils";
 
 const DetailRow = ({
   label,
@@ -102,18 +103,45 @@ export const PayoutDetailsScreen = () => {
   const handleDownload = async (start: string, end: string) => {
     setExportLoading(true);
     try {
-      const data = await FinanceService.exportPayouts(venueId, start, end);
-      if (data.length <= 2) {
-        // Only header + spacing + empty total row means no data
+      const blob = await FinanceService.exportPayoutsPdf(activeVenueName, venueId, start, end);
+
+      if (!blob) {
         Alert.alert("No Data", "There are no confirmed bookings in the selected range.");
         return;
       }
-      const fileName = `Payouts_${activeVenueName.replace(/\s+/g, "_")}_${start}_to_${end}`;
-      await exportToExcel(data, fileName);
-      setModalVisible(false);
+
+      const fileName = `Payouts_${activeVenueName.replace(/\s+/g, "_")}_${start}_to_${end}.pdf`;
+      const dirs = ReactNativeBlobUtil.fs.dirs;
+      const path =
+        Platform.OS === "ios"
+          ? `${dirs.DocumentDir}/${fileName}`
+          : `${dirs.DownloadDir}/${fileName}`;
+
+      // Use FileReader to convert Blob to Base64 (more compatible with React Native)
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64data = reader.result as string;
+        const base64 = base64data.split(",")[1]; // Remove "data:application/pdf;base64,"
+
+        await ReactNativeBlobUtil.fs.writeFile(path, base64, "base64");
+
+        if (Platform.OS === "android") {
+          ReactNativeBlobUtil.android.actionViewIntent(path, "application/pdf");
+        } else {
+          ReactNativeBlobUtil.ios.previewDocument(path);
+        }
+        setModalVisible(false);
+      };
+
+      reader.onerror = err => {
+        console.error("FileReader Error:", err);
+        Alert.alert("Export Failed", "Failed to process the PDF file.");
+      };
+
+      reader.readAsDataURL(blob);
     } catch (error) {
       console.error("[PayoutDetailsScreen] Export Error:", error);
-      Alert.alert("Export Failed", "Something went wrong while generating the Excel file.");
+      Alert.alert("Export Failed", "Something went wrong while generating the PDF file.");
     } finally {
       setExportLoading(false);
     }
