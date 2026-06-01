@@ -29,7 +29,6 @@ interface BulkBookingItem {
 }
 
 export const BulkBookingScreen = () => {
-  const [activeTab, setActiveTab] = useState<"multiple" | "single">("multiple");
   const [bookings, setBookings] = useState<BulkBookingItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -197,15 +196,11 @@ export const BulkBookingScreen = () => {
       return <ActivityIndicator color={COLORS.primary} style={{ marginTop: vs(20) }} />;
     }
 
-    const filteredBookings = bookings.filter(item =>
-      activeTab === "multiple" ? item.isMultiDay : !item.isMultiDay,
-    );
-
-    if (filteredBookings.length === 0) {
+    if (bookings.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <Text variant="body2" color={COLORS.text.muted}>
-            No {activeTab === "multiple" ? "multiple" : "single"} day bookings found.
+            No bulk bookings found.
           </Text>
         </View>
       );
@@ -213,7 +208,7 @@ export const BulkBookingScreen = () => {
 
     return (
       <View style={styles.listContainer}>
-        {filteredBookings.map(item => (
+        {bookings.map(item => (
           <BookingCard
             key={item.ids[0]}
             name={item.name}
@@ -226,7 +221,7 @@ export const BulkBookingScreen = () => {
             onPress={() =>
               navigation.navigate("BulkBookingDetails", {
                 bookingId: item.ids[0],
-                type: activeTab === "multiple" ? "multi" : "single",
+                type: item.isMultiDay ? "multi" : "single",
                 venueId,
                 groundId: selectedGroundId, // Passed currently selected ground
               })
@@ -265,29 +260,6 @@ export const BulkBookingScreen = () => {
         </View>
       )}
 
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "multiple" ? styles.tabActive : styles.tabInactive]}
-          onPress={() => setActiveTab("multiple")}>
-          <Text
-            variant="body2"
-            weight="semiBold"
-            color={activeTab === "multiple" ? COLORS.text.inverse : COLORS.text.muted}>
-            Multiple days
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "single" ? styles.tabActive : styles.tabInactive]}
-          onPress={() => setActiveTab("single")}>
-          <Text
-            variant="body2"
-            weight="semiBold"
-            color={activeTab === "single" ? COLORS.text.inverse : COLORS.text.muted}>
-            Single days
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       <ScrollView showsVerticalScrollIndicator={false}>
         {renderContent()}
         <View style={{ height: vs(100) }} />
@@ -299,7 +271,7 @@ export const BulkBookingScreen = () => {
         onPress={() =>
           navigation.navigate("BulkBookingDetails", {
             bookingId: "new",
-            type: activeTab === "multiple" ? "multi" : "single",
+            type: "multi", // Default to multi for new bulk bookings
             venueId,
             groundId: selectedGroundId, // Passes current ground to the form!
           })

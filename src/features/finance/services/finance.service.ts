@@ -220,9 +220,11 @@ export const FinanceService = {
     const summary = Object.values(groupedBookings).reduce(
       (acc, b: any) => {
         const isFull = b.payment_type === "full";
-        // Use subtotal (what user paid online) as the base for payout
-        const actualPaid = b.subtotal || b.paid_amount;
-        const totalAmount = b.total_amount;
+        // Base Revenue: paid_amount + discount
+        const actualPaid = Number(b.paid_amount || 0);
+        const discount = Number(b.discount_amount || 0);
+        const revenueBase = actualPaid + discount;
+        const totalAmount = Number(b.total_amount || 0);
 
         const bCount = vertical === "staycation" ? b.unit_count || 1 : 1;
 
@@ -236,7 +238,7 @@ export const FinanceService = {
 
         // Determine gateway fee base and rate
         let gateRate = 0.02; // Default
-        let gatewayBase = actualPaid;
+        let gatewayBase = b.subtotal || actualPaid; // Use subtotal for gateway fees if available
 
         if (vertical === "sports" && b.sports_type) {
           if (b.sports_type.toLowerCase().includes("pickleball")) {
@@ -246,15 +248,15 @@ export const FinanceService = {
           gatewayBase = totalAmount;
         }
 
-        // Commission is % of unit price, once per transaction group
-        const bCommission = (totalAmount / (b.merged_count || 1)) * commRate;
+        // Commission is % of TOTAL PRICE of ALL slots in the transaction
+        const bCommission = totalAmount * commRate;
 
-        // Gateway fee is calculated on the actual amount paid through the gateway (or gross if staycation)
+        // Gateway fee is calculated on the subtotal (money swiped)
         const bGateway = gatewayBase * gateRate;
 
         acc.totalCommission += bCommission;
         acc.totalGateway += bGateway;
-        acc.totalCashCollected += actualPaid;
+        acc.totalCashCollected += revenueBase;
         acc.totalGross += totalAmount;
         acc.count += bCount;
         return acc;
@@ -321,10 +323,13 @@ export const FinanceService = {
     });
 
     const rows = Object.values(groupedBookings).map((b: any) => {
-      let gateRate = 0.02;
       // Use subtotal (what user paid online) as the base for payout
-      const actualPaid = b.subtotal || b.paid_amount;
-      let gatewayBase = actualPaid;
+      const actualPaid = b.paid_amount;
+      const discount = Number(b.discount_amount || 0);
+      const revenueBase = actualPaid + discount;
+
+      let gateRate = 0.02;
+      let gatewayBase = b.subtotal || actualPaid;
 
       if (vertical === "sports" && b.sports_type) {
         if (b.sports_type.toLowerCase().includes("pickleball")) {
@@ -334,8 +339,8 @@ export const FinanceService = {
         gatewayBase = b.total_amount;
       }
 
-      // Commission per transaction (unit price)
-      const commission = (b.total_amount / (b.merged_count || 1)) * commRate;
+      // Commission per booking (total for all slots in group)
+      const commission = b.total_amount * commRate;
       const gateway = gatewayBase * gateRate;
 
       return {
@@ -345,10 +350,10 @@ export const FinanceService = {
         "User Name": b.user_name || "Guest",
         "User Phone": b.user_phone || "N/A",
         "Total Amount": Number(b.total_amount.toFixed(2)),
-        "Paid Amount": Number(actualPaid.toFixed(2)),
+        "Paid Amount": Number(revenueBase.toFixed(2)),
         "Bookr Commission": Number(commission.toFixed(2)),
         "Handling Fee": Number(gateway.toFixed(2)),
-        "Est. Payout": Number((actualPaid - commission - gateway).toFixed(2)),
+        "Est. Payout": Number((revenueBase - commission - gateway).toFixed(2)),
       };
     });
 

@@ -142,7 +142,10 @@ export const useStaycationDashboard = (
           check_in_date,
           check_out_date,
           room_id,
-          booking_status
+          booking_status,
+          paid_amount,
+          discount_amount,
+          subtotal
         `,
         )
         .eq("venue_id", actualVenueId)
@@ -203,8 +206,24 @@ export const useStaycationDashboard = (
         const isOnline = b.booking_source === "online" || !!b.user_id;
 
         if (isOnline) {
-          // ONLINE: Deduct 7% (5% commission + 2% handling fee) for estimated payout
-          const netPayout = amount * 0.93;
+          // --- ALIGNED PAYOUT FORMULA ---
+          const sumPaid = Number(b.paid_amount || 0);
+          const sumDiscount = Number(b.discount_amount || 0);
+          const sumSubtotal = Number(b.subtotal || 0);
+          const sumTotalAmt = Number(b.total_amount || 0);
+
+          // 1. Total Paid = paid_amount + discount
+          const totalPaid = sumPaid + sumDiscount;
+
+          // 2. Bookr Commission = 3.5% of Total Price
+          const commission = Number((sumTotalAmt * 0.035).toFixed(2));
+
+          // 3. Gateway Fee = 2% of Subtotal
+          const gateway = Number((sumSubtotal * 0.02).toFixed(2));
+
+          // 4. Net Payout
+          const netPayout = totalPaid - commission - gateway;
+
           onlineBookings++;
           onlineRevenue += netPayout;
           totalRevenue += netPayout;

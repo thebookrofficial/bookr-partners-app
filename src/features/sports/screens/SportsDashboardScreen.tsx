@@ -47,7 +47,7 @@ export const SportsDashboardScreen = () => {
   const storedCategory = selectedCategories[serviceId];
   const selectedCategory = routeCategory || storedCategory || "Football";
 
-  const [timeFilter, setTimeFilter] = useState("Today");
+  const [timeFilter, setTimeFilter] = useState("Yesterday");
   const [groundFilter, setGroundFilter] = useState("Overall");
 
   // Sync route param with store if we arrived via a deep link or specific tab click
@@ -65,7 +65,7 @@ export const SportsDashboardScreen = () => {
     metrics,
     grounds,
     loading: dataLoading,
-  } = useSportsDashboard(currentVenueId, timeFilter, groundFilter);
+  } = useSportsDashboard(currentVenueId, timeFilter, groundFilter, selectedCategory);
 
   const { activeVenueName } = useServiceStore();
 
@@ -137,9 +137,9 @@ export const SportsDashboardScreen = () => {
               </Text>
               <View style={styles.filterTabsRow}>
                 <FilterTab
-                  label="Today"
-                  isActive={timeFilter === "Today"}
-                  onPress={() => setTimeFilter("Today")}
+                  label="Yesterday"
+                  isActive={timeFilter === "Yesterday"}
+                  onPress={() => setTimeFilter("Yesterday")}
                 />
                 <FilterTab
                   label={"Last\nweek"}

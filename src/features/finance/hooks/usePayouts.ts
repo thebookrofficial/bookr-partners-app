@@ -28,6 +28,14 @@ const getLocalISODate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+/**
+ * Helper to parse YYYY-MM-DD string into a local Date object at midnight.
+ */
+const parseISODate = (dateStr: string) => {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+};
+
 export const usePayouts = (venueId: string) => {
   const [activeTab, setActiveTab] = useState("week");
   const [customStartDate, setCustomStartDate] = useState<Date>(new Date());
@@ -100,19 +108,29 @@ export const usePayouts = (venueId: string) => {
             return item.payout_date !== todayStr && !pendingDates.includes(item.payout_date);
           });
         } else if (tab === "week") {
-          // Hide the current week. Only show fully completed previous weeks.
-          // Assuming week starts on Monday for business logic.
-          const dayOfWeek = today.getDay();
-          const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-
-          const currentWeekStart = new Date(today);
-          currentWeekStart.setDate(today.getDate() - daysSinceMonday);
-          currentWeekStart.setHours(0, 0, 0, 0);
-
+          // Hide any week that has pending payouts OR is the current ongoing week.
           historical = historical.filter((item: PayoutItem) => {
-            const itemDate = new Date(item.payout_date);
-            // Hide if the week's start date is >= the current week's start date
-            return itemDate.getTime() < currentWeekStart.getTime();
+            const weekStart = parseISODate(item.payout_date);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            weekEnd.setHours(23, 59, 59, 999);
+
+            // 1. Hide if it's the current ongoing week
+            if (today >= weekStart && today <= weekEnd) {
+              return false;
+            }
+
+            // 2. Hide if any pending date falls within this week's range
+            const hasPendingInWeek = pendingDates.some(pDateStr => {
+              const pDate = parseISODate(pDateStr);
+              return pDate >= weekStart && pDate <= weekEnd;
+            });
+
+            if (hasPendingInWeek) {
+              return false;
+            }
+
+            return true;
           });
         } else if (tab === "month") {
           // Hide the current month AND any month that still has pending payouts
@@ -120,7 +138,7 @@ export const usePayouts = (venueId: string) => {
           const currentMonth = today.getMonth();
 
           historical = historical.filter((item: PayoutItem) => {
-            const itemDate = new Date(item.payout_date);
+            const itemDate = parseISODate(item.payout_date);
             const itemYear = itemDate.getFullYear();
             const itemMonth = itemDate.getMonth();
 
@@ -131,7 +149,7 @@ export const usePayouts = (venueId: string) => {
 
             // Check if any of the pending dates fall within this month
             const hasPendingInMonth = pendingDates.some(pDateStr => {
-              const pDate = new Date(pDateStr);
+              const pDate = parseISODate(pDateStr);
               return pDate.getFullYear() === itemYear && pDate.getMonth() === itemMonth;
             });
 

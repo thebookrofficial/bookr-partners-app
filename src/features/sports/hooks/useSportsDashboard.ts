@@ -35,10 +35,18 @@ export interface GroundInfo {
   name: string;
 }
 
+const getLocalISODate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export const useSportsDashboard = (
   venueId: string,
   timeFilter: string,
   groundFilter: string, // This will be the ground NAME or "Overall"
+  selectedCategory: string,
   customRange?: { start: Date; end: Date },
 ) => {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -85,7 +93,10 @@ export const useSportsDashboard = (
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(23, 59, 59, 999);
 
-      if (timeFilter === "Last week") {
+      if (timeFilter === "Yesterday") {
+        startDate.setDate(startDate.getDate() - 1);
+        endDate.setDate(endDate.getDate() - 1);
+      } else if (timeFilter === "Last week") {
         startDate.setDate(startDate.getDate() - 6);
       } else if (timeFilter === "This Month") {
         startDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
@@ -101,19 +112,19 @@ export const useSportsDashboard = (
         month: "short",
       })} - ${endDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}`;
 
-      // 3. Query Bookings
+      // 3. Query Bookings (Using Local ISO Strings for DB Bounds)
       let query = supabase
         .from("sports_bookings")
         .select(
           `
-          id, user_id, guest_name, total_amount, vendor_payout, booking_status, subtotal, booking_source,
+          id, user_id, guest_name, total_amount, vendor_payout, booking_status, subtotal, paid_amount, discount_amount, platform_fee, booking_source, booking_group_id, parent_booking_id,
           sports_slots!inner(slot_date, ground_id)
         `,
         )
         .eq("venue_id", venueId)
         .neq("booking_status", "cancelled")
-        .gte("sports_slots.slot_date", startDate.toISOString().split("T")[0])
-        .lte("sports_slots.slot_date", endDate.toISOString().split("T")[0]);
+        .gte("sports_slots.slot_date", getLocalISODate(startDate))
+        .lte("sports_slots.slot_date", getLocalISODate(endDate));
 
       if (targetGroundId) {
         query = query.eq("sports_slots.ground_id", targetGroundId);
@@ -122,7 +133,44 @@ export const useSportsDashboard = (
       const { data: bookings, error } = await query;
       if (error) throw error;
 
-      // 4. Process Data
+      // --- 4. SMART GROUPING ALGORITHM (Align with Home Screen) ---
+      const groupedBookings: Record<string, any> = {};
+
+      (bookings || []).forEach((b: any) => {
+        // ROBUST DATA ACCESS: slot_date might be in an object or a single-item array
+        const slot = Array.isArray(b.sports_slots) ? b.sports_slots[0] : b.sports_slots;
+        const date = slot?.slot_date;
+
+        if (!date) return; // Skip if no date found
+
+        const groupKey = b.booking_group_id || b.parent_booking_id || b.id;
+        const uniqueKey = `${date}_${groupKey}`;
+
+        if (!groupedBookings[uniqueKey]) {
+          groupedBookings[uniqueKey] = {
+            ...b,
+            date: date, // Keep a flat date for easier access later
+            total_amount: Number(b.total_amount || 0),
+            vendor_payout: Number(b.vendor_payout || 0),
+            subtotal: Number(b.subtotal || 0),
+            paid_amount: Number(b.paid_amount || 0),
+            discount_amount: Number(b.discount_amount || 0),
+            platform_fee: Number(b.platform_fee || 0),
+            merged_count: 1,
+          };
+        } else {
+          // Sum up amounts for the same transaction group
+          groupedBookings[uniqueKey].total_amount += Number(b.total_amount || 0);
+          groupedBookings[uniqueKey].vendor_payout += Number(b.vendor_payout || 0);
+          groupedBookings[uniqueKey].subtotal += Number(b.subtotal || 0);
+          groupedBookings[uniqueKey].paid_amount += Number(b.paid_amount || 0);
+          groupedBookings[uniqueKey].discount_amount += Number(b.discount_amount || 0);
+          groupedBookings[uniqueKey].platform_fee += Number(b.platform_fee || 0);
+          groupedBookings[uniqueKey].merged_count += 1;
+        }
+      });
+
+      // 5. Process Data
       let onlineCount = 0;
       let offlineCount = 0;
       let totalOnlineRevenue = 0;
@@ -133,7 +181,7 @@ export const useSportsDashboard = (
       // Initialize all dates in range with zeros
       const dateCursor = new Date(startDate);
       while (dateCursor <= endDate) {
-        const dateKey = dateCursor.toISOString().split("T")[0];
+        const dateKey = getLocalISODate(dateCursor);
         dailyData[dateKey] = {
           bookings: 0,
           revenue: 0,
@@ -142,7 +190,9 @@ export const useSportsDashboard = (
         dateCursor.setDate(dateCursor.getDate() + 1);
       }
 
-      (bookings || []).forEach((b: any) => {
+      const isPickleball = selectedCategory.toLowerCase().includes("pickleball");
+
+      Object.values(groupedBookings).forEach((b: any) => {
         const isOnline = b.booking_source === "online";
         const isOffline = !isOnline;
 
@@ -151,16 +201,43 @@ export const useSportsDashboard = (
           totalOfflineRevenue += Number(b.total_amount || 0);
         } else {
           onlineCount++;
-          // Actually, let's keep it simple as the user didn't explicitly ask for subtotal in dashboard yet,
-          // but they did for other screens. I'll stick to vendor_payout for online revenue here for now
-          // as it represents the net gain.
-          totalOnlineRevenue += Number(b.vendor_payout || 0);
+
+          // --- SYNCED WITH SportsInvoiceScreen.tsx ---
+          const sumPaid = Number(b.paid_amount || 0);
+          const sumDiscount = Number(b.discount_amount || 0);
+          const sumSubtotal = Number(b.subtotal || 0);
+          const sumTotalAmt = Number(b.total_amount || 0);
+          const sumPlatformFee = Number(b.platform_fee || 0);
+
+          // 1. Total Paid = paid_amount + discount - (if Pickleball, platform_fee)
+          const totalPaid = sumPaid + sumDiscount - (isPickleball ? sumPlatformFee : 0);
+
+          // 2. Platform Fee (Comm) = 3.5% of FULL TotalAmt (Matches Invoice Screen)
+          const commission = Number((sumTotalAmt * 0.035).toFixed(2));
+
+          // 3. Gateway Fee = 2% of Subtotal (actual gateway amount)
+          const gateway = Number((sumSubtotal * 0.02).toFixed(2));
+
+          // 4. Payout = Total Paid - Commission - Gateway
+          const payout = totalPaid - commission - gateway;
+
+          totalOnlineRevenue += payout;
         }
-        const dateKey = b.sports_slots.slot_date;
+
+        const dateKey = b.date;
         if (dailyData[dateKey]) {
           dailyData[dateKey].bookings += 1;
           if (isOnline) {
-            dailyData[dateKey].revenue += Number(b.vendor_payout || 0);
+            // Consistency: use same payout calc for graph
+            const totalPaid =
+              Number(b.paid_amount || 0) +
+              Number(b.discount_amount || 0) -
+              (isPickleball ? Number(b.platform_fee || 0) : 0);
+            const payout =
+              totalPaid -
+              Number((Number(b.total_amount || 0) * 0.035).toFixed(2)) -
+              Number((Number(b.subtotal || 0) * 0.02).toFixed(2));
+            dailyData[dateKey].revenue += payout;
           } else {
             dailyData[dateKey].revenue += Number(b.total_amount || 0);
           }
@@ -206,7 +283,7 @@ export const useSportsDashboard = (
     } finally {
       setLoading(false);
     }
-  }, [venueId, timeFilter, groundFilter, customRange]);
+  }, [venueId, timeFilter, groundFilter, customRange, selectedCategory]);
 
   useEffect(() => {
     setLoading(true);
