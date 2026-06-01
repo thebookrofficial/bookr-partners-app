@@ -201,9 +201,12 @@ export const useStaycationDashboard = (
       }
 
       // For Revenue and Online/Offline counts, we only count ACTIVE (non-cancelled) bookings.
+      const todayStr = formatDate(new Date());
+
       activeBookings.forEach(b => {
         const amount = parseFloat(b.total_amount) || 0;
         const isOnline = b.booking_source === "online" || !!b.user_id;
+        const bookingDate = b.check_in_date;
 
         if (isOnline) {
           // --- ALIGNED PAYOUT FORMULA ---
@@ -224,14 +227,16 @@ export const useStaycationDashboard = (
           // 4. Net Payout
           const netPayout = totalPaid - commission - gateway;
 
-          onlineBookings++;
-          onlineRevenue += netPayout;
-          totalRevenue += netPayout;
+          // Only include in summary totals if the booking is from YESTERDAY or earlier
+          if (bookingDate < todayStr) {
+            onlineBookings++;
+            onlineRevenue += netPayout;
+            totalRevenue += netPayout;
+          }
 
-          // For revenue graph, attribute net payout to check_in_date
-          const dateKey = b.check_in_date;
-          if (revenueByDate[dateKey] !== undefined) {
-            revenueByDate[dateKey] += netPayout;
+          // For revenue graph, attribute net payout to check_in_date (Always show in graph for range visibility)
+          if (revenueByDate[bookingDate] !== undefined) {
+            revenueByDate[bookingDate] += netPayout;
           }
         } else {
           // OFFLINE: Use gross amount (no platform commission)
@@ -240,12 +245,13 @@ export const useStaycationDashboard = (
           totalRevenue += amount;
 
           // For revenue graph, attribute gross amount to check_in_date
-          const dateKey = b.check_in_date;
-          if (revenueByDate[dateKey] !== undefined) {
-            revenueByDate[dateKey] += amount;
+          if (revenueByDate[bookingDate] !== undefined) {
+            revenueByDate[bookingDate] += amount;
           }
         }
       });
+
+      totalBookings = onlineBookings + offlineBookings;
 
       // Calculate Weekly Revenue
       const weeklyRevenue: WeeklyRevenue[] = [];

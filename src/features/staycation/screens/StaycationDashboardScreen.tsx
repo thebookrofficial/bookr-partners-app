@@ -100,12 +100,13 @@ export const StaycationDashboardScreen = () => {
 
   const { activeVenue: venue } = useStaycationHome(serviceId);
 
-  const [selection, setSelection] = useState("This Month");
+  const [selection, setSelection] = useState("Last Month");
   const [expandedWeek, setExpandedWeek] = useState<string | null>(null);
   const [isCustomSheetVisible, setIsCustomSheetVisible] = useState(false);
 
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(() => {
     const now = new Date();
+    // Default custom range to current month
     return {
       start: new Date(now.getFullYear(), now.getMonth(), 1),
       end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
@@ -114,12 +115,7 @@ export const StaycationDashboardScreen = () => {
 
   const dateRange = useMemo(() => {
     const now = new Date();
-    if (selection === "This Month") {
-      return {
-        start: new Date(now.getFullYear(), now.getMonth(), 1),
-        end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
-      };
-    } else if (selection === "Last Month") {
+    if (selection === "Last Month") {
       return {
         start: new Date(now.getFullYear(), now.getMonth() - 1, 1),
         end: new Date(now.getFullYear(), now.getMonth(), 0),
@@ -128,7 +124,7 @@ export const StaycationDashboardScreen = () => {
     return customRange;
   }, [selection, customRange]);
 
-  const SELECTION_TABS = ["This Month", "Last Month", "Custom"];
+  const SELECTION_TABS = ["Last Month", "Custom"];
 
   const { isLoading, stats } = useStaycationDashboard(
     serviceId || "",
@@ -259,7 +255,7 @@ export const StaycationDashboardScreen = () => {
               <View style={styles.revenueCol}>
                 <View style={styles.revenueItem}>
                   <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
-                    Est. Payout
+                    Online Collections
                   </Text>
                   <Text variant="h2" weight="bold" color={COLORS.primary}>
                     ₹{parseFloat(stats.onlineRevenue).toLocaleString("en-IN")}
@@ -267,7 +263,7 @@ export const StaycationDashboardScreen = () => {
                 </View>
                 <View style={styles.revenueItem}>
                   <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
-                    Offline Revenue
+                    Offline Collections
                   </Text>
                   <Text variant="h2" weight="bold" color={COLORS.danger}>
                     ₹{parseFloat(stats.offlineRevenue).toLocaleString("en-IN")}
