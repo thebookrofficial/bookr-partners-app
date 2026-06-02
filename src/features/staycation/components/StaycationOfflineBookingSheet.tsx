@@ -67,6 +67,7 @@ export const StaycationOfflineBookingSheet = ({
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [lastFetchedNumber, setLastFetchedNumber] = useState<string | null>(null);
   const [totalPayment, setTotalPayment] = useState("");
   const [advancePaid, setAdvancePaid] = useState("");
 
@@ -436,7 +437,29 @@ export const StaycationOfflineBookingSheet = ({
     setName("");
     setPhone("");
     setAdvancePaid("");
+    setLastFetchedNumber(null);
   }, [isFarmhouse, visible]);
+
+  useEffect(() => {
+    const checkPermissionAndFetch = async () => {
+      if (Platform.OS !== "android" || !visible) return;
+      try {
+        const hasPermission = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+        );
+        if (hasPermission) {
+          const logs = await CallLogs.load(1);
+          if (logs && logs.length > 0) {
+            const rawNumber = logs[0].phoneNumber.replace(/[^\d+]/g, "");
+            setLastFetchedNumber(rawNumber);
+          }
+        }
+      } catch (err) {
+        // Silent catch for auto-fetch
+      }
+    };
+    checkPermissionAndFetch();
+  }, [visible]);
 
   // Add this effect to StaycationOfflineBookingSheet.tsx
   useEffect(() => {
@@ -547,8 +570,8 @@ export const StaycationOfflineBookingSheet = ({
       return;
     }
 
-    if (!finalPhone) {
-      Alert.alert("Error", "Please enter the mobile number.");
+    if (!finalPhone || finalPhone.replace(/[^\d]/g, "").length !== 10) {
+      Alert.alert("Error", "Please enter a valid 10-digit mobile number.");
       return;
     }
 
@@ -557,8 +580,11 @@ export const StaycationOfflineBookingSheet = ({
       return;
     }
 
-    if (!advancePaid.trim() || isNaN(parseFloat(advancePaid))) {
-      Alert.alert("Error", "Please enter the advance paid amount. Enter 0 if none.");
+    const numericTotal = parseFloat(totalPayment);
+    const numericAdvance = parseFloat(advancePaid || "0");
+
+    if (numericAdvance > numericTotal) {
+      Alert.alert("Error", "Advance paid cannot exceed total payment.");
       return;
     }
 
@@ -695,15 +721,12 @@ Thank you for booking with Bookr!`;
         if (logs && logs.length > 0) {
           // Format the number to remove spaces/dashes and set it
           const rawNumber = logs[0].phoneNumber.replace(/[^\d+]/g, "");
-          setPhone(rawNumber); // Use setMobile(rawNumber) for Sports
+          setLastFetchedNumber(rawNumber);
         } else {
           Alert.alert("No Calls", "No recent calls found in your log.");
         }
-      } else {
-        console.log("Call Log permission denied");
       }
     } catch (e) {
-      console.error(e);
       Alert.alert("Error", "Failed to access call logs.");
     }
   };
@@ -730,48 +753,33 @@ Thank you for booking with Bookr!`;
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}>
               {/* Name */}
-              <View style={styles.inputGroup}>
-                <View style={styles.labelRow}>
-                  <User size={ms(20)} color={COLORS.text.primary} />
-                  <Text weight="medium" style={styles.label}>
-                    Name
-                  </Text>
+              {phone.length >= 10 && (
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelRow}>
+                    <User size={ms(20)} color={COLORS.text.primary} />
+                    <Text weight="medium" style={styles.label}>
+                      Name
+                    </Text>
+                  </View>
+                  <View style={styles.inputWrapper}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Yash"
+                      placeholderTextColor={COLORS.text.muted}
+                      value={name}
+                      onChangeText={setName}
+                    />
+                  </View>
                 </View>
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Yash"
-                    placeholderTextColor={COLORS.text.muted}
-                    value={name}
-                    onChangeText={setName}
-                  />
-                </View>
-              </View>
+              )}
 
               {/* Mobile No */}
               <View style={styles.inputGroup}>
-                <View style={[styles.labelRow, { justifyContent: "space-between" }]}>
-                  <View style={styles.labelRow}>
-                    <Phone size={ms(20)} color={COLORS.text.primary} />
-                    <Text weight="medium" style={styles.label}>
-                      Mobile No
-                    </Text>
-                  </View>
-                  {/* ADD THIS BUTTON */}
-                  {Platform.OS === "android" && (
-                    <TouchableOpacity
-                      onPress={fetchLatestCall}
-                      style={{ flexDirection: "row", alignItems: "center" }}>
-                      <Download
-                        size={ms(14)}
-                        color={COLORS.primary}
-                        style={{ marginRight: hs(4) }}
-                      />
-                      <Text variant="body2" color={COLORS.primary} weight="semiBold">
-                        Fetch Last Call
-                      </Text>
-                    </TouchableOpacity>
-                  )}
+                <View style={styles.labelRow}>
+                  <Phone size={ms(20)} color={COLORS.text.primary} />
+                  <Text weight="medium" style={styles.label}>
+                    Mobile No
+                  </Text>
                 </View>
                 <View style={styles.inputWrapper}>
                   <TextInput
@@ -780,9 +788,40 @@ Thank you for booking with Bookr!`;
                     placeholderTextColor={COLORS.text.muted}
                     keyboardType="phone-pad"
                     value={phone}
-                    onChangeText={setPhone}
+                    onChangeText={text => {
+                      const clean = text.replace(/[^\d]/g, "");
+                      setPhone(clean);
+                      if (clean.length < 10) {
+                        setName("");
+                      }
+                    }}
                   />
                 </View>
+                {Platform.OS === "android" && (
+                  <View style={styles.fetchContainerBelow}>
+                    {lastFetchedNumber && phone !== lastFetchedNumber ? (
+                      <TouchableOpacity
+                        style={styles.pillContainer}
+                        onPress={() => setPhone(lastFetchedNumber)}
+                        activeOpacity={0.7}>
+                        <Phone size={ms(12)} color={COLORS.text.inverse} />
+                        <Text variant="body2" color={COLORS.text.inverse} weight="semiBold">
+                          {lastFetchedNumber}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : !lastFetchedNumber ? (
+                      <TouchableOpacity
+                        onPress={fetchLatestCall}
+                        style={styles.fetchButtonBelow}
+                        activeOpacity={0.7}>
+                        <Download size={ms(14)} color={COLORS.primary} />
+                        <Text variant="body2" color={COLORS.primary} weight="semiBold">
+                          Fetch Last Call
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                )}
               </View>
 
               {/* Booking For & Type (OR Units) */}
@@ -1010,7 +1049,15 @@ Thank you for booking with Bookr!`;
                       placeholderTextColor="#8C8C8C"
                       keyboardType="numeric"
                       value={advancePaid}
-                      onChangeText={setAdvancePaid}
+                      onChangeText={text => {
+                        const val = parseFloat(text) || 0;
+                        const total = parseFloat(totalPayment) || 0;
+                        if (val > total) {
+                          setAdvancePaid(total.toString());
+                        } else {
+                          setAdvancePaid(text);
+                        }
+                      }}
                     />
                   </View>
                 </View>
@@ -1118,7 +1165,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(14),
+    fontSize: fs(18),
     color: COLORS.text.primary,
     padding: 0,
     margin: 0,
@@ -1138,6 +1185,25 @@ const styles = StyleSheet.create({
   guestCountRight: { flexDirection: "row", alignItems: "center", gap: hs(6) },
   guestCountNum: { fontSize: fs(14), color: COLORS.text.primary },
   extraChargeText: { fontSize: fs(12), color: COLORS.danger, marginTop: vs(2), textAlign: "right" },
+  fetchContainerBelow: {
+    marginTop: vs(4),
+    flexDirection: "row",
+    justifyContent: "flex-start",
+  },
+  pillContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(6),
+    borderRadius: ms(20),
+    gap: hs(6),
+  },
+  fetchButtonBelow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(4),
+  },
   bookNowButton: {
     backgroundColor: "#000000",
     borderRadius: ms(10),

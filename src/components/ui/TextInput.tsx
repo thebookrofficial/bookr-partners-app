@@ -129,13 +129,13 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: fs(16),
+    fontSize: fs(18),
     fontFamily: "Gilroy-SemiBold", // Matches Figma text style
     color: COLORS.text.primary,
     paddingVertical: vs(12),
   },
   filledInput: {
-    fontSize: fs(14), // Smaller text for the filled variant
+    fontSize: fs(18), // Smaller text for the filled variant
     paddingVertical: 0, // Let the container handle height
   },
   leftIcon: {

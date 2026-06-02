@@ -46,24 +46,36 @@ interface OfflineBookingSheetProps {
   _sportsType: string;
 }
 
-const offlineBookingSchema = z.object({
-  mobile: z
-    .string()
-    .min(10, "Mobile number must be at least 10 digits.")
-    .regex(/^\d+$/, "Mobile number can only contain digits."),
-  name: z.string().min(2, "Please provide a valid guest name."),
-  totalPayment: z.string().refine(val => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
-    message: "Total payment must be greater than zero.",
-  }),
-  advancePaid: z
-    .string()
-    .refine(val => val === "" || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0), {
-      message: "Advance paid must be a valid number.",
-    })
-    .optional(),
-  fromTime: z.string().min(1, "Start time is required."),
-  toTime: z.string().min(1, "End time is required."),
-});
+const offlineBookingSchema = z
+  .object({
+    mobile: z
+      .string()
+      .length(10, "Mobile number must be exactly 10 digits.")
+      .regex(/^\d+$/, "Mobile number can only contain digits."),
+    name: z.string().min(2, "Please provide a valid guest name."),
+    totalPayment: z.string().refine(val => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+      message: "Total payment must be greater than zero.",
+    }),
+    advancePaid: z
+      .string()
+      .refine(val => val === "" || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0), {
+        message: "Advance paid must be a valid number.",
+      })
+      .optional(),
+    fromTime: z.string().min(1, "Start time is required."),
+    toTime: z.string().min(1, "End time is required."),
+  })
+  .refine(
+    data => {
+      const total = parseFloat(data.totalPayment);
+      const advance = parseFloat(data.advancePaid || "0");
+      return advance <= total;
+    },
+    {
+      message: "Advance paid cannot exceed total payment.",
+      path: ["advancePaid"],
+    },
+  );
 
 const parseTimeTo24Hour = (time12h: string) => {
   if (time12h === "12 AM") return "00:00:00";
@@ -103,6 +115,7 @@ export const OfflineBookingSheet = ({
   const [advancePaid, setAdvancePaid] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasHistory, setHasHistory] = useState(false);
+  const [lastFetchedNumber, setLastFetchedNumber] = useState<string | null>(null);
   const [bookedHours, setBookedHours] = useState<string[]>([]);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
 
@@ -155,11 +168,33 @@ export const OfflineBookingSheet = ({
     setFromTime("Start Time");
     setToTime("End Time");
     setHasHistory(false);
+    setLastFetchedNumber(null);
   }, [initialDate]);
 
   useEffect(() => {
     setCurrentDate(initialDate);
   }, [initialDate]);
+
+  useEffect(() => {
+    const checkPermissionAndFetch = async () => {
+      if (Platform.OS !== "android" || !isVisible) return;
+      try {
+        const hasPermission = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+        );
+        if (hasPermission) {
+          const logs = await CallLogs.load(1);
+          if (logs && logs.length > 0) {
+            const rawNumber = logs[0].phoneNumber.replace(/[^\d+]/g, "");
+            setLastFetchedNumber(rawNumber);
+          }
+        }
+      } catch (err) {
+        // Silent catch for auto-fetch
+      }
+    };
+    checkPermissionAndFetch();
+  }, [isVisible]);
 
   useEffect(() => {
     const fetchUnavailableSlots = async () => {
@@ -365,15 +400,12 @@ export const OfflineBookingSheet = ({
         if (logs && logs.length > 0) {
           // Format the number to remove spaces/dashes and set it
           const rawNumber = logs[0].phoneNumber.replace(/[^\d+]/g, "");
-          setPhone(rawNumber); // Use setMobile(rawNumber) for Sports
+          setLastFetchedNumber(rawNumber);
         } else {
           Alert.alert("No Calls", "No recent calls found in your log.");
         }
-      } else {
-        console.log("Call Log permission denied");
       }
     } catch (e) {
-      console.error(e);
       Alert.alert("Error", "Failed to access call logs.");
     }
   };
@@ -406,45 +438,60 @@ export const OfflineBookingSheet = ({
                 pointerEvents="none"
               />
             </TouchableOpacity>
-            {/* <TextInput
+            <TextInput
               variant="filled"
               label={<CustomLabel icon={Phone} text="Mobile No" />}
               placeholder="+91 00000 00000"
               keyboardType="phone-pad"
               value={mobile}
-              onChangeText={setMobile}
-            /> */}
-            <TextInput
-              variant="filled"
-              label={
-                <View style={styles.mobileLabelContainer}>
-                  <CustomLabel icon={Phone} text="Mobile No" />
-                  {Platform.OS === "android" && (
-                    <TouchableOpacity onPress={fetchLatestCall} style={styles.fetchButton}>
-                      <Download size={ms(14)} color={COLORS.primary} />
-                      <Text
-                        variant="body2"
-                        color={COLORS.primary}
-                        weight="semiBold"
-                        style={styles.fetchText}>
-                        Fetch Last Call
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              }
-              placeholder="+91 00000 00000"
-              keyboardType="phone-pad"
-              value={mobile}
-              onChangeText={setMobile}
+              onChangeText={text => {
+                const clean = text.replace(/[^\d]/g, "");
+                setMobile(clean);
+                if (clean.length < 10) {
+                  setName("");
+                }
+              }}
             />
-            <TextInput
-              variant="filled"
-              label={<CustomLabel icon={UserIcon} text="Name" />}
-              placeholder="Guest Name"
-              value={name}
-              onChangeText={setName}
-            />
+            {Platform.OS === "android" && (
+              <View style={styles.fetchContainerBelow}>
+                {lastFetchedNumber && mobile !== lastFetchedNumber ? (
+                  <TouchableOpacity
+                    style={styles.pillContainer}
+                    onPress={() => {
+                      setMobile(lastFetchedNumber);
+                    }}
+                    activeOpacity={0.7}>
+                    <Phone size={ms(12)} color={COLORS.text.inverse} />
+                    <Text variant="body2" color={COLORS.text.inverse} weight="semiBold">
+                      {lastFetchedNumber}
+                    </Text>
+                  </TouchableOpacity>
+                ) : !lastFetchedNumber ? (
+                  <TouchableOpacity
+                    onPress={fetchLatestCall}
+                    style={styles.fetchButton}
+                    activeOpacity={0.7}>
+                    <Download size={ms(14)} color={COLORS.primary} />
+                    <Text
+                      variant="body2"
+                      color={COLORS.primary}
+                      weight="semiBold"
+                      style={styles.fetchText}>
+                      Fetch Last Call
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            )}
+            {mobile.length >= 10 && (
+              <TextInput
+                variant="filled"
+                label={<CustomLabel icon={UserIcon} text="Name" />}
+                placeholder="Guest Name"
+                value={name}
+                onChangeText={setName}
+              />
+            )}
             <View style={styles.row}>
               <View style={styles.flex1}>
                 <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("from")}>
@@ -493,7 +540,15 @@ export const OfflineBookingSheet = ({
                   placeholder="₹"
                   keyboardType="numeric"
                   value={advancePaid}
-                  onChangeText={setAdvancePaid}
+                  onChangeText={text => {
+                    const val = parseFloat(text) || 0;
+                    const total = parseFloat(totalPayment) || 0;
+                    if (val > total) {
+                      setAdvancePaid(total.toString());
+                    } else {
+                      setAdvancePaid(text);
+                    }
+                  }}
                 />
               </View>
             </View>
@@ -717,6 +772,21 @@ const styles = StyleSheet.create({
   },
   fetchText: {
     marginLeft: hs(4),
+  },
+  fetchContainerBelow: {
+    marginTop: vs(-4),
+    marginBottom: vs(12),
+    flexDirection: "row",
+    justifyContent: "flex-start",
+  },
+  pillContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(6),
+    borderRadius: ms(20),
+    gap: hs(6),
   },
   labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6) },
   row: { flexDirection: "row", gap: hs(20), width: "100%" },
