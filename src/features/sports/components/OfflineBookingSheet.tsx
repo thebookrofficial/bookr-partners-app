@@ -31,6 +31,10 @@ import { Calendar } from "react-native-calendars";
 import { z } from "zod";
 import { SportsService } from "../services/sports.service";
 
+import { PermissionsAndroid, Platform } from "react-native";
+import CallLogs from "react-native-call-log";
+import { Download } from "lucide-react-native"; // Make sure to import Download or another icon
+
 interface OfflineBookingSheetProps {
   isVisible: boolean;
   onClose: () => void;
@@ -336,6 +340,44 @@ export const OfflineBookingSheet = ({
     currentDate.getFullYear() === now.getFullYear();
   const currentHour = now.getHours();
 
+  const fetchLatestCall = async () => {
+    if (Platform.OS !== "android") {
+      Alert.alert("Not Supported", "Auto-fetching call logs is only available on Android.");
+      return;
+    }
+
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+        {
+          title: "Call Log Permission",
+          message:
+            "Bookr needs access to your call logs to automatically fill in guest phone numbers.",
+          buttonNeutral: "Ask Me Later",
+          buttonNegative: "Cancel",
+          buttonPositive: "OK",
+        },
+      );
+
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        // Fetch only the 1 most recent call
+        const logs = await CallLogs.load(1);
+        if (logs && logs.length > 0) {
+          // Format the number to remove spaces/dashes and set it
+          const rawNumber = logs[0].phoneNumber.replace(/[^\d+]/g, "");
+          setPhone(rawNumber); // Use setMobile(rawNumber) for Sports
+        } else {
+          Alert.alert("No Calls", "No recent calls found in your log.");
+        }
+      } else {
+        console.log("Call Log permission denied");
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Failed to access call logs.");
+    }
+  };
+
   return (
     <Modal
       visible={isVisible}
@@ -364,9 +406,33 @@ export const OfflineBookingSheet = ({
                 pointerEvents="none"
               />
             </TouchableOpacity>
-            <TextInput
+            {/* <TextInput
               variant="filled"
               label={<CustomLabel icon={Phone} text="Mobile No" />}
+              placeholder="+91 00000 00000"
+              keyboardType="phone-pad"
+              value={mobile}
+              onChangeText={setMobile}
+            /> */}
+            <TextInput
+              variant="filled"
+              label={
+                <View style={styles.mobileLabelContainer}>
+                  <CustomLabel icon={Phone} text="Mobile No" />
+                  {Platform.OS === "android" && (
+                    <TouchableOpacity onPress={fetchLatestCall} style={styles.fetchButton}>
+                      <Download size={ms(14)} color={COLORS.primary} />
+                      <Text
+                        variant="body2"
+                        color={COLORS.primary}
+                        weight="semiBold"
+                        style={styles.fetchText}>
+                        Fetch Last Call
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              }
               placeholder="+91 00000 00000"
               keyboardType="phone-pad"
               value={mobile}
@@ -639,6 +705,19 @@ const styles = StyleSheet.create({
   sheetHeader: { marginBottom: vs(16), paddingHorizontal: hs(6) },
   headerText: { textTransform: "uppercase" },
   sheetContent: { paddingBottom: vs(20) },
+  mobileLabelContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+  },
+  fetchButton: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  fetchText: {
+    marginLeft: hs(4),
+  },
   labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6) },
   row: { flexDirection: "row", gap: hs(20), width: "100%" },
   flex1: { flex: 1 },

@@ -22,6 +22,10 @@ import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/dat
 import { supabase } from "@/lib/supabase";
 import { useCreateStaycationOfflineBooking } from "../hooks/useCreateStaycationOfflineBooking";
 
+import { PermissionsAndroid, Platform } from "react-native";
+import CallLogs from "react-native-call-log";
+import { Download } from "lucide-react-native"; // Make sure to import Download or another icon
+
 interface StaycationOfflineBookingSheetProps {
   visible: boolean;
   onClose: () => void;
@@ -666,6 +670,44 @@ Thank you for booking with Bookr!`;
     setShowDatePicker(null);
   };
 
+  const fetchLatestCall = async () => {
+    if (Platform.OS !== "android") {
+      Alert.alert("Not Supported", "Auto-fetching call logs is only available on Android.");
+      return;
+    }
+
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+        {
+          title: "Call Log Permission",
+          message:
+            "Bookr needs access to your call logs to automatically fill in guest phone numbers.",
+          buttonNeutral: "Ask Me Later",
+          buttonNegative: "Cancel",
+          buttonPositive: "OK",
+        },
+      );
+
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        // Fetch only the 1 most recent call
+        const logs = await CallLogs.load(1);
+        if (logs && logs.length > 0) {
+          // Format the number to remove spaces/dashes and set it
+          const rawNumber = logs[0].phoneNumber.replace(/[^\d+]/g, "");
+          setPhone(rawNumber); // Use setMobile(rawNumber) for Sports
+        } else {
+          Alert.alert("No Calls", "No recent calls found in your log.");
+        }
+      } else {
+        console.log("Call Log permission denied");
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Failed to access call logs.");
+    }
+  };
+
   return (
     <>
       <Modal
@@ -708,11 +750,28 @@ Thank you for booking with Bookr!`;
 
               {/* Mobile No */}
               <View style={styles.inputGroup}>
-                <View style={styles.labelRow}>
-                  <Phone size={ms(20)} color={COLORS.text.primary} />
-                  <Text weight="medium" style={styles.label}>
-                    Mobile No
-                  </Text>
+                <View style={[styles.labelRow, { justifyContent: "space-between" }]}>
+                  <View style={styles.labelRow}>
+                    <Phone size={ms(20)} color={COLORS.text.primary} />
+                    <Text weight="medium" style={styles.label}>
+                      Mobile No
+                    </Text>
+                  </View>
+                  {/* ADD THIS BUTTON */}
+                  {Platform.OS === "android" && (
+                    <TouchableOpacity
+                      onPress={fetchLatestCall}
+                      style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Download
+                        size={ms(14)}
+                        color={COLORS.primary}
+                        style={{ marginRight: hs(4) }}
+                      />
+                      <Text variant="body2" color={COLORS.primary} weight="semiBold">
+                        Fetch Last Call
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <View style={styles.inputWrapper}>
                   <TextInput

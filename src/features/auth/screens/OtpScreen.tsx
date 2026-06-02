@@ -19,8 +19,7 @@ import { useAuthLogic } from "../hooks/useAuthLogic";
 import { LEGAL_TEXT } from "@/constants/legal";
 
 // Assets
-import AuthIllustration1 from "@/assets/images/auth_illustration_1.png";
-import AuthIllustration2 from "@/assets/images/auth_illustration_2.png";
+import LoginIllustration from "@/assets/images/login-screen-client-side.svg";
 import WhiteBookrLogo from "@/assets/images/white_bookr_logo.png";
 import DividerLine from "@/assets/icons/ic_divider_line.svg";
 
@@ -93,8 +92,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
         </View>
 
         <View style={styles.illustrationContainer}>
-          <Image source={AuthIllustration1} style={styles.illustration1} resizeMode="contain" />
-          <Image source={AuthIllustration2} style={styles.illustration2} resizeMode="contain" />
+          <LoginIllustration width={hs(380)} height={vs(345)} />
         </View>
       </View>
 
@@ -256,20 +254,9 @@ const styles = StyleSheet.create({
   illustrationContainer: {
     position: "absolute",
     bottom: vs(-20),
-    flexDirection: "row",
-    alignItems: "flex-end",
     width: "100%",
     justifyContent: "center",
-  },
-  illustration1: {
-    width: hs(200),
-    height: vs(220),
-    marginRight: hs(-50),
-  },
-  illustration2: {
-    width: hs(200),
-    height: vs(230),
-    marginLeft: hs(-50),
+    alignItems: "center",
   },
   bottomSheet: {
     flex: 1,

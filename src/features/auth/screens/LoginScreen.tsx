@@ -12,11 +12,8 @@ import { AuthTextInput } from "../components/AuthTextInput";
 import { LEGAL_TEXT } from "@/constants/legal";
 
 // Assets
-import AuthIllustration1 from "@/assets/images/auth_illustration_1.png";
-import AuthIllustration2 from "@/assets/images/auth_illustration_2.png";
-import WhiteBookrLogo from "@/assets/images/white_bookr_logo.png";
+import LoginIllustration from "@/assets/images/login-screen-client-side.svg";
 import EmailIcon from "@/assets/icons/ic_email_outline.svg";
-import DividerLine from "@/assets/icons/ic_divider_line.svg";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -49,17 +46,19 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <Image source={WhiteBookrLogo} style={styles.logo} resizeMode="contain" />
+        {/* <View style={styles.logoContainer}>
+          <Image
+            source={require("@/assets/images/white_bookr_logo.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.partnerText}>Partner</Text>
-        </View>
+        </View> */}
 
         <View style={styles.illustrationContainer}>
-          <Image source={AuthIllustration1} style={styles.illustration1} resizeMode="contain" />
-          <Image source={AuthIllustration2} style={styles.illustration2} resizeMode="contain" />
+          <LoginIllustration width={hs(440)} height={vs(400)} />
         </View>
       </View>
-
       <View style={styles.bottomSheet}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -71,12 +70,7 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.inputWrapper}>
-              <EmailIcon
-                width={hs(20)}
-                height={vs(16)}
-                stroke={COLORS.text.muted}
-                style={styles.inputIcon}
-              />
+              <EmailIcon width={hs(20)} height={vs(16)} />
               <AuthTextInput
                 placeholder="Email address"
                 value={email}
@@ -101,19 +95,17 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
           />
 
           <View style={styles.dividerContainer}>
-            <DividerLine
-              width={hs(70)}
-              height={1}
-              stroke={COLORS.text.muted}
-              style={styles.dividerLine}
-            />
+            <View style={styles.dividerContainer}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>Or login with</Text>
+              <View style={styles.dividerLine} />
+            </View>
             <Text style={styles.dividerText}>Or login with</Text>
-            <DividerLine
-              width={hs(70)}
-              height={1}
-              stroke={COLORS.text.muted}
-              style={styles.dividerLine}
-            />
+            <View style={styles.dividerContainer}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>Or login with</Text>
+              <View style={styles.dividerLine} />
+            </View>
           </View>
 
           <TouchableOpacity style={styles.socialButton} onPress={loginWithGoogle}>
@@ -194,21 +186,10 @@ const styles = StyleSheet.create({
   },
   illustrationContainer: {
     position: "absolute",
-    bottom: vs(-20),
-    flexDirection: "row",
-    alignItems: "flex-end",
+    bottom: vs(-26),
     width: "100%",
     justifyContent: "center",
-  },
-  illustration1: {
-    width: hs(200),
-    height: vs(220),
-    marginRight: hs(-50),
-  },
-  illustration2: {
-    width: hs(200),
-    height: vs(230),
-    marginLeft: hs(-50),
+    alignItems: "center",
   },
   bottomSheet: {
     flex: 1,
@@ -216,11 +197,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: ms(30),
     borderTopRightRadius: ms(30),
     paddingHorizontal: hs(30),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -5 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
+    boxShadow: "0px -5px 60px rgba(0, 0, 0, 0.46)",
   },
   scrollContent: {
     paddingTop: vs(30),
