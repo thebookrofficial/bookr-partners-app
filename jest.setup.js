@@ -130,11 +130,6 @@ jest.mock("react-native-share", () => ({
   open: jest.fn(() => Promise.resolve()),
 }));
 
-// Mock react-native-call-log
-jest.mock("react-native-call-log", () => ({
-  load: jest.fn(() => Promise.resolve([])),
-}));
-
 // Mock Stallion OTA wrapper
 jest.mock(
   "react-native-stallion",

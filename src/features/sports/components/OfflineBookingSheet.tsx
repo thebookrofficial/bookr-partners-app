@@ -31,10 +31,6 @@ import { Calendar } from "react-native-calendars";
 import { z } from "zod";
 import { SportsService } from "../services/sports.service";
 
-import { PermissionsAndroid, Platform } from "react-native";
-import CallLogs from "react-native-call-log";
-import { Download } from "lucide-react-native"; // Make sure to import Download or another icon
-
 interface OfflineBookingSheetProps {
   isVisible: boolean;
   onClose: () => void;
@@ -115,7 +111,6 @@ export const OfflineBookingSheet = ({
   const [advancePaid, setAdvancePaid] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasHistory, setHasHistory] = useState(false);
-  const [lastFetchedNumber, setLastFetchedNumber] = useState<string | null>(null);
   const [bookedHours, setBookedHours] = useState<string[]>([]);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
 
@@ -168,33 +163,11 @@ export const OfflineBookingSheet = ({
     setFromTime("Start Time");
     setToTime("End Time");
     setHasHistory(false);
-    setLastFetchedNumber(null);
   }, [initialDate]);
 
   useEffect(() => {
     setCurrentDate(initialDate);
   }, [initialDate]);
-
-  useEffect(() => {
-    const checkPermissionAndFetch = async () => {
-      if (Platform.OS !== "android" || !isVisible) return;
-      try {
-        const hasPermission = await PermissionsAndroid.check(
-          PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
-        );
-        if (hasPermission) {
-          const logs = await CallLogs.load(1);
-          if (logs && logs.length > 0) {
-            const rawNumber = logs[0].phoneNumber.replace(/[^\d+]/g, "");
-            setLastFetchedNumber(rawNumber);
-          }
-        }
-      } catch (err) {
-        // Silent catch for auto-fetch
-      }
-    };
-    checkPermissionAndFetch();
-  }, [isVisible]);
 
   useEffect(() => {
     const fetchUnavailableSlots = async () => {
@@ -375,41 +348,6 @@ export const OfflineBookingSheet = ({
     currentDate.getFullYear() === now.getFullYear();
   const currentHour = now.getHours();
 
-  const fetchLatestCall = async () => {
-    if (Platform.OS !== "android") {
-      Alert.alert("Not Supported", "Auto-fetching call logs is only available on Android.");
-      return;
-    }
-
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
-        {
-          title: "Call Log Permission",
-          message:
-            "Bookr needs access to your call logs to automatically fill in guest phone numbers.",
-          buttonNeutral: "Ask Me Later",
-          buttonNegative: "Cancel",
-          buttonPositive: "OK",
-        },
-      );
-
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        // Fetch only the 1 most recent call
-        const logs = await CallLogs.load(1);
-        if (logs && logs.length > 0) {
-          // Format the number to remove spaces/dashes and set it
-          const rawNumber = logs[0].phoneNumber.replace(/[^\d+]/g, "");
-          setLastFetchedNumber(rawNumber);
-        } else {
-          Alert.alert("No Calls", "No recent calls found in your log.");
-        }
-      }
-    } catch (e) {
-      Alert.alert("Error", "Failed to access call logs.");
-    }
-  };
-
   return (
     <Modal
       visible={isVisible}
@@ -452,37 +390,6 @@ export const OfflineBookingSheet = ({
                 }
               }}
             />
-            {Platform.OS === "android" && (
-              <View style={styles.fetchContainerBelow}>
-                {lastFetchedNumber && mobile !== lastFetchedNumber ? (
-                  <TouchableOpacity
-                    style={styles.pillContainer}
-                    onPress={() => {
-                      setMobile(lastFetchedNumber);
-                    }}
-                    activeOpacity={0.7}>
-                    <Phone size={ms(12)} color={COLORS.text.inverse} />
-                    <Text variant="body2" color={COLORS.text.inverse} weight="semiBold">
-                      {lastFetchedNumber}
-                    </Text>
-                  </TouchableOpacity>
-                ) : !lastFetchedNumber ? (
-                  <TouchableOpacity
-                    onPress={fetchLatestCall}
-                    style={styles.fetchButton}
-                    activeOpacity={0.7}>
-                    <Download size={ms(14)} color={COLORS.primary} />
-                    <Text
-                      variant="body2"
-                      color={COLORS.primary}
-                      weight="semiBold"
-                      style={styles.fetchText}>
-                      Fetch Last Call
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            )}
             {mobile.length >= 10 && (
               <TextInput
                 variant="filled"
@@ -765,28 +672,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
-  },
-  fetchButton: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  fetchText: {
-    marginLeft: hs(4),
-  },
-  fetchContainerBelow: {
-    marginTop: vs(-4),
-    marginBottom: vs(12),
-    flexDirection: "row",
-    justifyContent: "flex-start",
-  },
-  pillContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: hs(12),
-    paddingVertical: vs(6),
-    borderRadius: ms(20),
-    gap: hs(6),
   },
   labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6) },
   row: { flexDirection: "row", gap: hs(20), width: "100%" },
