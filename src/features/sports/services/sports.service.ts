@@ -297,6 +297,46 @@ export const SportsService = {
       if (i === 0) firstBookingId = booking.id;
     }
 
+    // --- NEW NOTIFICATION TRIGGER ---
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        // Fetch the vendor's device token
+        const { data: device } = await supabase
+          .from("user_devices")
+          .select("fcm_token")
+          .eq("user_id", session.user.id)
+          .order("last_seen_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (device?.fcm_token) {
+          // 1. Insert into Queue (This triggers your Edge Function!)
+          await supabase.from("notification_queue").insert({
+            user_id: session.user.id,
+            fcm_token: device.fcm_token,
+            title: "Offline Booking Saved! 🎟️",
+            body: `Booking for ${params.guestName} is confirmed.`,
+            status: "pending",
+          });
+
+          // 2. Insert into History (For your in-app notification bell screen)
+          await supabase.from("user_notifications").insert({
+            user_id: session.user.id,
+            type: "booking_confirmed",
+            title: "Offline Booking Saved! 🎟️",
+            body: `Booking for ${params.guestName} is confirmed.`,
+          });
+        }
+      }
+    } catch (notifErr) {
+      // Catch silently so the booking still succeeds even if notifications fail
+      console.warn("Failed to queue notification:", notifErr);
+    }
+    // --- END NOTIFICATION TRIGGER ---
+
     return firstBookingId;
   },
 
