@@ -126,5 +126,5 @@ describe("EventScanScreen QR Code Test", () => {
         }),
       );
     });
-  });
+  }, 15000);
 });

@@ -116,6 +116,9 @@ export const StaycationBookingCard = ({
     if (onPress) {
       onPress();
     } else {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const isPast = (displayData.checkOut || "") < todayStr;
+
       navigation.navigate("StaycationBookingDetails", {
         booking: {
           ...displayData,
@@ -123,7 +126,7 @@ export const StaycationBookingCard = ({
           checkOut: formatDisplayDate(displayData.checkOut || ""),
           amount: displayData.amount,
         },
-        isFromHistory: displayData.status === "Complete",
+        isFromHistory: isPast || displayData.status === "Cancelled",
       });
     }
   };
@@ -135,8 +138,6 @@ export const StaycationBookingCard = ({
         return "#63A1FD";
       case "offline":
         return "#E55959";
-      case "complete":
-        return "#00B562";
       case "cancelled":
         return "#E55959";
       default:
@@ -145,7 +146,7 @@ export const StaycationBookingCard = ({
   };
 
   const isPaymentPending = useMemo(() => {
-    if (displayData.status === "Cancelled" || displayData.status === "Complete") return false;
+    if (displayData.status === "Cancelled") return false;
 
     const paid =
       typeof displayData.paidAmount === "number"
@@ -233,13 +234,15 @@ export const StaycationBookingCard = ({
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const isGreyBg = useMemo(() => {
     const s = displayData.status?.toLowerCase();
-    return s === "cancelled" || s === "complete";
-  }, [displayData.status]);
+    const todayStr = new Date().toISOString().split("T")[0];
+    const isPast = (displayData.checkOut || "") < todayStr;
+
+    return s === "cancelled" || isPast;
+  }, [displayData.status, displayData.checkOut]);
 
   const getAmountColor = () => {
     const s = displayData.status?.toLowerCase();
-    if (s === "advance" || s === "complete") return "#00B562";
-    if (s === "online" || s === "offline") return "#00B562";
+    if (s === "advance") return "#00B562";
     return "#00B562";
   };
 

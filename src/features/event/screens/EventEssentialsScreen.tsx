@@ -11,6 +11,7 @@ import { EventActionRow } from "../components/EventActionRow";
 import {
   Calendar,
   Star,
+  Banknote,
   //  RotateCcw
 } from "lucide-react-native";
 import { useNavigation, RouteProp, useRoute } from "@react-navigation/native";
@@ -58,6 +59,11 @@ export const EventEssentialsScreen = () => {
             icon={<Calendar size={ms(20)} color={COLORS.primary} />}
             label="Export Bookings"
             onPress={() => navigation.navigate("EventExportBookings", { serviceId })}
+          />
+          <EventActionRow
+            icon={<Banknote size={ms(20)} color={COLORS.primary} />}
+            label="Payouts"
+            onPress={() => navigation.navigate("Payouts", { venueId: serviceId })}
           />
           {/* <EventActionRow
             icon={<RotateCcw size={ms(20)} color={COLORS.primary} />}

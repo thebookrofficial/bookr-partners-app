@@ -48,24 +48,9 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
       setIsDataLoading(true);
       const todayStr = formatDate(new Date());
 
-      // 1. Fetch Availability Blocks
+      // 1. Fetch Availability Blocks - REMOVED: We only show black for explicitly closed dates
       const newMarkedDates: any = {};
       const newClosedDates = new Set<string>();
-
-      const { data: blocks } = await supabase
-        .from("staycation_availability")
-        .select("date, is_blocked")
-        .eq("venue_id", activeVenue.venueId)
-        .eq("is_blocked", true);
-
-      blocks?.forEach(b => {
-        newMarkedDates[b.date] = {
-          customStyles: {
-            container: { backgroundColor: COLORS.danger, borderRadius: 4 },
-            text: { color: "white" },
-          },
-        };
-      });
 
       // 1.5. Fetch Closed Dates
       const { data: closedDatesData } = await supabase
@@ -82,7 +67,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           newClosedDates.add(dStr);
           newMarkedDates[dStr] = {
             customStyles: {
-              container: { backgroundColor: COLORS.danger, borderRadius: 0, width: "100%" },
+              container: { backgroundColor: "black", borderRadius: 4, width: "100%" },
               text: { color: "white" },
             },
           };
@@ -118,15 +103,11 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
             !b.profiles || (Array.isArray(b.profiles) && b.profiles.length === 0);
 
           if (isProfileEmpty && b.user_id) {
-            // console.log(`[DEBUG] Fallback triggered for user_id: ${b.user_id}`);
-
             const { data: profileData, error: _profileErr } = await supabase
               .from("profiles")
               .select("full_name, phone, avatar_url")
               .eq("id", b.user_id)
               .maybeSingle();
-
-            // console.log(`[DEBUG] Fallback result:`, profileData, profileErr);
 
             if (profileData) {
               b.profiles = [profileData] as any;
@@ -137,19 +118,14 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
       );
 
       const todayList: StaycationBooking[] = [];
-      const tomorrowList: StaycationBooking[] = [];
       const upcomingList: StaycationBooking[] = [];
 
       bookings.forEach(b => {
         // 4. Map the data safely
         const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
 
-        // console.log(`[DEBUG] Final Extracted Profile for ${b.id}:`, profile);
-
         const finalDisplayName = b.guest_name || profile?.full_name || "Guest";
         const finalPhone = b.guest_phone || profile?.phone || "N/A";
-
-        // console.log(`[DEBUG] Final Display Name: ${finalDisplayName}`);
 
         const isOnline = !!b.user_id;
         const rangeColor = isOnline ? COLORS.primary : COLORS.danger;
@@ -161,7 +137,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           const dStr = formatDate(curr);
           newMarkedDates[dStr] = {
             customStyles: {
-              container: { backgroundColor: rangeColor, borderRadius: 0, width: "100%" },
+              container: { backgroundColor: rangeColor, borderRadius: 4, width: "100%" },
               text: { color: "white" },
             },
           };
@@ -182,18 +158,63 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           guestCount: b.guest_count,
         };
 
-        const tomorrowStr = formatDate(new Date(Date.now() + 86400000));
+        if (b.check_in_date === todayStr) {
+          todayList.push(formatted);
+        } else {
+          upcomingList.push(formatted);
+        }
+      });
 
-        if (b.check_in_date === todayStr) todayList.push(formatted);
-        else if (b.check_in_date === tomorrowStr) tomorrowList.push(formatted);
-        else upcomingList.push(formatted);
+      // 5. Post-process to connect continuous dates
+      Object.keys(newMarkedDates).forEach(dStr => {
+        const current = newMarkedDates[dStr];
+        if (!current.customStyles || !current.customStyles.container) return;
+
+        const color = current.customStyles.container.backgroundColor;
+
+        const parts = dStr.split("-").map(Number);
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+
+        const prev = new Date(d);
+        prev.setDate(d.getDate() - 1);
+        const prevStr = formatDate(prev);
+
+        const next = new Date(d);
+        next.setDate(d.getDate() + 1);
+        const nextStr = formatDate(next);
+
+        const hasPrev =
+          newMarkedDates[prevStr] &&
+          newMarkedDates[prevStr].customStyles?.container?.backgroundColor === color;
+        const hasNext =
+          newMarkedDates[nextStr] &&
+          newMarkedDates[nextStr].customStyles?.container?.backgroundColor === color;
+
+        const container = current.customStyles.container;
+
+        if (hasPrev && hasNext) {
+          container.borderRadius = 0;
+        } else if (hasPrev) {
+          container.borderTopLeftRadius = 0;
+          container.borderBottomLeftRadius = 0;
+          container.borderTopRightRadius = 4;
+          container.borderBottomRightRadius = 4;
+          delete container.borderRadius;
+        } else if (hasNext) {
+          container.borderTopLeftRadius = 4;
+          container.borderBottomLeftRadius = 4;
+          container.borderTopRightRadius = 0;
+          container.borderBottomRightRadius = 0;
+          delete container.borderRadius;
+        } else {
+          container.borderRadius = 4;
+        }
       });
 
       setMarkedDates(newMarkedDates);
 
       const sections = [];
       if (todayList.length) sections.push({ title: "Today's Check-ins", data: todayList });
-      if (tomorrowList.length) sections.push({ title: "Tomorrow's Check-ins", data: tomorrowList });
       if (upcomingList.length) sections.push({ title: "Upcoming Bookings", data: upcomingList });
 
       setGroupedBookings(sections);
@@ -221,10 +242,6 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         .update({ booking_status: "cancelled" })
         .eq("id", bookingId)
         .select();
-
-      // 3. Print the absolute truth to the console
-      // console.log("DEBUG - Updated Rows:", updatedRows);
-      // console.log("DEBUG - Cancel Error:", cancelErr);
 
       if (cancelErr) throw cancelErr;
 
@@ -278,7 +295,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
     return groupedBookings
       .map(section => ({
         ...section,
-        data: section.data.filter(b => b.checkIn === selectedDate || b.checkOut === selectedDate),
+        data: section.data.filter(b => b.checkIn === selectedDate),
       }))
       .filter(s => s.data.length > 0);
   }, [groupedBookings, selectedDate]);

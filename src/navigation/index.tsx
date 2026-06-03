@@ -23,6 +23,9 @@ import {
   MoreHorizontal,
   User,
 } from "lucide-react-native";
+import { Linking } from "react-native";
+import messaging from "@react-native-firebase/messaging";
+import { LinkingOptions } from "@react-navigation/native";
 
 import { VendorProfileScreen } from "@/features/profile/screens/VendorProfileScreen";
 import { SettingsScreen } from "@/features/settings/screens/SettingsScreen";
@@ -38,6 +41,7 @@ import { BlockUnblockScreen } from "@/features/sports/screens/BlockUnblockScreen
 import { BulkBookingScreen } from "@/features/sports/screens/BulkBookingScreen";
 import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingDetailsScreen";
 import { StaycationBookingDetailsScreen } from "@/features/staycation/screens/StaycationBookingDetailsScreen";
+import { StaycationInvoiceScreen } from "@/features/staycation/screens/StaycationInvoiceScreen";
 import { StaycationOffersScreen } from "@/features/staycation/screens/StaycationOffersScreen";
 import { StaycationHomeScreen } from "@/features/staycation/screens/StaycationHomeScreen";
 import { StaycationHistoryScreen } from "@/features/staycation/screens/StaycationHistoryScreen";
@@ -62,8 +66,12 @@ import { EventScanScreen } from "@/features/event/screens/EventScanScreen";
 import { EventEntryDetailsScreen } from "@/features/event/screens/EventEntryDetailsScreen";
 import { EventScanConfirmationScreen } from "@/features/event/screens/EventScanConfirmationScreen";
 import { LegalViewScreen } from "@/features/settings/screens/LegalViewScreen";
+import { NotificationSettingsScreen } from "@/features/settings/screens/NotificationSettingsScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
+import { PayoutsScreen } from "@/features/finance/screens/PayoutsScreen";
+import { PayoutDetailsScreen } from "@/features/finance/screens/PayoutDetailsScreen";
+import { SportsInvoiceScreen } from "@/features/sports/screens/SportsInvoiceScreen";
 
 import { COLORS } from "@/constants/theme";
 import { vs, ms, fs, hs } from "@/utils/responsive.utils";
@@ -300,6 +308,7 @@ const MainNavigator = () => (
   <MainStack.Navigator screenOptions={{ headerShown: false }}>
     <MainStack.Screen name="VendorProfile" component={VendorProfileScreen} />
     <MainStack.Screen name="Settings" component={SettingsScreen} />
+    <MainStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
     <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
     <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
     <MainStack.Screen name="LegalView" component={LegalViewScreen} />
@@ -309,6 +318,7 @@ const MainNavigator = () => (
     <MainStack.Screen name="EventServiceTabs" component={EventTabNavigator} />
     <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
     <MainStack.Screen name="StaycationBookingDetails" component={StaycationBookingDetailsScreen} />
+    <MainStack.Screen name="StaycationInvoice" component={StaycationInvoiceScreen} />
     <MainStack.Screen name="StaycationOffers" component={StaycationOffersScreen} />
     <MainStack.Screen name="DineBookingDetails" component={DineBookingDetailsScreen} />
     <MainStack.Screen name="DinePaymentDetails" component={DinePaymentDetailsScreen} />
@@ -324,8 +334,58 @@ const MainNavigator = () => (
     <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
     <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />
     <MainStack.Screen name="BulkBookingDetails" component={BulkBookingDetailsScreen} />
+    <MainStack.Screen name="Payouts" component={PayoutsScreen} />
+    <MainStack.Screen name="PayoutDetails" component={PayoutDetailsScreen} />
+    <MainStack.Screen name="SportsInvoice" component={SportsInvoiceScreen} />
   </MainStack.Navigator>
 );
+
+const linking: LinkingOptions<RootStackParamList> = {
+  // Your custom URL schemes
+  prefixes: ["bookrpartner://", "https://partners.thebookr.in"],
+
+  // Handles deep links when the app is completely closed (cold start)
+  async getInitialURL() {
+    const url = await Linking.getInitialURL();
+    if (url != null) return url;
+
+    const message = await messaging().getInitialNotification();
+    if (message?.data?.link) return message.data.link as string;
+
+    return null;
+  },
+
+  // Handles deep links when the app is running in the background
+  subscribe(listener: (url: string) => void) {
+    const onReceiveURL = ({ url }: { url: string }) => listener(url);
+    const linkingSubscription = Linking.addEventListener("url", onReceiveURL);
+
+    const unsubscribeNotification = messaging().onNotificationOpenedApp(message => {
+      if (message?.data?.link) {
+        listener(message.data.link as string);
+      }
+    });
+
+    return () => {
+      linkingSubscription.remove();
+      unsubscribeNotification();
+    };
+  },
+
+  // Maps the URL paths to your actual screens
+  config: {
+    screens: {
+      Main: {
+        screens: {
+          Settings: "settings",
+          BookingDetails: "booking/:bookingId",
+          Payouts: "payouts/:venueId",
+          // You can map any screen from MainStackParamList here!
+        },
+      },
+    },
+  },
+};
 
 export const AppNavigator = () => {
   const { session, isInitialized, setSession, setInitialized } = useAuthStore();
@@ -354,7 +414,7 @@ export const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
           <RootStack.Screen name="Main" component={MainNavigator} />

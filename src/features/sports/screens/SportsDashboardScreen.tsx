@@ -11,9 +11,8 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
 // Navigation & DB Imports
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
+import { RouteProp, useRoute } from "@react-navigation/native";
+import { SportsTabParamList } from "@/navigation/navigation.types";
 import { supabase } from "@/lib/supabase";
 
 import { useServiceStore } from "@/store/serviceStore";
@@ -36,38 +35,27 @@ const FilterTab = ({ label, isActive, onPress, icon }: any) => (
 );
 
 export const SportsDashboardScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, any>>();
 
-  // Extract initial serviceId and category
-  let serviceId = route.params?.serviceId;
-  let routeCategory = route.params?.category;
+  const { selectedCategories, setServiceCategory, activeServiceId } = useServiceStore();
 
-  if (!serviceId) {
-    const parentState = navigation.getParent()?.getState();
-    const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
-    const params = (tabRoute?.params as any) || {};
-    serviceId = params.serviceId || params.params?.serviceId || "";
-    routeCategory = routeCategory || params.category || params.params?.category;
-  }
+  // 1. Get Service ID (Priority: Route -> Store)
+  const serviceId = route.params?.serviceId || activeServiceId;
 
-  const [timeFilter, setTimeFilter] = useState("Today");
+  // 2. Get Category (Priority: Route -> Store)
+  const routeCategory = route.params?.category;
+  const storedCategory = selectedCategories[serviceId];
+  const selectedCategory = routeCategory || storedCategory || "Football";
+
+  const [timeFilter, setTimeFilter] = useState("Yesterday");
   const [groundFilter, setGroundFilter] = useState("Overall");
 
-  const { selectedCategories, setServiceCategory } = useServiceStore();
-
-  const lastRouteCategory = React.useRef<string | undefined>(undefined);
-
+  // Sync route param with store if we arrived via a deep link or specific tab click
   useEffect(() => {
-    if (routeCategory && routeCategory !== lastRouteCategory.current) {
-      lastRouteCategory.current = routeCategory;
-      if (selectedCategories[serviceId] !== routeCategory) {
-        setServiceCategory(serviceId, routeCategory);
-      }
+    if (routeCategory && routeCategory !== storedCategory) {
+      setServiceCategory(serviceId, routeCategory);
     }
-  }, [routeCategory, serviceId, setServiceCategory, selectedCategories]);
-
-  const selectedCategory = selectedCategories[serviceId] || routeCategory || "Football";
+  }, [routeCategory, serviceId, storedCategory, setServiceCategory]);
 
   // Dynamic Venue Resolution State
   const [currentVenueId, setCurrentVenueId] = useState<string>("");
@@ -77,7 +65,7 @@ export const SportsDashboardScreen = () => {
     metrics,
     grounds,
     loading: dataLoading,
-  } = useSportsDashboard(currentVenueId, timeFilter, groundFilter);
+  } = useSportsDashboard(currentVenueId, timeFilter, groundFilter, selectedCategory);
 
   const { activeVenueName } = useServiceStore();
 
@@ -149,9 +137,9 @@ export const SportsDashboardScreen = () => {
               </Text>
               <View style={styles.filterTabsRow}>
                 <FilterTab
-                  label="Today"
-                  isActive={timeFilter === "Today"}
-                  onPress={() => setTimeFilter("Today")}
+                  label="Yesterday"
+                  isActive={timeFilter === "Yesterday"}
+                  onPress={() => setTimeFilter("Yesterday")}
                 />
                 <FilterTab
                   label={"Last\nweek"}
@@ -159,9 +147,9 @@ export const SportsDashboardScreen = () => {
                   onPress={() => setTimeFilter("Last week")}
                 />
                 <FilterTab
-                  label={"This\nMonth"}
-                  isActive={timeFilter === "This Month"}
-                  onPress={() => setTimeFilter("This Month")}
+                  label={"Last\nMonth"}
+                  isActive={timeFilter === "Last Month"}
+                  onPress={() => setTimeFilter("Last Month")}
                 />
                 <FilterTab
                   label="Custom"
@@ -220,18 +208,18 @@ export const SportsDashboardScreen = () => {
               </View>
               <View style={styles.splitBlock}>
                 <View style={styles.splitRow}>
-                  <Text variant="body2" weight="medium" color="#001C65">
+                  <Text variant="body2" weight="medium" color={COLORS.text.primary}>
                     Online bookings
                   </Text>
-                  <Text variant="body1" weight="medium" color="#001C65">
+                  <Text variant="body1" weight="medium" color={COLORS.primary}>
                     {metrics.onlineBookings}
                   </Text>
                 </View>
                 <View style={styles.splitRow}>
-                  <Text variant="body2" weight="medium" color={COLORS.primary}>
+                  <Text variant="body2" weight="medium" color={COLORS.text.primary}>
                     Offline bookings
                   </Text>
-                  <Text variant="body1" weight="medium" color={COLORS.primary}>
+                  <Text variant="body1" weight="medium" color={COLORS.danger}>
                     {metrics.offlineBookings}
                   </Text>
                 </View>
@@ -240,25 +228,37 @@ export const SportsDashboardScreen = () => {
 
             {/* Revenue Details Summary */}
             <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              ONLINE PAYOUT REVENUE
+              GROSS PROFIT DETAILS
             </Text>
             <View style={styles.onlineRevenueCard}>
-              <View style={styles.revenueRow}>
-                <Text variant="body2" weight="medium">
-                  Total Online Payout
-                </Text>
-                <Text variant="h2" weight="bold" color="#00B562">
-                  ₹{metrics.onlineRevenue.toLocaleString("en-IN")}
-                </Text>
-              </View>
               <View style={styles.revenueDonutWrapper}>
                 <View style={[styles.donutRing, styles.donutRingBase]} />
+                <View style={[styles.donutRing, styles.donutRingOver, styles.donutRingOnline]} />
                 <View style={styles.donutInner}>
                   <Text variant="body2" weight="semiBold" color="#00B562">
-                    100%
+                    +₹{(metrics.onlineRevenue + metrics.offlineRevenue).toLocaleString("en-IN")}
                   </Text>
                   <Text variant="caption" weight="semiBold">
-                    Online
+                    Total
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.revenueSplitBlock}>
+                <View style={styles.revenueRow}>
+                  <Text variant="body2" weight="bold" color={COLORS.text.primary}>
+                    Online Collections
+                  </Text>
+                  <Text variant="body1" weight="bold" color={COLORS.primary}>
+                    ₹{metrics.onlineRevenue.toLocaleString("en-IN")}
+                  </Text>
+                </View>
+                <View style={styles.revenueRow}>
+                  <Text variant="body2" weight="bold" color={COLORS.text.primary}>
+                    Offline Collections
+                  </Text>
+                  <Text variant="body1" weight="bold" color={COLORS.danger}>
+                    ₹{metrics.offlineRevenue.toLocaleString("en-IN")}
                   </Text>
                 </View>
               </View>
@@ -270,21 +270,24 @@ export const SportsDashboardScreen = () => {
             </Text>
             <View style={styles.graphContainer}>
               <View style={styles.yAxis}>
-                {Array.from({ length: 9 }, (_, i) =>
-                  Math.round((metrics.maxBookingValue / 8) * (8 - i)),
+                {Array.from({ length: 5 }, (_, i) =>
+                  Math.round((metrics.maxBookingValue / 4) * (4 - i)),
                 ).map((val, idx) => (
-                  <Text key={idx} variant="body2" weight="medium" style={styles.yAxisText}>
+                  <Text key={idx} variant="caption" weight="medium" style={styles.yAxisText}>
                     {val}
                   </Text>
                 ))}
               </View>
-              <View style={styles.chartArea}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chartArea}>
                 {metrics.bookingGraphData.map((item, index) => {
                   const heightPct = (item.value / (metrics.maxBookingValue || 1)) * 100;
                   return (
                     <View key={index} style={styles.barColumn}>
                       <View style={styles.barTrack}>
-                        <View style={[styles.barFill, { height: `${heightPct}%` }]} />
+                        <View style={[styles.barFill, { height: `${Math.max(heightPct, 2)}%` }]} />
                       </View>
                       <Text variant="caption" weight="medium" style={styles.xLabelDate}>
                         {item.date}
@@ -299,7 +302,7 @@ export const SportsDashboardScreen = () => {
                     </View>
                   );
                 })}
-              </View>
+              </ScrollView>
             </View>
 
             {/* Revenue Graph */}
@@ -307,23 +310,27 @@ export const SportsDashboardScreen = () => {
               REVENUE GRAPH
             </Text>
             <View style={styles.revenueGraphContainer}>
-              {metrics.revenueGraphData.map((item, index) => (
-                <View key={index} style={styles.revenueGraphRow}>
-                  <Text variant="body2" weight="semiBold" style={styles.revenueDateLabel}>
-                    {item.date}
-                  </Text>
-                  <View style={styles.revenueBarContainer}>
-                    <View style={[styles.revenueBarTrack, { width: item.fillPct as any }]}>
-                      <Text
-                        variant="caption"
-                        weight="semiBold"
-                        color={item.isBlue ? COLORS.primary : "#00B562"}>
-                        {item.value}
-                      </Text>
+              {metrics.revenueGraphData.length > 0 ? (
+                metrics.revenueGraphData.map((item, index) => (
+                  <View key={index} style={styles.revenueGraphRow}>
+                    <Text variant="caption" weight="semiBold" style={styles.revenueDateLabel}>
+                      {item.date}
+                    </Text>
+                    <View style={styles.revenueBarContainer}>
+                      <View style={[styles.revenueBarTrack, { width: item.fillPct as any }]}>
+                        <Text
+                          variant="caption"
+                          weight="semiBold"
+                          color={item.isBlue ? COLORS.primary : "#00B562"}>
+                          ₹{item.rawAmount}
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                ))
+              ) : (
+                <Text style={styles.emptyStateText}>No revenue data available for this range.</Text>
+              )}
             </View>
           </>
         )}
@@ -371,7 +378,6 @@ const styles = StyleSheet.create({
     borderRadius: ms(10),
     padding: hs(12),
     marginBottom: vs(20),
-    justifyContent: "space-between",
   },
   revenueSummaryCard: { backgroundColor: "transparent", justifyContent: "center" },
   totalBlock: {
@@ -397,7 +403,8 @@ const styles = StyleSheet.create({
     height: ms(100),
     justifyContent: "center",
     alignItems: "center",
-    marginRight: hs(30),
+    marginRight: hs(20),
+    marginLeft: hs(10),
   },
   donutRing: {
     position: "absolute",
@@ -406,7 +413,7 @@ const styles = StyleSheet.create({
     borderRadius: ms(50),
     borderWidth: ms(4),
   },
-  donutRingBase: { borderColor: COLORS.primary },
+  donutRingBase: { borderColor: COLORS.danger },
   donutRingOver: {
     position: "absolute",
     width: ms(100),
@@ -416,7 +423,7 @@ const styles = StyleSheet.create({
     borderTopColor: "transparent",
     borderLeftColor: "transparent",
   },
-  donutRingDark: { borderColor: "#001C65", transform: [{ rotate: "45deg" }] },
+  donutRingOnline: { borderColor: COLORS.primary, transform: [{ rotate: "45deg" }] },
   donutInner: {
     width: ms(92),
     height: ms(92),
@@ -434,15 +441,16 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: COLORS.border.navBar,
     height: vs(200),
+    paddingBottom: vs(40), // Offset for x-axis labels
   },
-  yAxisText: { textAlign: "right", fontSize: fs(12) },
+  yAxisText: { textAlign: "right", fontSize: fs(10), minWidth: hs(20) },
   chartArea: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
     paddingLeft: hs(14),
+    paddingRight: hs(20),
+    flexDirection: "row",
+    gap: hs(12),
   },
-  barColumn: { alignItems: "center", width: hs(28) },
+  barColumn: { alignItems: "center", width: hs(35) },
   barTrack: { width: "100%", height: vs(200), justifyContent: "flex-end" },
   barFill: { width: "100%", backgroundColor: COLORS.primary, borderRadius: ms(4) },
   xLabelDate: { marginTop: vs(8), fontSize: fs(10) },

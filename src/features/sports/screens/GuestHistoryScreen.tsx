@@ -136,26 +136,37 @@ export const GuestHistoryScreen = () => {
         <Text variant="body2" weight="bold" style={styles.sectionLabel}>
           {activeTab.toUpperCase()} BOOKINGS
         </Text>
-        {Object.keys(groupedHistory).map(month => (
-          <React.Fragment key={month}>
-            <Text variant="body2" weight="bold" style={styles.monthHeader}>
-              {month}
+        {Object.keys(groupedHistory).length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text variant="body1" color={COLORS.text.muted}>
+              No {activeTab} bookings found for this guest.
             </Text>
-            {groupedHistory[month].map(item => (
-              <BookingCard
-                key={item.id}
-                name={item.venue_name}
-                subtitle={item.vertical === "staycation" ? "Staycation Booking" : "Sports Booking"}
-                date={item.display_date}
-                time={item.display_time}
-                price={`₹${item.total_amount}`}
-                // Use 'as any' to bypass the strict prop type constraint
-                status={(item.booking_status === "cancelled" ? "Cancelled" : item.status) as any}
-                hideCallButton={true}
-              />
-            ))}
-          </React.Fragment>
-        ))}
+          </View>
+        ) : (
+          Object.keys(groupedHistory).map(month => (
+            <React.Fragment key={month}>
+              <Text variant="body2" weight="bold" style={styles.monthHeader}>
+                {month}
+              </Text>
+              {groupedHistory[month].map(item => (
+                <BookingCard
+                  key={item.id}
+                  name={item.venue_name}
+                  subtitle={
+                    item.vertical === "staycation" ? "Staycation Booking" : "Sports Booking"
+                  }
+                  date={item.display_date}
+                  time={item.display_time}
+                  price={`₹${item.total_amount}`}
+                  isDisabled={activeTab === "past"}
+                  // Use 'as any' to bypass the strict prop type constraint
+                  status={(item.booking_status === "cancelled" ? "Cancelled" : item.status) as any}
+                  hideCallButton={true}
+                />
+              ))}
+            </React.Fragment>
+          ))
+        )}
       </View>
       <View style={{ height: vs(40) }} />
     </ScreenContainer>
@@ -186,6 +197,11 @@ const styles = StyleSheet.create({
   },
   statTabActive: { backgroundColor: COLORS.primary },
   listSection: { width: "100%" },
+  emptyState: {
+    paddingVertical: vs(40),
+    alignItems: "center",
+    justifyContent: "center",
+  },
   sectionLabel: { color: COLORS.text.primary, marginBottom: vs(16), letterSpacing: 0.5 },
   monthHeader: { color: COLORS.text.primary, marginVertical: vs(10) },
 });

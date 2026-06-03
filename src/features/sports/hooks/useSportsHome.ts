@@ -39,6 +39,18 @@ export interface BookingData {
   isDisabled?: boolean;
   isPaymentPending?: boolean;
   startTimeRaw?: string;
+  endTimeRaw?: string;
+  notes?: string;
+  idChain: string[];
+  parent_booking_id?: string | null;
+  booking_group_id?: string | null;
+  sports_booking_type?: string;
+  sequence_number?: number;
+  rawSubtotal?: number;
+  rawPaidAmount?: number;
+  rawDiscountAmount?: number;
+  isOnline?: boolean;
+  isPickleball?: boolean;
 }
 
 const getLocalDateString = (date: Date) => {
@@ -77,6 +89,16 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [bookings, setBookings] = useState<BookingData[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
+
+  // Reset state when venue or category changes to avoid stale data leakage
+  useEffect(() => {
+    setLoading(true);
+    setVenue(null);
+    setGrounds([]);
+    setActiveGroundId("");
+    setSlots([]);
+    setBookings([]);
+  }, [initialVenueId, category]);
 
   // Auto-select the first available category if the current one isn't valid for this vendor
   useEffect(() => {
@@ -236,7 +258,9 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           });
 
           // DETERMINING OFFLINE VS ONLINE
-          const isOffline = !!b.guest_name && b.guest_name !== "null";
+          const isOnline = b.booking_source === "online";
+          const isOffline = !isOnline;
+          const isPickleball = category.toLowerCase() === "pickleball";
 
           // TIME CALCULATIONS (WITH MIDNIGHT FIX)
           let [endH, endM] = b.end_time.split(":").map(Number);
@@ -255,56 +279,116 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           const finalName = isOffline ? b.guest_name : b.full_name || "Guest User";
           const finalPhone = isOffline ? b.guest_phone || "" : b.phone || "";
 
+          // For online Pickleball, use subtotal. Otherwise use paid_amount + discount_amount.
+          const displayPrice =
+            isOnline && isPickleball
+              ? Number(b.subtotal || 0)
+              : Number(b.paid_amount || 0) + Number(b.discount_amount || 0);
+
           return {
             id: b.id,
             name: finalName,
             phone: finalPhone,
             date: formattedDate,
             time: `${formatTime(b.start_time)} - ${formatTime(b.end_time)}`,
-            price: `₹${b.paid_amount || 0}`,
-            status: isOffline ? "Offline" : "Online",
+            price: `₹${displayPrice}`,
+            status: isOnline ? "Online" : "Offline",
             avatarUrl: b.avatar_url,
             isOfflineRecord: isOffline,
             isDisabled,
             isPaymentPending: isDisabled && isUnpaid,
             startTimeRaw: b.start_time,
+            endTimeRaw: b.end_time,
+            notes: b.notes,
+            idChain: [b.id],
+            parent_booking_id: b.parent_booking_id,
+            booking_group_id: b.booking_group_id,
+            sports_booking_type: b.sports_booking_type,
+            sequence_number: b.sequence_number,
+            rawSubtotal: Number(b.subtotal || 0), // Keep raw values for merged calculation
+            rawPaidAmount: Number(b.paid_amount || 0),
+            rawDiscountAmount: Number(b.discount_amount || 0),
+            isOnline,
+            isPickleball,
           };
         });
 
-      // Sort: Upcoming bookings first, Passed (isDisabled) bookings at the bottom.
-      // Maintain chronological order within each group.
+      // Sort chronological by start time
       const sortedBookings = [...formattedBookings].sort((a, b) => {
-        if (a.isDisabled !== b.isDisabled) {
-          return a.isDisabled ? 1 : -1; // non-disabled (upcoming) first
-        }
         return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
       });
 
-      // // Deduplicate ghost bookings by slot time
-      const uniqueBookings = Array.from(
-        new Map(sortedBookings.map(b => [b.startTimeRaw, b])).values(),
-      );
-      const merged = uniqueBookings.reduce((acc, current) => {
-        const existing = acc.find(b => b.phone === current.phone && b.date === current.date);
+      // Refined Merge: Use database-backed grouping IDs
+      const merged = sortedBookings.reduce((acc, current) => {
+        const existing = acc.find(b => {
+          // 1. Group by booking_group_id (User multi-slot)
+          if (
+            current.booking_group_id &&
+            b.booking_group_id === current.booking_group_id &&
+            b.date === current.date
+          ) {
+            return true;
+          }
+
+          // 2. Group by parent_booking_id (Vendor extension)
+          const existingParentId = b.parent_booking_id || b.id;
+          if (
+            current.parent_booking_id &&
+            existingParentId === current.parent_booking_id &&
+            b.date === current.date
+          ) {
+            return true;
+          }
+
+          return false;
+        });
+
         if (existing) {
           // Merge the time and price
+          // We assume sortedBookings is chronological, so we just update the end time
           existing.time = existing.time.replace(/ - .*/, "") + " - " + current.time.split(" - ")[1];
-          existing.price = `₹${
-            Number(existing.price.replace("₹", "")) + Number(current.price.replace("₹", ""))
-          }`;
+          existing.endTimeRaw = current.endTimeRaw;
+
+          const isOnlinePickleball = existing.isOnline && existing.isPickleball;
+
+          // Recalculate summed amounts
+          const newSumSubtotal = (existing.rawSubtotal || 0) + (current.rawSubtotal || 0);
+          const newSumPaid = (existing.rawPaidAmount || 0) + (current.rawPaidAmount || 0);
+          const newSumDiscount =
+            (existing.rawDiscountAmount || 0) + (current.rawDiscountAmount || 0);
+
+          existing.rawSubtotal = newSumSubtotal;
+          existing.rawPaidAmount = newSumPaid;
+          existing.rawDiscountAmount = newSumDiscount;
+
+          // Update display price based on logic
+          const finalDisplayPrice = isOnlinePickleball
+            ? newSumSubtotal
+            : newSumPaid + newSumDiscount;
+          existing.price = `₹${finalDisplayPrice}`;
+
+          existing.idChain.push(current.id);
         } else {
           acc.push(current);
         }
         return acc;
       }, [] as BookingData[]);
 
-      setBookings(merged);
+      // Finally, sort by status (upcoming first)
+      const finalSorted = [...merged].sort((a, b) => {
+        if (a.isDisabled !== b.isDisabled) {
+          return a.isDisabled ? 1 : -1;
+        }
+        return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
+      });
+
+      setBookings(finalSorted);
     } catch (error) {
       console.error("Error fetching bookings:", error);
     } finally {
       setBookingsLoading(false);
     }
-  }, [currentVenueId, activeGroundId, selectedDate]);
+  }, [currentVenueId, activeGroundId, selectedDate, category]);
 
   useEffect(() => {
     if (initialVenueId) fetchVenueDetails();

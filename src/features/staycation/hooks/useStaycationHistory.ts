@@ -9,7 +9,13 @@ import { StaycationBooking } from "../types/staycation.types";
 // Helper to format Date to YYYY-MM-DD
 const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
-export type DateFilterOption = "all" | "3_months" | "6_months" | "9_months" | "custom";
+export type DateFilterOption =
+  | "all"
+  | "yesterday"
+  | "3_months"
+  | "6_months"
+  | "9_months"
+  | "custom";
 export const useStaycationHistory = (
   serviceId?: string,
   dateFilter: DateFilterOption = "all",
@@ -81,7 +87,9 @@ export const useStaycationHistory = (
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayStr = formatDate(today);
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const yesterdayStr = formatDate(yesterday);
 
       let query = supabase
         .from("staycation_bookings")
@@ -90,7 +98,10 @@ export const useStaycationHistory = (
           id,
           booking_type,
           booking_status,
+          booking_source,
           platform_fee,
+          discount_amount,
+          subtotal,
           check_in_date,
           check_out_date,
           guest_count,
@@ -103,7 +114,8 @@ export const useStaycationHistory = (
           profiles:user_id ( full_name, phone, avatar_url )
         `,
         )
-        .eq("venue_id", venueData.id);
+        .eq("venue_id", venueData.id)
+        .lte("check_in_date", yesterdayStr);
 
       // Base History Filter: Show all bookings except cancelled ones
       const historyFilterStr = `booking_status.neq.cancelled`;
@@ -111,9 +123,12 @@ export const useStaycationHistory = (
       // Apply Date Range Filters
       if (dateFilter !== "all") {
         let fromDate = new Date();
-        let toDate = new Date();
+        let toDate = new Date(yesterday); // Default end range to yesterday for history
 
-        if (dateFilter === "3_months") {
+        if (dateFilter === "yesterday") {
+          fromDate = new Date(yesterday);
+          toDate = new Date(yesterday);
+        } else if (dateFilter === "3_months") {
           fromDate.setMonth(fromDate.getMonth() - 3);
         } else if (dateFilter === "6_months") {
           fromDate.setMonth(fromDate.getMonth() - 6);
@@ -122,20 +137,23 @@ export const useStaycationHistory = (
         } else if (dateFilter === "custom" && customRange) {
           fromDate = customRange.start;
           toDate = customRange.end;
+
+          // CAP to yesterday to prevent future bookings showing in history
+          if (toDate > yesterday) {
+            toDate = new Date(yesterday);
+          }
         }
 
         const fromStr = formatDate(fromDate);
         const toStr = formatDate(toDate);
 
         // Apply AND condition using method chaining correctly
-        // We use or() to ensure it's a history booking, AND gte/lte for date ranges
-        // Note: Chaining .or() with .gte()/.lte() forms an implicit AND at the root level in PostgREST.
         query = query
           .or(historyFilterStr)
           .gte("check_in_date", fromStr)
           .lte("check_in_date", toStr);
       } else {
-        // No date range applied, just the base History filter
+        // No date range applied, but base LTE condition on check_in_date already restricts to yesterday
         query = query.or(historyFilterStr);
       }
 
@@ -156,22 +174,16 @@ export const useStaycationHistory = (
         const checkOutStr = booking.check_out_date;
         const profile = Array.isArray(booking.profiles) ? booking.profiles[0] : booking.profiles;
 
-        const isOnline =
-          booking.booking_type === "online" || (parseFloat(booking.platform_fee) || 0) > 0;
+        const isOnline = booking.booking_source === "online" || !!booking.user_id;
 
         let statusTag: StaycationBooking["status"] = isOnline ? "Online" : "Offline";
 
         if (booking.booking_status === "cancelled") {
           statusTag = "Cancelled";
-        } else if (booking.paid_amount >= booking.total_amount) {
-          statusTag = "Online";
-        } else if (booking.paid_amount > 0) {
-          statusTag = "Offline";
         }
 
-        if (checkOutStr < todayStr && booking.booking_status !== "cancelled") {
-          statusTag = "Complete";
-        }
+        const rawSubtotal = parseFloat(booking.subtotal) || 0;
+        const rawPaid = parseFloat(booking.paid_amount) || 0;
 
         formattedBookings.push({
           id: booking.id,
@@ -185,7 +197,7 @@ export const useStaycationHistory = (
           guestCount: booking.guest_count,
           roomId: booking.room_id,
           vendorPayout: parseFloat(booking.vendor_payout) || 0,
-          paidAmount: parseFloat(booking.paid_amount) || 0,
+          paidAmount: isOnline ? rawSubtotal : rawPaid,
         });
       });
 
@@ -201,7 +213,7 @@ export const useStaycationHistory = (
     fetchHistoryData();
   }, [fetchHistoryData]);
 
-  // Helper to group by month if needed, but UI expects grouping by date
+  // Helper to group by month for History View
   const getGroupedBookings = (activeRoomName: string) => {
     const activeRoom = rooms.find(r => r.name === activeRoomName);
 
@@ -210,27 +222,44 @@ export const useStaycationHistory = (
       filtered = allBookings.filter(b => b.roomId === activeRoom.id);
     }
 
-    const grouped: Record<string, { bookings: typeof filtered; settlement: number }> = {};
+    const grouped: Record<
+      string,
+      { bookings: typeof filtered; settlement: number; rawDate: number }
+    > = {};
     filtered.forEach(booking => {
       const dateObj = new Date(booking.checkIn);
-      const headerDate = dateObj.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
+      // Group by Month e.g. "August 2026"
+      const headerMonth = dateObj.toLocaleDateString("en-GB", {
+        month: "long",
         year: "numeric",
       });
 
-      if (!grouped[headerDate]) {
-        grouped[headerDate] = { bookings: [], settlement: 0 };
+      // We need a sortable key (first day of the month)
+      const rawMonth = new Date(dateObj.getFullYear(), dateObj.getMonth(), 1).getTime();
+
+      if (!grouped[headerMonth]) {
+        grouped[headerMonth] = { bookings: [], settlement: 0, rawDate: rawMonth };
       }
-      grouped[headerDate].bookings.push(booking);
-      grouped[headerDate].settlement += booking.vendorPayout;
+      grouped[headerMonth].bookings.push(booking);
+
+      const amount = parseFloat(booking.amount) || 0;
+      if (booking.status === "Online") {
+        // ONLINE: Deduct 7% (5% commission + 2% handling fee)
+        grouped[headerMonth].settlement += amount * 0.93;
+      } else {
+        // OFFLINE: No commission deducted
+        grouped[headerMonth].settlement += amount;
+      }
     });
 
-    return Object.keys(grouped).map(dateStr => ({
-      date: dateStr,
-      settlement: grouped[dateStr].settlement,
-      data: grouped[dateStr].bookings,
-    }));
+    return Object.keys(grouped)
+      .map(monthStr => ({
+        date: monthStr, // UI uses this as the section header text
+        settlement: grouped[monthStr].settlement,
+        data: grouped[monthStr].bookings,
+        rawDate: grouped[monthStr].rawDate,
+      }))
+      .sort((a, b) => b.rawDate - a.rawDate);
   };
 
   return {

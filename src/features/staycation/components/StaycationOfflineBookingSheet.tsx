@@ -22,6 +22,10 @@ import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/dat
 import { supabase } from "@/lib/supabase";
 import { useCreateStaycationOfflineBooking } from "../hooks/useCreateStaycationOfflineBooking";
 
+import { PermissionsAndroid, Platform } from "react-native";
+import CallLogs from "react-native-call-log";
+import { Download } from "lucide-react-native"; // Make sure to import Download or another icon
+
 interface StaycationOfflineBookingSheetProps {
   visible: boolean;
   onClose: () => void;
@@ -63,6 +67,7 @@ export const StaycationOfflineBookingSheet = ({
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [lastFetchedNumber, setLastFetchedNumber] = useState<string | null>(null);
   const [totalPayment, setTotalPayment] = useState("");
   const [advancePaid, setAdvancePaid] = useState("");
 
@@ -254,13 +259,6 @@ export const StaycationOfflineBookingSheet = ({
       }
 
       // Check for Closed Dates
-      const { data: closedDates } = await supabase
-        .from("venue_closed_dates")
-        .select("start_date, end_date")
-        .eq("venue_id", venueId)
-        .lt("start_date", dOutStr)
-        .gt("end_date", dInStr); // This filter might be tricky depending on how end_date is stored (it can be null)
-
       // Let's just fetch all and check overlap manually to be safe if query is complex
       const { data: allClosed } = await supabase
         .from("venue_closed_dates")
@@ -439,7 +437,29 @@ export const StaycationOfflineBookingSheet = ({
     setName("");
     setPhone("");
     setAdvancePaid("");
+    setLastFetchedNumber(null);
   }, [isFarmhouse, visible]);
+
+  useEffect(() => {
+    const checkPermissionAndFetch = async () => {
+      if (Platform.OS !== "android" || !visible) return;
+      try {
+        const hasPermission = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+        );
+        if (hasPermission) {
+          const logs = await CallLogs.load(1);
+          if (logs && logs.length > 0) {
+            const rawNumber = logs[0].phoneNumber.replace(/[^\d+]/g, "");
+            setLastFetchedNumber(rawNumber);
+          }
+        }
+      } catch (err) {
+        // Silent catch for auto-fetch
+      }
+    };
+    checkPermissionAndFetch();
+  }, [visible]);
 
   // Add this effect to StaycationOfflineBookingSheet.tsx
   useEffect(() => {
@@ -511,6 +531,10 @@ export const StaycationOfflineBookingSheet = ({
   };
 
   const handleBookNow = async () => {
+    if (isLoading) {
+      console.warn("[DEBUG: UI] Prevented double submission!");
+      return;
+    }
     if (!venueId) {
       Alert.alert("Error", "Venue information missing.");
       return;
@@ -538,8 +562,31 @@ export const StaycationOfflineBookingSheet = ({
       }
     }
 
-    const finalName = name.trim() || "Offline Guest";
-    const finalPhone = phone.trim() || "";
+    const finalName = name.trim();
+    const finalPhone = phone.trim();
+
+    if (!finalName) {
+      Alert.alert("Error", "Please enter the guest name.");
+      return;
+    }
+
+    if (!finalPhone || finalPhone.replace(/[^\d]/g, "").length !== 10) {
+      Alert.alert("Error", "Please enter a valid 10-digit mobile number.");
+      return;
+    }
+
+    if (!totalPayment.trim() || isNaN(parseFloat(totalPayment))) {
+      Alert.alert("Error", "Please enter a valid total payment amount.");
+      return;
+    }
+
+    const numericTotal = parseFloat(totalPayment);
+    const numericAdvance = parseFloat(advancePaid || "0");
+
+    if (numericAdvance > numericTotal) {
+      Alert.alert("Error", "Advance paid cannot exceed total payment.");
+      return;
+    }
 
     const result = await createBooking({
       venueId,
@@ -592,7 +639,13 @@ Thank you for booking with Bookr!`;
           setShowDatePicker(null);
           return;
         }
-        setCheckInDate(selectedDate);
+        const newCheckIn = selectedDate;
+        const nextDay = new Date(selectedDate);
+        nextDay.setDate(nextDay.getDate() + 1); // Force checkout to be at least tomorrow
+
+        setCheckInDate(newCheckIn);
+        setCheckOutDate(nextDay);
+        // setCheckInDate(selectedDate);
         const tomorrow = new Date(selectedDate);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -643,6 +696,41 @@ Thank you for booking with Bookr!`;
     setShowDatePicker(null);
   };
 
+  const fetchLatestCall = async () => {
+    if (Platform.OS !== "android") {
+      Alert.alert("Not Supported", "Auto-fetching call logs is only available on Android.");
+      return;
+    }
+
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+        {
+          title: "Call Log Permission",
+          message:
+            "Bookr needs access to your call logs to automatically fill in guest phone numbers.",
+          buttonNeutral: "Ask Me Later",
+          buttonNegative: "Cancel",
+          buttonPositive: "OK",
+        },
+      );
+
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        // Fetch only the 1 most recent call
+        const logs = await CallLogs.load(1);
+        if (logs && logs.length > 0) {
+          // Format the number to remove spaces/dashes and set it
+          const rawNumber = logs[0].phoneNumber.replace(/[^\d+]/g, "");
+          setLastFetchedNumber(rawNumber);
+        } else {
+          Alert.alert("No Calls", "No recent calls found in your log.");
+        }
+      }
+    } catch (e) {
+      Alert.alert("Error", "Failed to access call logs.");
+    }
+  };
+
   return (
     <>
       <Modal
@@ -665,23 +753,25 @@ Thank you for booking with Bookr!`;
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}>
               {/* Name */}
-              <View style={styles.inputGroup}>
-                <View style={styles.labelRow}>
-                  <User size={ms(20)} color={COLORS.text.primary} />
-                  <Text weight="medium" style={styles.label}>
-                    Name
-                  </Text>
+              {phone.length >= 10 && (
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelRow}>
+                    <User size={ms(20)} color={COLORS.text.primary} />
+                    <Text weight="medium" style={styles.label}>
+                      Name
+                    </Text>
+                  </View>
+                  <View style={styles.inputWrapper}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Yash"
+                      placeholderTextColor={COLORS.text.muted}
+                      value={name}
+                      onChangeText={setName}
+                    />
+                  </View>
                 </View>
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Yash"
-                    placeholderTextColor={COLORS.text.muted}
-                    value={name}
-                    onChangeText={setName}
-                  />
-                </View>
-              </View>
+              )}
 
               {/* Mobile No */}
               <View style={styles.inputGroup}>
@@ -698,9 +788,40 @@ Thank you for booking with Bookr!`;
                     placeholderTextColor={COLORS.text.muted}
                     keyboardType="phone-pad"
                     value={phone}
-                    onChangeText={setPhone}
+                    onChangeText={text => {
+                      const clean = text.replace(/[^\d]/g, "");
+                      setPhone(clean);
+                      if (clean.length < 10) {
+                        setName("");
+                      }
+                    }}
                   />
                 </View>
+                {Platform.OS === "android" && (
+                  <View style={styles.fetchContainerBelow}>
+                    {lastFetchedNumber && phone !== lastFetchedNumber ? (
+                      <TouchableOpacity
+                        style={styles.pillContainer}
+                        onPress={() => setPhone(lastFetchedNumber)}
+                        activeOpacity={0.7}>
+                        <Phone size={ms(12)} color={COLORS.text.inverse} />
+                        <Text variant="body2" color={COLORS.text.inverse} weight="semiBold">
+                          {lastFetchedNumber}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : !lastFetchedNumber ? (
+                      <TouchableOpacity
+                        onPress={fetchLatestCall}
+                        style={styles.fetchButtonBelow}
+                        activeOpacity={0.7}>
+                        <Download size={ms(14)} color={COLORS.primary} />
+                        <Text variant="body2" color={COLORS.primary} weight="semiBold">
+                          Fetch Last Call
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                )}
               </View>
 
               {/* Booking For & Type (OR Units) */}
@@ -928,7 +1049,15 @@ Thank you for booking with Bookr!`;
                       placeholderTextColor="#8C8C8C"
                       keyboardType="numeric"
                       value={advancePaid}
-                      onChangeText={setAdvancePaid}
+                      onChangeText={text => {
+                        const val = parseFloat(text) || 0;
+                        const total = parseFloat(totalPayment) || 0;
+                        if (val > total) {
+                          setAdvancePaid(total.toString());
+                        } else {
+                          setAdvancePaid(text);
+                        }
+                      }}
                     />
                   </View>
                 </View>
@@ -1036,7 +1165,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(14),
+    fontSize: fs(18),
     color: COLORS.text.primary,
     padding: 0,
     margin: 0,
@@ -1056,6 +1185,25 @@ const styles = StyleSheet.create({
   guestCountRight: { flexDirection: "row", alignItems: "center", gap: hs(6) },
   guestCountNum: { fontSize: fs(14), color: COLORS.text.primary },
   extraChargeText: { fontSize: fs(12), color: COLORS.danger, marginTop: vs(2), textAlign: "right" },
+  fetchContainerBelow: {
+    marginTop: vs(4),
+    flexDirection: "row",
+    justifyContent: "flex-start",
+  },
+  pillContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(6),
+    borderRadius: ms(20),
+    gap: hs(6),
+  },
+  fetchButtonBelow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(4),
+  },
   bookNowButton: {
     backgroundColor: "#000000",
     borderRadius: ms(10),

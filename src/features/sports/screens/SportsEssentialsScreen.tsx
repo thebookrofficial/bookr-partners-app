@@ -6,7 +6,7 @@ import { View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "re
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
-import { ChevronRight, Files, Ban } from "lucide-react-native";
+import { ChevronRight, Files, Ban, Banknote } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
@@ -32,33 +32,22 @@ export const SportsEssentialsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, "SportsEssentials">>();
 
-  // Extract initial serviceId and category
-  let venueId = route.params?.serviceId;
-  let routeCategory = route.params?.category;
+  const { selectedCategories, setServiceCategory, activeServiceId } = useServiceStore();
 
-  if (!venueId) {
-    const parentState = navigation.getParent()?.getState();
-    const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
-    const tabParams = tabRoute?.params as any;
-    venueId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
-    routeCategory = routeCategory || tabParams?.category || tabParams?.params?.category;
-  }
+  // 1. Get Venue ID (Priority: Route -> Store)
+  const venueId = route.params?.serviceId || activeServiceId;
 
-  // --- UI STATES ---
-  const { selectedCategories, setServiceCategory } = useServiceStore();
+  // 2. Get Category (Priority: Route -> Store)
+  const routeCategory = route.params?.category;
+  const storedCategory = selectedCategories[venueId];
+  const selectedCategory = routeCategory || storedCategory || "Football";
 
-  const lastRouteCategory = React.useRef<string | undefined>(undefined);
-
+  // Sync route param with store if we arrived via a deep link or specific tab click
   useEffect(() => {
-    if (routeCategory && routeCategory !== lastRouteCategory.current) {
-      lastRouteCategory.current = routeCategory;
-      if (selectedCategories[venueId] !== routeCategory) {
-        setServiceCategory(venueId, routeCategory);
-      }
+    if (routeCategory && routeCategory !== storedCategory) {
+      setServiceCategory(venueId, routeCategory);
     }
-  }, [routeCategory, venueId, setServiceCategory, selectedCategories]);
-
-  const selectedCategory = selectedCategories[venueId] || routeCategory || "Football";
+  }, [routeCategory, venueId, storedCategory, setServiceCategory]);
 
   // --- DYNAMIC VENUE STATES ---
   const [currentVenueId, setCurrentVenueId] = useState<string>("");
@@ -178,6 +167,15 @@ export const SportsEssentialsScreen = () => {
                 Alert.alert("No Ground Found", "We couldn't find a sports ground for this venue.");
               }
             }}
+          />
+          <EssentialActionRow
+            title="Payouts"
+            icon={Banknote}
+            onPress={() =>
+              navigation.navigate("Payouts", {
+                venueId: currentVenueId,
+              })
+            }
           />
           {/* 
           <EssentialActionRow title="Offers" icon={CalendarDays} onPress={() => {}} />

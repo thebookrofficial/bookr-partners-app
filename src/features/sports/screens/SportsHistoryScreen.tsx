@@ -2,7 +2,14 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, TextInput } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -21,9 +28,12 @@ import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.
 // ==========================================
 // 1. NEW HISTORY CARD
 // ==========================================
-const HistoryCard = ({ name, phone, time, price, status }: any) => {
+const HistoryCard = ({ name, phone, time, price, status, onPress }: any) => {
+  const isOnline = status === "Online";
+  const statusColor = isOnline ? COLORS.primary : COLORS.danger;
+
   return (
-    <View style={styles.cardContainer}>
+    <TouchableOpacity style={styles.cardContainer} activeOpacity={0.7} onPress={onPress}>
       <View style={styles.avatarCircle} />
       <View style={styles.cardInfoCol}>
         <View style={styles.cardHeaderRow}>
@@ -36,7 +46,7 @@ const HistoryCard = ({ name, phone, time, price, status }: any) => {
           </View>
           <View style={styles.priceStatusCol}>
             <Text style={styles.cardPrice}>{price}</Text>
-            <Text style={styles.cardStatus}>{status}</Text>
+            <Text style={[styles.cardStatus, { color: statusColor }]}>{status}</Text>
           </View>
         </View>
         <View style={styles.timeRow}>
@@ -44,37 +54,25 @@ const HistoryCard = ({ name, phone, time, price, status }: any) => {
           <Text style={styles.cardTime}>{time}</Text>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
 // ==========================================
 // 2. HEADERS
 // ==========================================
-const MonthSectionHeader = ({
-  month,
-  totalSettlement,
-}: {
-  month: string;
-  totalSettlement: number;
-}) => (
+const MonthSectionHeader = ({ month }: { month: string }) => (
   <View style={styles.monthHeaderRow}>
     <Text style={styles.monthText}>{month}</Text>
-    <View style={styles.monthSettlementContainer}>
-      <Text style={styles.monthSettlementLabel}>Total:</Text>
-      <Text style={styles.monthSettlementAmount}>₹{totalSettlement}</Text>
-    </View>
   </View>
 );
 
 const DateSectionHeader = ({
   date,
-  settlement,
   isExpanded,
   onToggle,
 }: {
   date: string;
-  settlement: number;
   isExpanded: boolean;
   onToggle: () => void;
 }) => (
@@ -89,11 +87,6 @@ const DateSectionHeader = ({
         style={{ transform: [{ rotate: isExpanded ? "180deg" : "0deg" }] }}
       />
     </TouchableOpacity>
-
-    <View style={styles.settlementRight}>
-      <Text style={styles.datePriceText}>₹{settlement}</Text>
-      <Text style={styles.dateSettlementLabel}>Settlement</Text>
-    </View>
   </View>
 );
 
@@ -104,32 +97,22 @@ export const SportsHistoryScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, any>>();
 
-  // Extract initial serviceId and category gracefully
-  let serviceId = route.params?.serviceId;
-  let routeCategory = route.params?.category;
+  const { selectedCategories, setServiceCategory, activeServiceId } = useServiceStore();
 
-  if (!serviceId) {
-    const parentState = navigation.getParent()?.getState();
-    const tabRoute = parentState?.routes.find((r: any) => r.name === "SportsServiceTabs");
-    const params = (tabRoute?.params as any) || {};
-    serviceId = params.serviceId || params.params?.serviceId || "";
-    routeCategory = routeCategory || params.category || params.params?.category;
-  }
+  // 1. Get Service ID (Priority: Route -> Store)
+  const serviceId = route.params?.serviceId || activeServiceId;
 
-  const { selectedCategories, setServiceCategory } = useServiceStore();
+  // 2. Get Category (Priority: Route -> Store)
+  const routeCategory = route.params?.category;
+  const storedCategory = selectedCategories[serviceId];
+  const selectedCategory = routeCategory || storedCategory || "Football";
 
-  const lastRouteCategory = React.useRef<string | undefined>(undefined);
-
+  // Sync route param with store if we arrived via a deep link or specific tab click
   React.useEffect(() => {
-    if (routeCategory && routeCategory !== lastRouteCategory.current) {
-      lastRouteCategory.current = routeCategory;
-      if (selectedCategories[serviceId] !== routeCategory) {
-        setServiceCategory(serviceId, routeCategory);
-      }
+    if (routeCategory && routeCategory !== storedCategory) {
+      setServiceCategory(serviceId, routeCategory);
     }
-  }, [routeCategory, serviceId, setServiceCategory, selectedCategories]);
-
-  const selectedCategory = selectedCategories[serviceId] || routeCategory || "Football";
+  }, [routeCategory, serviceId, storedCategory, setServiceCategory]);
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -148,7 +131,7 @@ export const SportsHistoryScreen = () => {
   };
 
   // Pass dynamic IDs and filters to the updated hook
-  const { currentVenueId, historyGroups, loading } = useSportsHistory(
+  const { currentVenueId, historyGroups, loading, refetch } = useSportsHistory(
     serviceId,
     selectedCategory,
     searchQuery,
@@ -157,9 +140,27 @@ export const SportsHistoryScreen = () => {
   );
   const { activeVenueName } = useServiceStore();
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
+
   return (
-    <ScreenContainer backgroundColor={COLORS.background}>
-      <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[1]}>
+    <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={0}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[1]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }>
         {/* Header */}
         <View style={styles.headerZIndex}>
           <ServiceHeader title={activeVenueName} subtitle="History" />
@@ -195,10 +196,7 @@ export const SportsHistoryScreen = () => {
           ) : (
             historyGroups.map((monthGroup, mIndex) => (
               <View key={`month-${mIndex}`} style={styles.monthGroupContainer}>
-                <MonthSectionHeader
-                  month={monthGroup.month}
-                  totalSettlement={monthGroup.totalSettlement}
-                />
+                <MonthSectionHeader month={monthGroup.month} />
 
                 {monthGroup.days.map((dayGroup, dIndex) => {
                   const isCollapsed = !!collapsedDates[dayGroup.date];
@@ -206,7 +204,6 @@ export const SportsHistoryScreen = () => {
                     <View key={`day-${dIndex}`}>
                       <DateSectionHeader
                         date={dayGroup.date}
-                        settlement={dayGroup.settlement}
                         isExpanded={!isCollapsed}
                         onToggle={() => toggleDateAccordion(dayGroup.date)}
                       />
@@ -220,6 +217,9 @@ export const SportsHistoryScreen = () => {
                             time={booking.timeRanges}
                             price={`₹${booking.price}`}
                             status={booking.status}
+                            onPress={() =>
+                              navigation.navigate("SportsInvoice", { bookingId: booking.id })
+                            }
                           />
                         ))}
                     </View>

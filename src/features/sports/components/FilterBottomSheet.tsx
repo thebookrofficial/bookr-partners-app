@@ -8,8 +8,15 @@ import { X, Calendar } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import DateTimePicker from "@react-native-community/datetimepicker";
+// import { tr } from "zod/v4/locales";
 
-export type DateFilterOption = "all" | "3_months" | "6_months" | "9_months" | "custom";
+export type DateFilterOption =
+  | "all"
+  | "yesterday"
+  | "3_months"
+  | "6_months"
+  | "9_months"
+  | "custom";
 
 interface FilterBottomSheetProps {
   visible: boolean;
@@ -46,7 +53,6 @@ export const FilterBottomSheet = ({
   };
 
   const filterOptions: { label: string; value: DateFilterOption }[] = [
-    { label: "All Time", value: "all" },
     { label: "3 Months", value: "3_months" },
     { label: "6 Months", value: "6_months" },
     { label: "9 Months", value: "9_months" },
@@ -57,7 +63,12 @@ export const FilterBottomSheet = ({
     d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent={true}>
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
 

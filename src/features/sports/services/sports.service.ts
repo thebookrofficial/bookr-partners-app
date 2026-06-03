@@ -59,6 +59,7 @@ export const SportsService = {
       .select(
         `
         id, user_id, venue_id, slot_id, booking_status, subtotal, discount_amount, platform_fee, gateway_fee, total_amount, vendor_payout, paid_amount, guest_name, guest_phone, notes, created_at,
+        parent_booking_id, booking_group_id, sports_booking_type, sequence_number, booking_source,
         profiles ( full_name, phone, avatar_url ),
         sports_slots!inner ( id, start_time, end_time, slot_date, status, ground_id )
       `,
@@ -195,67 +196,148 @@ export const SportsService = {
     advancePaid: number;
     guestName: string;
     guestPhone: string;
+    bookingSource: string;
+    sportsBookingType: string;
   }) {
-    const { data: newSlot, error: insertError } = await supabase
-      .from("sports_slots")
-      .insert({
-        venue_id: params.venueId,
-        ground_id: params.groundId,
-        slot_date: params.dateStr,
-        start_time: params.startTime24,
-        end_time: params.endTime24,
-        price: params.numericTotal,
-        status: "booked",
-      })
-      .select("id")
-      .maybeSingle();
+    // 1. Calculate total hours
+    const startH = parseInt(params.startTime24.split(":")[0], 10);
+    const endH = parseInt(params.endTime24.split(":")[0], 10);
+    const totalHours = endH - startH;
 
-    let slotId = newSlot?.id;
+    if (totalHours <= 0) throw new Error("Invalid time range selected.");
 
-    // If insertion failed (e.g., slot already exists), fetch the existing slot
-    if (insertError || !slotId) {
-      const { data: foundSlot } = await supabase
+    const isMultiSlot = totalHours > 1;
+    const finalBookingType = isMultiSlot ? "multi_slot" : "standard";
+    const hourlyPrice = params.numericTotal / totalHours;
+    const hourlyAdvance = params.advancePaid / totalHours;
+
+    // Custom UUID generation for React Native compatibility
+    const generateUUID = () => {
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        /* eslint-disable no-bitwise */
+        const r = (Math.random() * 16) | 0;
+        const v = c === "x" ? r : (r & 0x3) | 0x8;
+        /* eslint-enable no-bitwise */
+        return v.toString(16);
+      });
+    };
+
+    // Use a proper UUID for multi-slot bookings to satisfy database constraints
+    const bookingGroupId = isMultiSlot ? generateUUID() : null;
+    let firstBookingId = "";
+
+    for (let i = 0; i < totalHours; i++) {
+      const currentStart = `${(startH + i).toString().padStart(2, "0")}:00:00`;
+      const currentEnd = `${(startH + i + 1).toString().padStart(2, "0")}:00:00`;
+
+      // a. Create/Resolve Slot
+      const { data: newSlot, error: insertError } = await supabase
         .from("sports_slots")
-        .select("id, status")
-        .eq("venue_id", params.venueId)
-        .eq("ground_id", params.groundId)
-        .eq("slot_date", params.dateStr)
-        .eq("start_time", params.startTime24)
-        .eq("end_time", params.endTime24)
+        .insert({
+          venue_id: params.venueId,
+          ground_id: params.groundId,
+          slot_date: params.dateStr,
+          start_time: currentStart,
+          end_time: currentEnd,
+          price: hourlyPrice,
+          status: "booked",
+        })
+        .select("id")
+        .maybeSingle();
+
+      let slotId = newSlot?.id;
+
+      if (insertError || !slotId) {
+        const { data: foundSlot } = await supabase
+          .from("sports_slots")
+          .select("id, status")
+          .eq("venue_id", params.venueId)
+          .eq("ground_id", params.groundId)
+          .eq("slot_date", params.dateStr)
+          .eq("start_time", currentStart)
+          .eq("end_time", currentEnd)
+          .single();
+
+        if (foundSlot && foundSlot.status !== "available") {
+          throw new Error(`Slot ${currentStart} is already taken or blocked.`);
+        }
+        slotId = foundSlot?.id;
+      }
+
+      if (!slotId) throw new Error(`Could not resolve slot for ${currentStart}`);
+
+      // b. Create Booking
+      const { data: booking, error: bookingError } = await supabase
+        .from("sports_bookings")
+        .insert({
+          user_id: null,
+          guest_name: params.guestName,
+          guest_phone: params.guestPhone,
+          venue_id: params.venueId,
+          slot_id: slotId,
+          booking_status: "confirmed",
+          subtotal: hourlyPrice,
+          discount_amount: 0,
+          platform_fee: 0,
+          gateway_fee: 0,
+          total_amount: hourlyPrice,
+          vendor_payout: hourlyPrice,
+          paid_amount: hourlyAdvance,
+          booking_source: params.bookingSource,
+          sports_booking_type: finalBookingType,
+          booking_group_id: bookingGroupId,
+          parent_booking_id: i === 0 ? null : firstBookingId,
+          sequence_number: i + 1,
+          notes: `Manual Offline Booking ${isMultiSlot ? `(Slot ${i + 1}/${totalHours})` : ""}`,
+        })
+        .select("id")
         .single();
 
-      // CRITICAL FIX: Removed the buggy `&& !insertError` check
-      if (foundSlot && foundSlot.status !== "available") {
-        throw new Error("This slot is already taken or blocked.");
-      }
-      slotId = foundSlot?.id;
+      if (bookingError) throw bookingError;
+      if (i === 0) firstBookingId = booking.id;
     }
 
-    if (!slotId) throw new Error("Could not resolve Slot ID.");
+    // --- NEW NOTIFICATION TRIGGER ---
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        // Fetch the vendor's device token
+        const { data: device } = await supabase
+          .from("user_devices")
+          .select("fcm_token")
+          .eq("user_id", session.user.id)
+          .order("last_seen_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-    const { data: booking, error: bookingError } = await supabase
-      .from("sports_bookings")
-      .insert({
-        user_id: null,
-        guest_name: params.guestName,
-        guest_phone: params.guestPhone,
-        venue_id: params.venueId,
-        slot_id: slotId,
-        booking_status: "confirmed",
-        subtotal: params.numericTotal,
-        discount_amount: 0,
-        platform_fee: 0,
-        gateway_fee: 0,
-        total_amount: params.numericTotal,
-        vendor_payout: params.numericTotal,
-        notes: `Manual Offline Booking`,
-        paid_amount: params.advancePaid,
-      })
-      .select("id")
-      .single();
+        if (device?.fcm_token) {
+          // 1. Insert into Queue (This triggers your Edge Function!)
+          await supabase.from("notification_queue").insert({
+            user_id: session.user.id,
+            fcm_token: device.fcm_token,
+            title: "Offline Booking Saved! 🎟️",
+            body: `Booking for ${params.guestName} is confirmed.`,
+            status: "pending",
+          });
 
-    if (bookingError) throw bookingError;
-    return booking.id;
+          // 2. Insert into History (For your in-app notification bell screen)
+          await supabase.from("user_notifications").insert({
+            user_id: session.user.id,
+            type: "booking_confirmed",
+            title: "Offline Booking Saved! 🎟️",
+            body: `Booking for ${params.guestName} is confirmed.`,
+          });
+        }
+      }
+    } catch (notifErr) {
+      // Catch silently so the booking still succeeds even if notifications fail
+      console.warn("Failed to queue notification:", notifErr);
+    }
+    // --- END NOTIFICATION TRIGGER ---
+
+    return firstBookingId;
   },
 
   // Add this method inside the SportsService object
@@ -326,6 +408,10 @@ export const SportsService = {
       platform_fee: 0,
       gateway_fee: 0,
       notes: `Extension of booking: ${params.bookingId}`,
+      parent_booking_id: originalBooking.parent_booking_id || originalBooking.id,
+      sports_booking_type: "extension",
+      booking_source: originalBooking.booking_source,
+      sequence_number: (originalBooking.sequence_number || 1) + 1,
     });
 
     if (bookingError) {

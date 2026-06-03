@@ -2,16 +2,28 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect, useRef } from "react";
-import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput } from "react-native";
-import { Text } from "@/components/ui";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput as RNTextInput,
+  Image,
+  ScrollView,
+  Dimensions,
+} from "react-native";
+import { Text, Button } from "@/components/ui";
 import { AuthScreenProps } from "@/navigation/navigation.types";
 import { COLORS } from "@/constants/theme";
 import { vs, hs, ms, fs } from "@/utils/responsive.utils";
-import { ChevronLeft } from "lucide-react-native";
 import { useAuthLogic } from "../hooks/useAuthLogic";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { LEGAL_TEXT } from "@/constants/legal";
 
+// Assets
+import LoginIllustration from "@/assets/images/login-screen-client-side.svg";
+import WhiteBookrLogo from "@/assets/images/white_bookr_logo.png";
+import DividerLine from "@/assets/icons/ic_divider_line.svg";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const OTP_LENGTH = 6;
 const TIMER_SECONDS = 30;
 
@@ -19,7 +31,6 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
   const { email } = route.params;
   const { isLoading, verifyOtpCode, resendOtpCode } = useAuthLogic();
 
-  // Now we just use a simple string instead of an array!
   const [code, setCode] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [timer, setTimer] = useState(TIMER_SECONDS);
@@ -34,25 +45,28 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
     return () => clearInterval(interval);
   }, [timer]);
 
-  // Trigger API call the exact millisecond the 6th digit is typed
   useEffect(() => {
     if (code.length === OTP_LENGTH && !hasSubmitted.current) {
-      hasSubmitted.current = true; // Lock the gate!
+      hasSubmitted.current = true;
       verifyOtpCode(email, code);
     } else if (code.length < OTP_LENGTH) {
-      // If the user deletes a number to fix a typo, unlock the gate so they can submit again
       hasSubmitted.current = false;
     }
   }, [code, email, verifyOtpCode]);
 
   const handleChangeText = (text: string) => {
-    // Sanitize: Only allow numbers
     const numericText = text.replace(/[^0-9]/g, "");
     setCode(numericText);
   };
 
   const handleResend = () => {
     resendOtpCode(email, () => setTimer(TIMER_SECONDS));
+  };
+
+  const handleLoginPress = () => {
+    if (code.length === OTP_LENGTH) {
+      verifyOtpCode(email, code);
+    }
   };
 
   const navigateToPrivacyPolicy = () => {
@@ -70,182 +84,234 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ChevronLeft color={COLORS.text.primary} size={24} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.content}>
         <View style={styles.logoContainer}>
-          <Text variant="h1" style={styles.logoText}>
-            bookr
-          </Text>
+          <Image source={WhiteBookrLogo} style={styles.logo} resizeMode="contain" />
+          <Text style={styles.partnerText}>Partner</Text>
         </View>
 
-        <Text variant="h2" weight="bold" style={styles.title}>
-          Email Verification
-        </Text>
-        <Text variant="body2" color={COLORS.text.secondary} style={styles.subtitle}>
-          Enter the 6-digit code sent to {email}
-        </Text>
+        <View style={styles.illustrationContainer}>
+          <LoginIllustration width={hs(380)} height={vs(345)} />
+        </View>
+      </View>
 
-        {/* The New OTP Container */}
-        <View style={styles.otpContainer}>
-          {/* 1. Render the 6 visual UI boxes */}
-          {new Array(OTP_LENGTH).fill(0).map((_, index) => {
-            const digit = code[index] || "";
-            const isCurrentBox = isFocused && code.length === index;
+      <View style={styles.bottomSheet}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}>
+          <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>
+            Login
+          </Text>
 
-            return (
-              <View
-                key={index}
-                style={[
-                  styles.otpBox,
-                  digit !== "" && styles.otpBoxFilled,
-                  isCurrentBox && styles.otpBoxFocused, // Highlights the box you are currently on!
-                ]}>
-                <Text style={styles.otpText}>{digit}</Text>
-              </View>
-            );
-          })}
+          <View style={styles.otpContainer}>
+            {new Array(OTP_LENGTH).fill(0).map((_, index) => {
+              const digit = code[index] || "";
+              const isCurrentBox = isFocused && code.length === index;
 
-          {/* 2. The single, invisible master input sitting on top */}
-          <RNTextInput
-            value={code}
-            onChangeText={handleChangeText}
-            maxLength={OTP_LENGTH}
-            keyboardType="number-pad"
-            style={styles.hiddenInput}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            autoFocus
-            editable={!isLoading}
-            autoComplete="one-time-code" // Helps with native OTP autofill
-            textContentType="oneTimeCode"
+              return (
+                <View
+                  key={index}
+                  style={[
+                    styles.otpBox,
+                    digit !== "" && styles.otpBoxFilled,
+                    isCurrentBox && styles.otpBoxFocused,
+                  ]}>
+                  <Text style={styles.otpText}>{digit}</Text>
+                </View>
+              );
+            })}
+
+            <RNTextInput
+              value={code}
+              onChangeText={handleChangeText}
+              maxLength={OTP_LENGTH}
+              keyboardType="number-pad"
+              style={styles.hiddenInput}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              autoFocus
+              editable={!isLoading}
+              autoComplete="one-time-code"
+              textContentType="oneTimeCode"
+            />
+          </View>
+
+          <View style={styles.resendContainer}>
+            <Text style={styles.resendLabel}>Didn’t received the OTP? </Text>
+            {timer > 0 ? (
+              <Text style={styles.timerText}>Resend in {timer}s</Text>
+            ) : (
+              <TouchableOpacity onPress={handleResend} disabled={isLoading}>
+                <Text style={styles.resendText}>Resend</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <Button
+            title="Login"
+            variant="primary"
+            onPress={handleLoginPress}
+            isLoading={isLoading}
+            disabled={code.length !== OTP_LENGTH || isLoading}
+            style={styles.loginButton}
+            textStyle={styles.loginButtonText}
           />
-        </View>
 
-        <View style={styles.resendContainer}>
-          <Text variant="body2" color={COLORS.text.secondary}>
-            Didn't receive it?{" "}
-          </Text>
-          {timer > 0 ? (
-            <Text variant="body2" color={COLORS.text.muted}>
-              Resend in {timer}s
+          <View style={styles.dividerContainer}>
+            <DividerLine
+              width={hs(70)}
+              height={1}
+              stroke={COLORS.text.muted}
+              style={styles.dividerLine}
+            />
+            <Text style={styles.dividerText}>Or login with</Text>
+            <DividerLine
+              width={hs(70)}
+              height={1}
+              stroke={COLORS.text.muted}
+              style={styles.dividerLine}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.socialButton}>
+            <Image
+              source={{ uri: "https://img.icons8.com/color/48/google-logo.png" }}
+              style={styles.socialIcon}
+            />
+            <Text style={styles.socialButtonText}>Sign in with Google</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.socialButton}>
+            <Image
+              source={{ uri: "https://img.icons8.com/ios-filled/50/000000/mac-os.png" }}
+              style={styles.socialIcon}
+            />
+            <Text style={styles.socialButtonText}>Sign in with Apple</Text>
+          </TouchableOpacity>
+
+          <View style={styles.footer}>
+            <Text variant="caption" color={COLORS.text.secondary}>
+              By continuing, you agree to our
             </Text>
-          ) : (
-            <TouchableOpacity onPress={handleResend} disabled={isLoading}>
-              <Text variant="body2" weight="bold" color={COLORS.text.primary}>
-                Resend
+            <View style={styles.footerLinks}>
+              <TouchableOpacity onPress={navigateToPrivacyPolicy}>
+                <Text
+                  variant="caption"
+                  weight="bold"
+                  color={COLORS.text.primary}
+                  style={styles.linkText}>
+                  Privacy Policy
+                </Text>
+              </TouchableOpacity>
+              <Text variant="caption" color={COLORS.text.secondary}>
+                {" "}
+                and{" "}
               </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+              <TouchableOpacity onPress={navigateToTerms}>
+                <Text
+                  variant="caption"
+                  weight="bold"
+                  color={COLORS.text.primary}
+                  style={styles.linkText}>
+                  Terms of Service
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
       </View>
-
-      <View style={styles.footer}>
-        <Text variant="caption" color={COLORS.text.secondary}>
-          By continuing, you agree to our
-        </Text>
-        <View style={styles.footerLinks}>
-          <TouchableOpacity onPress={navigateToPrivacyPolicy}>
-            <Text
-              variant="caption"
-              weight="bold"
-              color={COLORS.text.primary}
-              style={styles.linkText}>
-              Privacy Policy
-            </Text>
-          </TouchableOpacity>
-          <Text variant="caption" color={COLORS.text.secondary}>
-            {" "}
-            and{" "}
-          </Text>
-          <TouchableOpacity onPress={navigateToTerms}>
-            <Text
-              variant="caption"
-              weight="bold"
-              color={COLORS.text.primary}
-              style={styles.linkText}>
-              Terms of Service
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.danger,
   },
   header: {
-    paddingHorizontal: hs(20),
-    paddingTop: vs(20),
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.surface.primary,
-    alignItems: "center",
+    height: SCREEN_HEIGHT * 0.4,
     justifyContent: "center",
-  },
-  content: {
-    flex: 1,
-    justifyContent: "flex-end",
     alignItems: "center",
-    paddingHorizontal: hs(24),
-    paddingBottom: vs(40),
+    paddingTop: vs(40),
   },
   logoContainer: {
-    marginBottom: vs(40),
+    alignItems: "center",
+    zIndex: 10,
   },
-  logoText: {
-    fontSize: fs(48),
-    fontFamily: "Gilroy-ExtraBold",
-    color: "#4A00E0",
-    letterSpacing: -1.5,
+  logo: {
+    width: hs(180),
+    height: vs(70),
+  },
+  partnerText: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(36),
+    color: COLORS.text.inverse,
+    marginTop: vs(-10),
+  },
+  illustrationContainer: {
+    position: "absolute",
+    bottom: vs(-20),
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  bottomSheet: {
+    flex: 1,
+    backgroundColor: "#F0F0F0",
+    borderTopLeftRadius: ms(30),
+    borderTopRightRadius: ms(30),
+    paddingHorizontal: hs(30),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  scrollContent: {
+    paddingTop: vs(30),
+    paddingBottom: vs(40),
+    alignItems: "center",
   },
   title: {
-    color: "#4A00E0",
-    marginBottom: vs(8),
-  },
-  subtitle: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(34),
+    color: COLORS.danger,
+    marginBottom: vs(28),
     textAlign: "center",
-    marginBottom: vs(40),
+    width: "100%",
+    lineHeight: fs(42), // Added explicit line height
+    paddingTop: vs(4), // Added padding to prevent clipping
   },
-
-  // Updated Styles for the new pattern
   otpContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
-    marginBottom: vs(30),
-    position: "relative", // Required for absolute positioning the hidden input
+    marginBottom: vs(20),
+    position: "relative",
   },
   otpBox: {
     width: ms(48),
     height: ms(56),
     borderWidth: 1.5,
-    borderColor: COLORS.surface.fallback,
-    borderRadius: ms(12),
+    borderColor: "transparent", // Default to transparent
+    borderRadius: ms(21),
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.background,
+    backgroundColor: "#E1E1E1",
   },
   otpBoxFilled: {
-    borderColor: COLORS.warning,
+    borderColor: COLORS.danger, // Red border when filled
+    backgroundColor: "#E1E1E1",
   },
   otpBoxFocused: {
-    borderColor: COLORS.primary, // Gives a nice visual cue for where you are typing
+    borderColor: COLORS.danger, // Red border when focused
+    borderWidth: 2,
   },
   otpText: {
-    fontSize: fs(24),
+    fontSize: fs(24), // Increased from 14
     fontFamily: "Gilroy-Bold",
     color: COLORS.text.primary,
   },
@@ -253,17 +319,81 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: "100%",
     height: "100%",
-    opacity: 0, // This makes it completely invisible!
-    zIndex: 99, // Keeps it on top so taps register
+    opacity: 0,
+    zIndex: 99,
   },
-
   resendContainer: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: vs(28),
+  },
+  resendLabel: {
+    fontFamily: "Gilroy-Medium",
+    fontSize: fs(16),
+    color: COLORS.text.muted,
+  },
+  resendText: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(16),
+    color: COLORS.danger,
+  },
+  timerText: {
+    fontFamily: "Gilroy-Medium",
+    fontSize: fs(16),
+    color: COLORS.text.muted,
+  },
+  loginButton: {
+    width: "100%",
+    height: vs(54),
+    borderRadius: ms(21),
+    backgroundColor: COLORS.danger,
+    marginBottom: vs(28),
+  },
+  loginButtonText: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(16),
+  },
+  dividerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: vs(28),
+    width: "100%",
+    justifyContent: "center",
+  },
+  dividerLine: {
+    width: hs(70),
+    height: 1,
+    tintColor: COLORS.text.muted,
+  },
+  dividerText: {
+    fontFamily: "Gilroy-Medium",
+    fontSize: fs(16),
+    color: COLORS.text.muted,
+    marginHorizontal: hs(10),
+  },
+  socialButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    height: vs(54),
+    backgroundColor: "#E1E1E1",
+    borderRadius: ms(21),
+    marginBottom: vs(20),
+  },
+  socialIcon: {
+    width: 24,
+    height: 24,
+    marginRight: hs(10),
+  },
+  socialButtonText: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(14),
+    color: COLORS.text.muted,
   },
   footer: {
     alignItems: "center",
-    marginBottom: vs(30),
+    marginTop: vs(20),
   },
   footerLinks: {
     flexDirection: "row",

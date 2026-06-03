@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, PillTabs } from "@/components/ui";
+import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import { Calendar, ChevronRight, ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -50,14 +50,14 @@ const DonutChart = ({ size = ms(100), strokeWidth = 6, onlineRevenue, totalReven
           <>
             <Path
               path={onlinePath}
-              color="#001C65"
+              color={COLORS.primary}
               style="stroke"
               strokeWidth={strokeWidth}
               strokeCap="round"
             />
             <Path
               path={offlinePath}
-              color="#63A1FD"
+              color={COLORS.danger}
               style="stroke"
               strokeWidth={strokeWidth}
               strokeCap="round"
@@ -75,7 +75,7 @@ const DonutChart = ({ size = ms(100), strokeWidth = 6, onlineRevenue, totalReven
       </Canvas>
       <View style={[StyleSheet.absoluteFill, styles.donutOverlay]}>
         <Text variant="body2" weight="bold" color="#00B562" style={styles.revenueAmountText}>
-          +₹{totalRevenue}
+          +₹{totalRevNum.toLocaleString("en-IN")}
         </Text>
         <Text variant="body2" color={COLORS.text.primary} style={styles.totalText}>
           Total
@@ -100,13 +100,13 @@ export const StaycationDashboardScreen = () => {
 
   const { activeVenue: venue } = useStaycationHome(serviceId);
 
-  const [selection, setSelection] = useState("This Month");
-  const [activeTab, setActiveTab] = useState("All Rooms");
+  const [selection, setSelection] = useState("Last Month");
   const [expandedWeek, setExpandedWeek] = useState<string | null>(null);
   const [isCustomSheetVisible, setIsCustomSheetVisible] = useState(false);
 
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(() => {
     const now = new Date();
+    // Default custom range to current month
     return {
       start: new Date(now.getFullYear(), now.getMonth(), 1),
       end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
@@ -115,12 +115,7 @@ export const StaycationDashboardScreen = () => {
 
   const dateRange = useMemo(() => {
     const now = new Date();
-    if (selection === "This Month") {
-      return {
-        start: new Date(now.getFullYear(), now.getMonth(), 1),
-        end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
-      };
-    } else if (selection === "Last Month") {
+    if (selection === "Last Month") {
       return {
         start: new Date(now.getFullYear(), now.getMonth() - 1, 1),
         end: new Date(now.getFullYear(), now.getMonth(), 0),
@@ -129,16 +124,14 @@ export const StaycationDashboardScreen = () => {
     return customRange;
   }, [selection, customRange]);
 
-  const SELECTION_TABS = ["This Month", "Last Month", "Custom"];
+  const SELECTION_TABS = ["Last Month", "Custom"];
 
-  const { isLoading, rooms, stats } = useStaycationDashboard(
+  const { isLoading, stats } = useStaycationDashboard(
     serviceId || "",
     dateRange.start,
     dateRange.end,
-    activeTab,
+    "All Rooms",
   );
-
-  const roomTabs = useMemo(() => ["All Rooms", ...rooms.map(r => r.name)], [rooms]);
 
   const toggleWeek = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -204,22 +197,6 @@ export const StaycationDashboardScreen = () => {
         initialRange={customRange}
       />
 
-      {/* Bookings Filter Tabs */}
-      <View style={styles.bookingTabRow}>
-        <Text variant="body1" weight="bold" style={styles.bookingsLabel}>
-          Bookings
-        </Text>
-        {roomTabs.length > 0 && (
-          <PillTabs
-            tabs={roomTabs}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            variant="dark"
-            style={styles.pillTabs}
-          />
-        )}
-      </View>
-
       {isLoading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
@@ -238,7 +215,7 @@ export const StaycationDashboardScreen = () => {
                     {stats.totalBookings}
                   </Text>
                   <Text variant="body2" weight="semiBold" color="#00B562" style={styles.smallTotal}>
-                    {stats.totalBookings}
+                    +₹{parseFloat(stats.totalRevenue).toLocaleString("en-IN")}
                   </Text>
                 </View>
                 <Text variant="body1" color={COLORS.text.primary} style={styles.totalLabel}>
@@ -248,18 +225,18 @@ export const StaycationDashboardScreen = () => {
 
               <View style={styles.onlineOfflineCol}>
                 <View style={styles.badgeBox}>
-                  <Text variant="body2" color="#001C65" style={styles.badgeText}>
+                  <Text variant="body2" color={COLORS.text.primary} style={styles.badgeText}>
                     Online bookings
                   </Text>
-                  <Text variant="body1" weight="bold" color="#001C65">
+                  <Text variant="body1" weight="bold" color={COLORS.primary}>
                     {stats.onlineBookings}
                   </Text>
                 </View>
                 <View style={styles.badgeBox}>
-                  <Text variant="body2" color="#63A1FD" style={styles.badgeText}>
+                  <Text variant="body2" color={COLORS.text.primary} style={styles.badgeText}>
                     Offline bookings
                   </Text>
-                  <Text variant="body1" weight="bold" color="#63A1FD">
+                  <Text variant="body1" weight="bold" color={COLORS.danger}>
                     {stats.offlineBookings}
                   </Text>
                 </View>
@@ -278,18 +255,18 @@ export const StaycationDashboardScreen = () => {
               <View style={styles.revenueCol}>
                 <View style={styles.revenueItem}>
                   <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
-                    Online Revenue
+                    Online Collections
                   </Text>
-                  <Text variant="h2" weight="bold" color="#001C65">
-                    ₹{stats.onlineRevenue}
+                  <Text variant="h2" weight="bold" color={COLORS.primary}>
+                    ₹{parseFloat(stats.onlineRevenue).toLocaleString("en-IN")}
                   </Text>
                 </View>
                 <View style={styles.revenueItem}>
                   <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
-                    Offline Revenue
+                    Offline Collections
                   </Text>
-                  <Text variant="h2" weight="bold" color="#63A1FD">
-                    ₹{stats.offlineRevenue}
+                  <Text variant="h2" weight="bold" color={COLORS.danger}>
+                    ₹{parseFloat(stats.offlineRevenue).toLocaleString("en-IN")}
                   </Text>
                 </View>
               </View>
@@ -446,20 +423,6 @@ const styles = StyleSheet.create({
   },
   activeSelectionTabText: {
     color: COLORS.text.inverse,
-  },
-  bookingTabRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(10),
-    marginBottom: vs(16),
-    height: vs(40),
-  },
-  bookingsLabel: {
-    fontSize: fs(16),
-  },
-  pillTabs: {
-    flex: 1,
-    marginVertical: 0,
   },
   sectionContainer: {
     marginTop: vs(24),

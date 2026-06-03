@@ -2,31 +2,27 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Dimensions } from "react-native";
 import { Text, Button } from "@/components/ui";
 import { AuthScreenProps } from "@/navigation/navigation.types";
 import { COLORS } from "@/constants/theme";
 import { vs, hs, ms, fs } from "@/utils/responsive.utils";
 import { useAuthLogic } from "../hooks/useAuthLogic";
 import { AuthTextInput } from "../components/AuthTextInput";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { LEGAL_TEXT } from "@/constants/legal";
+
+// Assets
+import LoginIllustration from "@/assets/images/login-screen-client-side.svg";
+import EmailIcon from "@/assets/icons/ic_email_outline.svg";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
   const [email, setEmail] = useState("");
   const { isLoading, loginWithEmail, loginWithGoogle } = useAuthLogic();
 
-  // const handleEmailContinue = () => {
-  //   loginWithEmail(email, () => {
-  //     navigation.navigate("Otp", { email: email.trim() });
-  //   });
-  // };
-
   const handleEmailContinue = () => {
     loginWithEmail(email, isBypass => {
-      // If we did NOT bypass with a password, go to the OTP screen.
-      // If we DID bypass, do nothing here—the AppNavigator will automatically
-      // detect the new session and switch to the Main App Dashboard!
       if (!isBypass) {
         navigation.navigate("Otp", { email: email.trim() });
       }
@@ -48,164 +44,254 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.logoContainer}>
-          <Text variant="h1" style={styles.logoText}>
-            bookr
-          </Text>
-        </View>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        {/* <View style={styles.logoContainer}>
+          <Image
+            source={require("@/assets/images/white_bookr_logo.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.partnerText}>Partner</Text>
+        </View> */}
 
-        <Button
-          title="Sign in with Google"
-          variant="outline"
-          onPress={loginWithGoogle}
-          style={styles.googleButton}
-          leftIcon={
+        <View style={styles.illustrationContainer}>
+          <LoginIllustration width={hs(440)} height={vs(400)} />
+        </View>
+      </View>
+      <View style={styles.bottomSheet}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}>
+          <Text style={styles.welcomeTitle} numberOfLines={1} adjustsFontSizeToFit>
+            Welcome Back!
+          </Text>
+
+          <View style={styles.inputContainer}>
+            <View style={styles.inputWrapper}>
+              <EmailIcon width={hs(20)} height={vs(16)} />
+              <AuthTextInput
+                placeholder="Email address"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!isLoading}
+                style={styles.emailInput}
+              />
+            </View>
+          </View>
+
+          <Button
+            title="Continue with email address"
+            variant="primary"
+            onPress={handleEmailContinue}
+            isLoading={isLoading}
+            disabled={!email.trim() || isLoading}
+            style={styles.continueButton}
+            textStyle={styles.continueButtonText}
+          />
+
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerContainer}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>Or login with</Text>
+              <View style={styles.dividerLine} />
+            </View>
+            <Text style={styles.dividerText}>Or login with</Text>
+            <View style={styles.dividerContainer}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>Or login with</Text>
+              <View style={styles.dividerLine} />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.socialButton} onPress={loginWithGoogle}>
             <Image
               source={{ uri: "https://img.icons8.com/color/48/google-logo.png" }}
-              style={styles.googleIconPlaceholder}
+              style={styles.socialIcon}
             />
-          }
-        />
-
-        <View style={styles.dividerContainer}>
-          <View style={styles.dividerLine} />
-          <Text
-            variant="caption"
-            weight="bold"
-            color={COLORS.text.muted}
-            style={styles.dividerText}>
-            OR
-          </Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        {/* Replaced with the custom Auth-specific input */}
-        <AuthTextInput
-          placeholder="Email Address"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!isLoading}
-          style={styles.emailInput}
-        />
-
-        <Button
-          title="Continue"
-          variant="primary"
-          onPress={handleEmailContinue}
-          isLoading={isLoading}
-          disabled={!email.trim() || isLoading}
-          style={styles.continueButton}
-        />
-      </View>
-
-      <View style={styles.footer}>
-        <Text variant="caption" color={COLORS.text.secondary}>
-          By continuing, you agree to our
-        </Text>
-        <View style={styles.footerLinks}>
-          <TouchableOpacity onPress={navigateToPrivacyPolicy}>
-            <Text
-              variant="caption"
-              weight="bold"
-              color={COLORS.text.primary}
-              style={styles.linkText}>
-              Privacy Policy
-            </Text>
+            <Text style={styles.socialButtonText}>Sign in with Google</Text>
           </TouchableOpacity>
-          <Text variant="caption" color={COLORS.text.secondary}>
-            {" "}
-            and{" "}
-          </Text>
-          <TouchableOpacity onPress={navigateToTerms}>
-            <Text
-              variant="caption"
-              weight="bold"
-              color={COLORS.text.primary}
-              style={styles.linkText}>
-              Terms of Service
-            </Text>
+
+          <TouchableOpacity style={styles.socialButton}>
+            <Image
+              source={{ uri: "https://img.icons8.com/ios-filled/50/000000/mac-os.png" }}
+              style={styles.socialIcon}
+            />
+            <Text style={styles.socialButtonText}>Sign in with Apple</Text>
           </TouchableOpacity>
-        </View>
+
+          <View style={styles.footer}>
+            <Text variant="caption" color={COLORS.text.secondary}>
+              By continuing, you agree to our
+            </Text>
+            <View style={styles.footerLinks}>
+              <TouchableOpacity onPress={navigateToPrivacyPolicy}>
+                <Text
+                  variant="caption"
+                  weight="bold"
+                  color={COLORS.text.primary}
+                  style={styles.linkText}>
+                  Privacy Policy
+                </Text>
+              </TouchableOpacity>
+              <Text variant="caption" color={COLORS.text.secondary}>
+                {" "}
+                and{" "}
+              </Text>
+              <TouchableOpacity onPress={navigateToTerms}>
+                <Text
+                  variant="caption"
+                  weight="bold"
+                  color={COLORS.text.primary}
+                  style={styles.linkText}>
+                  Terms of Service
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.danger,
   },
-  content: {
-    flex: 1,
-    justifyContent: "flex-end",
-    paddingHorizontal: hs(24),
-    paddingBottom: vs(40),
+  header: {
+    height: SCREEN_HEIGHT * 0.4,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: vs(40),
   },
   logoContainer: {
     alignItems: "center",
-    marginBottom: vs(80),
+    zIndex: 10,
   },
-  logoText: {
-    fontSize: fs(64),
-    fontFamily: "Gilroy-ExtraBold",
-    color: "#4A00E0",
-    letterSpacing: -2,
+  logo: {
+    width: hs(180),
+    height: vs(70),
   },
-  googleButton: {
-    borderRadius: ms(30),
-    borderColor: COLORS.surface.fallback,
-    height: vs(50),
+  partnerText: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(36),
+    color: COLORS.text.inverse,
+    marginTop: vs(-10),
   },
-  googleIconPlaceholder: {
-    width: 24,
-    height: 24,
+  illustrationContainer: {
+    position: "absolute",
+    bottom: vs(-26),
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  googleIconText: {
-    color: "#fff",
-    fontSize: fs(12),
-    fontWeight: "bold",
+  bottomSheet: {
+    flex: 1,
+    backgroundColor: "#F0F0F0",
+    borderTopLeftRadius: ms(30),
+    borderTopRightRadius: ms(30),
+    paddingHorizontal: hs(30),
+    boxShadow: "0px -5px 60px rgba(0, 0, 0, 0.46)",
+  },
+  scrollContent: {
+    paddingTop: vs(30),
+    paddingBottom: vs(40),
+    alignItems: "center",
+  },
+  welcomeTitle: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(34),
+    color: COLORS.danger,
+    marginBottom: vs(28),
+    textAlign: "center",
+    width: "100%",
+    lineHeight: fs(42), // Added explicit line height
+    paddingTop: vs(4), // Added padding to prevent clipping
+  },
+  inputContainer: {
+    width: "100%",
+    marginBottom: vs(28),
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E1E1E1",
+    borderRadius: ms(21),
+    paddingHorizontal: hs(20),
+    height: vs(54),
+  },
+  inputIcon: {
+    width: hs(24),
+    height: vs(24),
+    marginRight: hs(10),
+  },
+  emailInput: {
+    flex: 1,
+    height: "100%",
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    paddingHorizontal: 0,
+    fontSize: fs(14),
+    fontFamily: "Gilroy-Bold",
+  },
+  continueButton: {
+    width: "100%",
+    height: vs(54),
+    borderRadius: ms(21),
+    backgroundColor: COLORS.danger,
+    marginBottom: vs(28),
+  },
+  continueButtonText: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(16),
   },
   dividerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: vs(24),
+    marginBottom: vs(28),
+    width: "100%",
+    justifyContent: "center",
   },
   dividerLine: {
-    flex: 1,
+    width: hs(70),
     height: 1,
-    backgroundColor: COLORS.text.muted,
+    tintColor: COLORS.text.muted,
   },
   dividerText: {
-    marginHorizontal: hs(16),
-  },
-  emailInput: {
-    marginBottom: vs(20),
-    height: vs(54),
-    // Use your theme's grey (#F5F5F5) instead of the bluish-white
-    backgroundColor: COLORS.surface.secondary,
-    // Increase thickness slightly to make it visible
-    borderWidth: 1.5,
-    // Use the darker fallback grey (#EAEAEA) for a visible outline
-    borderColor: COLORS.surface.fallback,
-    borderRadius: ms(30),
-    paddingHorizontal: hs(24),
+    fontFamily: "Gilroy-Medium",
     fontSize: fs(16),
-    fontFamily: "Gilroy-SemiBold",
-    color: COLORS.text.primary,
-    width: "100%",
+    color: COLORS.text.muted,
+    marginHorizontal: hs(10),
   },
-  continueButton: {
-    borderRadius: ms(30),
+  socialButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    height: vs(54),
+    backgroundColor: "#E1E1E1",
+    borderRadius: ms(21),
+    marginBottom: vs(20),
+  },
+  socialIcon: {
+    width: 24,
+    height: 24,
+    marginRight: hs(10),
+  },
+  socialButtonText: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(14),
+    color: COLORS.text.muted,
   },
   footer: {
     alignItems: "center",
-    marginBottom: vs(30),
+    marginTop: vs(20),
   },
   footerLinks: {
     flexDirection: "row",

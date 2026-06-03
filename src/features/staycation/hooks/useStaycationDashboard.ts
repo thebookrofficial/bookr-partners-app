@@ -137,10 +137,15 @@ export const useStaycationDashboard = (
           total_amount,
           platform_fee,
           booking_type,
+          booking_source,
+          user_id,
           check_in_date,
           check_out_date,
           room_id,
-          booking_status
+          booking_status,
+          paid_amount,
+          discount_amount,
+          subtotal
         `,
         )
         .eq("venue_id", actualVenueId)
@@ -148,9 +153,13 @@ export const useStaycationDashboard = (
         .gte("check_out_date", startStr);
 
       if (selectedRoomName !== "All Rooms" && rooms.length > 0) {
-        const matchingRoom = rooms.find(r => r.name === selectedRoomName);
-        if (matchingRoom) {
-          query = query.eq("room_id", matchingRoom.id);
+        // Filter by base name (e.g., if "Deluxe" is selected, match all rooms like "Deluxe-101", "Deluxe-102")
+        const matchingRoomIds = rooms
+          .filter(r => r.name.startsWith(selectedRoomName))
+          .map(r => r.id);
+
+        if (matchingRoomIds.length > 0) {
+          query = query.in("room_id", matchingRoomIds);
         }
       }
 
@@ -171,15 +180,10 @@ export const useStaycationDashboard = (
         return;
       }
 
-      // Filter out cancelled for counts and revenue to match typical dashboard behavior,
-      // but we could include them in a 'total' if we wanted to match the Home list perfectly.
-      // However, the Home list 'Recent Bookings' shows Today+Future.
-      // If we want to match 'Current Activity', we should probably stick to non-cancelled.
+      // Filter out cancelled for consistency across all metrics
       const activeBookings = bookings.filter(b => b.booking_status !== "cancelled");
 
-      // Match Home Screen: Total bookings should include all bookings in the period, even cancelled ones,
-      // so the top-level number matches expectations when comparing lists.
-      let totalBookings = bookings.length;
+      let totalBookings = activeBookings.length;
       let onlineBookings = 0;
       let offlineBookings = 0;
       let totalRevenue = 0;
@@ -197,27 +201,57 @@ export const useStaycationDashboard = (
       }
 
       // For Revenue and Online/Offline counts, we only count ACTIVE (non-cancelled) bookings.
+      const todayStr = formatDate(new Date());
+
       activeBookings.forEach(b => {
         const amount = parseFloat(b.total_amount) || 0;
-        const platformFee = parseFloat(b.platform_fee) || 0;
-        const isOnline = b.booking_type === "online" || platformFee > 0;
+        const isOnline = b.booking_source === "online" || !!b.user_id;
+        const bookingDate = b.check_in_date;
 
-        totalRevenue += amount;
         if (isOnline) {
-          onlineBookings++;
-          onlineRevenue += amount;
+          // --- ALIGNED PAYOUT FORMULA ---
+          const sumPaid = Number(b.paid_amount || 0);
+          const sumDiscount = Number(b.discount_amount || 0);
+          const sumSubtotal = Number(b.subtotal || 0);
+          const sumTotalAmt = Number(b.total_amount || 0);
+
+          // 1. Total Paid = paid_amount + discount
+          const totalPaid = sumPaid + sumDiscount;
+
+          // 2. Bookr Commission = 5% of Total Price (Staycation specific)
+          const commission = Number((sumTotalAmt * 0.05).toFixed(2));
+
+          // 3. Gateway Fee = 2% of Subtotal
+          const gateway = Number((sumSubtotal * 0.02).toFixed(2));
+
+          // 4. Net Payout
+          const netPayout = totalPaid - commission - gateway;
+
+          // Only include in summary totals if the booking is from YESTERDAY or earlier
+          if (bookingDate < todayStr) {
+            onlineBookings++;
+            onlineRevenue += netPayout;
+            totalRevenue += netPayout;
+          }
+
+          // For revenue graph, attribute net payout to check_in_date (Always show in graph for range visibility)
+          if (revenueByDate[bookingDate] !== undefined) {
+            revenueByDate[bookingDate] += netPayout;
+          }
         } else {
+          // OFFLINE: Use gross amount (no platform commission)
           offlineBookings++;
           offlineRevenue += amount;
-        }
+          totalRevenue += amount;
 
-        // For revenue graph, we still attribute to check_in_date
-        // but only if it falls within our current display range
-        const dateKey = b.check_in_date;
-        if (revenueByDate[dateKey] !== undefined) {
-          revenueByDate[dateKey] += amount;
+          // For revenue graph, attribute gross amount to check_in_date
+          if (revenueByDate[bookingDate] !== undefined) {
+            revenueByDate[bookingDate] += amount;
+          }
         }
       });
+
+      totalBookings = onlineBookings + offlineBookings;
 
       // Calculate Weekly Revenue
       const weeklyRevenue: WeeklyRevenue[] = [];

@@ -6,11 +6,21 @@ import { supabase } from "../../../lib/supabase";
 import { Alert } from "react-native";
 import { useAuthStore } from "../../../store";
 
+export interface PaymentLog {
+  id: string;
+  amount: number;
+  payment_mode: "cash" | "online" | "upi" | "card" | "bank_transfer" | "other";
+  note: string;
+  created_at: string;
+  isInitial?: boolean;
+}
+
 export const useStaycationBookingDetails = (bookingId: string | undefined) => {
   const { profile } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [bookingDetails, setBookingDetails] = useState<any>(null);
+  const [paymentLogs, setPaymentLogs] = useState<PaymentLog[]>([]);
 
   const fetchBookingDetails = useCallback(async () => {
     if (!bookingId) {
@@ -40,6 +50,9 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
           guest_name,   
           guest_phone,   
           booking_status,
+          created_at,
+          special_requests,
+          venues!venue_id ( staycation_venues ( property_type ) ),
           profiles:user_id ( full_name, phone, avatar_url, email )
         `,
         )
@@ -48,6 +61,42 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
 
       if (error) throw error;
       setBookingDetails(data);
+
+      // Fetch Payment Logs Ledger
+      const { data: logsData, error: logsError } = await supabase
+        .from("offline_payment_logs")
+        .select("id, amount, payment_mode, note, created_at")
+        .eq("booking_id", bookingId)
+        .eq("booking_vertical", "staycation")
+        .order("created_at", { ascending: true });
+
+      let fetchedLogs = (logsData as PaymentLog[]) || [];
+
+      if (logsError && logsError.code !== "PGRST116") {
+        console.warn("Could not fetch payment logs:", logsError);
+      }
+
+      // Reconstruct Initial Advance Payment
+      const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
+      const totalPaidAmount = Number(data.paid_amount) || 0;
+
+      if (totalPaidAmount > totalLoggedAmount) {
+        const initialAmount = totalPaidAmount - totalLoggedAmount;
+        const initialLog: PaymentLog = {
+          id: `initial-${data.id}`,
+          amount: initialAmount,
+          // Assume Online/UPI if user_id exists (app booking), otherwise Cash for manual
+          payment_mode: data.user_id ? "online" : "cash",
+          note: "Initial Advance Payment",
+          created_at: data.created_at,
+          isInitial: true,
+        };
+
+        // Unshift to put it at the very top of the list (earliest date)
+        fetchedLogs.unshift(initialLog);
+      }
+
+      setPaymentLogs(fetchedLogs);
     } catch (error: any) {
       console.error("Error fetching booking details:", error);
       Alert.alert("Error", "Could not load booking details.");
@@ -116,7 +165,10 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
       return true;
     } catch (error: any) {
       console.error("Error updating payment:", error);
-      Alert.alert("Update Failed", error.message || "Could not update payment.");
+      Alert.alert(
+        "Update Failed",
+        "Could not update the payment amount. Please check your connection and try again.",
+      );
       return false;
     } finally {
       setIsUpdating(false);
@@ -170,6 +222,7 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
     isLoading,
     isUpdating,
     bookingDetails,
+    paymentLogs,
     updatePayment,
     cancelBooking,
     refetch: fetchBookingDetails,

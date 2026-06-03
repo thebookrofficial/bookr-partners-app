@@ -10,12 +10,13 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  ScrollView,
 } from "react-native";
 import { Text } from "@/components/ui";
 import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
-import { Plus, Calendar as CalendarIcon } from "lucide-react-native";
+import { Plus, Calendar as CalendarIcon, ChevronDown, ChevronUp } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { StaycationBooking } from "../types/staycation.types";
@@ -29,13 +30,36 @@ interface StaycationResortContentProps {
 }
 
 type ListEntry =
-  | { type: "header"; title: string }
+  | { type: "header"; title: string; occupiedCount?: number; totalCount?: number }
   | { type: "booking"; data: StaycationBooking; sectionTitle: string };
 
 export const StaycationResortContent = ({ initialVenueId }: StaycationResortContentProps) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const activeRoomType = "All";
+  const [activeRoomType, setActiveRoomType] = useState("All");
+  const [activeRoomStatus, setActiveRoomStatus] = useState<"Check Outs" | "Bookings">("Check Outs");
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = (title: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(title)) {
+        next.delete(title);
+      } else {
+        next.add(title);
+      }
+      return next;
+    });
+  };
+
+  const effectiveDate = useMemo(() => {
+    if (activeRoomStatus === "Check Outs") {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    return selectedDate;
+  }, [activeRoomStatus, selectedDate]);
 
   // CRITICAL FIX: Passed activeRoomType to the hook so occupancy updates dynamically!
   const {
@@ -45,16 +69,15 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
     refetch,
     venues,
     activeVenue,
-    roomsFilled,
+    rooms,
     cancelBooking,
-  } = useStaycationResort(initialVenueId, selectedDate, activeRoomType);
+  } = useStaycationResort(initialVenueId, effectiveDate, activeRoomType);
 
   const isDateClosed = useMemo(() => {
     const dStr = selectedDate.toISOString().split("T")[0];
     return closedDates.has(dStr);
   }, [selectedDate, closedDates]);
 
-  const [activeRoomStatus, setActiveRoomStatus] = useState<"Check Outs" | "Bookings">("Check Outs");
   const [isOfflineSheetVisible, setIsOfflineSheetVisible] = useState(false);
 
   const onDateChange = (event: DateTimePickerEvent, date?: Date) => {
@@ -75,14 +98,22 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
     ]);
   };
 
+  const uniqueRoomTypes = useMemo(() => {
+    const types = new Set<string>();
+    rooms?.forEach(r => types.add(r.room_name));
+    return ["All", ...Array.from(types)];
+  }, [rooms]);
+
   const flatListData = useMemo(() => {
     const data: ListEntry[] = [];
 
-    groupedBookings.forEach(section => {
+    groupedBookings.forEach((section: any) => {
       let filteredBookings = section.data;
 
       if (activeRoomType !== "All") {
-        filteredBookings = filteredBookings.filter(b => b.roomName?.includes(activeRoomType));
+        filteredBookings = filteredBookings.filter((b: any) =>
+          b.roomName?.includes(activeRoomType),
+        );
       }
 
       const isTargetSection =
@@ -92,37 +123,76 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
       let shouldShow = false;
       if (activeRoomStatus === "Check Outs") {
+        // Today tab: Show Check-ins and Check-outs
         shouldShow = isCheckOutSection || isTargetSection;
       } else {
+        // Upcoming tab: Only show Upcoming sections
         shouldShow = isUpcomingSection;
       }
 
       if (shouldShow && filteredBookings.length > 0) {
-        data.push({ type: "header", title: section.title });
-        filteredBookings.forEach(b => {
-          data.push({ type: "booking", data: b, sectionTitle: section.title });
+        data.push({
+          type: "header",
+          title: section.title,
+          occupiedCount: section.occupiedCount,
+          totalCount: section.totalCount,
         });
+
+        // Only add bookings if section is not collapsed
+        if (!collapsedSections.has(section.title)) {
+          filteredBookings.forEach((b: any) => {
+            data.push({ type: "booking", data: b, sectionTitle: section.title });
+          });
+        }
       }
     });
 
     return data;
-  }, [groupedBookings, activeRoomStatus, activeRoomType]);
+  }, [groupedBookings, activeRoomStatus, activeRoomType, collapsedSections]);
 
   const renderItem = ({ item }: { item: ListEntry }) => {
     if (item.type === "header") {
       let displayTitle = item.title;
-      if (item.title.toLowerCase().includes("check out")) {
+      const isCheckOut = item.title.toLowerCase().includes("check out");
+      const isCheckIn = item.title.includes("Today") || item.title.includes("Bookings for");
+      const isUpcoming = item.title.includes("Upcoming:");
+
+      if (isCheckOut) {
         displayTitle = "Check-Out";
-      } else if (item.title.includes("Today") || item.title.includes("Bookings for")) {
+      } else if (isCheckIn) {
         displayTitle = "Check-In";
+      } else if (isUpcoming) {
+        // Strip the "Upcoming: " prefix for cleaner display if desired,
+        // or just keep it. The prompt says "wrap the bookings under the date".
+        displayTitle = item.title.replace("Upcoming: ", "");
       }
 
+      const isCollapsed = collapsedSections.has(item.title);
+
       return (
-        <View style={[styles.sectionHeader, { marginTop: vs(10) }]}>
+        <TouchableOpacity
+          activeOpacity={isUpcoming ? 0.7 : 1}
+          onPress={() => isUpcoming && toggleSection(item.title)}
+          style={[styles.sectionHeader, { marginTop: vs(10) }]}>
           <View style={styles.headerRow}>
             <Text style={styles.sectionTitle}>{displayTitle}</Text>
+
+            {isUpcoming && (
+              <View style={styles.headerRight}>
+                <View style={styles.occupancyBadge}>
+                  <Text weight="semiBold" style={styles.occupancyText}>
+                    {item.occupiedCount}/{item.totalCount}
+                  </Text>
+                </View>
+                {isCollapsed ? (
+                  <ChevronDown size={ms(20)} color={COLORS.text.primary} />
+                ) : (
+                  <ChevronUp size={ms(20)} color={COLORS.text.primary} />
+                )}
+              </View>
+            )}
           </View>
-        </View>
+        </TouchableOpacity>
       );
     }
 
@@ -157,6 +227,42 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
             activeVenue?.cover_image_url ? { uri: activeVenue.cover_image_url } : USER_PROFILE
           }
         />
+
+        <View style={styles.roomTypesRow}>
+          <Text style={styles.typesLabel}>Types</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.roomTypesScroll}>
+            {uniqueRoomTypes.map((type, index) => {
+              const isActive = activeRoomType === type;
+              const lines = type === "All" ? ["All"] : type.split(" ");
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.typePill,
+                    isActive ? styles.typePillActive : styles.typePillInactive,
+                  ]}
+                  onPress={() => setActiveRoomType(type)}>
+                  <View style={styles.typePillContent}>
+                    {lines.map((line, i) => (
+                      <Text
+                        key={i}
+                        weight="semiBold"
+                        style={[
+                          styles.typePillText,
+                          isActive ? styles.typePillTextActive : styles.typePillTextInactive,
+                        ]}>
+                        {line}
+                      </Text>
+                    ))}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
 
         <View style={styles.roomsFiltersContainer}>
           <View style={styles.statusDateRow}>
@@ -201,15 +307,6 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
               <CalendarIcon size={ms(16)} color={COLORS.text.primary} />
             </TouchableOpacity>
           </View>
-
-          <View style={styles.roomsFilledContainer}>
-            <Text weight="semiBold" style={styles.roomsFilledLabel}>
-              Rooms Filled
-            </Text>
-            <Text weight="semiBold" style={styles.roomsFilledValue}>
-              {roomsFilled.occupied}/{roomsFilled.total}
-            </Text>
-          </View>
         </View>
 
         {isDateClosed && (
@@ -230,7 +327,15 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
         )}
       </View>
     );
-  }, [activeVenue, activeRoomStatus, roomsFilled, selectedDate, showDatePicker, isDateClosed]);
+  }, [
+    activeVenue,
+    activeRoomStatus,
+    selectedDate,
+    showDatePicker,
+    isDateClosed,
+    uniqueRoomTypes,
+    activeRoomType,
+  ]);
 
   return (
     <View style={styles.root}>
@@ -283,6 +388,51 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   headerContainer: { paddingTop: vs(10) },
   roomsFiltersContainer: { gap: vs(12), marginBottom: vs(10) },
+  roomTypesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: vs(12),
+    marginBottom: vs(16),
+  },
+  typesLabel: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(16),
+    color: COLORS.text.primary,
+    marginRight: hs(10),
+  },
+  roomTypesScroll: {
+    gap: hs(10),
+  },
+  typePill: {
+    backgroundColor: "#F4F7FC",
+    paddingHorizontal: hs(14),
+    paddingVertical: vs(10),
+    borderRadius: ms(10),
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: hs(50),
+  },
+  typePillActive: {
+    backgroundColor: "#282828",
+  },
+  typePillInactive: {
+    backgroundColor: "#F4F7FC",
+  },
+  typePillContent: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  typePillText: {
+    fontSize: fs(12),
+    textAlign: "center",
+    lineHeight: vs(13),
+  },
+  typePillTextActive: {
+    color: COLORS.text.inverse,
+  },
+  typePillTextInactive: {
+    color: "#8c8c8c",
+  },
   statusDateRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -305,15 +455,6 @@ const styles = StyleSheet.create({
     borderRadius: ms(8),
   },
   todayText: { fontSize: fs(14), color: COLORS.text.primary },
-  roomsFilledContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: vs(4),
-    paddingHorizontal: hs(4),
-  },
-  roomsFilledLabel: { fontSize: fs(14), color: COLORS.text.primary },
-  roomsFilledValue: { fontSize: fs(14), color: COLORS.text.primary },
   closedDateContainer: {
     backgroundColor: "#FEF2F2",
     paddingVertical: vs(10),
@@ -335,6 +476,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: vs(8),
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(10),
+  },
+  occupancyBadge: {
+    backgroundColor: "#F4F7FC",
+    paddingHorizontal: hs(8),
+    paddingVertical: vs(4),
+    borderRadius: ms(6),
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  occupancyText: {
+    fontSize: fs(12),
+    color: COLORS.text.primary,
   },
   sectionTitle: {
     fontFamily: "Gilroy-SemiBold",

@@ -24,6 +24,9 @@ import {
   Trash2,
   ChevronDown,
   Minus,
+  CheckCircle2,
+  ChevronRight,
+  FileText,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -59,10 +62,11 @@ export const StaycationBookingDetailsScreen = () => {
   const route = useRoute<any>();
   const { booking: initialBooking, isFromHistory } = route.params || {};
 
-  const { isLoading, isUpdating, bookingDetails, updatePayment, cancelBooking } =
+  const { isLoading, isUpdating, bookingDetails, paymentLogs, updatePayment, cancelBooking } =
     useStaycationBookingDetails(initialBooking?.dbId || initialBooking?.id);
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
   const [onlineAmount, setOnlineAmount] = useState("");
 
@@ -126,10 +130,30 @@ export const StaycationBookingDetailsScreen = () => {
 
   const remainingAmount = Math.max(0, totalPayment - amountPaid);
 
+  // Parse Group Type from special_requests
+  const getGroupType = (requests: string) => {
+    if (!requests) return null;
+    const parts = requests.split("|");
+    const groupPart = parts.find(p => p.trim().toLowerCase().startsWith("group type:"));
+    if (groupPart) {
+      return groupPart.split(":")[1]?.trim();
+    }
+    return null;
+  };
+
+  // Check if it's a farmhouse
+  const staycationVenues = (bookingDetails?.venues as any)?.staycation_venues;
+  const propertyType = Array.isArray(staycationVenues)
+    ? staycationVenues[0]?.property_type
+    : staycationVenues?.property_type;
+  const isFarmhouse = propertyType?.toLowerCase() === "farmhouse";
+
+  const groupType = getGroupType(bookingDetails?.special_requests);
+
   // 2. The CORRECT way to check if a booking is online
-  const isOnline = !!bookingDetails?.user_id;
+  const isOnline = bookingDetails?.booking_source === "online" || !!bookingDetails?.user_id;
   const isCancelled = bookingDetails?.booking_status === "cancelled";
-  const bookingType = isOnline ? "Online" : "Manual";
+  const bookingType = isOnline ? "Online" : "Offline";
 
   // 3. Assemble the data, prioritizing the "unrolled" data passed from the card
   const bookingData = {
@@ -159,6 +183,7 @@ export const StaycationBookingDetailsScreen = () => {
     totalPayment: totalPayment.toFixed(2), // Keep it clean
     remainingAmount: remainingAmount.toFixed(2),
     amountPaid: amountPaid.toFixed(2),
+    groupType: groupType,
   };
 
   // Direct WhatsApp Share Handler
@@ -256,6 +281,19 @@ Thank you for booking with Bookr!`;
           </View>
         </View>
 
+        {/* Group Type Section */}
+        {isFarmhouse && bookingData.groupType && (
+          <View style={styles.section}>
+            <View style={styles.labelRow}>
+              <FileText size={ms(18)} color={COLORS.text?.primary || "black"} />
+              <Text style={styles.labelText}>Group Type</Text>
+            </View>
+            <View style={styles.valueBox}>
+              <Text style={styles.valueText}>{bookingData.groupType}</Text>
+            </View>
+          </View>
+        )}
+
         {/* Check In / Out Section */}
         <View style={styles.row}>
           <InfoBlock label="Check In" value={bookingData.checkIn} icon={Clock} />
@@ -351,6 +389,39 @@ Thank you for booking with Bookr!`;
             </View>
           )}
         </View>
+
+        {/* Payment History Ledger */}
+        {showPaymentHistory && paymentLogs.length > 0 && (
+          <View style={styles.ledgerContainer}>
+            <Text style={styles.paymentLabel}>Payment History</Text>
+            {paymentLogs.map(log => (
+              <View key={log.id} style={styles.ledgerRow}>
+                <View style={styles.ledgerLeft}>
+                  <CheckCircle2 size={ms(14)} color="#00B562" />
+                  <Text style={styles.ledgerDate}>
+                    {new Date(log.created_at).toLocaleDateString("en-GB")}
+                  </Text>
+                </View>
+                <View style={styles.ledgerRight}>
+                  <Text style={styles.ledgerAmount}>₹{log.amount}</Text>
+                  <Text style={styles.ledgerMode}>
+                    ({log.payment_mode === "upi" ? "ONLINE" : log.payment_mode.toUpperCase()})
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Action Toggle for Payment History */}
+        <TouchableOpacity
+          style={styles.actionCard}
+          activeOpacity={0.7}
+          onPress={() => setShowPaymentHistory(!showPaymentHistory)}>
+          <Clock size={ms(20)} color="#E55959" />
+          <Text style={styles.actionCardText}>Current Booking Payment History</Text>
+          <ChevronRight size={ms(20)} color="black" />
+        </TouchableOpacity>
 
         {/* WhatsApp Share Button */}
         <TouchableOpacity
@@ -488,4 +559,63 @@ const styles = StyleSheet.create({
   },
   cancelContent: { flexDirection: "row", alignItems: "center" },
   cancelText: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: "black" },
+  ledgerContainer: {
+    marginTop: vs(4),
+    marginBottom: vs(14),
+    padding: hs(10),
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: "#cbdffe",
+  },
+  ledgerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: vs(6),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E0E0E0",
+  },
+  ledgerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+  },
+  ledgerDate: {
+    fontFamily: "Gilroy-Medium",
+    fontSize: fs(12),
+    color: "black",
+  },
+  ledgerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(4),
+  },
+  ledgerAmount: {
+    fontFamily: "Gilroy-SemiBold",
+    fontSize: fs(14),
+    color: "black",
+  },
+  ledgerMode: {
+    fontFamily: "Gilroy-Medium",
+    fontSize: fs(10),
+    color: COLORS.text.muted,
+  },
+  actionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#CBDFFE",
+    borderRadius: ms(10),
+    paddingHorizontal: hs(10),
+    height: vs(44),
+    marginBottom: vs(12),
+  },
+  actionCardText: {
+    flex: 1,
+    marginLeft: hs(8),
+    fontFamily: "Gilroy-SemiBold",
+    fontSize: fs(14),
+    color: "#E55959",
+  },
 });

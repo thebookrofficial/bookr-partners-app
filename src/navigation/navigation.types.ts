@@ -63,6 +63,7 @@ export type MainStackParamList = {
   EditProfile: undefined;
   AddService: undefined;
   Settings: undefined;
+  NotificationSettings: undefined;
   LegalView: { title: string; content: string };
 
   SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;
@@ -71,6 +72,7 @@ export type MainStackParamList = {
   EventServiceTabs: NavigatorScreenParams<EventTabParamList>;
   BookingDetails: { bookingId: string };
   StaycationBookingDetails: { booking: any };
+  StaycationInvoice: { bookingId: string };
   StaycationCloseDate: { serviceId: string };
   StaycationOffers: { serviceId: string };
   DineBookingDetails: { bookingId: string; isFromPayment?: boolean };
@@ -95,13 +97,22 @@ export type MainStackParamList = {
     venueId: string;
     groundId: string;
   };
+  Payouts: { venueId: string };
+  PayoutDetails: {
+    venueId: string;
+    startDate: string;
+    endDate: string;
+    displayLabel: string;
+    totalBookings: number;
+  };
+  SportsInvoice: { bookingId: string };
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 
 // 4. Define the Root flow (Switches between Auth and Main)
 export type RootStackParamList = {
   Auth: undefined;
-  Main: undefined;
+  Main: NavigatorScreenParams<MainStackParamList>;
 };
 
 // 5. Export Screen Props for easy typing inside the screen components

@@ -133,14 +133,22 @@ export const BookingDetailsScreen = () => {
   const totalAmount = Number(booking.total_amount) || 0;
   const currentPaid = Number(booking.paid_amount) || 0;
   const totalDiscount = Number(booking.discount_amount) || 0;
+  const totalFees = booking.platform_fee || 0;
 
-  // The vendor wants to see the "Gross" amount (Value before discount)
-  const displayTotalAmount = totalAmount + totalDiscount;
-  // The vendor wants to see the "Credit" (Cash + Discount) as the total amount paid
-  const displayAmountPaid = currentPaid + totalDiscount;
+  // Identify if it's a Pickleball service
+  const sportsType = booking.venues?.sports_venues?.[0]?.sports_type || "";
+  const isPickleball = sportsType.toLowerCase().includes("pickleball");
+
+  // The vendor wants to see the "Total Payment"
+  const displayTotalAmount = totalAmount;
+
+  // The vendor wants to see the "Credit" (Cash + Discount - Fees) as the total amount paid
+  // Formula: paid_amount + discount - platform_fee
+  // Note: Platform fee subtraction is applied ONLY to Pickleball as requested.
+  const displayAmountPaid = currentPaid + totalDiscount - (isPickleball ? totalFees : 0);
 
   // Remaining Amount is what is still due at the venue
-  const remainingAmount = Math.max(0, totalAmount - currentPaid);
+  const remainingAmount = Math.max(0, displayTotalAmount - displayAmountPaid);
 
   const formatHour = (timeStr: string) => {
     if (!timeStr) return "";
