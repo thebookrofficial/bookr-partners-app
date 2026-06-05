@@ -42,6 +42,7 @@ describe("FinanceService Payout Logic", () => {
       {
         id: "b1",
         paid_amount: 800,
+        subtotal: 800, // Added subtotal
         total_amount: 800,
         payment_type: "full",
         date: "2026-05-28",
@@ -65,16 +66,17 @@ describe("FinanceService Payout Logic", () => {
   });
 
   it("should calculate commission on TOTAL price for Advance Payment", async () => {
-    // Turf Advance: 200 paid online, 1000 total price.
+    // Turf Advance: 200 subtotal (money swiped), 1000 total price.
     // Commission: 3.5% of 1000 = 35.
     // Gateway: 2% of 200 = 4.
     // Payout: 200 - 35 - 4 = 161.
     const mockRawData = [
       {
         id: "b3",
-        paid_amount: 200,
+        paid_amount: 300,
+        subtotal: 200, // strictly use subtotal
         total_amount: 1000,
-        discount_amount: 0,
+        discount_amount: 100, // should be excluded
         payment_type: "advance",
         date: "2026-05-28",
         sports_type: "Cricket",
@@ -96,12 +98,12 @@ describe("FinanceService Payout Logic", () => {
   });
 
   it("should group multi-slot bookings correctly", async () => {
-    // User books 2 slots of 500 each, pays 200 advance tied to first slot.
-    // Group ID matches for both.
+    // User books 2 slots of 500 each, pays 200 subtotal tied to first slot.
     const mockRawData = [
       {
         id: "b4-1",
         paid_amount: 200,
+        subtotal: 200,
         total_amount: 500,
         payment_type: "advance",
         booking_group_id: "group-x",
@@ -111,6 +113,7 @@ describe("FinanceService Payout Logic", () => {
       {
         id: "b4-2",
         paid_amount: 0,
+        subtotal: 0,
         total_amount: 500,
         payment_type: "advance",
         booking_group_id: "group-x",
@@ -127,21 +130,13 @@ describe("FinanceService Payout Logic", () => {
       "2026-05-28",
     );
 
-    // Grouping should merge them:
-    // Total Paid = 200
-    // Total Price = 1000 (across 2 slots)
-    // Commission = 1000 * 0.035 = 35 (FULL total price)
-    // Gateway = 200 * 0.02 = 4
-    // Payout = 200 - 35 - 4 = 161
-    // Count = 1 (MERGED)
-
     expect(breakdown.count).toBe(1);
-    expect(breakdown.totalPaid).toBe(200);
+    expect(breakdown.totalPaid).toBe(200); // Should use sum of subtotals
     expect(breakdown.commission).toBe(35);
     expect(breakdown.finalPayout).toBe(161);
   });
 
-  it("should calculate Staycation payout using Total Amount for both commission and gateway", async () => {
+  it("should calculate Staycation payout using Subtotal for gateway", async () => {
     // Mock vertical to staycation
     (supabase.from as jest.Mock).mockImplementation(table => {
       if (table === "venues") {
@@ -161,16 +156,18 @@ describe("FinanceService Payout Logic", () => {
       };
     });
 
-    // Staycation: 10100 main price (9900 paid + 200 discount).
+    // Staycation: 10100 main price.
+    // Subtotal (Money Swiped) = 9900.
     // Commission (5%) = 10100 * 0.05 = 505.
-    // Gateway (2%) = 10100 * 0.02 = 202. (Staycation logic uses total_amount)
-    // Final Payout = 9900 - 505 - 202 = 9193.
+    // Gateway (2% of Subtotal) = 9900 * 0.02 = 198.
+    // Final Payout = 9900 - 505 - 198 = 9197.
     const mockRawData = [
       {
         id: "s1",
         paid_amount: 9900,
+        subtotal: 9900,
         total_amount: 10100,
-        discount_amount: 200,
+        discount_amount: 200, // excluded
         payment_type: "full",
         date: "2026-05-28",
         booking_status: "confirmed",
@@ -188,8 +185,8 @@ describe("FinanceService Payout Logic", () => {
     );
 
     expect(breakdown.commission).toBe(505);
-    expect(breakdown.gateway).toBe(202);
-    expect(breakdown.finalPayout).toBe(9393);
+    expect(breakdown.gateway).toBe(198);
+    expect(breakdown.finalPayout).toBe(9197);
   });
 
   it("should exclude non-confirmed/completed bookings", async () => {
@@ -197,6 +194,7 @@ describe("FinanceService Payout Logic", () => {
       {
         id: "b_confirmed",
         paid_amount: 1000,
+        subtotal: 1000,
         total_amount: 1000,
         payment_type: "full",
         booking_status: "confirmed",
@@ -205,6 +203,7 @@ describe("FinanceService Payout Logic", () => {
       {
         id: "b_pending",
         paid_amount: 1000,
+        subtotal: 1000,
         total_amount: 1000,
         payment_type: "full",
         booking_status: "pending",
