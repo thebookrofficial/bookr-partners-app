@@ -1,28 +1,45 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   LayoutAnimation,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
-import { Calendar, ChevronRight, ChevronDown } from "lucide-react-native";
+import { Calendar, ChevronRight, ChevronDown, X } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { Canvas, Path, Skia } from "@shopify/react-native-skia";
-import { CustomRangeSheet } from "../components/CustomRangeSheet";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
 import { useStaycationHome } from "../hooks/useStaycationHome";
 import { useStaycationDashboard } from "../hooks/useStaycationDashboard";
+import DatePicker from "react-native-date-picker";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
+
+const FilterTab = ({ label, isActive, onPress, icon }: any) => (
+  <TouchableOpacity
+    style={[styles.selectionTab, isActive && styles.activeSelectionTab]}
+    onPress={onPress}
+    activeOpacity={0.7}>
+    {icon}
+    <Text
+      variant="caption"
+      weight="semiBold"
+      color={isActive ? COLORS.text.inverse : COLORS.text.muted}
+      style={styles.selectionTabText}>
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
 
 const DonutChart = ({ size = ms(100), strokeWidth = 6, onlineRevenue, totalRevenue }: any) => {
   const onlineRevNum = parseFloat(onlineRevenue) || 0;
@@ -100,37 +117,24 @@ export const StaycationDashboardScreen = () => {
 
   const { activeVenue: venue } = useStaycationHome(serviceId);
 
-  const [selection, setSelection] = useState("Last Month");
+  const [timeFilter, setTimeFilter] = useState("Last Month");
   const [expandedWeek, setExpandedWeek] = useState<string | null>(null);
-  const [isCustomSheetVisible, setIsCustomSheetVisible] = useState(false);
+  const [isCustomModalVisible, setIsCustomModalVisible] = useState(false);
 
-  const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(() => {
-    const now = new Date();
-    // Default custom range to current month
-    return {
-      start: new Date(now.getFullYear(), now.getMonth(), 1),
-      end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
-    };
+  const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>({
+    start: new Date(),
+    end: new Date(),
   });
-
-  const dateRange = useMemo(() => {
-    const now = new Date();
-    if (selection === "Last Month") {
-      return {
-        start: new Date(now.getFullYear(), now.getMonth() - 1, 1),
-        end: new Date(now.getFullYear(), now.getMonth(), 0),
-      };
-    }
-    return customRange;
-  }, [selection, customRange]);
-
-  const SELECTION_TABS = ["Last Month", "Custom"];
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [tempStart, setTempStart] = useState(new Date());
+  const [tempEnd, setTempEnd] = useState(new Date());
 
   const { isLoading, stats } = useStaycationDashboard(
     serviceId || "",
-    dateRange.start,
-    dateRange.end,
+    timeFilter,
     "All Rooms",
+    customRange,
   );
 
   const toggleWeek = (id: string) => {
@@ -138,18 +142,10 @@ export const StaycationDashboardScreen = () => {
     setExpandedWeek(expandedWeek === id ? null : id);
   };
 
-  const handleSelectionPress = (tab: string) => {
-    if (tab === "Custom") {
-      setIsCustomSheetVisible(true);
-    } else {
-      setSelection(tab);
-    }
-  };
-
-  const handleApplyCustomRange = (start: Date, end: Date) => {
-    setCustomRange({ start, end });
-    setSelection("Custom");
-    setIsCustomSheetVisible(false);
+  const handleApplyCustomRange = () => {
+    setCustomRange({ start: tempStart, end: tempEnd });
+    setTimeFilter("Custom");
+    setIsCustomModalVisible(false);
   };
 
   return (
@@ -166,35 +162,104 @@ export const StaycationDashboardScreen = () => {
           Selection
         </Text>
         <View style={styles.selectionTabs}>
-          {SELECTION_TABS.map(tab => {
-            const isActive = selection === tab;
-            const isCustom = tab === "Custom";
-            return (
-              <TouchableOpacity
-                key={tab}
-                onPress={() => handleSelectionPress(tab)}
-                activeOpacity={0.8}
-                style={[styles.selectionTab, isActive && styles.activeSelectionTab]}>
-                {isCustom && (
-                  <Calendar size={ms(20)} color={isActive ? COLORS.text.inverse : "#8C8C8C"} />
-                )}
-                <Text
-                  variant="body2"
-                  weight="semiBold"
-                  style={[styles.selectionTabText, isActive && styles.activeSelectionTabText]}>
-                  {tab}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          <FilterTab
+            label="Yesterday"
+            isActive={timeFilter === "Yesterday"}
+            onPress={() => setTimeFilter("Yesterday")}
+          />
+          <FilterTab
+            label={"Last\nweek"}
+            isActive={timeFilter === "Last week"}
+            onPress={() => setTimeFilter("Last week")}
+          />
+          <FilterTab
+            label={"Last\nMonth"}
+            isActive={timeFilter === "Last Month"}
+            onPress={() => setTimeFilter("Last Month")}
+          />
+          <FilterTab
+            label="Custom"
+            isActive={timeFilter === "Custom"}
+            onPress={() => {
+              setTempStart(customRange.start);
+              setTempEnd(customRange.end);
+              setIsCustomModalVisible(true);
+            }}
+            icon={
+              <Calendar
+                size={ms(16)}
+                color={timeFilter === "Custom" ? COLORS.text.inverse : COLORS.text.muted}
+              />
+            }
+          />
         </View>
       </View>
 
-      <CustomRangeSheet
-        visible={isCustomSheetVisible}
-        onClose={() => setIsCustomSheetVisible(false)}
-        onApply={handleApplyCustomRange}
-        initialRange={customRange}
+      {/* Custom Date Selection Modal */}
+      <Modal
+        visible={isCustomModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCustomModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text variant="h3" weight="bold">
+                Custom Range
+              </Text>
+              <TouchableOpacity onPress={() => setIsCustomModalVisible(false)}>
+                <X size={ms(24)} color={COLORS.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalContent}>
+              <Text variant="body2" weight="medium" style={styles.inputLabel}>
+                From
+              </Text>
+              <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
+                <Text>{tempStart.toLocaleDateString("en-GB")}</Text>
+                <Calendar size={ms(18)} color={COLORS.primary} />
+              </TouchableOpacity>
+
+              <Text variant="body2" weight="medium" style={styles.inputLabel}>
+                To
+              </Text>
+              <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
+                <Text>{tempEnd.toLocaleDateString("en-GB")}</Text>
+                <Calendar size={ms(18)} color={COLORS.primary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.applyButton} onPress={handleApplyCustomRange}>
+                <Text variant="body1" weight="bold" color={COLORS.text.inverse}>
+                  Apply Filter
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <DatePicker
+        modal
+        open={showStartPicker}
+        date={tempStart}
+        mode="date"
+        onConfirm={date => {
+          setShowStartPicker(false);
+          setTempStart(date);
+        }}
+        onCancel={() => setShowStartPicker(false)}
+      />
+      <DatePicker
+        modal
+        open={showEndPicker}
+        date={tempEnd}
+        mode="date"
+        onConfirm={date => {
+          setShowEndPicker(false);
+          setTempEnd(date);
+        }}
+        onCancel={() => setShowEndPicker(false)}
       />
 
       {isLoading ? (
@@ -418,12 +483,58 @@ const styles = StyleSheet.create({
   },
   selectionTabText: {
     fontSize: fs(12),
-    color: "#8C8C8C",
     textAlign: "center",
   },
   activeSelectionTabText: {
     color: COLORS.text.inverse,
   },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: hs(20),
+  },
+  modalContainer: {
+    width: "100%",
+    backgroundColor: COLORS.background,
+    borderRadius: ms(20),
+    padding: hs(20),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: vs(20),
+  },
+  modalContent: {
+    gap: vs(12),
+  },
+  inputLabel: {
+    color: COLORS.text.muted,
+  },
+  dateInput: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: COLORS.surface.primary,
+    padding: hs(12),
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+  },
+  applyButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: vs(14),
+    borderRadius: ms(10),
+    alignItems: "center",
+    marginTop: vs(10),
+  },
+
   sectionContainer: {
     marginTop: vs(24),
   },

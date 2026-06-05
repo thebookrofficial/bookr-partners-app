@@ -2,13 +2,21 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Modal,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
-import { Calendar } from "lucide-react-native";
+import { Calendar, X } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
+import DatePicker from "react-native-date-picker";
 
 // Navigation & DB Imports
 import { RouteProp, useRoute } from "@react-navigation/native";
@@ -50,6 +58,20 @@ export const SportsDashboardScreen = () => {
   const [timeFilter, setTimeFilter] = useState("Yesterday");
   const [groundFilter, setGroundFilter] = useState("Overall");
 
+  // Custom Date Range State
+  const [customRange, setCustomRange] = useState({ start: new Date(), end: new Date() });
+  const [isCustomModalVisible, setIsCustomModalVisible] = useState(false);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [tempStart, setTempStart] = useState(new Date());
+  const [tempEnd, setTempEnd] = useState(new Date());
+
+  const handleApplyCustomRange = () => {
+    setCustomRange({ start: tempStart, end: tempEnd });
+    setTimeFilter("Custom");
+    setIsCustomModalVisible(false);
+  };
+
   // Sync route param with store if we arrived via a deep link or specific tab click
   useEffect(() => {
     if (routeCategory && routeCategory !== storedCategory) {
@@ -65,7 +87,7 @@ export const SportsDashboardScreen = () => {
     metrics,
     grounds,
     loading: dataLoading,
-  } = useSportsDashboard(currentVenueId, timeFilter, groundFilter, selectedCategory);
+  } = useSportsDashboard(currentVenueId, timeFilter, groundFilter, selectedCategory, customRange);
 
   const { activeVenueName } = useServiceStore();
 
@@ -154,7 +176,11 @@ export const SportsDashboardScreen = () => {
                 <FilterTab
                   label="Custom"
                   isActive={timeFilter === "Custom"}
-                  onPress={() => setTimeFilter("Custom")}
+                  onPress={() => {
+                    setTempStart(customRange.start);
+                    setTempEnd(customRange.end);
+                    setIsCustomModalVisible(true);
+                  }}
                   icon={
                     <Calendar
                       size={ms(16)}
@@ -336,6 +362,73 @@ export const SportsDashboardScreen = () => {
         )}
         <View style={{ height: vs(120) }} />
       </ScrollView>
+
+      {/* Custom Date Selection Modal */}
+      <Modal
+        visible={isCustomModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCustomModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text variant="h3" weight="bold">
+                Custom Range
+              </Text>
+              <TouchableOpacity onPress={() => setIsCustomModalVisible(false)}>
+                <X size={ms(24)} color={COLORS.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalContent}>
+              <Text variant="body2" weight="medium" style={styles.inputLabel}>
+                From
+              </Text>
+              <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
+                <Text>{tempStart.toLocaleDateString("en-GB")}</Text>
+                <Calendar size={ms(18)} color={COLORS.primary} />
+              </TouchableOpacity>
+
+              <Text variant="body2" weight="medium" style={styles.inputLabel}>
+                To
+              </Text>
+              <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
+                <Text>{tempEnd.toLocaleDateString("en-GB")}</Text>
+                <Calendar size={ms(18)} color={COLORS.primary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.applyButton} onPress={handleApplyCustomRange}>
+                <Text variant="body1" weight="bold" color={COLORS.text.inverse}>
+                  Apply Filter
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <DatePicker
+        modal
+        open={showStartPicker}
+        date={tempStart}
+        mode="date"
+        onConfirm={date => {
+          setShowStartPicker(false);
+          setTempStart(date);
+        }}
+        onCancel={() => setShowStartPicker(false)}
+      />
+      <DatePicker
+        modal
+        open={showEndPicker}
+        date={tempEnd}
+        mode="date"
+        onConfirm={date => {
+          setShowEndPicker(false);
+          setTempEnd(date);
+        }}
+        onCancel={() => setShowEndPicker(false)}
+      />
     </ScreenContainer>
   );
 };
@@ -467,6 +560,52 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     paddingRight: hs(10),
     minWidth: hs(40),
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: hs(20),
+  },
+  modalContainer: {
+    width: "100%",
+    backgroundColor: COLORS.background,
+    borderRadius: ms(20),
+    padding: hs(20),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: vs(20),
+  },
+  modalContent: {
+    gap: vs(12),
+  },
+  inputLabel: {
+    color: COLORS.text.muted,
+  },
+  dateInput: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: COLORS.surface.primary,
+    padding: hs(12),
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+  },
+  applyButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: vs(14),
+    borderRadius: ms(10),
+    alignItems: "center",
+    marginTop: vs(10),
   },
 
   loader: { marginTop: vs(60) },
