@@ -181,7 +181,7 @@ export const VendorProfileScreen = () => {
         )}
       </View>
 
-      <View style={{ height: vs(40) }} />
+      <View style={{ height: vs(100) }} />
     </ScreenContainer>
   );
 };

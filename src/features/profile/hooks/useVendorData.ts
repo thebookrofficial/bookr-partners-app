@@ -58,6 +58,7 @@ export const useVendorData = () => {
           .from("venues")
           .select("*, sports_venues(sports_type)")
           .eq("owner_id", clientData.id)
+          .eq("status", "active")
           .is("deleted_at", null);
 
         if (venuesError) throw venuesError;
