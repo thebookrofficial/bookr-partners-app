@@ -98,16 +98,22 @@ export const useStaycationVenues = (options: UseStaycationVenuesOptions = {}) =>
         setVenues(uniqueVenues);
 
         if (uniqueVenues.length > 0) {
-          let currentId = forcedVenueId || activeVenueId || initialVenueId;
-          const exists = uniqueVenues.find(v => v.id === currentId);
+          let currentId: string | null = forcedVenueId || null;
 
-          if (!currentId || !exists) {
-            if (initialVenueId) {
-              const matchedByVenueId = uniqueVenues.find(v => v.venueId === initialVenueId);
-              currentId = matchedByVenueId ? matchedByVenueId.id : uniqueVenues[0].id;
-            } else {
-              currentId = uniqueVenues[0].id;
+          // If a new initialVenueId is provided, attempt to match it.
+          if (!currentId && initialVenueId) {
+            const matchedByVenueId = uniqueVenues.find(
+              v => v.venueId === initialVenueId || v.id === initialVenueId,
+            );
+            if (matchedByVenueId) {
+              currentId = matchedByVenueId.id;
             }
+          }
+
+          // Fallback to existing activeVenueId (if it's still valid), then default to the first venue.
+          if (!currentId || !uniqueVenues.find(v => v.id === currentId)) {
+            const exists = uniqueVenues.find(v => v.id === activeVenueId);
+            currentId = exists ? (activeVenueId as string) : uniqueVenues[0].id;
           }
 
           setActiveVenueId(currentId);

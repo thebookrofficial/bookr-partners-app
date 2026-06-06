@@ -159,13 +159,12 @@ export const StaycationHistoryScreen = () => {
         }
         ListHeaderComponent={
           <>
-            <View style={{ paddingHorizontal: hs(12) }}>
-              <StaycationHeader
-                title={venue?.name || "Vally view farmhouse"}
-                subtitle="History"
-                imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
-              />
-              {/* 
+            <StaycationHeader
+              title={venue?.name || "Vally view farmhouse"}
+              subtitle="History"
+              imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
+            />
+            {/* 
               <View style={styles.tabRow}>
                 <Text variant="body1" weight="bold" style={styles.bookingsLabel}>
                   Bookings
@@ -177,59 +176,51 @@ export const StaycationHistoryScreen = () => {
                 </View>
               </View> */}
 
-              <View style={styles.filterRow}>
-                <Text variant="body2" weight="semiBold" style={styles.monthText}>
-                  {dateFilter === "all"
-                    ? "Past History"
-                    : dateFilter === "3_months"
-                    ? "Last 3 Months"
-                    : dateFilter === "6_months"
-                    ? "Last 6 Months"
-                    : dateFilter === "9_months"
-                    ? "Last 9 Months"
-                    : customRange
-                    ? `${customRange.start.toLocaleDateString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })} - ${customRange.end.toLocaleDateString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}`
-                    : "Custom Range"}
-                </Text>
-                <TouchableOpacity onPress={() => setIsFilterOpen(true)}>
-                  <Calendar size={ms(16)} color={COLORS.text.primary} />
-                </TouchableOpacity>
-              </View>
+            <View style={styles.filterRow}>
+              <Text variant="body2" weight="semiBold" style={styles.monthText}>
+                {dateFilter === "all"
+                  ? "Past History"
+                  : dateFilter === "3_months"
+                  ? "Last 3 Months"
+                  : dateFilter === "6_months"
+                  ? "Last 6 Months"
+                  : dateFilter === "9_months"
+                  ? "Last 9 Months"
+                  : customRange
+                  ? `${customRange.start.toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })} - ${customRange.end.toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}`
+                  : "Custom Range"}
+              </Text>
+              <TouchableOpacity onPress={() => setIsFilterOpen(true)}>
+                <Calendar size={ms(16)} color={COLORS.text.primary} />
+              </TouchableOpacity>
             </View>
           </>
         }
         renderItem={({ item }) => (
-          <View style={{ paddingHorizontal: hs(12) }}>
-            <HistoryCard
-              name={item.name}
-              phone={item.phone}
-              dateRange={`${formatDisplayDate(item.checkIn)} - ${formatDisplayDate(item.checkOut)}`}
-              guests={item.guestCount}
-              price={item.paidAmount}
-              status={item.status}
-              onPress={() =>
-                navigation.navigate("StaycationInvoice", {
-                  bookingId: item.id,
-                })
-              }
-            />
-          </View>
+          <HistoryCard
+            name={item.name}
+            phone={item.phone}
+            dateRange={`${formatDisplayDate(item.checkIn)} - ${formatDisplayDate(item.checkOut)}`}
+            guests={item.guestCount}
+            price={item.paidAmount}
+            status={item.status}
+            onPress={() =>
+              navigation.navigate("StaycationInvoice", {
+                bookingId: item.id,
+              })
+            }
+          />
         )}
         renderSectionHeader={({ section }) => (
-          <View style={{ paddingHorizontal: hs(12) }}>
-            <MonthSectionHeader
-              month={section.date}
-              totalSettlement={(section as any).settlement}
-            />
-          </View>
+          <MonthSectionHeader month={section.date} totalSettlement={(section as any).settlement} />
         )}
         ListEmptyComponent={
           !isLoading ? (

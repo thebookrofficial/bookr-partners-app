@@ -60,3 +60,5 @@ export const useAuthStore = create<AuthState>(set => ({
   setClientProfile: clientProfile => set({ clientProfile }),
   setInitialized: status => set({ isInitialized: status }),
 }));
+
+export * from "./serviceStore";
