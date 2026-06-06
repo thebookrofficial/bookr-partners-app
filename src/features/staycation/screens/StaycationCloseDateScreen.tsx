@@ -21,6 +21,7 @@ import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
 import { useStaycationHome } from "../hooks/useStaycationHome";
 import { useStaycationCloseDate, ClosedDateRecord } from "../hooks/useStaycationCloseDate";
+import { useServiceStore } from "@/store";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -29,6 +30,7 @@ export const StaycationCloseDateScreen = () => {
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationCloseDate">>();
   const { serviceId } = route.params;
   const { activeVenue: venue } = useStaycationHome(serviceId);
+  const { activeVenueName } = useServiceStore();
 
   const {
     upcomingClosedDates,
@@ -195,7 +197,7 @@ export const StaycationCloseDateScreen = () => {
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <StaycationHeader
-          title={venue?.name || "Loading..."}
+          title={venue?.name || activeVenueName}
           subtitle="Close date"
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
           onBack={() => navigation.goBack()}

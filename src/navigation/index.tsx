@@ -67,6 +67,7 @@ import { EventEntryDetailsScreen } from "@/features/event/screens/EventEntryDeta
 import { EventScanConfirmationScreen } from "@/features/event/screens/EventScanConfirmationScreen";
 import { LegalViewScreen } from "@/features/settings/screens/LegalViewScreen";
 import { NotificationSettingsScreen } from "@/features/settings/screens/NotificationSettingsScreen";
+import { FAQScreen } from "@/features/settings/screens/FAQScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
 import { PayoutsScreen } from "@/features/finance/screens/PayoutsScreen";
@@ -337,6 +338,7 @@ const MainNavigator = () => (
     <MainStack.Screen name="Payouts" component={PayoutsScreen} />
     <MainStack.Screen name="PayoutDetails" component={PayoutDetailsScreen} />
     <MainStack.Screen name="SportsInvoice" component={SportsInvoiceScreen} />
+    <MainStack.Screen name="FAQ" component={FAQScreen} />
   </MainStack.Navigator>
 );
 

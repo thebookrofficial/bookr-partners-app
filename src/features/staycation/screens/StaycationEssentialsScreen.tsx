@@ -10,6 +10,7 @@ import {
   Ban,
   Ticket,
   Banknote,
+  HelpCircle,
   //  RefreshCw,
   ChevronRight,
 } from "lucide-react-native";
@@ -18,6 +19,7 @@ import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
 import { useStaycationHome } from "../hooks/useStaycationHome";
+import { useServiceStore } from "@/store";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -42,6 +44,7 @@ const EssentialsItem = ({ label, Icon, onPress }: EssentialsItemProps) => (
 export const StaycationEssentialsScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationEssentials">>();
+  const { activeVenueName } = useServiceStore();
 
   // Extract serviceId with fallback from parent navigator
   let serviceId = route.params?.serviceId;
@@ -61,6 +64,8 @@ export const StaycationEssentialsScreen = () => {
       navigation.navigate("StaycationOffers", { serviceId });
     } else if (label === "Payouts") {
       navigation.navigate("Payouts", { venueId: serviceId });
+    } else if (label === "FAQ's") {
+      navigation.navigate("FAQ", { vertical: "staycation" });
     } else {
       // Handle other presses
     }
@@ -69,7 +74,7 @@ export const StaycationEssentialsScreen = () => {
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <StaycationHeader
-        title={venue?.name || "Vally view farmhouse"}
+        title={venue?.name || activeVenueName}
         subtitle="Essentials"
         imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
       />
@@ -78,6 +83,7 @@ export const StaycationEssentialsScreen = () => {
         <EssentialsItem label="Close date" Icon={Ban} onPress={() => handlePress("Close date")} />
         <EssentialsItem label="Offers" Icon={Ticket} onPress={() => handlePress("Offers")} />
         <EssentialsItem label="Payouts" Icon={Banknote} onPress={() => handlePress("Payouts")} />
+        <EssentialsItem label="FAQ's" Icon={HelpCircle} onPress={() => handlePress("FAQ's")} />
         {/* <EssentialsItem
           label="Update Venue Info"
           Icon={RefreshCw}

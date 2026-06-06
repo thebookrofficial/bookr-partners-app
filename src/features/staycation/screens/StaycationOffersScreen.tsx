@@ -33,6 +33,7 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
 import { useStaycationHome } from "../hooks/useStaycationHome";
 import { useStaycationOffers } from "../hooks/useStaycationOffers";
+import { useServiceStore } from "@/store";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -40,10 +41,11 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
  * StaycationOffersScreen - Manage coupons and discounts for a staycation venue.
  */
 export const StaycationOffersScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationOffers">>();
   const { serviceId } = route.params;
   const { activeVenue: venue } = useStaycationHome(serviceId);
+  const { activeVenueName } = useServiceStore();
 
   // Hook for Database Interactions
   const {
@@ -252,7 +254,7 @@ export const StaycationOffersScreen = () => {
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <StaycationHeader
-          title={venue?.name || "Staycation Venue"}
+          title={venue?.name || activeVenueName}
           subtitle="Offers"
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
           onBack={() => navigation.goBack()}

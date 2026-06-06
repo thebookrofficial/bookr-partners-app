@@ -106,6 +106,7 @@ export type MainStackParamList = {
     totalBookings: number;
   };
   SportsInvoice: { bookingId: string };
+  FAQ: { vertical: "sports" | "staycation" };
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

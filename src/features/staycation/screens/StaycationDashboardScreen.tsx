@@ -21,6 +21,7 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
 import { useStaycationHome } from "../hooks/useStaycationHome";
 import { useStaycationDashboard } from "../hooks/useStaycationDashboard";
+import { useServiceStore } from "@/store";
 import DatePicker from "react-native-date-picker";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
@@ -105,6 +106,7 @@ const DonutChart = ({ size = ms(100), strokeWidth = 6, onlineRevenue, totalReven
 export const StaycationDashboardScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationDashboard">>();
+  const { activeVenueName } = useServiceStore();
 
   // Extract serviceId with fallback from parent navigator
   let serviceId = route.params?.serviceId;
@@ -151,7 +153,7 @@ export const StaycationDashboardScreen = () => {
   return (
     <ScreenContainer scrollable paddingHorizontal={hs(12)}>
       <StaycationHeader
-        title={venue?.name || "Staycation Property"}
+        title={venue?.name || activeVenueName}
         subtitle="Dashboard"
         imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
       />

@@ -17,6 +17,7 @@ import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
 import { Plus, Calendar as CalendarIcon, ChevronDown, ChevronUp } from "lucide-react-native";
+import { useServiceStore } from "@/store";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { StaycationBooking } from "../types/staycation.types";
@@ -34,6 +35,7 @@ type ListEntry =
   | { type: "booking"; data: StaycationBooking; sectionTitle: string };
 
 export const StaycationResortContent = ({ initialVenueId }: StaycationResortContentProps) => {
+  const { activeVenueName } = useServiceStore();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [activeRoomType, setActiveRoomType] = useState("All");
@@ -221,7 +223,7 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
     return (
       <View style={styles.headerContainer}>
         <StaycationHeader
-          title={activeVenue?.name || "Staycation Venue"}
+          title={activeVenue?.name || activeVenueName}
           subtitle="Bookings"
           imageSource={
             activeVenue?.cover_image_url ? { uri: activeVenue.cover_image_url } : USER_PROFILE
@@ -329,6 +331,7 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
     );
   }, [
     activeVenue,
+    activeVenueName,
     activeRoomStatus,
     selectedDate,
     showDatePicker,

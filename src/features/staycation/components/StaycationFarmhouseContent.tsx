@@ -16,6 +16,7 @@ import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
 import { Plus, X } from "lucide-react-native";
+import { useServiceStore } from "@/store";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { Calendar } from "react-native-calendars";
@@ -31,6 +32,7 @@ interface StaycationFarmhouseContentProps {
 type ListEntry = { type: "header"; title: string } | { type: "booking"; data: StaycationBooking };
 
 export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhouseContentProps) => {
+  const { activeVenueName } = useServiceStore();
   const {
     isLoading,
     markedDates,
@@ -113,7 +115,7 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
     () => (
       <View style={styles.headerContainer}>
         <StaycationHeader
-          title={activeVenue?.name || "Staycation Venue"}
+          title={activeVenue?.name || activeVenueName}
           subtitle="Bookings"
           imageSource={
             activeVenue?.cover_image_url ? { uri: activeVenue.cover_image_url } : USER_PROFILE
@@ -189,7 +191,7 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
         </View>
       </View>
     ),
-    [activeVenue, markedDates, selectedDate, setSelectedDate, isDateClosed],
+    [activeVenue, activeVenueName, markedDates, selectedDate, setSelectedDate, isDateClosed],
   );
 
   return (

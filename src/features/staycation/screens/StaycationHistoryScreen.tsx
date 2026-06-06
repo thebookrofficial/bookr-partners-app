@@ -21,6 +21,7 @@ import { StaycationTabParamList } from "@/navigation/navigation.types";
 import { useStaycationHistory } from "../hooks/useStaycationHistory";
 import { DateFilterOption } from "../hooks/useStaycationHistory";
 import { FilterBottomSheet } from "../../sports/components/FilterBottomSheet";
+import { useServiceStore } from "@/store";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -105,6 +106,7 @@ const formatDisplayDate = (dateStr: string) => {
 export const StaycationHistoryScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationHistory">>();
+  const { activeVenueName } = useServiceStore();
 
   // Extract serviceId with fallback from parent navigator
   let serviceId = route.params?.serviceId;
@@ -160,7 +162,7 @@ export const StaycationHistoryScreen = () => {
         ListHeaderComponent={
           <>
             <StaycationHeader
-              title={venue?.name || "Vally view farmhouse"}
+              title={venue?.name || activeVenueName}
               subtitle="History"
               imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
             />
