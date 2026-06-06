@@ -10,10 +10,11 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Linking,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
-import { ChevronDown, ChevronUp, ChevronLeft } from "lucide-react-native";
+import { ChevronDown, ChevronUp, ChevronLeft, Phone } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -107,6 +108,10 @@ export const FAQScreen = () => {
   const vertical = route.params?.vertical || "sports";
   const data = FAQ_DATA[vertical as keyof typeof FAQ_DATA] || FAQ_DATA.sports;
 
+  const handleCall = () => {
+    Linking.openURL("tel:+919270368494");
+  };
+
   return (
     <ScreenContainer backgroundColor={COLORS.background}>
       <View style={styles.header}>
@@ -119,6 +124,18 @@ export const FAQScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.supportRow}>
+          <Text variant="body1" weight="semiBold">
+            Customer Care
+          </Text>
+          <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
+            <Phone size={ms(18)} color={COLORS.text.inverse} fill={COLORS.text.inverse} />
+            <Text variant="body2" weight="bold" color={COLORS.text.inverse}>
+              Call
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <Text variant="body1" weight="semiBold" style={styles.sectionTitle}>
           Frequently Asked Questions
         </Text>
@@ -140,7 +157,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: hs(16),
+    paddingHorizontal: hs(6),
     paddingVertical: vs(12),
     gap: hs(12),
   },
@@ -153,11 +170,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   scrollContent: {
-    paddingHorizontal: hs(16),
+    paddingHorizontal: hs(6),
     paddingBottom: vs(40),
   },
+  supportRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: COLORS.surface.primary,
+    paddingHorizontal: hs(16),
+    paddingVertical: vs(12),
+    borderRadius: ms(12),
+    marginTop: vs(10),
+  },
+  callBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: hs(16),
+    paddingVertical: vs(8),
+    borderRadius: ms(20),
+    gap: hs(8),
+  },
   sectionTitle: {
-    marginTop: vs(20),
+    marginTop: vs(24),
     fontSize: fs(18),
   },
   subtitle: {
