@@ -136,8 +136,8 @@ export const useBulkBooking = () => {
             .from("sports_bookings")
             .insert({
               user_id: profile?.id || null,
-              guest_name: profile ? null : params.name,
-              guest_phone: profile ? null : cleanMobile,
+              guest_name: params.name,
+              guest_phone: cleanMobile,
               venue_id: venueId,
               slot_id: slotId,
               booking_status: "confirmed",
@@ -149,6 +149,7 @@ export const useBulkBooking = () => {
               platform_fee: 0,
               gateway_fee: 0,
               paid_amount: 0,
+              booking_source: "offline", // ADDED: Set booking source to offline
 
               notes: "Bulk Booking Record",
             })

@@ -6,7 +6,6 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -57,15 +56,6 @@ const HOURS = [
   "11 PM",
   "12 AM",
 ];
-
-const parseTimeTo24 = (time12h: string): string => {
-  if (!time12h || time12h === "12 AM") return "00:00:00";
-  const [time, modifier] = time12h.split(" ");
-  let hours = parseInt(time, 10);
-  if (hours === 12 && modifier === "AM") hours = 0;
-  if (hours < 12 && modifier === "PM") hours += 12;
-  return `${hours.toString().padStart(2, "0")}:00:00`;
-};
 
 // ==========================================
 // CREATE MODE (Internal Component)
@@ -118,9 +108,7 @@ const CreateBulkBooking = ({
   const [toDate, setToDate] = useState(new Date());
   const [fromTime, setFromTime] = useState("7 AM");
   const [toTime, setToTime] = useState("8 AM");
-  const [pricePerHour] = useState(1000);
-  const [totalPaymentInput, setTotalPaymentInput] = useState("1000");
-  const [totalPaymentEdited, setTotalPaymentEdited] = useState(false);
+  const [pricePerHour, setPricePerHour] = useState(1000);
   const [cashInput, setCashInput] = useState("");
   const [onlineInput, setOnlineInput] = useState("");
   const [stagedPayments, setStagedPayments] = useState<{ mode: "cash" | "upi"; amount: number }[]>(
@@ -129,59 +117,39 @@ const CreateBulkBooking = ({
   const [showDatePicker, setShowDatePicker] = useState<"from" | "to" | null>(null);
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
-  const [showProcessingModal, setShowProcessingModal] = useState(false);
 
-  const { confirmBulkBooking, isSubmitting } = useBulkBooking();
-
-  const [bookedSlotHours, setBookedSlotHours] = useState<string[]>([]);
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
 
   useEffect(() => {
-    const fetchBooked = async () => {
-      const dateStr = fromDate.toISOString().split("T")[0];
-
+    const fetchBookedSlots = async () => {
+      if (!selectedGroundId || !fromDate) return;
+      const formattedDate = fromDate.toISOString().split("T")[0];
       const { data } = await supabase
         .from("sports_slots")
-        .select("start_time")
-        .eq("venue_id", venueId)
+        .select("start_time, status")
         .eq("ground_id", selectedGroundId)
-        .eq("slot_date", dateStr)
-        .neq("status", "available");
+        .eq("slot_date", formattedDate);
 
-      const dbSlots = data ? data.map(s => s.start_time.slice(0, 2)) : [];
-      setBookedSlotHours([...new Set(dbSlots)]);
+      if (data) {
+        const unavailable = data
+          .filter(slot => slot.status === "booked")
+          .map(slot => slot.start_time);
+        setBookedSlots(unavailable);
+      }
     };
+    fetchBookedSlots();
+  }, [selectedGroundId, fromDate]);
 
-    if (selectedGroundId) {
-      fetchBooked();
-    }
-  }, [venueId, selectedGroundId, fromDate]);
-
-  const currentHour = new Date().getHours();
-  const isToday = new Date().toDateString() === fromDate.toDateString();
-  const pastSlotHours = isToday
-    ? HOURS.filter(hour => parseInt(parseTimeTo24(hour), 10) <= currentHour).map(hour =>
-        parseTimeTo24(hour).slice(0, 2),
-      )
-    : [];
+  const { confirmBulkBooking, isSubmitting } = useBulkBooking();
 
   const totalSlots =
     (bookingType === "single"
       ? 1
       : Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1) *
     (HOURS.indexOf(toTime) - HOURS.indexOf(fromTime));
-  const defaultTotalPayment = totalSlots * pricePerHour;
-
-  useEffect(() => {
-    if (!totalPaymentEdited) {
-      setTotalPaymentInput(defaultTotalPayment.toString());
-    }
-  }, [defaultTotalPayment, totalPaymentEdited]);
-
-  const totalPaymentValue = parseFloat(totalPaymentInput.replace(/[^\d]/g, "")) || 0;
+  const totalPayment = totalSlots * pricePerHour;
   const amountPaid = stagedPayments.reduce((sum, p) => sum + p.amount, 0);
-  const remainingAmount = totalPaymentValue - amountPaid;
-  const totalAmountPerSlot =
-    totalSlots > 0 ? Math.round(totalPaymentValue / totalSlots) : pricePerHour;
+  const remainingAmount = totalPayment - amountPaid;
 
   const { activeVenueName } = useServiceStore();
 
@@ -232,14 +200,6 @@ const CreateBulkBooking = ({
       Alert.alert("Missing Info", "Please ensure dates, times, ground, and guest info are valid.");
       return;
     }
-
-    if (totalPaymentValue <= 0) {
-      Alert.alert("Invalid Amount", "Total payment must be greater than zero.");
-      return;
-    }
-
-    setShowProcessingModal(true);
-
     const success = await confirmBulkBooking({
       ownerId,
       venueId,
@@ -251,10 +211,9 @@ const CreateBulkBooking = ({
       toDate: bookingType === "single" ? fromDate : toDate,
       fromTime,
       toTime,
-      totalAmountPerSlot: totalAmountPerSlot,
+      totalAmountPerSlot: pricePerHour,
       initialPayments: stagedPayments,
     });
-    setShowProcessingModal(false);
     if (success) navigation.goBack();
   };
 
@@ -418,14 +377,17 @@ const CreateBulkBooking = ({
           <Text style={styles.labelBold}>Total Payment</Text>
           <TextInput
             variant="filled"
-            keyboardType="numeric"
-            value={totalPaymentInput}
-            onChangeText={value => {
-              const numeric = value.replace(/[^\d]/g, "");
-              setTotalPaymentInput(numeric);
-              setTotalPaymentEdited(true);
+            value={String(totalPayment)} // Display totalPayment
+            onChangeText={text => {
+              const newTotalPayment = parseFloat(text || "0");
+              if (!isNaN(newTotalPayment) && totalSlots > 0) {
+                setPricePerHour(newTotalPayment / totalSlots); // Calculate pricePerHour
+              } else if (isNaN(newTotalPayment) && text === "") {
+                setPricePerHour(0);
+              }
             }}
-            placeholder="Enter total amount"
+            keyboardType="numeric"
+            placeholder="₹ 0"
             style={styles.inputFill}
           />
         </View>
@@ -503,107 +465,57 @@ const CreateBulkBooking = ({
         />
       )}
 
-      <Modal
-        visible={showProcessingModal}
-        transparent
-        animationType="fade"
-        statusBarTranslucent={true}>
-        <View style={styles.processingOverlay}>
-          <View style={styles.processingContainer}>
-            <Text style={styles.processingTitle}>Wait for confirmation</Text>
-            <Text style={styles.processingSubtitle}>
-              Booking your bulk slots. This may take a few seconds.
-            </Text>
-            <ActivityIndicator size="large" color="#000" style={styles.processingIndicator} />
-          </View>
-        </View>
-      </Modal>
-
       {/* --- TIME PICKER MODAL --- */}
-      <Modal
-        visible={!!showHourPicker}
-        transparent
-        animationType="fade"
-        statusBarTranslucent={true}>
-        <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback onPress={() => setShowHourPicker(null)}>
-            <View style={styles.modalBackground} />
-          </TouchableWithoutFeedback>
-
+      <Modal visible={!!showHourPicker} transparent animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowHourPicker(null)}>
           <View style={styles.pickerContainer}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>
-                  {showHourPicker === "from" ? "Choose start time" : "Choose end time"}
-                </Text>
-                <Text style={styles.modalSubtitle}>
-                  Select a slot for your bulk booking. Booked and unavailable hours are shown below.
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowHourPicker(null)}
-                style={styles.modalCloseButton}>
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              nestedScrollEnabled
-              contentContainerStyle={styles.timePickerScrollContent}
-              keyboardShouldPersistTaps="handled">
+            <ScrollView showsVerticalScrollIndicator={false}>
               {HOURS.map(hour => {
-                const hour24 = parseTimeTo24(hour).slice(0, 2);
-                const isBooked = bookedSlotHours.includes(hour24);
-                const isUnavailable = pastSlotHours.includes(hour24) && !isBooked;
-                const currentSelection = showHourPicker === "from" ? fromTime : toTime;
-                const isSelected = hour === currentSelection;
-                const label = isBooked ? "Booked" : isUnavailable ? "Unavailable" : "Available";
-                const isDisabled = isBooked || isUnavailable;
+                const now = new Date();
+                const currentHour24 = now.getHours();
+                const currentMinute = now.getMinutes();
+
+                const hour12h = hour;
+                let [h, ampm] = hour12h.split(" ");
+                let hour24 = parseInt(h, 10);
+                if (ampm === "PM" && hour24 !== 12) hour24 += 12;
+                if (ampm === "AM" && hour24 === 12) hour24 = 0;
+
+                const isPast =
+                  fromDate.toDateString() === now.toDateString() &&
+                  (hour24 < currentHour24 || (hour24 === currentHour24 && currentMinute > 0));
+
+                const isBooked = bookedSlots.some(bookedTime => {
+                  const [bookedHour] = bookedTime.split(":").map(Number);
+                  return bookedHour === hour24;
+                });
+
+                const isDisabled = isPast || isBooked;
 
                 return (
                   <TouchableOpacity
                     key={hour}
-                    disabled={isDisabled}
-                    activeOpacity={0.7}
-                    style={[
-                      styles.pickerItem,
-                      isDisabled && styles.pickerItemDisabled,
-                      isSelected && styles.pickerItemSelected,
-                    ]}
+                    style={[styles.pickerItem, isDisabled && styles.pickerItemDisabled]}
                     onPress={() => {
+                      if (isDisabled) return;
                       if (showHourPicker === "from") setFromTime(hour);
                       else setToTime(hour);
                       setShowHourPicker(null);
-                    }}>
-                    <Text
-                      style={[styles.pickerHourText, isDisabled && styles.pickerHourTextDisabled]}>
+                    }}
+                    disabled={isDisabled}>
+                    <Text style={[styles.inputText, isDisabled && styles.textDisabled]}>
                       {hour}
                     </Text>
-                    <View style={styles.pickerBadge}>
-                      <Text
-                        style={[
-                          styles.pickerBadgeText,
-                          isBooked && styles.badgeBooked,
-                          isUnavailable && styles.badgeUnavailable,
-                          !isBooked && !isUnavailable && styles.badgeAvailable,
-                        ]}>
-                        {label}
-                      </Text>
-                    </View>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* --- NEW GROUND PICKER MODAL --- */}
-      <Modal
-        visible={showGroundPicker}
-        transparent
-        animationType="fade"
-        statusBarTranslucent={true}>
+      <Modal visible={showGroundPicker} transparent animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowGroundPicker(false)}>
           <View style={styles.pickerContainer}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -784,147 +696,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: vs(10),
   },
-  processingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: hs(24),
-  },
-  processingContainer: {
-    width: "100%",
-    maxWidth: ms(320),
-    backgroundColor: "#FFF",
-    borderRadius: ms(20),
-    padding: ms(24),
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.16,
-    shadowRadius: 24,
-    elevation: 20,
-  },
-  processingTitle: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(18),
-    color: "#111827",
-    marginBottom: vs(8),
-    textAlign: "center",
-  },
-  processingSubtitle: {
-    fontFamily: "Gilroy-Medium",
-    fontSize: fs(14),
-    color: "#4B5563",
-    textAlign: "center",
-    marginBottom: vs(18),
-    lineHeight: fs(20),
-  },
-  processingIndicator: {
-    marginTop: vs(4),
-  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: hs(12),
-  },
-  modalBackground: {
-    ...StyleSheet.absoluteFillObject,
   },
   pickerContainer: {
-    width: "100%",
+    width: "80%",
     backgroundColor: "#FFF",
-    borderRadius: ms(16),
-    maxHeight: "70%",
-    padding: ms(16),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 15,
-  },
-  timePickerScrollContent: {
-    paddingBottom: vs(12),
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: vs(14),
-  },
-  modalTitle: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(16),
-    color: "#000",
-    marginBottom: vs(4),
-  },
-  modalSubtitle: {
-    fontFamily: "Gilroy-Medium",
-    fontSize: fs(12),
-    color: "#6B7280",
-    lineHeight: fs(18),
-    maxWidth: "85%",
-  },
-  modalCloseButton: {
-    width: ms(32),
-    height: ms(32),
-    borderRadius: ms(16),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F4F7FC",
-  },
-  modalCloseText: {
-    fontSize: fs(16),
-    color: "#000",
+    borderRadius: ms(10),
+    maxHeight: "50%",
+    padding: ms(10),
   },
   pickerItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    padding: ms(15),
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEE",
     alignItems: "center",
-    backgroundColor: "#F8FAFD",
-    paddingVertical: vs(14),
-    paddingHorizontal: ms(14),
-    borderRadius: ms(12),
-    marginBottom: vs(8),
   },
   pickerItemDisabled: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#F0F0F0",
+    opacity: 0.6,
   },
-  pickerItemSelected: {
-    borderWidth: 1,
-    borderColor: "#63A1FD",
-    backgroundColor: "#E9F2FF",
-  },
-  pickerHourText: {
-    fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(14),
-    color: "#000",
-  },
-  pickerHourTextDisabled: {
-    color: "#9E9E9E",
-  },
-  pickerBadge: {
-    paddingVertical: vs(4),
-    paddingHorizontal: hs(10),
-    borderRadius: ms(999),
-    backgroundColor: "rgba(0,0,0,0.04)",
-  },
-  pickerBadgeText: {
-    fontFamily: "Gilroy-Medium",
-    fontSize: fs(11),
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    color: "#374151",
-  },
-  badgeBooked: {
-    color: "#B91C1C",
-  },
-  badgeUnavailable: {
-    color: "#6B7280",
-  },
-  badgeAvailable: {
-    color: "#047857",
+  textDisabled: {
+    color: "#A0A0A0",
   },
 
   /* --- FIXED OVERLAY DROPDOWN STYLES --- */
