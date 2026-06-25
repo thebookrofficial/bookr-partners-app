@@ -60,59 +60,19 @@ export const SportsEssentialsScreen = () => {
     const resolveVenueAndGround = async () => {
       setLoading(true);
       try {
-        // Map UI names to exact DB enums
-        const CATEGORY_DB_MAP: Record<string, string> = {
-          Football: "football",
-          "Box Cricket": "box_cricket",
-          Pickleball: "pickleball",
-        };
-        const dbSportType = CATEGORY_DB_MAP[selectedCategory] || selectedCategory;
+        // STRICTLY use the exact venueId from the store/route. No switching!
+        setCurrentVenueId(venueId);
 
-        // Find Owner
-        const { data: initialVenue } = await supabase
-          .from("venues")
-          .select("id, owner_id, sports_venues(sports_type)")
-          .eq("id", venueId)
-          .single();
-        if (!initialVenue) return;
+        // Fetch just the first ground to have as a fallback reference
+        const { data: groundData } = await supabase
+          .from("sports_grounds")
+          .select("id")
+          .eq("venue_id", venueId)
+          .order("display_order", { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
-        // Check if the initial venue itself matches the sport type
-        const initialSportType = initialVenue.sports_venues?.[0]?.sports_type;
-        let finalVenueId = "";
-
-        if (initialSportType === dbSportType) {
-          finalVenueId = initialVenue.id;
-        } else {
-          // Find Venue for Owner + Category
-          const { data: matchedVenue } = await supabase
-            .from("venues")
-            .select("id, sports_venues!inner(sports_type)")
-            .eq("owner_id", initialVenue.owner_id)
-            .eq("sports_venues.sports_type", dbSportType)
-            .limit(1)
-            .maybeSingle();
-
-          if (matchedVenue) finalVenueId = matchedVenue.id;
-        }
-
-        if (finalVenueId) {
-          setCurrentVenueId(finalVenueId);
-
-          // Find First Ground for this matched Venue
-          const { data: groundData } = await supabase
-            .from("sports_grounds")
-            .select("id")
-            .eq("venue_id", finalVenueId)
-            .order("display_order", { ascending: true })
-            .limit(1)
-            .maybeSingle();
-
-          setActiveGroundId(groundData ? groundData.id : "");
-        } else {
-          // Reset if this owner doesn't have a facility for the selected sport
-          setCurrentVenueId("");
-          setActiveGroundId("");
-        }
+        setActiveGroundId(groundData ? groundData.id : "");
       } catch (err) {
         console.error("Resolution error:", err);
       } finally {
@@ -121,7 +81,7 @@ export const SportsEssentialsScreen = () => {
     };
 
     if (venueId) resolveVenueAndGround();
-  }, [venueId, selectedCategory]);
+  }, [venueId]);
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
@@ -145,7 +105,6 @@ export const SportsEssentialsScreen = () => {
             onPress={() =>
               navigation.navigate("BulkBooking", {
                 venueId: currentVenueId,
-                groundId: activeGroundId,
               })
             }
           />

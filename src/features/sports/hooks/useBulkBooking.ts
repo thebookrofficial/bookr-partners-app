@@ -179,6 +179,7 @@ export const useBulkBooking = () => {
             amount: p.amount,
             payment_mode: p.mode, // Safety fallback for enum
             note: "Bulk booking initial payment",
+            logged_by: params.ownerId,
           });
 
           if (payErr) {

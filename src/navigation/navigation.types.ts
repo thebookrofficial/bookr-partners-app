@@ -90,7 +90,7 @@ export type MainStackParamList = {
     vertical: "sports" | "staycation" | "dining" | "events";
   };
   BlockUnblock: { venueId: string; groundId: string };
-  BulkBooking: { venueId: string; groundId: string };
+  BulkBooking: { venueId: string; groundId?: string };
   BulkBookingDetails: {
     bookingId: string;
     type: "multi" | "single";

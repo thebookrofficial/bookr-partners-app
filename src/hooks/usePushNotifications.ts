@@ -1,6 +1,6 @@
 // src/hooks/usePushNotifications.ts
 import { useEffect } from "react";
-import { PermissionsAndroid, Platform, Alert } from "react-native";
+import { PermissionsAndroid, Platform } from "react-native";
 import messaging, { FirebaseMessagingTypes } from "@react-native-firebase/messaging";
 import { supabase } from "@/lib/supabase";
 
@@ -10,15 +10,9 @@ export const usePushNotifications = () => {
 
     // This handles notifications when the app is OPEN (Foreground)
     const unsubscribe = messaging().onMessage(
-      async (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
-        // Show an in-app alert for incoming online bookings
-        if (remoteMessage.notification) {
-          Alert.alert(
-            remoteMessage.notification.title || "New Notification",
-            remoteMessage.notification.body || "",
-            [{ text: "OK", style: "default" }],
-          );
-        }
+      async (_remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
+        // Foreground push notifications are handled by the OS or notification center.
+        // Do not show an in-app alert here to avoid duplicate on-screen notifications.
       },
     );
 

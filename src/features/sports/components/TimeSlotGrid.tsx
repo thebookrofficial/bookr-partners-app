@@ -39,6 +39,7 @@ const SlotPill = ({
   isBlocked,
   isOnline,
   isManual,
+  isBooked,
   onSlotPress,
   slotWidth,
 }: any) => (
@@ -53,6 +54,7 @@ const SlotPill = ({
       isBlocked && styles.slotBlocked,
       isOnline && styles.slotOnline,
       isManual && styles.slotManual,
+      isBooked && styles.slotBooked,
       isUnavailable && styles.slotUnavailable,
     ]}>
     <Text
@@ -110,8 +112,9 @@ const SlotAccordion = ({ title, data, selectedDate, onSlotPress, slotWidth }: an
             const isUnavailable = isPast || slot.status === "maintenance";
             const isAvailable = !isUnavailable && slot.status === "available";
             const isBlocked = !isUnavailable && slot.status === "blocked";
-            const isOnline = !isUnavailable && slot.status === "booked" && !slot.isManualBooking;
-            const isManual = !isUnavailable && slot.status === "booked" && slot.isManualBooking;
+            const isBooked = !isUnavailable && slot.status === "booked";
+            const isOnline = isBooked && !slot.isManualBooking;
+            const isManual = isBooked && slot.isManualBooking;
 
             return (
               <SlotPill
@@ -122,6 +125,7 @@ const SlotAccordion = ({ title, data, selectedDate, onSlotPress, slotWidth }: an
                 isBlocked={isBlocked}
                 isOnline={isOnline}
                 isManual={isManual}
+                isBooked={isBooked}
                 onSlotPress={onSlotPress}
                 slotWidth={slotWidth}
               />
@@ -216,8 +220,9 @@ export const TimeSlotGrid = ({
         const isUnavailable = isPast || slot.status === "maintenance";
         const isAvailable = !isUnavailable && slot.status === "available";
         const isBlocked = !isUnavailable && slot.status === "blocked";
-        const isOnline = !isUnavailable && slot.status === "booked" && !slot.isManualBooking;
-        const isManual = !isUnavailable && slot.status === "booked" && slot.isManualBooking;
+        const isBooked = !isUnavailable && slot.status === "booked";
+        const isOnline = isBooked && !slot.isManualBooking;
+        const isManual = isBooked && slot.isManualBooking;
 
         return (
           <SlotPill
@@ -228,6 +233,7 @@ export const TimeSlotGrid = ({
             isBlocked={isBlocked}
             isOnline={isOnline}
             isManual={isManual}
+            isBooked={isBooked}
             onSlotPress={onSlotPress}
             slotWidth={slotWidth}
           />
@@ -261,6 +267,7 @@ const styles = StyleSheet.create({
   },
   slotOnline: { backgroundColor: COLORS.primary },
   slotManual: { backgroundColor: COLORS.danger },
+  slotBooked: { backgroundColor: "#9CA3AF" },
   slotUnavailable: { backgroundColor: "#E5E5E5", borderWidth: 1, borderColor: "#E5E5E5" },
   slotBlocked: { backgroundColor: "#BEBEBE" },
 

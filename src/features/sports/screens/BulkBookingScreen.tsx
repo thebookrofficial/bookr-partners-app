@@ -42,7 +42,7 @@ export const BulkBookingScreen = () => {
 
   const { activeVenueName } = useServiceStore();
 
-  // NEW: Fetch Grounds on mount
+  // Fix: Re-fetch grounds if venueId changes
   useEffect(() => {
     const fetchGrounds = async () => {
       const { data } = await supabase
@@ -53,11 +53,18 @@ export const BulkBookingScreen = () => {
 
       if (data && data.length > 0) {
         setGrounds(data);
-        if (!selectedGroundId) setSelectedGroundId(data[0].id);
+
+        // If a groundId was passed in navigation, use it.
+        // Otherwise, ALWAYS default to the first ground in the database!
+        if (groundId) {
+          setSelectedGroundId(groundId);
+        } else {
+          setSelectedGroundId(data[0].id);
+        }
       }
     };
     fetchGrounds();
-  }, [selectedGroundId, venueId]);
+  }, [venueId, groundId]);
 
   const fetchBulkBookings = useCallback(async () => {
     if (!selectedGroundId) return; // Wait until ground is selected

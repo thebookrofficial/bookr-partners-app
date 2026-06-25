@@ -5,10 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 export const SportsService = {
   // --- HOME SCREEN FETCHES ---
-  // --- HOME SCREEN FETCHES ---
   async getVenueDetails(initialVenueId: string, _dbSportType: string) {
-    // CRITICAL FIX: We no longer try to "find" a venue based on the category string.
-    // We strictly load the exact Venue ID that the user clicked on the dashboard!
     const { data: venue, error } = await supabase
       .from("venues")
       .select(`id, name, vertical, cover_image_url, owner_id, sports_venues ( sports_type )`)
@@ -52,7 +49,6 @@ export const SportsService = {
     return data;
   },
 
-  // CRITICAL FIX: Replaced RPC with a robust Supabase relational query
   async getBookings(venueId: string, groundId: string, dateStr: string) {
     const { data, error } = await supabase
       .from("sports_bookings")
@@ -76,16 +72,12 @@ export const SportsService = {
         const slot = Array.isArray(b.sports_slots) ? b.sports_slots[0] : b.sports_slots;
         const slotStatus = (slot?.status || "").toLowerCase().trim();
 
-        // Exclude cancelled/refunded bookings
         if (bookingStatus === "cancelled" || bookingStatus === "refunded") return false;
-
-        // The Magic Bullet: If the slot was released (available), this booking is dead. Remove it.
         if (slotStatus === "available") return false;
 
         return true;
       })
       .map((b: any) => {
-        // Flatten the relationships to match what `useSportsHome.ts` expects
         const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
         const slot = Array.isArray(b.sports_slots) ? b.sports_slots[0] : b.sports_slots;
 
@@ -199,7 +191,6 @@ export const SportsService = {
     bookingSource: string;
     sportsBookingType: string;
   }) {
-    // 1. Calculate total hours
     const startH = parseInt(params.startTime24.split(":")[0], 10);
     const endH = parseInt(params.endTime24.split(":")[0], 10);
     const totalHours = endH - startH;
@@ -211,7 +202,6 @@ export const SportsService = {
     const hourlyPrice = params.numericTotal / totalHours;
     const hourlyAdvance = params.advancePaid / totalHours;
 
-    // Custom UUID generation for React Native compatibility
     const generateUUID = () => {
       return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
         /* eslint-disable no-bitwise */
@@ -222,7 +212,6 @@ export const SportsService = {
       });
     };
 
-    // Use a proper UUID for multi-slot bookings to satisfy database constraints
     const bookingGroupId = isMultiSlot ? generateUUID() : null;
     let firstBookingId = "";
 
@@ -230,7 +219,6 @@ export const SportsService = {
       const currentStart = `${(startH + i).toString().padStart(2, "0")}:00:00`;
       const currentEnd = `${(startH + i + 1).toString().padStart(2, "0")}:00:00`;
 
-      // a. Create/Resolve Slot
       const { data: newSlot, error: insertError } = await supabase
         .from("sports_slots")
         .insert({
@@ -266,7 +254,6 @@ export const SportsService = {
 
       if (!slotId) throw new Error(`Could not resolve slot for ${currentStart}`);
 
-      // b. Create Booking
       const { data: booking, error: bookingError } = await supabase
         .from("sports_bookings")
         .insert({
@@ -298,88 +285,5 @@ export const SportsService = {
     }
 
     return firstBookingId;
-  },
-
-  // Add this method inside the SportsService object
-  // REPLACE THIS FUNCTION ENTIRELY
-  async extendBookingDuration(params: {
-    slotId: string;
-    bookingId: string;
-    newEndTime24: string; // The time they WANT to end at (e.g., 18:00)
-    extraAmount: number;
-  }) {
-    // 1. Fetch the original booking to use as a template
-    const { data: originalBooking, error: fetchError } = await supabase
-      .from("sports_bookings")
-      .select("*, sports_slots!inner(ground_id, slot_date, end_time)")
-      .eq("id", params.bookingId)
-      .single();
-
-    if (fetchError || !originalBooking)
-      throw fetchError || new Error("Original booking not found.");
-
-    // The slot they want to book STARTS when the original booking ENDS
-    const nextSlotStartTime = originalBooking.sports_slots.end_time;
-    const targetDate = originalBooking.sports_slots.slot_date;
-    const groundId = originalBooking.sports_slots.ground_id;
-
-    // 2. Find the specific slot in the database that matches the new time window
-    const { data: targetSlot, error: targetSlotError } = await supabase
-      .from("sports_slots")
-      .select("id, status")
-      .eq("venue_id", originalBooking.venue_id)
-      .eq("ground_id", groundId)
-      .eq("slot_date", targetDate)
-      .eq("start_time", nextSlotStartTime)
-      .eq("end_time", params.newEndTime24)
-      .maybeSingle();
-
-    if (targetSlotError || !targetSlot) {
-      throw new Error(
-        `Could not find a valid 1-hour slot from ${nextSlotStartTime} to ${params.newEndTime24}.`,
-      );
-    }
-
-    if (targetSlot.status !== "available") {
-      throw new Error("The requested extension slot is already booked or blocked.");
-    }
-
-    // 3. Mark the new slot as booked
-    const { error: slotUpdateError } = await supabase
-      .from("sports_slots")
-      .update({ status: "booked" })
-      .eq("id", targetSlot.id);
-
-    if (slotUpdateError) throw slotUpdateError;
-
-    // 4. Create a NEW booking for this new slot, inheriting the guest details
-    const { error: bookingError } = await supabase.from("sports_bookings").insert({
-      user_id: originalBooking.user_id, // Keep null if manual
-      guest_name: originalBooking.guest_name,
-      guest_phone: originalBooking.guest_phone,
-      venue_id: originalBooking.venue_id,
-      slot_id: targetSlot.id,
-      booking_status: "confirmed",
-      subtotal: params.extraAmount,
-      total_amount: params.extraAmount,
-      vendor_payout: params.extraAmount,
-      paid_amount: params.extraAmount, // Assuming extension is paid immediately
-      discount_amount: 0,
-      platform_fee: 0,
-      gateway_fee: 0,
-      notes: `Extension of booking: ${params.bookingId}`,
-      parent_booking_id: originalBooking.parent_booking_id || originalBooking.id,
-      sports_booking_type: "extension",
-      booking_source: originalBooking.booking_source,
-      sequence_number: (originalBooking.sequence_number || 1) + 1,
-    });
-
-    if (bookingError) {
-      // Rollback slot if booking fails
-      await supabase.from("sports_slots").update({ status: "available" }).eq("id", targetSlot.id);
-      throw bookingError;
-    }
-
-    return true;
   },
 };
