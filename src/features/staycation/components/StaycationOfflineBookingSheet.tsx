@@ -13,6 +13,8 @@ import {
   ActivityIndicator,
   Alert,
   Share,
+  Platform,
+  Linking,
 } from "react-native";
 import { Text } from "@/components/ui";
 import { User, Phone, Calendar, ChevronDown, Wallet, Hash } from "lucide-react-native";
@@ -579,20 +581,40 @@ export const StaycationOfflineBookingSheet = ({
 
     if (result.success) {
       const dueAmount = (parseFloat(totalPayment) || 0) - (parseFloat(advancePaid) || 0);
-      const shareMessage = `Booking Confirmed! 🎉
-Hi ${finalName},
-Your slot at ${result.venueName || "our venue"} is locked in via Bookr.
-Date: ${formatDateLabel(checkInDate)} to ${formatDateLabel(checkOutDate)}
-Payment Summary:
-Total: ₹${totalPayment || 0}
-Paid: ₹${advancePaid || 0}
-Due at Venue: ₹${dueAmount}
-Thank you for booking with Bookr!`;
+      const appLink =
+        Platform.OS === "ios"
+          ? "https://apps.apple.com/app/bookr/idYOUR_APP_ID"
+          : "https://play.google.com/store/apps/details?id=com.bookr_mobile";
+
+      const spicyLine =
+        "🔥 Don't let your slot get snatched! Lock in your favorite time instantly on the Bookr app.";
+
+      const shareMessage = `Booking Confirmed! 🎉\nHi ${finalName},\nYour slot at ${
+        result.venueName || "our venue"
+      } is locked in via Bookr.\n\nDate: ${formatDateLabel(checkInDate)} to ${formatDateLabel(
+        checkOutDate,
+      )}\n\nPayment Summary:\nTotal: ₹${totalPayment}\nPaid: ₹${advancePaid}\nDue: ₹${dueAmount}\n\n${spicyLine}\n${appLink}\n\nThank you!`;
+
+      // Direct WhatsApp Deep Link Logic
+      const cleanPhone = finalPhone.replace(/\D/g, "");
+      const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+      const whatsappUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(
+        shareMessage,
+      )}`;
 
       try {
+        const supported = await Linking.canOpenURL(whatsappUrl);
+        if (supported) {
+          await Linking.openURL(whatsappUrl); // Opens DM directly
+        } else {
+          // Fallback for Web/Desktop or if WhatsApp isn't installed
+          await Linking.openURL(
+            `https://wa.me/${formattedPhone}?text=${encodeURIComponent(shareMessage)}`,
+          );
+        }
+      } catch (err) {
+        // Fallback to standard share if deep link fails
         await Share.share({ message: shareMessage });
-      } catch (error) {
-        // Fallback silently
       }
 
       Alert.alert("Success", "Offline booking created successfully.");
