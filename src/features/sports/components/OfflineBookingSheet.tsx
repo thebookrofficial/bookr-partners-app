@@ -383,22 +383,22 @@ export const OfflineBookingSheet = ({
               keyboardType="phone-pad"
               value={mobile}
               onChangeText={text => {
-                const clean = text.replace(/[^\d]/g, "");
+                const clean = text.replace(/[^\d]/g, "").slice(0, 10);
                 setMobile(clean);
                 if (clean.length < 10) {
                   setName("");
                 }
               }}
             />
-            {mobile.length >= 10 && (
-              <TextInput
-                variant="filled"
-                label={<CustomLabel icon={UserIcon} text="Name" />}
-                placeholder="Guest Name"
-                value={name}
-                onChangeText={setName}
-              />
-            )}
+            {/* {mobile.length >= 10 && ( */}
+            <TextInput
+              variant="filled"
+              label={<CustomLabel icon={UserIcon} text="Name" />}
+              placeholder="Guest Name"
+              value={name}
+              onChangeText={setName}
+            />
+            {/* )} */}
             <View style={styles.row}>
               <View style={styles.flex1}>
                 <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("from")}>

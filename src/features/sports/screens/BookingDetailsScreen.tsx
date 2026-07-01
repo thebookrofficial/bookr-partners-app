@@ -13,6 +13,7 @@ import {
   Linking,
   Modal,
   Pressable,
+  Platform,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -193,18 +194,24 @@ export const BookingDetailsScreen = () => {
     const bookingTime = `${formatHour(booking.sports_slots.start_time)} to ${formatHour(
       booking.sports_slots.end_time,
     )}`;
+    // Spicy Marketing Line
+    const spicyLine =
+      "🔥 Don't let your slot get snatched! Lock in your favorite time instantly on the Bookr app.";
+
+    // Platform-Strict Link Logic
+    const playStoreLink = "https://play.google.com/store/apps/details?id=com.bookr_mobile";
+    const appStoreLink = "https://apps.apple.com/app/bookr/idYOUR_APP_ID"; // Remember to update this!
+    const appLink = Platform.OS === "ios" ? appStoreLink : playStoreLink;
 
     const message = encodeURIComponent(
       `Booking Confirmed! 🎉\n` +
         `Hi ${guestName},\n` +
-        `Your booking at ${venueName} has been successfully reserved.\n\n` +
+        `Your booking at ${venueName} is reserved.\n\n` +
         `Date: ${bookingDate}\n` +
         `Time: ${bookingTime}\n\n` +
-        `Payment Summary:\n` +
-        `Total: ₹${displayTotalAmount}\n` +
-        `Paid: ₹${displayAmountPaid}\n` +
-        `Due at Venue: ₹${remainingAmount}\n\n` +
-        `Thank you for booking.`,
+        `${spicyLine}\n\n` + // <--- Double newline ensures the link is distinct
+        `${appLink}\n\n` + // <--- The link is now clickable
+        `Thank you for playing with us!`,
     );
 
     const url = `whatsapp://send?phone=${cleanNumber}&text=${message}`;

@@ -713,25 +713,25 @@ export const StaycationOfflineBookingSheet = ({
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}>
               {/* Name */}
-              {phone.length >= 10 && (
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <User size={ms(20)} color={COLORS.text.primary} />
-                    <Text weight="medium" style={styles.label}>
-                      Name
-                    </Text>
-                  </View>
-                  <View style={styles.inputWrapper}>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="Yash"
-                      placeholderTextColor={COLORS.text.muted}
-                      value={name}
-                      onChangeText={setName}
-                    />
-                  </View>
+              {/* {phone.length >= 10 && ( */}
+              <View style={styles.inputGroup}>
+                <View style={styles.labelRow}>
+                  <User size={ms(20)} color={COLORS.text.primary} />
+                  <Text weight="medium" style={styles.label}>
+                    Name
+                  </Text>
                 </View>
-              )}
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Yash"
+                    placeholderTextColor={COLORS.text.muted}
+                    value={name}
+                    onChangeText={setName}
+                  />
+                </View>
+              </View>
+              {/* )} */}
 
               {/* Mobile No */}
               <View style={styles.inputGroup}>
@@ -749,7 +749,7 @@ export const StaycationOfflineBookingSheet = ({
                     keyboardType="phone-pad"
                     value={phone}
                     onChangeText={text => {
-                      const clean = text.replace(/[^\d]/g, "");
+                      const clean = text.replace(/[^\d]/g, "").slice(0, 10);
                       setPhone(clean);
                       if (clean.length < 10) {
                         setName("");
