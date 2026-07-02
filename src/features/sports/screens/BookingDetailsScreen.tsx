@@ -129,6 +129,8 @@ export const BookingDetailsScreen = () => {
     return `${displayHour} ${ampm}`;
   };
 
+  const isOnline = booking.booking_source === "online" || !!booking.user_id;
+
   const handleSavePayment = async () => {
     const cashAdded = parseFloat(cashInput) || 0;
     const onlineAdded = parseFloat(onlineInput) || 0;
@@ -493,7 +495,7 @@ export const BookingDetailsScreen = () => {
         </Text>
         <Send size={ms(20)} color={COLORS.text.inverse} />
       </TouchableOpacity>
-      {booking.booking_status !== "cancelled" && (
+      {booking.booking_status !== "cancelled" && !isOnline && (
         <TouchableOpacity
           style={styles.actionCard}
           activeOpacity={0.7}

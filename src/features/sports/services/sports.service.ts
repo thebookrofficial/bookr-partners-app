@@ -217,7 +217,9 @@ export const SportsService = {
 
     for (let i = 0; i < totalHours; i++) {
       const currentStart = `${(startH + i).toString().padStart(2, "0")}:00:00`;
-      const currentEnd = `${(startH + i + 1).toString().padStart(2, "0")}:00:00`;
+      const endHour = startH + i + 1;
+      const currentEnd =
+        endHour === 24 ? "23:59:59" : `${endHour.toString().padStart(2, "0")}:00:00`;
 
       const { data: newSlot, error: insertError } = await supabase
         .from("sports_slots")
@@ -243,7 +245,7 @@ export const SportsService = {
           .eq("ground_id", params.groundId)
           .eq("slot_date", params.dateStr)
           .eq("start_time", currentStart)
-          .eq("end_time", currentEnd)
+          // .eq("end_time", currentEnd)
           .single();
 
         if (foundSlot && foundSlot.status !== "available") {

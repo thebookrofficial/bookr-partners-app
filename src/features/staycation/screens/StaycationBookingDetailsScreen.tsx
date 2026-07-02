@@ -470,7 +470,7 @@ export const StaycationBookingDetailsScreen = () => {
         </TouchableOpacity>
 
         {/* Removed the !isOnline check so vendors can cancel ANY active booking */}
-        {!isFromHistory && !isCancelled && (
+        {!isFromHistory && !isCancelled && !isOnline && (
           <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} disabled={isUpdating}>
             <View style={styles.cancelContent}>
               {isUpdating ? (

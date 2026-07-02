@@ -58,8 +58,9 @@ const offlineBookingSchema = z
         message: "Advance paid must be a valid number.",
       })
       .optional(),
-    fromTime: z.string().min(1, "Start time is required."),
-    toTime: z.string().min(1, "End time is required."),
+    // UPDATE THESE TWO LINES:
+    fromTime: z.string().refine(val => val !== "Start Time", "Please select a Start Time."),
+    toTime: z.string().refine(val => val !== "End Time", "Please select an End Time."),
   })
   .refine(
     data => {
@@ -73,8 +74,10 @@ const offlineBookingSchema = z
     },
   );
 
-const parseTimeTo24Hour = (time12h: string) => {
-  if (time12h === "12 AM") return "00:00:00";
+const parseTimeTo24Hour = (time12h: string, isEnd = false) => {
+  // If it's 12 AM and it's the end time, make it 24:00:00
+  if (time12h === "12 AM") return isEnd ? "24:00:00" : "00:00:00";
+
   const [time, modifier] = time12h.split(" ");
   let hours = parseInt(time, 10);
   if (hours === 12 && modifier === "AM") hours = 0;
@@ -308,8 +311,8 @@ export const OfflineBookingSheet = ({
     setIsSubmitting(true);
     try {
       const formattedDate = getLocalDateString(currentDate);
-      const startTime24 = parseTimeTo24Hour(fromTime);
-      const endTime24 = parseTimeTo24Hour(toTime);
+      const startTime24 = parseTimeTo24Hour(fromTime, false);
+      const endTime24 = parseTimeTo24Hour(toTime, true);
       const numericTotal = parseFloat(totalPayment);
       const numericAdvance = parseFloat(advancePaid || "0");
 
@@ -447,6 +450,12 @@ export const OfflineBookingSheet = ({
                   placeholder="₹"
                   keyboardType="numeric"
                   value={advancePaid}
+                  // ADD THIS LINE:
+                  onFocus={() => {
+                    if (advancePaid === "0" || advancePaid === "0.00") {
+                      setAdvancePaid("");
+                    }
+                  }}
                   onChangeText={text => {
                     const val = parseFloat(text) || 0;
                     const total = parseFloat(totalPayment) || 0;

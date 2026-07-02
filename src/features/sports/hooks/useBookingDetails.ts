@@ -203,13 +203,15 @@ export const useBookingDetails = (bookingId: string) => {
         throw new Error("You must be logged in to log a payment. Please log out and back in.");
       }
 
+      const vertical = booking?.venues?.vertical || "sports";
+
       const dbPaymentMode = mode === "online" ? "upi" : mode;
 
       // Log payment against the main booking ID
       const { error } = await supabase.functions.invoke("log-offline-payment", {
         body: {
           bookingId: bookingId,
-          vertical: "sports",
+          vertical: vertical,
           amount: amount,
           mode: dbPaymentMode,
           loggedBy: userId,
