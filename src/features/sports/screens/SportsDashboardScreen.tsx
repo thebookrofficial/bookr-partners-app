@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
   Modal,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
@@ -87,9 +88,14 @@ export const SportsDashboardScreen = () => {
     metrics,
     grounds,
     loading: dataLoading,
+    refetch,
   } = useSportsDashboard(currentVenueId, timeFilter, groundFilter, selectedCategory, customRange);
 
   const { activeVenueName } = useServiceStore();
+
+  const onRefresh = React.useCallback(() => {
+    refetch();
+  }, [refetch]);
 
   useEffect(() => {
     const resolveVenue = async () => {
@@ -139,7 +145,12 @@ export const SportsDashboardScreen = () => {
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={loading || dataLoading} onRefresh={onRefresh} />
+        }>
         {/* 1. Header */}
         <ServiceHeader title={activeVenueName} subtitle="Dashboard" />
 

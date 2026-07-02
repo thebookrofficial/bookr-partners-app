@@ -205,7 +205,7 @@ export const useSportsDashboard = (
 
         if (isOffline) {
           offlineCount++;
-          totalOfflineRevenue += Number(b.total_amount || 0);
+          totalOfflineRevenue += Number(b.paid_amount || 0);
         } else {
           onlineCount++;
 
