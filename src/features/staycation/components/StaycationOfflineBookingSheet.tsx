@@ -12,7 +12,6 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
-  Share,
   Platform,
   Linking,
 } from "react-native";
@@ -595,31 +594,39 @@ export const StaycationOfflineBookingSheet = ({
         checkOutDate,
       )}\n\nPayment Summary:\nTotal: ₹${totalPayment}\nPaid: ₹${advancePaid}\nDue: ₹${dueAmount}\n\n${spicyLine}\n${appLink}\n\nThank you!`;
 
-      // Direct WhatsApp Deep Link Logic
-      const cleanPhone = finalPhone.replace(/\D/g, "");
-      const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-      const whatsappUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(
-        shareMessage,
-      )}`;
+      Alert.alert("Booking Success", "Offline booking created successfully.", [
+        {
+          text: "Okay",
+          style: "cancel",
+          onPress: () => {
+            onSuccess?.();
+            onClose();
+          },
+        },
+        {
+          text: "Send to WhatsApp",
+          onPress: async () => {
+            const cleanPhone = phone.replace(/\D/g, "");
+            const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+            const whatsappUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(
+              shareMessage,
+            )}`;
 
-      try {
-        const supported = await Linking.canOpenURL(whatsappUrl);
-        if (supported) {
-          await Linking.openURL(whatsappUrl); // Opens DM directly
-        } else {
-          // Fallback for Web/Desktop or if WhatsApp isn't installed
-          await Linking.openURL(
-            `https://wa.me/${formattedPhone}?text=${encodeURIComponent(shareMessage)}`,
-          );
-        }
-      } catch (err) {
-        // Fallback to standard share if deep link fails
-        await Share.share({ message: shareMessage });
-      }
-
-      Alert.alert("Success", "Offline booking created successfully.");
-      onSuccess?.();
-      onClose();
+            try {
+              const supported = await Linking.canOpenURL(whatsappUrl);
+              await Linking.openURL(
+                supported
+                  ? whatsappUrl
+                  : `https://wa.me/${formattedPhone}?text=${encodeURIComponent(shareMessage)}`,
+              );
+            } catch (err) {
+              Alert.alert("Error", "Could not open WhatsApp.");
+            }
+            onSuccess?.();
+            onClose();
+          },
+        },
+      ]);
     } else {
       Alert.alert("Error", "Failed to create booking. Please check availability.");
     }

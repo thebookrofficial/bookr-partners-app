@@ -8,7 +8,7 @@ import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import {
   Ban,
-  Ticket,
+  // Ticket,
   Banknote,
   HelpCircle,
   //  RefreshCw,
@@ -81,7 +81,7 @@ export const StaycationEssentialsScreen = () => {
 
       <View style={styles.listContainer}>
         <EssentialsItem label="Close date" Icon={Ban} onPress={() => handlePress("Close date")} />
-        <EssentialsItem label="Offers" Icon={Ticket} onPress={() => handlePress("Offers")} />
+        {/* <EssentialsItem label="Offers" Icon={Ticket} onPress={() => handlePress("Offers")} /> */}
         <EssentialsItem label="Payouts" Icon={Banknote} onPress={() => handlePress("Payouts")} />
         <EssentialsItem label="FAQ's" Icon={HelpCircle} onPress={() => handlePress("FAQ's")} />
         {/* <EssentialsItem
