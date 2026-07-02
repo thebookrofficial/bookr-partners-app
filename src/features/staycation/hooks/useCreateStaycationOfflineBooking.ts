@@ -162,6 +162,7 @@ export const useCreateStaycationOfflineBooking = () => {
         special_requests: `Booking For: ${payload.bookingType}, Type: ${assignedRoomStr}, Group: ${
           payload.groupType || "-"
         }`,
+        booking_source: "offline",
       });
 
       if (insertError) {

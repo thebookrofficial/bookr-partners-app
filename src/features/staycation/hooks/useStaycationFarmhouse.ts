@@ -83,7 +83,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         .select(
           `
             id, user_id, booking_type, booking_status, platform_fee, check_in_date, check_out_date,
-            guest_count, total_amount, paid_amount, guest_name, guest_phone,
+            guest_count, total_amount, paid_amount, guest_name, guest_phone, booking_source,
             profiles ( full_name, phone, avatar_url )
           `,
         )
@@ -127,7 +127,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         const finalDisplayName = b.guest_name || profile?.full_name || "Guest";
         const finalPhone = b.guest_phone || profile?.phone || "N/A";
 
-        const isOnline = !!b.user_id;
+        const isOnline = b.booking_source === "online";
         const rangeColor = isOnline ? COLORS.primary : COLORS.danger;
 
         // Calendar marking
