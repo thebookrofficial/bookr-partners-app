@@ -131,6 +131,10 @@ export const useBulkBooking = () => {
             slotId = newSlot.id;
           }
 
+          const totalHours = HOURS.slice(startIdx, endIdx).length; // Ensure this is the length of your slice
+          const isBulk = dates.length > 1 || totalHours > 1;
+          const finalBookingType = isBulk ? "multi_slot" : "standard";
+
           // 2. Create Booking Record with ALL missing financial columns
           const { data: booking, error: bookingError } = await supabase
             .from("sports_bookings")
@@ -150,7 +154,7 @@ export const useBulkBooking = () => {
               gateway_fee: 0,
               paid_amount: 0,
               booking_source: "offline", // ADDED: Set booking source to offline
-
+              sports_booking_type: finalBookingType,
               notes: "Bulk Booking Record",
             })
             .select("id")

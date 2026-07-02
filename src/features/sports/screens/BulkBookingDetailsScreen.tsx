@@ -594,10 +594,10 @@ const styles = StyleSheet.create({
 
   /* --- FONTS --- */
   bisonText: {
-    fontFamily: "MDNichromeTest-Bold",
-    fontWeight: "700",
-    fontSize: fs(20),
+    fontFamily: "Bison-Bold",
+    fontSize: fs(22),
     color: "#FFF",
+    letterSpacing: 1,
   },
   tabText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(12) },
   bookingTypeTitle: {

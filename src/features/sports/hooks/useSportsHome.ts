@@ -182,7 +182,10 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           const bStatus = (b.booking_status || "").toLowerCase().trim();
           return bStatus !== "cancelled" && bStatus !== "refunded";
         });
-        const isManual = validBooking ? !validBooking.user_id : false;
+
+        const isManual = validBooking
+          ? !validBooking.user_id || validBooking.sports_booking_type === "multi_slot"
+          : false;
 
         const startH = parseInt(startHStr, 10);
         const startM = parseInt(startMStr, 10);

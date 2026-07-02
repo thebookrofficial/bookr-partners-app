@@ -39,7 +39,7 @@ export const SportsService = {
     const { data, error } = await supabase
       .from("sports_slots")
       .select(
-        `id, start_time, end_time, status, sports_bookings ( platform_fee, gateway_fee, user_id, booking_status )`,
+        `id, start_time, end_time, status, sports_bookings ( platform_fee, gateway_fee, user_id, booking_status, sports_booking_type )`,
       )
       .eq("venue_id", venueId)
       .eq("ground_id", groundId)
