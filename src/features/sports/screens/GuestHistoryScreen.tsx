@@ -19,12 +19,16 @@ export const GuestHistoryScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "GuestHistory">>();
 
   // CRITICAL FIX 1: Extract vertical from route.params
-  const { guestId: guestIdParam, bookingId, vertical } = route.params;
+  const { guestId: guestIdParam, bookingId, vertical, venueId } = route.params as any;
 
   const identifier = guestIdParam || bookingId;
 
   // CRITICAL Fix 2: Pass vertical into the hook
-  const { history, stats, guestName, guestPhone, loading } = useGuestHistory(identifier, vertical);
+  const { history, stats, guestName, guestPhone, loading } = useGuestHistory(
+    identifier,
+    vertical,
+    venueId,
+  );
 
   const [activeTab, setActiveTab] = useState<"past" | "upcoming" | "cancelled">("past");
 

@@ -32,7 +32,7 @@ const formatTime = (timeStr: string) => {
   return `${hourInt % 12 || 12} ${hourInt >= 12 ? "PM" : "AM"}`;
 };
 
-export const useGuestHistory = (identifier: string, vertical: string) => {
+export const useGuestHistory = (identifier: string, vertical: string, currentVenueId?: string) => {
   const [history, setHistory] = useState<HistoryBooking[]>([]);
   const [stats, setStats] = useState({ past: 0, upcoming: 0, cancelled: 0 });
   const [guestName, setGuestName] = useState<string>("Guest User");
@@ -85,23 +85,34 @@ export const useGuestHistory = (identifier: string, vertical: string) => {
       let query;
       if (vertical === "sports") {
         query = supabase.from("sports_bookings").select(`
-            id, guest_name, total_amount, platform_fee, gateway_fee, booking_status,
-            sports_slots!inner ( slot_date, start_time, end_time, sports_grounds ( name ) )
-          `);
+      id, guest_name, guest_phone, total_amount, platform_fee, gateway_fee, booking_status,
+      sports_slots!inner ( slot_date, start_time, end_time, sports_grounds ( name ) )
+    `);
       } else {
-        query = supabase.from("staycation_bookings").select(`
-            id, guest_name, total_amount, platform_fee, gateway_fee, booking_status, check_in_date, check_out_date,
-            venues ( name )
-          `);
+        query = supabase.from("sports_bookings").select(`
+      id, guest_name, guest_phone, total_amount, platform_fee, gateway_fee, booking_status,
+      sports_slots!inner ( slot_date, start_time, end_time, sports_grounds ( name ) )
+    `);
+      }
+
+      // NEW: Filter strictly by Venue ID to stop sports from mixing
+      if (currentVenueId) {
+        query = query.eq("venue_id", currentVenueId);
       }
 
       // 4. Execute Main Fetch
+      const cleanPhone = resolvedPhone.replace(/[^\d]/g, "");
+      const tenDigit = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+      const phoneVariants = [tenDigit, `+91${tenDigit}`, `+91 ${tenDigit}`, `91${tenDigit}`];
+
       let results;
       if (userId) {
-        const { data } = await query.or(`guest_phone.eq.${resolvedPhone},user_id.eq.${userId}`);
+        const { data } = await query.or(
+          `user_id.eq.${userId},guest_phone.in.(${phoneVariants.map(p => `"${p}"`).join(",")})`,
+        );
         results = data;
       } else {
-        const { data } = await query.eq("guest_phone", resolvedPhone);
+        const { data } = await query.in("guest_phone", phoneVariants);
         results = data;
       }
 
@@ -183,7 +194,7 @@ export const useGuestHistory = (identifier: string, vertical: string) => {
     } finally {
       setLoading(false);
     }
-  }, [identifier, vertical]);
+  }, [currentVenueId, identifier, vertical]);
 
   useEffect(() => {
     fetchHistory();

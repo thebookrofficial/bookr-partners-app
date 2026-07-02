@@ -469,6 +469,7 @@ export const BookingDetailsScreen = () => {
             guestId: guestPhone === "N/A" ? undefined : guestPhone,
             bookingId: booking.id,
             vertical: "sports",
+            venueId: booking.venue_id,
           })
         }>
         <FileText size={ms(20)} color={COLORS.text.primary} />

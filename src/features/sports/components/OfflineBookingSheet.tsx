@@ -482,6 +482,7 @@ export const OfflineBookingSheet = ({
                     guestId: mobile,
                     bookingId: "",
                     vertical: "sports",
+                    venueId: venueId,
                   });
                 }}>
                 <FileText size={ms(20)} color={COLORS.text.primary} />

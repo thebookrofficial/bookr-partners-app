@@ -124,6 +124,10 @@ export const useBookingDetails = (bookingId: string) => {
       const firstBooking = finalChain[0];
       const lastBooking = finalChain[finalChain.length - 1];
 
+      if (!firstBooking || !lastBooking) {
+        throw new Error("No booking data found in chain.");
+      }
+
       const aggregatedBooking: BookingDetailData = {
         ...baseBooking,
         total_amount: totalAmount,
