@@ -123,13 +123,16 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
       const isCheckOutSection = section.title.toLowerCase().includes("check out");
       const isUpcomingSection = section.title.includes("Upcoming");
 
+      // Determine if the selected date is in the future
+      const isFutureDate = selectedDate > new Date(new Date().setHours(0, 0, 0, 0));
+
       let shouldShow = false;
       if (activeRoomStatus === "Check Outs") {
         // Today tab: Show Check-ins and Check-outs
         shouldShow = isCheckOutSection || isTargetSection;
       } else {
         // Upcoming tab: Only show Upcoming sections
-        shouldShow = isUpcomingSection;
+        shouldShow = isUpcomingSection || (isTargetSection && isFutureDate);
       }
 
       if (shouldShow && filteredBookings.length > 0) {
@@ -148,9 +151,8 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
         }
       }
     });
-
     return data;
-  }, [groupedBookings, activeRoomStatus, activeRoomType, collapsedSections]);
+  }, [groupedBookings, activeRoomType, selectedDate, activeRoomStatus, collapsedSections]);
 
   const renderItem = ({ item }: { item: ListEntry }) => {
     if (item.type === "header") {

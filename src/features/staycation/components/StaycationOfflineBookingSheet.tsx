@@ -205,6 +205,7 @@ export const StaycationOfflineBookingSheet = ({
   }, [visible, isFarmhouse, venueId, roomType]);
 
   // Track exactly how many units are available for the currently selected Check In/Out dates
+  // Track exactly how many units are available for the currently selected Check In/Out dates
   useEffect(() => {
     if (isFarmhouse || !venueId || !roomType || !visible) return;
 
@@ -222,59 +223,33 @@ export const StaycationOfflineBookingSheet = ({
         return;
       }
 
-      const dateCounts: Record<string, number> = {};
       const dInStr = formatYMD(checkInDate);
       const dOutStr = formatYMD(checkOutDate);
 
-      // Fetch Bookings with unit_count!
-      const { data: bookings } = await supabase
-        .from("staycation_bookings")
-        .select("check_in_date, check_out_date, unit_count")
+      // FIX: Check the actual availability calendar, NOT the bookings table
+      const { data: blocks } = await supabase
+        .from("staycation_availability")
+        .select("room_id, date")
         .eq("venue_id", venueId)
         .in("room_id", roomIds)
-        .neq("booking_status", "cancelled")
-        .lt("check_in_date", dOutStr)
-        .gt("check_out_date", dInStr);
+        .eq("is_blocked", true)
+        .gte("date", dInStr)
+        .lt("date", dOutStr); // Less than checkout date
 
-      bookings?.forEach(b => {
-        let curr = new Date(b.check_in_date);
-        const end = new Date(b.check_out_date);
-        while (curr < end) {
-          const dStr = formatYMD(curr);
-          if (dStr >= dInStr && dStr < dOutStr) {
-            // CRITICAL FIX: Add b.unit_count instead of just +1
-            dateCounts[dStr] = (dateCounts[dStr] || 0) + (b.unit_count || 1);
-          }
-          curr.setDate(curr.getDate() + 1);
-        }
+      // Count max blocked rooms per date
+      const blockCountsPerDate: Record<string, Set<string>> = {};
+      blocks?.forEach(b => {
+        if (!blockCountsPerDate[b.date]) blockCountsPerDate[b.date] = new Set();
+        if (b.room_id) blockCountsPerDate[b.date].add(b.room_id);
       });
 
-      let maxOccupied = 0;
-      for (const count of Object.values(dateCounts)) {
-        if (count > maxOccupied) maxOccupied = count;
+      let maxBlocked = 0;
+      for (const dateSet of Object.values(blockCountsPerDate)) {
+        if (dateSet.size > maxBlocked) maxBlocked = dateSet.size;
       }
 
-      // Check for Closed Dates
-      // Let's just fetch all and check overlap manually to be safe if query is complex
-      const { data: allClosed } = await supabase
-        .from("venue_closed_dates")
-        .select("start_date, end_date")
-        .eq("venue_id", venueId);
-
-      let isClosedInRange = false;
-      allClosed?.forEach(c => {
-        const cStart = c.start_date;
-        const cEnd = c.end_date || c.start_date;
-        if (cStart < dOutStr && cEnd >= dInStr) {
-          isClosedInRange = true;
-        }
-      });
-
-      if (isClosedInRange) {
-        setAvailableUnitsForCurrentDates(0);
-      } else {
-        setAvailableUnitsForCurrentDates(Math.max(0, roomIds.length - maxOccupied));
-      }
+      // Final availability is total physical rooms minus the max blocked on any given day
+      setAvailableUnitsForCurrentDates(Math.max(0, roomIds.length - maxBlocked));
     };
 
     fetchAvailabilityForDates();
@@ -1053,22 +1028,27 @@ export const StaycationOfflineBookingSheet = ({
                   {activeDropdown?.title}
                 </Text>
                 <ScrollView showsVerticalScrollIndicator={false} style={styles.dropdownScroll}>
-                  {activeDropdown?.options.map(option => (
-                    <TouchableOpacity
-                      key={option}
-                      style={styles.dropdownItem}
-                      onPress={() => handleDropdownSelect(option)}>
-                      <Text
-                        variant="body1"
-                        weight="medium"
-                        style={[
-                          styles.dropdownItemText,
-                          option.includes("(Booked)") && { color: COLORS.danger },
-                        ]}>
-                        {option}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {activeDropdown?.options.map(option => {
+                    // Determine if this count is over the limit
+                    const isOverLimit = parseInt(option, 10) > maxStandardGuests;
+                    return (
+                      <TouchableOpacity
+                        key={option}
+                        style={styles.dropdownItem}
+                        onPress={() => handleDropdownSelect(option)}>
+                        <Text
+                          variant="body1"
+                          weight="medium"
+                          style={[
+                            styles.dropdownItemText,
+                            option.includes("(Booked)") && { color: COLORS.danger },
+                            isOverLimit && { color: COLORS.danger },
+                          ]}>
+                          {option}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </ScrollView>
               </View>
             </TouchableWithoutFeedback>

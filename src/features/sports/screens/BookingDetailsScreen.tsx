@@ -319,11 +319,6 @@ export const BookingDetailsScreen = () => {
         </View>
       </View>
 
-      <View style={styles.inputBox}>
-        <Text variant="body2" weight="semiBold" style={styles.inputText}>
-          {booking.combined_time}
-        </Text>
-      </View>
       <View style={styles.fieldGroup}>
         <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
           Total Payment

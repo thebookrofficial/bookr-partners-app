@@ -85,7 +85,7 @@ export const useStaycationResort = (
         )
         .eq("venue_id", activeVenue.venueId)
         .eq("booking_type", "per_room")
-        .neq("booking_status", "cancelled")
+        .neq("booking_status", "cancelled") // Or a date far in the future
         .gte("check_out_date", targetDateStr)
         .order("check_in_date", { ascending: true });
 
@@ -220,9 +220,10 @@ export const useStaycationResort = (
         } else if (b.check_in_date === targetDateStr) {
           targetDayList.push(formatted);
         } else if (b.check_in_date < targetDateStr && b.check_out_date > targetDateStr) {
-          // NEW: Add "In-House" bookings (checked in before today, checking out after today)
+          // Catch bookings that started before the selected date and end after it
           targetDayList.push(formatted);
         } else if (b.check_in_date > targetDateStr) {
+          // Matches bookings starting AFTER today
           if (!upcomingByDate[b.check_in_date]) {
             upcomingByDate[b.check_in_date] = [];
           }
@@ -269,16 +270,12 @@ export const useStaycationResort = (
 
     if (targetDayList.length) {
       sections.push({
-        title: currentTitle,
+        title: currentTitle, // This uses your calculated currentTitle
         data: targetDayList,
         occupiedCount: occupiedTargetDay,
         totalCount: relevantRooms.length,
       });
     }
-
-    // if (targetDayList.length) {
-    //   sections.push({ title: currentTitle, data: targetDayList });
-    // }
 
     // Process upcoming dates
     const sortedDates = Object.keys(upcomingByDate).sort();
@@ -315,7 +312,7 @@ export const useStaycationResort = (
       groupedBookings: sections,
       roomsFilled: { occupied: occupiedTargetDay, total: relevantRooms.length },
     };
-  }, [rooms, rawBookings, activeRoomType, targetDateStr, selectedDate]);
+  }, [activeRoomType, rooms, rawBookings, targetDateStr, selectedDate]);
 
   const cancelBooking = async (bookingId: string) => {
     try {
