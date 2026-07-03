@@ -65,12 +65,18 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
 
   const flatListData = useMemo(() => {
     const data: ListEntry[] = [];
+    const todayStr = new Date().toISOString().split("T")[0]; // Get current date
+
     groupedBookings.forEach(section => {
-      if (section.data.length > 0) {
+      // Filter out sections or bookings that are in the past
+      const filteredSectionData = section.data.filter(b => b.checkOut > todayStr);
+
+      if (filteredSectionData.length > 0) {
         data.push({ type: "header", title: section.title });
 
-        // Sort bookings by check-in date ascending
-        const sortedBookings = [...section.data].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+        const sortedBookings = [...filteredSectionData].sort((a, b) =>
+          a.checkIn.localeCompare(b.checkIn),
+        );
 
         sortedBookings.forEach(b => {
           data.push({ type: "booking", data: b });
@@ -145,6 +151,12 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
             <View style={[styles.dot, styles.closedDot]} />
             <Text weight="bold" style={styles.legendText}>
               Closed
+            </Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, styles.passedDot]} />
+            <Text weight="bold" style={styles.legendText}>
+              Past
             </Text>
           </View>
         </View>
@@ -336,6 +348,9 @@ const styles = StyleSheet.create({
   },
   closedDot: {
     backgroundColor: "black",
+  },
+  passedDot: {
+    backgroundColor: "#aaa",
   },
   legendText: {
     fontSize: fs(14),

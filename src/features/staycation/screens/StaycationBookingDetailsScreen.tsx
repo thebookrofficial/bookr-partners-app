@@ -27,7 +27,6 @@ import {
   Minus,
   CheckCircle2,
   ChevronRight,
-  FileText,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -141,13 +140,6 @@ export const StaycationBookingDetailsScreen = () => {
     }
     return null;
   };
-
-  // Check if it's a farmhouse
-  const staycationVenues = (bookingDetails?.venues as any)?.staycation_venues;
-  const propertyType = Array.isArray(staycationVenues)
-    ? staycationVenues[0]?.property_type
-    : staycationVenues?.property_type;
-  const isFarmhouse = propertyType?.toLowerCase() === "farmhouse";
 
   const groupType = getGroupType(bookingDetails?.special_requests);
 
@@ -284,6 +276,13 @@ export const StaycationBookingDetailsScreen = () => {
       .catch(() => Share.share({ message: shareMessage }));
   };
 
+  const getGroupInfo = (requests: string) => {
+    if (!requests) return null;
+    // This matches "Group: Family" or "Group Type: friends"
+    const match = requests.match(/(?:Group|Group Type):\s*([^|]+)/i);
+    return match ? match[1].trim() : null;
+  };
+
   return (
     <View style={styles.root}>
       <ScreenContainer scrollable paddingHorizontal={hs(12)}>
@@ -316,14 +315,14 @@ export const StaycationBookingDetailsScreen = () => {
         </View>
 
         {/* Group Type Section */}
-        {isFarmhouse && bookingData.groupType && (
+        {getGroupInfo(bookingDetails?.special_requests) && (
           <View style={styles.section}>
             <View style={styles.labelRow}>
-              <FileText size={ms(18)} color={COLORS.text?.primary || "black"} />
-              <Text style={styles.labelText}>Group Type</Text>
+              <User size={ms(18)} color="black" />
+              <Text style={styles.labelText}>Group</Text>
             </View>
             <View style={styles.valueBox}>
-              <Text style={styles.valueText}>{bookingData.groupType}</Text>
+              <Text style={styles.valueText}>{getGroupInfo(bookingDetails?.special_requests)}</Text>
             </View>
           </View>
         )}
