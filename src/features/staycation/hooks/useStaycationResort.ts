@@ -219,6 +219,9 @@ export const useStaycationResort = (
           checkOutsList.push(formatted);
         } else if (b.check_in_date === targetDateStr) {
           targetDayList.push(formatted);
+        } else if (b.check_in_date < targetDateStr && b.check_out_date > targetDateStr) {
+          // NEW: Add "In-House" bookings (checked in before today, checking out after today)
+          targetDayList.push(formatted);
         } else if (b.check_in_date > targetDateStr) {
           if (!upcomingByDate[b.check_in_date]) {
             upcomingByDate[b.check_in_date] = [];
@@ -228,11 +231,6 @@ export const useStaycationResort = (
       }
     });
 
-    const sections: any[] = [];
-    if (checkOutsList.length) {
-      sections.push({ title: "Check outs", data: checkOutsList });
-    }
-
     const isActuallyToday = targetDateStr === todayRealStr;
     const currentTitle = isActuallyToday
       ? "Today's Bookings"
@@ -241,9 +239,46 @@ export const useStaycationResort = (
           month: "short",
         })}`;
 
-    if (targetDayList.length) {
-      sections.push({ title: currentTitle, data: targetDayList });
+    // Calculate occupiedTargetDay
+    // let occupiedTargetDay = 0;
+    const targetDayOccupiedSet = occupiedRoomsByDate[targetDateStr];
+    // if (targetDayOccupiedSet) {
+    //   if (activeRoomType === "All") {
+    //     occupiedTargetDay = targetDayOccupiedSet.size;
+    //   } else {
+    //     targetDayOccupiedSet.forEach(roomId => {
+    //       const r = rooms.find(room => room.id === roomId);
+    //       if (r && r.room_name === activeRoomType) occupiedTargetDay++;
+    //     });
+    //   }
+    // }
+    let occupiedTargetDay = 0;
+    if (targetDayOccupiedSet) {
+      occupiedTargetDay = activeRoomType === "All" ? targetDayOccupiedSet.size : 0; // Filter logic
     }
+
+    const sections: any[] = [];
+    if (checkOutsList.length) {
+      sections.push({
+        title: "Check outs",
+        data: checkOutsList,
+        occupiedCount: occupiedTargetDay,
+        totalCount: relevantRooms.length,
+      });
+    }
+
+    if (targetDayList.length) {
+      sections.push({
+        title: currentTitle,
+        data: targetDayList,
+        occupiedCount: occupiedTargetDay,
+        totalCount: relevantRooms.length,
+      });
+    }
+
+    // if (targetDayList.length) {
+    //   sections.push({ title: currentTitle, data: targetDayList });
+    // }
 
     // Process upcoming dates
     const sortedDates = Object.keys(upcomingByDate).sort();
@@ -275,20 +310,6 @@ export const useStaycationResort = (
         totalCount: relevantRooms.length,
       });
     });
-
-    // Calculate occupiedTargetDay
-    let occupiedTargetDay = 0;
-    const targetDayOccupiedSet = occupiedRoomsByDate[targetDateStr];
-    if (targetDayOccupiedSet) {
-      if (activeRoomType === "All") {
-        occupiedTargetDay = targetDayOccupiedSet.size;
-      } else {
-        targetDayOccupiedSet.forEach(roomId => {
-          const r = rooms.find(room => room.id === roomId);
-          if (r && r.room_name === activeRoomType) occupiedTargetDay++;
-        });
-      }
-    }
 
     return {
       groupedBookings: sections,
