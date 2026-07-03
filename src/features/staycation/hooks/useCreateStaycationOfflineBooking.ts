@@ -19,6 +19,7 @@ interface CreateOfflineBookingPayload {
   roomType?: string;
   groupType?: string;
   unitCount?: number;
+  bookingSource?: "offline" | "online";
 }
 
 export const useCreateStaycationOfflineBooking = () => {

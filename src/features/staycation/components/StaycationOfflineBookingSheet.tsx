@@ -576,6 +576,7 @@ export const StaycationOfflineBookingSheet = ({
       roomId: undefined,
       groupType: isFarmhouse ? groupType : undefined,
       unitCount: isFarmhouse ? 1 : unitsInt,
+      bookingSource: "offline",
     });
 
     if (result.success) {
