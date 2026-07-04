@@ -192,30 +192,42 @@ export const ViewBulkBooking = ({ bookingId: _bookingId, type }: ViewBulkBooking
 
     setIsSavingPayment(true);
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      const vendorId = userData?.user?.id;
+      if (!vendorId) {
+        throw new Error("Could not identify logged-in user.");
+      }
+
       if (cash > 0) {
-        await supabase.from("offline_payment_logs").insert({
+        const { error } = await supabase.from("offline_payment_logs").insert({
           booking_id: _bookingId,
+          booking_vertical: "sports",
           amount: cash,
           payment_mode: "cash",
           note: "Additional bulk payment",
+          logged_by: vendorId,
         });
+        if (error) throw error;
       }
       if (online > 0) {
-        // CHANGED 'online' TO 'upi' HERE TO MATCH YOUR DATABASE ENUM
-        await supabase.from("offline_payment_logs").insert({
+        const { error } = await supabase.from("offline_payment_logs").insert({
           booking_id: _bookingId,
+          booking_vertical: "sports",
           amount: online,
           payment_mode: "upi",
           note: "Additional bulk payment",
+          logged_by: vendorId,
         });
+        if (error) throw error;
       }
 
       setCashInput("");
       setOnlineInput("");
       setIsAddingPayment(false);
       await fetchDetails();
-    } catch (err) {
-      Alert.alert("Error", "Failed to save payment.");
+    } catch (err: any) {
+      console.error("Error saving payment:", err);
+      Alert.alert("Error", err.message || "Failed to save payment.");
     } finally {
       setIsSavingPayment(false);
     }

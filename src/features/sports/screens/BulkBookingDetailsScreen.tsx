@@ -34,6 +34,7 @@ import { supabase } from "@/lib/supabase";
 
 // IMPORT THE NEW VIEW COMPONENT
 import { ViewBulkBooking } from "../components/ViewBulkBooking";
+import { TimePickerModal } from "../components/TimePickerModal";
 
 const HOURS = [
   "6 AM",
@@ -122,13 +123,24 @@ const CreateBulkBooking = ({
 
   useEffect(() => {
     const fetchBookedSlots = async () => {
+      setBookedSlots([]);
       if (!selectedGroundId || !fromDate) return;
-      const formattedDate = fromDate.toISOString().split("T")[0];
-      const { data } = await supabase
+
+      const year = fromDate.getFullYear();
+      const month = String(fromDate.getMonth() + 1).padStart(2, "0");
+      const day = String(fromDate.getDate()).padStart(2, "0");
+      const formattedDate = `${year}-${month}-${day}`;
+
+      const { data, error } = await supabase
         .from("sports_slots")
         .select("start_time, status")
         .eq("ground_id", selectedGroundId)
         .eq("slot_date", formattedDate);
+
+      if (error) {
+        console.error("[DEBUG] Error fetching slots:", error);
+        return;
+      }
 
       if (data) {
         const unavailable = data
@@ -465,54 +477,42 @@ const CreateBulkBooking = ({
         />
       )}
 
-      {/* --- TIME PICKER MODAL --- */}
-      <Modal visible={!!showHourPicker} transparent animationType="fade">
-        <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowHourPicker(null)}>
-          <View style={styles.pickerContainer}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {HOURS.map(hour => {
-                const now = new Date();
-                const currentHour24 = now.getHours();
-                const currentMinute = now.getMinutes();
+      <TimePickerModal
+        visible={!!showHourPicker}
+        onClose={() => setShowHourPicker(null)}
+        title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
+        hours={HOURS}
+        selectedTime={showHourPicker === "from" ? fromTime : toTime}
+        onSelectTime={hour => {
+          if (showHourPicker === "from") {
+            setFromTime(hour);
+          } else {
+            setToTime(hour);
+          }
+        }}
+        isHourDisabled={(hour, _index) => {
+          const now = new Date();
+          const currentHour24 = now.getHours();
+          const currentMinute = now.getMinutes();
 
-                const hour12h = hour;
-                let [h, ampm] = hour12h.split(" ");
-                let hour24 = parseInt(h, 10);
-                if (ampm === "PM" && hour24 !== 12) hour24 += 12;
-                if (ampm === "AM" && hour24 === 12) hour24 = 0;
+          const hour12h = hour;
+          let [h, ampm] = hour12h.split(" ");
+          let hour24 = parseInt(h, 10);
+          if (ampm === "PM" && hour24 !== 12) hour24 += 12;
+          if (ampm === "AM" && hour24 === 12) hour24 = 0;
 
-                const isPast =
-                  fromDate.toDateString() === now.toDateString() &&
-                  (hour24 < currentHour24 || (hour24 === currentHour24 && currentMinute > 0));
+          const isPast =
+            fromDate.toDateString() === now.toDateString() &&
+            (hour24 < currentHour24 || (hour24 === currentHour24 && currentMinute > 0));
 
-                const isBooked = bookedSlots.some(bookedTime => {
-                  const [bookedHour] = bookedTime.split(":").map(Number);
-                  return bookedHour === hour24;
-                });
+          const isBooked = bookedSlots.some(bookedTime => {
+            const [bookedHour] = bookedTime.split(":").map(Number);
+            return bookedHour === hour24;
+          });
 
-                const isDisabled = isPast || isBooked;
-
-                return (
-                  <TouchableOpacity
-                    key={hour}
-                    style={[styles.pickerItem, isDisabled && styles.pickerItemDisabled]}
-                    onPress={() => {
-                      if (isDisabled) return;
-                      if (showHourPicker === "from") setFromTime(hour);
-                      else setToTime(hour);
-                      setShowHourPicker(null);
-                    }}
-                    disabled={isDisabled}>
-                    <Text style={[styles.inputText, isDisabled && styles.textDisabled]}>
-                      {hour}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+          return isPast || isBooked;
+        }}
+      />
 
       {/* --- NEW GROUND PICKER MODAL --- */}
       <Modal visible={showGroundPicker} transparent animationType="fade">
@@ -714,10 +714,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#EEE",
     alignItems: "center",
-  },
-  pickerItemDisabled: {
-    backgroundColor: "#F0F0F0",
-    opacity: 0.6,
   },
   textDisabled: {
     color: "#A0A0A0",
