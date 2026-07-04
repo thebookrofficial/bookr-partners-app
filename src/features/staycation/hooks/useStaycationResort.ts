@@ -85,7 +85,7 @@ export const useStaycationResort = (
         )
         .eq("venue_id", activeVenue.venueId)
         .eq("booking_type", "per_room")
-        .neq("booking_status", "cancelled")
+        .neq("booking_status", "cancelled") // Or a date far in the future
         .gte("check_out_date", targetDateStr)
         .order("check_in_date", { ascending: true });
 
@@ -219,7 +219,11 @@ export const useStaycationResort = (
           checkOutsList.push(formatted);
         } else if (b.check_in_date === targetDateStr) {
           targetDayList.push(formatted);
+        } else if (b.check_in_date < targetDateStr && b.check_out_date > targetDateStr) {
+          // Catch bookings that started before the selected date and end after it
+          targetDayList.push(formatted);
         } else if (b.check_in_date > targetDateStr) {
+          // Matches bookings starting AFTER today
           if (!upcomingByDate[b.check_in_date]) {
             upcomingByDate[b.check_in_date] = [];
           }
@@ -227,11 +231,6 @@ export const useStaycationResort = (
         }
       }
     });
-
-    const sections: any[] = [];
-    if (checkOutsList.length) {
-      sections.push({ title: "Check outs", data: checkOutsList });
-    }
 
     const isActuallyToday = targetDateStr === todayRealStr;
     const currentTitle = isActuallyToday
@@ -241,8 +240,41 @@ export const useStaycationResort = (
           month: "short",
         })}`;
 
+    // Calculate occupiedTargetDay
+    // let occupiedTargetDay = 0;
+    const targetDayOccupiedSet = occupiedRoomsByDate[targetDateStr];
+    // if (targetDayOccupiedSet) {
+    //   if (activeRoomType === "All") {
+    //     occupiedTargetDay = targetDayOccupiedSet.size;
+    //   } else {
+    //     targetDayOccupiedSet.forEach(roomId => {
+    //       const r = rooms.find(room => room.id === roomId);
+    //       if (r && r.room_name === activeRoomType) occupiedTargetDay++;
+    //     });
+    //   }
+    // }
+    let occupiedTargetDay = 0;
+    if (targetDayOccupiedSet) {
+      occupiedTargetDay = activeRoomType === "All" ? targetDayOccupiedSet.size : 0; // Filter logic
+    }
+
+    const sections: any[] = [];
+    if (checkOutsList.length) {
+      sections.push({
+        title: "Check outs",
+        data: checkOutsList,
+        occupiedCount: occupiedTargetDay,
+        totalCount: relevantRooms.length,
+      });
+    }
+
     if (targetDayList.length) {
-      sections.push({ title: currentTitle, data: targetDayList });
+      sections.push({
+        title: currentTitle, // This uses your calculated currentTitle
+        data: targetDayList,
+        occupiedCount: occupiedTargetDay,
+        totalCount: relevantRooms.length,
+      });
     }
 
     // Process upcoming dates
@@ -276,25 +308,11 @@ export const useStaycationResort = (
       });
     });
 
-    // Calculate occupiedTargetDay
-    let occupiedTargetDay = 0;
-    const targetDayOccupiedSet = occupiedRoomsByDate[targetDateStr];
-    if (targetDayOccupiedSet) {
-      if (activeRoomType === "All") {
-        occupiedTargetDay = targetDayOccupiedSet.size;
-      } else {
-        targetDayOccupiedSet.forEach(roomId => {
-          const r = rooms.find(room => room.id === roomId);
-          if (r && r.room_name === activeRoomType) occupiedTargetDay++;
-        });
-      }
-    }
-
     return {
       groupedBookings: sections,
       roomsFilled: { occupied: occupiedTargetDay, total: relevantRooms.length },
     };
-  }, [rooms, rawBookings, activeRoomType, targetDateStr, selectedDate]);
+  }, [activeRoomType, rooms, rawBookings, targetDateStr, selectedDate]);
 
   const cancelBooking = async (bookingId: string) => {
     try {

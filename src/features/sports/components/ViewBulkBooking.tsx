@@ -103,7 +103,12 @@ export const ViewBulkBooking = ({ bookingId: _bookingId, type }: ViewBulkBooking
 
       const slots = (batchBookings || []).map((b: any) => b.sports_slots);
 
-      const dates = slots.map((s: any) => new Date(s.slot_date).getTime());
+      const parseSlotDate = (dateStr: string) => {
+        const [year, month, day] = dateStr.split("-").map(Number);
+        return new Date(year, month - 1, day);
+      };
+
+      const dates = slots.map((s: any) => parseSlotDate(s.slot_date).getTime());
       const minDate = new Date(Math.min(...dates));
       const maxDate = new Date(Math.max(...dates));
       const formatDate = (d: Date) =>
@@ -192,30 +197,42 @@ export const ViewBulkBooking = ({ bookingId: _bookingId, type }: ViewBulkBooking
 
     setIsSavingPayment(true);
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      const vendorId = userData?.user?.id;
+      if (!vendorId) {
+        throw new Error("Could not identify logged-in user.");
+      }
+
       if (cash > 0) {
-        await supabase.from("offline_payment_logs").insert({
+        const { error } = await supabase.from("offline_payment_logs").insert({
           booking_id: _bookingId,
+          booking_vertical: "sports",
           amount: cash,
           payment_mode: "cash",
           note: "Additional bulk payment",
+          logged_by: vendorId,
         });
+        if (error) throw error;
       }
       if (online > 0) {
-        // CHANGED 'online' TO 'upi' HERE TO MATCH YOUR DATABASE ENUM
-        await supabase.from("offline_payment_logs").insert({
+        const { error } = await supabase.from("offline_payment_logs").insert({
           booking_id: _bookingId,
+          booking_vertical: "sports",
           amount: online,
           payment_mode: "upi",
           note: "Additional bulk payment",
+          logged_by: vendorId,
         });
+        if (error) throw error;
       }
 
       setCashInput("");
       setOnlineInput("");
       setIsAddingPayment(false);
       await fetchDetails();
-    } catch (err) {
-      Alert.alert("Error", "Failed to save payment.");
+    } catch (err: any) {
+      console.error("Error saving payment:", err);
+      Alert.alert("Error", err.message || "Failed to save payment.");
     } finally {
       setIsSavingPayment(false);
     }
@@ -494,10 +511,10 @@ const styles = StyleSheet.create({
 
   /* --- FONTS --- */
   bisonText: {
-    fontFamily: "MDNichromeTest-Bold",
-    fontWeight: "700",
-    fontSize: fs(18),
+    fontFamily: "Bison-Bold",
+    fontSize: fs(22),
     color: "#FFF",
+    letterSpacing: 1,
   },
   bookingTypeTitle: {
     fontFamily: "Gilroy-Bold",

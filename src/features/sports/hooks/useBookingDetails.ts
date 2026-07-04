@@ -4,7 +4,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Alert } from "react-native";
-import { SportsService } from "../services/sports.service";
 
 export interface BookingDetailData {
   id: string;
@@ -125,6 +124,10 @@ export const useBookingDetails = (bookingId: string) => {
       const firstBooking = finalChain[0];
       const lastBooking = finalChain[finalChain.length - 1];
 
+      if (!firstBooking || !lastBooking) {
+        throw new Error("No booking data found in chain.");
+      }
+
       const aggregatedBooking: BookingDetailData = {
         ...baseBooking,
         total_amount: totalAmount,
@@ -204,13 +207,15 @@ export const useBookingDetails = (bookingId: string) => {
         throw new Error("You must be logged in to log a payment. Please log out and back in.");
       }
 
+      const vertical = booking?.venues?.vertical || "sports";
+
       const dbPaymentMode = mode === "online" ? "upi" : mode;
 
       // Log payment against the main booking ID
       const { error } = await supabase.functions.invoke("log-offline-payment", {
         body: {
           bookingId: bookingId,
-          vertical: "sports",
+          vertical: vertical,
           amount: amount,
           mode: dbPaymentMode,
           loggedBy: userId,
@@ -264,38 +269,6 @@ export const useBookingDetails = (bookingId: string) => {
     }
   };
 
-  const extendBooking = async (additionalMinutes: number, additionalCost: number) => {
-    if (!booking) return false;
-    setIsSaving(true);
-    try {
-      // Use the LAST booking in the chain to determine next start time
-      const [h, m, s] = booking.sports_slots.end_time.split(":").map(Number);
-      let date = new Date();
-      date.setHours(h, m + additionalMinutes, s);
-
-      const newEndTime24 = `${date.getHours().toString().padStart(2, "0")}:${date
-        .getMinutes()
-        .toString()
-        .padStart(2, "0")}:00`;
-
-      await SportsService.extendBookingDuration({
-        slotId: booking.sports_slots.id, // This is the last slot's ID now
-        bookingId: booking.lastBookingId, // This is the last booking's ID
-        newEndTime24,
-        extraAmount: additionalCost,
-      });
-
-      Alert.alert("Success", "Booking extended successfully.");
-      await fetchDetails();
-      return true;
-    } catch (error: any) {
-      Alert.alert("Extension Failed", error.message);
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   useEffect(() => {
     fetchDetails();
   }, [fetchDetails]);
@@ -307,7 +280,6 @@ export const useBookingDetails = (bookingId: string) => {
     isSaving,
     logPayment,
     cancelBooking,
-    extendBooking,
     refresh: fetchDetails,
   };
 };

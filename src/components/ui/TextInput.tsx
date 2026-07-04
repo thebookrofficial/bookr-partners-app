@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     paddingVertical: vs(12),
   },
   filledInput: {
-    fontSize: fs(18), // Smaller text for the filled variant
+    fontSize: fs(16), // Smaller text for the filled variant
     paddingVertical: 0, // Let the container handle height
   },
   leftIcon: {

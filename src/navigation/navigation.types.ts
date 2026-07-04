@@ -88,9 +88,10 @@ export type MainStackParamList = {
     bookingId: string;
     guestId?: string;
     vertical: "sports" | "staycation" | "dining" | "events";
+    venueId?: string;
   };
   BlockUnblock: { venueId: string; groundId: string };
-  BulkBooking: { venueId: string; groundId: string };
+  BulkBooking: { venueId: string; groundId?: string };
   BulkBookingDetails: {
     bookingId: string;
     type: "multi" | "single";
@@ -106,6 +107,7 @@ export type MainStackParamList = {
     totalBookings: number;
   };
   SportsInvoice: { bookingId: string };
+  FAQ: { vertical: "sports" | "staycation" };
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

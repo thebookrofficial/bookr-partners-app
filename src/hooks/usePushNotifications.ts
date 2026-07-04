@@ -1,6 +1,6 @@
 // src/hooks/usePushNotifications.ts
 import { useEffect } from "react";
-import { PermissionsAndroid, Platform } from "react-native"; // Removed 'Alert' import
+import { PermissionsAndroid, Platform } from "react-native";
 import messaging, { FirebaseMessagingTypes } from "@react-native-firebase/messaging";
 import { supabase } from "@/lib/supabase";
 
@@ -11,9 +11,8 @@ export const usePushNotifications = () => {
     // This handles notifications when the app is OPEN (Foreground)
     const unsubscribe = messaging().onMessage(
       async (_remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
-        // We removed the Alert.alert() here!
-        // The app will now receive the data silently without interrupting the user.
-        // (Optional) Later, you can trigger a subtle custom Toast component here instead!
+        // Foreground push notifications are handled by the OS or notification center.
+        // Do not show an in-app alert here to avoid duplicate on-screen notifications.
       },
     );
 

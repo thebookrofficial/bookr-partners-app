@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Avatar, PillTabs } from "@/components/ui";
@@ -13,15 +13,53 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { COLORS } from "@/constants/theme";
 import { STRINGS } from "@/constants/strings";
-import { useAuthStore } from "@/store";
+import { useAuthStore, useServiceStore } from "@/store";
 import { useVendorData } from "../hooks/useVendorData";
 
 export const VendorProfileScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { user, clientProfile } = useAuthStore();
   const { loading, venues, refresh } = useVendorData();
+  const {
+    lastSelectedService,
+    hasNavigatedInitially,
+    setHasNavigatedInitially,
+    setLastSelectedService,
+  } = useServiceStore();
 
   const [activeTab, setActiveTab] = useState(STRINGS.profile.tabs[0]);
+
+  // Handle auto-navigation to last selected service on initial app load
+  useEffect(() => {
+    if (!hasNavigatedInitially && lastSelectedService) {
+      setHasNavigatedInitially(true);
+
+      const { vertical, serviceId, category } = lastSelectedService;
+      if (vertical === "sports") {
+        navigation.navigate("SportsServiceTabs", {
+          screen: "SportsHome",
+          params: { serviceId, category },
+        });
+      } else if (vertical === "dining") {
+        navigation.navigate("DineServiceTabs", {
+          screen: "DineHome",
+          params: { serviceId },
+        });
+      } else if (vertical === "staycation") {
+        navigation.navigate("StaycationServiceTabs", {
+          screen: "StaycationHome",
+          params: { serviceId },
+        });
+      } else if (vertical === "events") {
+        navigation.navigate("EventServiceTabs", {
+          screen: "EventHome",
+          params: { serviceId },
+        });
+      }
+    } else if (!hasNavigatedInitially) {
+      setHasNavigatedInitially(true);
+    }
+  }, [hasNavigatedInitially, lastSelectedService, navigation, setHasNavigatedInitially]);
 
   const availableTabs = useMemo(() => {
     const allTabs = STRINGS.profile.tabs;
@@ -131,6 +169,7 @@ export const VendorProfileScreen = () => {
                   : { uri: "https://via.placeholder.com/150" }
               }
               onPress={() => {
+                const baseService = { vertical: venue.vertical, serviceId: venue.id };
                 if (venue.vertical === "sports") {
                   // CRITICAL FIX: Handle Supabase returning an object instead of an array
                   const sportsData: any = venue.sports_venues;
@@ -147,21 +186,25 @@ export const VendorProfileScreen = () => {
 
                   const category = sportsType ? categoryMap[sportsType] || sportsType : undefined;
 
+                  setLastSelectedService({ ...baseService, category });
                   navigation.navigate("SportsServiceTabs", {
                     screen: "SportsHome",
                     params: { serviceId: venue.id, category },
                   });
                 } else if (venue.vertical === "dining") {
+                  setLastSelectedService(baseService);
                   navigation.navigate("DineServiceTabs", {
                     screen: "DineHome",
                     params: { serviceId: venue.id },
                   });
                 } else if (venue.vertical === "staycation") {
+                  setLastSelectedService(baseService);
                   navigation.navigate("StaycationServiceTabs", {
                     screen: "StaycationHome",
                     params: { serviceId: venue.id },
                   });
                 } else if (venue.vertical === "events") {
+                  setLastSelectedService(baseService);
                   navigation.navigate("EventServiceTabs", {
                     screen: "EventHome",
                     params: { serviceId: venue.id },
@@ -181,7 +224,7 @@ export const VendorProfileScreen = () => {
         )}
       </View>
 
-      <View style={{ height: vs(40) }} />
+      <View style={{ height: vs(100) }} />
     </ScreenContainer>
   );
 };

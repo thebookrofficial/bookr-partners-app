@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -13,6 +13,7 @@ import {
   Linking,
   Modal,
   Pressable,
+  Platform,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -29,7 +30,6 @@ import {
   Send,
   Trash2,
   X,
-  ChevronDown,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -47,12 +47,8 @@ export const BookingDetailsScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "BookingDetails">>();
   const { bookingId } = route.params;
 
-  const { booking, paymentLogs, loading, isSaving, logPayment, cancelBooking, extendBooking } =
+  const { booking, paymentLogs, loading, isSaving, logPayment, cancelBooking } =
     useBookingDetails(bookingId);
-
-  const [isAddingOn, setIsAddingOn] = useState(false);
-  const [addOnTime, setAddOnTime] = useState("30 min");
-  const [extraMoney, setExtraMoney] = useState("0");
 
   const lottie = useMemo(() => {
     try {
@@ -64,14 +60,6 @@ export const BookingDetailsScreen = () => {
   }, []);
 
   const progress = useSharedValue(0);
-
-  // Automatically set suggested extra money when time changes
-  useEffect(() => {
-    if (isAddingOn) {
-      const suggested = addOnTime === "30 min" ? "500" : "1000";
-      setExtraMoney(suggested);
-    }
-  }, [addOnTime, isAddingOn]);
 
   useEffect(() => {
     if (lottie) {
@@ -87,16 +75,6 @@ export const BookingDetailsScreen = () => {
       return () => clearTimeout(timer);
     }
   }, [lottie, progress]);
-
-  const handleConfirmExtension = async () => {
-    const mins = addOnTime === "30 min" ? 30 : 60;
-    const cost = parseFloat(extraMoney) || 0;
-
-    const success = await extendBooking(mins, cost);
-    if (success) {
-      setIsAddingOn(false);
-    }
-  };
 
   const frame = useDerivedValue(() => {
     if (!lottie) {
@@ -135,19 +113,11 @@ export const BookingDetailsScreen = () => {
   const totalDiscount = Number(booking.discount_amount) || 0;
   const totalFees = booking.platform_fee || 0;
 
-  // Identify if it's a Pickleball service
   const sportsType = booking.venues?.sports_venues?.[0]?.sports_type || "";
   const isPickleball = sportsType.toLowerCase().includes("pickleball");
 
-  // The vendor wants to see the "Total Payment"
   const displayTotalAmount = totalAmount;
-
-  // The vendor wants to see the "Credit" (Cash + Discount - Fees) as the total amount paid
-  // Formula: paid_amount + discount - platform_fee
-  // Note: Platform fee subtraction is applied ONLY to Pickleball as requested.
   const displayAmountPaid = currentPaid + totalDiscount - (isPickleball ? totalFees : 0);
-
-  // Remaining Amount is what is still due at the venue
   const remainingAmount = Math.max(0, displayTotalAmount - displayAmountPaid);
 
   const formatHour = (timeStr: string) => {
@@ -158,6 +128,8 @@ export const BookingDetailsScreen = () => {
     const displayHour = hourInt % 12 || 12;
     return `${displayHour} ${ampm}`;
   };
+
+  const isOnline = booking.booking_source === "online" || !!booking.user_id;
 
   const handleSavePayment = async () => {
     const cashAdded = parseFloat(cashInput) || 0;
@@ -199,7 +171,6 @@ export const BookingDetailsScreen = () => {
       return;
     }
 
-    // REGEX FIX: Remove EVERYTHING except digits and the '+' sign
     const cleanNumber = guestPhone.replace(/[^\d+]/g, "");
     const url = `tel:${cleanNumber}`;
 
@@ -216,7 +187,6 @@ export const BookingDetailsScreen = () => {
     }
 
     let cleanNumber = guestPhone.replace(/\D/g, "");
-    // Default to Indian country code if missing
     if (cleanNumber.length === 10) {
       cleanNumber = `91${cleanNumber}`;
     }
@@ -226,18 +196,24 @@ export const BookingDetailsScreen = () => {
     const bookingTime = `${formatHour(booking.sports_slots.start_time)} to ${formatHour(
       booking.sports_slots.end_time,
     )}`;
+    // Spicy Marketing Line
+    const spicyLine =
+      "🔥 Don't let your slot get snatched! Lock in your favorite time instantly on the Bookr app.";
+
+    // Platform-Strict Link Logic
+    const playStoreLink = "https://play.google.com/store/apps/details?id=com.bookr_mobile";
+    const appStoreLink = "https://apps.apple.com/app/bookr/idYOUR_APP_ID"; // Remember to update this!
+    const appLink = Platform.OS === "ios" ? appStoreLink : playStoreLink;
 
     const message = encodeURIComponent(
       `Booking Confirmed! 🎉\n` +
         `Hi ${guestName},\n` +
-        `Your booking at ${venueName} has been successfully reserved.\n\n` +
+        `Your booking at ${venueName} is reserved.\n\n` +
         `Date: ${bookingDate}\n` +
         `Time: ${bookingTime}\n\n` +
-        `Payment Summary:\n` +
-        `Total: ₹${displayTotalAmount}\n` +
-        `Paid: ₹${displayAmountPaid}\n` +
-        `Due at Venue: ₹${remainingAmount}\n\n` +
-        `Thank you for booking.`,
+        `${spicyLine}\n\n` + // <--- Double newline ensures the link is distinct
+        `${appLink}\n\n` + // <--- The link is now clickable
+        `Thank you for playing with us!`,
     );
 
     const url = `whatsapp://send?phone=${cleanNumber}&text=${message}`;
@@ -247,7 +223,6 @@ export const BookingDetailsScreen = () => {
         if (supported) {
           return Linking.openURL(url);
         } else {
-          // Fallback to web link if app isn't installed
           const webUrl = `https://wa.me/${cleanNumber}?text=${message}`;
           return Linking.openURL(webUrl);
         }
@@ -335,78 +310,15 @@ export const BookingDetailsScreen = () => {
             <Text variant="body2" weight="medium" style={styles.subLabel}>
               To
             </Text>
-            <View style={styles.inputBoxRowWithInline}>
+            <View style={styles.inputBox}>
               <Text variant="body2" weight="semiBold" style={styles.inputText}>
                 {formatHour(booking.sports_slots.end_time)}
               </Text>
-              <TouchableOpacity
-                style={styles.inlineAddBtn}
-                onPress={() => setIsAddingOn(!isAddingOn)}>
-                <Text
-                  variant="body2"
-                  weight="semiBold"
-                  color={isAddingOn ? COLORS.danger : COLORS.primary}>
-                  {isAddingOn ? "Cancel" : "Add"}
-                </Text>
-                {isAddingOn ? (
-                  <X size={ms(16)} color={COLORS.danger} />
-                ) : (
-                  <Plus size={ms(16)} color={COLORS.primary} />
-                )}
-              </TouchableOpacity>
             </View>
           </View>
         </View>
       </View>
-      {isAddingOn && (
-        <View style={styles.addOnContainer}>
-          <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
-            Add On
-          </Text>
-          <View style={styles.row}>
-            <View style={styles.flex1}>
-              <Text variant="body2" weight="medium" style={styles.subLabel}>
-                Extra Time
-              </Text>
-              <TouchableOpacity
-                style={styles.dropDownPlaceholder}
-                onPress={() => setAddOnTime(addOnTime === "30 min" ? "60 min" : "30 min")}>
-                <Text variant="body2" weight="semiBold">
-                  {addOnTime}
-                </Text>
-                <ChevronDown size={ms(16)} color={COLORS.text.primary} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.flex1}>
-              <Text variant="body2" weight="medium" style={styles.subLabel}>
-                Extra Money
-              </Text>
-              <View style={styles.inputBox}>
-                <TextInput
-                  style={styles.extraMoneyInput}
-                  keyboardType="numeric"
-                  value={extraMoney}
-                  onChangeText={setExtraMoney}
-                />
-              </View>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirmExtension}>
-            <Text
-              variant="h3"
-              family="nichrome"
-              color={COLORS.text.inverse}
-              style={styles.confirmText}>
-              CONFIRM
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      <View style={styles.inputBox}>
-        <Text variant="body2" weight="semiBold" style={styles.inputText}>
-          {booking.combined_time}
-        </Text>
-      </View>
+
       <View style={styles.fieldGroup}>
         <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
           Total Payment
@@ -552,6 +464,7 @@ export const BookingDetailsScreen = () => {
             guestId: guestPhone === "N/A" ? undefined : guestPhone,
             bookingId: booking.id,
             vertical: "sports",
+            venueId: booking.venue_id,
           })
         }>
         <FileText size={ms(20)} color={COLORS.text.primary} />
@@ -578,7 +491,7 @@ export const BookingDetailsScreen = () => {
         </Text>
         <Send size={ms(20)} color={COLORS.text.inverse} />
       </TouchableOpacity>
-      {booking.booking_status !== "cancelled" && (
+      {booking.booking_status !== "cancelled" && !isOnline && (
         <TouchableOpacity
           style={styles.actionCard}
           activeOpacity={0.7}
@@ -730,13 +643,6 @@ const styles = StyleSheet.create({
     fontFamily: "Gilroy-SemiBold",
     color: COLORS.text.primary,
   },
-  extraMoneyInput: {
-    flex: 1,
-    fontSize: fs(14),
-    fontFamily: "Gilroy-SemiBold",
-    color: COLORS.text.primary,
-    fontWeight: "600",
-  },
   inlineAddBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -761,18 +667,6 @@ const styles = StyleSheet.create({
   actionCardText: {
     flex: 1,
     marginLeft: hs(8),
-  },
-  confirmBtn: {
-    backgroundColor: "#000000",
-    borderRadius: ms(10),
-    height: vs(44),
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: vs(12),
-  },
-  confirmText: {
-    fontSize: fs(20),
-    textTransform: "uppercase",
   },
   whatsappAnimWrapper: {
     width: ms(30),
@@ -937,22 +831,5 @@ const styles = StyleSheet.create({
   },
   saveButtonDisabled: {
     opacity: 0.7,
-  },
-  addOnContainer: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#63A1FD",
-    borderRadius: ms(10),
-    padding: ms(12),
-    marginVertical: vs(10),
-  },
-  dropDownPlaceholder: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#F4F7FC",
-    borderRadius: ms(10),
-    padding: ms(10),
-    marginTop: vs(4),
   },
 });

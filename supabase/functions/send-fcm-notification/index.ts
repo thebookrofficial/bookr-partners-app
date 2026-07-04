@@ -1,8 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { JWT } from "https://esm.sh/google-auth-library@9";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"; // Added Supabase client
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Grab secrets from Supabase environments
 const serviceAccountString = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -10,106 +9,130 @@ const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 serve(async req => {
   try {
     const payload = await req.json();
-
-    // 1. Get the inserted row from the Supabase webhook payload
     const record = payload.record;
-    if (!record || !record.fcm_token) {
-      return new Response(
-        JSON.stringify({ error: "No FCM token provided or not an insert payload." }),
-        { status: 400 },
-      );
+    const type = payload.type;
+
+    // eslint-disable-next-line no-console
+    console.log(
+      `[EVENT] Type: ${type}, RecordID: ${record?.id}, UserID: ${record?.user_id}, Title: "${record?.title}"`,
+    );
+
+    // 1. STOPS THE INFINITE LOGS: Only process initial INSERTS
+    if (type && type !== "INSERT") {
+      return new Response(JSON.stringify({ message: "Skipping non-insert" }), { status: 200 });
     }
 
-    if (!serviceAccountString || !supabaseUrl || !supabaseKey) {
-      throw new Error("Missing required environment secrets.");
+    if (!record || record.status !== "pending") {
+      return new Response(JSON.stringify({ message: "Skipping non-pending" }), { status: 200 });
     }
 
-    // 2. Initialize Supabase Admin Client to fetch user data
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // 2. STOPS THE RACE CONDITION: Stagger executions
+    const jitter = Math.floor(Math.random() * 1000);
+    await new Promise(resolve => setTimeout(resolve, jitter));
 
-    // Fetch the user's profile to get their name
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", record.user_id)
+    const supabase = createClient(supabaseUrl!, supabaseKey!);
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+
+    // 3. BROAD DEDUPLICATION: User + Title only
+    let winnerQuery = supabase
+      .from("notification_queue")
+      .select("id")
+      .eq("title", record.title)
+      .gte("created_at", oneMinuteAgo);
+
+    if (record.user_id) winnerQuery = winnerQuery.eq("user_id", record.user_id);
+    else winnerQuery = winnerQuery.is("user_id", null);
+
+    const { data: winner } = await winnerQuery
+      .order("id", { ascending: true })
+      .limit(1)
       .maybeSingle();
 
-    // Setup fallback names if profile is missing or name is empty
-    const fullName = profile?.full_name || "Partner";
-    const firstName = fullName.split(" ")[0];
+    if (winner && winner.id !== record.id) {
+      // eslint-disable-next-line no-console
+      console.log(`[DEDUPE] Skipping duplicate: ${record.id}`);
+      await supabase.from("notification_queue").update({ status: "skipped" }).eq("id", record.id);
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    }
 
-    // 3. Process Dynamic Placeholders (The Template Engine)
-    // Replaces {{userName}} with full name, and {{firstName}} with just the first name
-    const finalTitle = record.title
-      .replace(/\{\{userName\}\}/g, fullName)
-      .replace(/\{\{firstName\}\}/g, firstName);
+    // 4. TOKEN REPAIR: Fetch the CURRENT token, don't trust the one in the record
+    let finalToken = record.fcm_token;
+    if (record.user_id) {
+      const { data: dev } = await supabase
+        .from("user_devices")
+        .select("fcm_token")
+        .eq("user_id", record.user_id)
+        .order("last_seen_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (dev?.fcm_token) {
+        finalToken = dev.fcm_token;
+      }
+    }
 
-    const finalBody = record.body
-      .replace(/\{\{userName\}\}/g, fullName)
-      .replace(/\{\{firstName\}\}/g, firstName);
+    if (!finalToken) {
+      console.error(`[ERROR] No valid token found for user ${record.user_id}`);
+      await supabase.from("notification_queue").update({ status: "failed" }).eq("id", record.id);
+      return new Response(JSON.stringify({ error: "No valid token" }), { status: 200 });
+    }
 
-    // 4. Initialize Google Auth JWT for the new HTTP v1 API
-    const serviceAccount = JSON.parse(serviceAccountString);
+    // 5. HIGH PRIORITY PAYLOAD
+    const serviceAccount = JSON.parse(serviceAccountString!);
     const jwtClient = new JWT({
       email: serviceAccount.client_email,
       key: serviceAccount.private_key,
       scopes: ["https://www.googleapis.com/auth/firebase.messaging"],
     });
-
     const tokens = await jwtClient.authorize();
-    const accessToken = tokens.access_token;
-
-    // 5. Construct the payload for Firebase Cloud Messaging
-    const stringifiedData: Record<string, string> = {};
-    if (record.data && typeof record.data === "object") {
-      for (const [key, value] of Object.entries(record.data)) {
-        stringifiedData[key] = String(value);
-      }
-    }
 
     const fcmPayload = {
       message: {
-        token: record.fcm_token,
-        notification: {
-          title: finalTitle, // Use the processed title
-          body: finalBody, // Use the processed body
+        token: finalToken,
+        notification: { title: record.title, body: record.body },
+        android: {
+          priority: "high",
+          notification: {
+            sound: "default",
+          },
         },
-        data: stringifiedData,
+        apns: {
+          payload: {
+            aps: {
+              contentAvailable: true,
+              sound: "default",
+            },
+          },
+        },
       },
     };
 
-    // 6. Send the Push Notification
-    const fcmResponse = await fetch(
+    const res = await fetch(
       `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${tokens.access_token}`,
         },
         body: JSON.stringify(fcmPayload),
       },
     );
 
-    const fcmData = await fcmResponse.json();
+    const fcmData = await res.json();
+    const status = res.ok ? "sent" : "failed";
 
-    if (!fcmResponse.ok) {
-      console.error("FCM Error:", fcmData);
-      throw new Error("Failed to send FCM message");
-    }
+    if (!res.ok) console.error(`[FCM ERROR]`, fcmData);
 
-    // Optional: Mark as sent in the queue
     await supabase
       .from("notification_queue")
-      .update({ status: "sent", sent_at: new Date().toISOString() })
+      .update({ status, sent_at: new Date().toISOString() })
       .eq("id", record.id);
+    // eslint-disable-next-line no-console
+    console.log(`[${status.toUpperCase()}] Record ${record.id}`);
 
-    return new Response(
-      JSON.stringify({ success: true, message: "Notification blasted out!", data: fcmData }),
-      { headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ success: res.ok, data: fcmData }), { status: 200 });
   } catch (err: any) {
-    console.error("Edge Function Error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    console.error(`[FATAL ERROR]`, err);
+    return new Response(JSON.stringify({ error: err.message }), { status: 200 });
   }
 });

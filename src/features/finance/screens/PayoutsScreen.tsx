@@ -2,7 +2,14 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -99,6 +106,7 @@ export const PayoutsScreen = () => {
     pendingPayouts,
     historicalPayouts,
     loading,
+    refetch,
   } = usePayouts(venueId);
 
   const [showPicker, setShowPicker] = useState<"start" | "end" | null>(null);
@@ -155,7 +163,17 @@ export const PayoutsScreen = () => {
         </Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading && (pendingPayouts.length > 0 || historicalPayouts.length > 0)}
+            onRefresh={refetch}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }>
         <Text variant="body1" weight="bold" style={styles.sectionTitle}>
           PENDING PAYOUT
         </Text>

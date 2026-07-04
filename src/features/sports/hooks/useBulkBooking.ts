@@ -72,8 +72,15 @@ export const useBulkBooking = () => {
 
       const dates: string[] = [];
       let curr = new Date(params.fromDate);
-      while (curr <= params.toDate) {
-        dates.push(curr.toISOString().split("T")[0]);
+      curr.setHours(0, 0, 0, 0);
+      let end = new Date(params.toDate);
+      end.setHours(0, 0, 0, 0);
+
+      while (curr <= end) {
+        const year = curr.getFullYear();
+        const month = String(curr.getMonth() + 1).padStart(2, "0");
+        const day = String(curr.getDate()).padStart(2, "0");
+        dates.push(`${year}-${month}-${day}`);
         curr.setDate(curr.getDate() + 1);
       }
 
@@ -131,13 +138,17 @@ export const useBulkBooking = () => {
             slotId = newSlot.id;
           }
 
+          const totalHours = HOURS.slice(startIdx, endIdx).length; // Ensure this is the length of your slice
+          const isBulk = dates.length > 1 || totalHours > 1;
+          const finalBookingType = isBulk ? "multi_slot" : "standard";
+
           // 2. Create Booking Record with ALL missing financial columns
           const { data: booking, error: bookingError } = await supabase
             .from("sports_bookings")
             .insert({
               user_id: profile?.id || null,
-              guest_name: profile ? null : params.name,
-              guest_phone: profile ? null : cleanMobile,
+              guest_name: params.name,
+              guest_phone: cleanMobile,
               venue_id: venueId,
               slot_id: slotId,
               booking_status: "confirmed",
@@ -149,7 +160,8 @@ export const useBulkBooking = () => {
               platform_fee: 0,
               gateway_fee: 0,
               paid_amount: 0,
-
+              booking_source: "offline", // ADDED: Set booking source to offline
+              sports_booking_type: finalBookingType,
               notes: "Bulk Booking Record",
             })
             .select("id")
@@ -179,6 +191,7 @@ export const useBulkBooking = () => {
             amount: p.amount,
             payment_mode: p.mode, // Safety fallback for enum
             note: "Bulk booking initial payment",
+            logged_by: params.ownerId,
           });
 
           if (payErr) {

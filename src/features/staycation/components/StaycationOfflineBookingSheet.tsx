@@ -12,7 +12,8 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
-  Share,
+  Platform,
+  Linking,
 } from "react-native";
 import { Text } from "@/components/ui";
 import { User, Phone, Calendar, ChevronDown, Wallet, Hash } from "lucide-react-native";
@@ -204,6 +205,7 @@ export const StaycationOfflineBookingSheet = ({
   }, [visible, isFarmhouse, venueId, roomType]);
 
   // Track exactly how many units are available for the currently selected Check In/Out dates
+  // Track exactly how many units are available for the currently selected Check In/Out dates
   useEffect(() => {
     if (isFarmhouse || !venueId || !roomType || !visible) return;
 
@@ -221,59 +223,33 @@ export const StaycationOfflineBookingSheet = ({
         return;
       }
 
-      const dateCounts: Record<string, number> = {};
       const dInStr = formatYMD(checkInDate);
       const dOutStr = formatYMD(checkOutDate);
 
-      // Fetch Bookings with unit_count!
-      const { data: bookings } = await supabase
-        .from("staycation_bookings")
-        .select("check_in_date, check_out_date, unit_count")
+      // FIX: Check the actual availability calendar, NOT the bookings table
+      const { data: blocks } = await supabase
+        .from("staycation_availability")
+        .select("room_id, date")
         .eq("venue_id", venueId)
         .in("room_id", roomIds)
-        .neq("booking_status", "cancelled")
-        .lt("check_in_date", dOutStr)
-        .gt("check_out_date", dInStr);
+        .eq("is_blocked", true)
+        .gte("date", dInStr)
+        .lt("date", dOutStr); // Less than checkout date
 
-      bookings?.forEach(b => {
-        let curr = new Date(b.check_in_date);
-        const end = new Date(b.check_out_date);
-        while (curr < end) {
-          const dStr = formatYMD(curr);
-          if (dStr >= dInStr && dStr < dOutStr) {
-            // CRITICAL FIX: Add b.unit_count instead of just +1
-            dateCounts[dStr] = (dateCounts[dStr] || 0) + (b.unit_count || 1);
-          }
-          curr.setDate(curr.getDate() + 1);
-        }
+      // Count max blocked rooms per date
+      const blockCountsPerDate: Record<string, Set<string>> = {};
+      blocks?.forEach(b => {
+        if (!blockCountsPerDate[b.date]) blockCountsPerDate[b.date] = new Set();
+        if (b.room_id) blockCountsPerDate[b.date].add(b.room_id);
       });
 
-      let maxOccupied = 0;
-      for (const count of Object.values(dateCounts)) {
-        if (count > maxOccupied) maxOccupied = count;
+      let maxBlocked = 0;
+      for (const dateSet of Object.values(blockCountsPerDate)) {
+        if (dateSet.size > maxBlocked) maxBlocked = dateSet.size;
       }
 
-      // Check for Closed Dates
-      // Let's just fetch all and check overlap manually to be safe if query is complex
-      const { data: allClosed } = await supabase
-        .from("venue_closed_dates")
-        .select("start_date, end_date")
-        .eq("venue_id", venueId);
-
-      let isClosedInRange = false;
-      allClosed?.forEach(c => {
-        const cStart = c.start_date;
-        const cEnd = c.end_date || c.start_date;
-        if (cStart < dOutStr && cEnd >= dInStr) {
-          isClosedInRange = true;
-        }
-      });
-
-      if (isClosedInRange) {
-        setAvailableUnitsForCurrentDates(0);
-      } else {
-        setAvailableUnitsForCurrentDates(Math.max(0, roomIds.length - maxOccupied));
-      }
+      // Final availability is total physical rooms minus the max blocked on any given day
+      setAvailableUnitsForCurrentDates(Math.max(0, roomIds.length - maxBlocked));
     };
 
     fetchAvailabilityForDates();
@@ -575,29 +551,58 @@ export const StaycationOfflineBookingSheet = ({
       roomId: undefined,
       groupType: isFarmhouse ? groupType : undefined,
       unitCount: isFarmhouse ? 1 : unitsInt,
+      bookingSource: "offline",
     });
 
     if (result.success) {
       const dueAmount = (parseFloat(totalPayment) || 0) - (parseFloat(advancePaid) || 0);
-      const shareMessage = `Booking Confirmed! 🎉
-Hi ${finalName},
-Your slot at ${result.venueName || "our venue"} is locked in via Bookr.
-Date: ${formatDateLabel(checkInDate)} to ${formatDateLabel(checkOutDate)}
-Payment Summary:
-Total: ₹${totalPayment || 0}
-Paid: ₹${advancePaid || 0}
-Due at Venue: ₹${dueAmount}
-Thank you for booking with Bookr!`;
+      const appLink =
+        Platform.OS === "ios"
+          ? "https://apps.apple.com/app/bookr/idYOUR_APP_ID"
+          : "https://play.google.com/store/apps/details?id=com.bookr_mobile";
 
-      try {
-        await Share.share({ message: shareMessage });
-      } catch (error) {
-        // Fallback silently
-      }
+      const spicyLine =
+        "🔥 Don't let your slot get snatched! Lock in your favorite time instantly on the Bookr app.";
 
-      Alert.alert("Success", "Offline booking created successfully.");
-      onSuccess?.();
-      onClose();
+      const shareMessage = `Booking Confirmed! 🎉\nHi ${finalName},\nYour slot at ${
+        result.venueName || "our venue"
+      } is locked in via Bookr.\n\nDate: ${formatDateLabel(checkInDate)} to ${formatDateLabel(
+        checkOutDate,
+      )}\n\nPayment Summary:\nTotal: ₹${totalPayment}\nPaid: ₹${advancePaid}\nDue: ₹${dueAmount}\n\n${spicyLine}\n${appLink}\n\nThank you!`;
+
+      Alert.alert("Booking Success", "Offline booking created successfully.", [
+        {
+          text: "Okay",
+          style: "cancel",
+          onPress: () => {
+            onSuccess?.();
+            onClose();
+          },
+        },
+        {
+          text: "Send to WhatsApp",
+          onPress: async () => {
+            const cleanPhone = phone.replace(/\D/g, "");
+            const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+            const whatsappUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(
+              shareMessage,
+            )}`;
+
+            try {
+              const supported = await Linking.canOpenURL(whatsappUrl);
+              await Linking.openURL(
+                supported
+                  ? whatsappUrl
+                  : `https://wa.me/${formattedPhone}?text=${encodeURIComponent(shareMessage)}`,
+              );
+            } catch (err) {
+              Alert.alert("Error", "Could not open WhatsApp.");
+            }
+            onSuccess?.();
+            onClose();
+          },
+        },
+      ]);
     } else {
       Alert.alert("Error", "Failed to create booking. Please check availability.");
     }
@@ -691,25 +696,25 @@ Thank you for booking with Bookr!`;
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}>
               {/* Name */}
-              {phone.length >= 10 && (
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <User size={ms(20)} color={COLORS.text.primary} />
-                    <Text weight="medium" style={styles.label}>
-                      Name
-                    </Text>
-                  </View>
-                  <View style={styles.inputWrapper}>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="Yash"
-                      placeholderTextColor={COLORS.text.muted}
-                      value={name}
-                      onChangeText={setName}
-                    />
-                  </View>
+              {/* {phone.length >= 10 && ( */}
+              <View style={styles.inputGroup}>
+                <View style={styles.labelRow}>
+                  <User size={ms(20)} color={COLORS.text.primary} />
+                  <Text weight="medium" style={styles.label}>
+                    Name
+                  </Text>
                 </View>
-              )}
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Yash"
+                    placeholderTextColor={COLORS.text.muted}
+                    value={name}
+                    onChangeText={setName}
+                  />
+                </View>
+              </View>
+              {/* )} */}
 
               {/* Mobile No */}
               <View style={styles.inputGroup}>
@@ -727,7 +732,7 @@ Thank you for booking with Bookr!`;
                     keyboardType="phone-pad"
                     value={phone}
                     onChangeText={text => {
-                      const clean = text.replace(/[^\d]/g, "");
+                      const clean = text.replace(/[^\d]/g, "").slice(0, 10);
                       setPhone(clean);
                       if (clean.length < 10) {
                         setName("");
@@ -1023,22 +1028,27 @@ Thank you for booking with Bookr!`;
                   {activeDropdown?.title}
                 </Text>
                 <ScrollView showsVerticalScrollIndicator={false} style={styles.dropdownScroll}>
-                  {activeDropdown?.options.map(option => (
-                    <TouchableOpacity
-                      key={option}
-                      style={styles.dropdownItem}
-                      onPress={() => handleDropdownSelect(option)}>
-                      <Text
-                        variant="body1"
-                        weight="medium"
-                        style={[
-                          styles.dropdownItemText,
-                          option.includes("(Booked)") && { color: COLORS.danger },
-                        ]}>
-                        {option}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {activeDropdown?.options.map(option => {
+                    // Determine if this count is over the limit
+                    const isOverLimit = parseInt(option, 10) > maxStandardGuests;
+                    return (
+                      <TouchableOpacity
+                        key={option}
+                        style={styles.dropdownItem}
+                        onPress={() => handleDropdownSelect(option)}>
+                        <Text
+                          variant="body1"
+                          weight="medium"
+                          style={[
+                            styles.dropdownItemText,
+                            option.includes("(Booked)") && { color: COLORS.danger },
+                            isOverLimit && { color: COLORS.danger },
+                          ]}>
+                          {option}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </ScrollView>
               </View>
             </TouchableWithoutFeedback>

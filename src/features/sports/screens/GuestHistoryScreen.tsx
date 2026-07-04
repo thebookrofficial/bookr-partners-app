@@ -10,24 +10,41 @@ import { BookingCard } from "../components/BookingCard";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { useGuestHistory, HistoryBooking } from "../hooks/useGuestHistory";
 
 export const GuestHistoryScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<MainStackParamList, "GuestHistory">>();
 
   // CRITICAL FIX 1: Extract vertical from route.params
-  const { guestId: guestIdParam, bookingId, vertical } = route.params;
+  const { guestId: guestIdParam, bookingId, vertical, venueId } = route.params as any;
 
   const identifier = guestIdParam || bookingId;
 
-  // CRITICAL FIX 2: Pass vertical into the hook
-  const { history, stats, guestName, guestPhone, loading } = useGuestHistory(identifier, vertical);
+  // CRITICAL Fix 2: Pass vertical into the hook
+  const { history, stats, guestName, guestPhone, loading } = useGuestHistory(
+    identifier,
+    vertical,
+    venueId,
+  );
 
   const [activeTab, setActiveTab] = useState<"past" | "upcoming" | "cancelled">("past");
 
   const filteredHistory = history.filter(h => h.booking_status === activeTab);
+
+  const navigateToHistoryItem = (item: HistoryBooking) => {
+    if (item.vertical === "sports") {
+      navigation.navigate("SportsInvoice", { bookingId: item.id });
+    } else if (item.vertical === "staycation") {
+      navigation.navigate("StaycationInvoice", { bookingId: item.id });
+    } else if (item.vertical === "dining") {
+      navigation.navigate("DineBookingDetails", { bookingId: item.id });
+    } else if (item.vertical === "events") {
+      navigation.navigate("EventEntryDetails", { entryId: item.id });
+    }
+  };
 
   const groupedHistory = filteredHistory.reduce(
     (acc: { [key: string]: HistoryBooking[] }, item) => {
@@ -162,6 +179,7 @@ export const GuestHistoryScreen = () => {
                   // Use 'as any' to bypass the strict prop type constraint
                   status={(item.booking_status === "cancelled" ? "Cancelled" : item.status) as any}
                   hideCallButton={true}
+                  onPress={() => navigateToHistoryItem(item)}
                 />
               ))}
             </React.Fragment>

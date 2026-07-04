@@ -172,10 +172,10 @@ export const SportsHomeScreen = () => {
               style={styles.dateRow}
               onPress={() => setIsDatePickerOpen(true)}
               activeOpacity={0.7}>
-              <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
+              <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
                 {getFormattedDate(selectedDate)}
               </Text>
-              <CalendarIcon size={ms(16)} color="#00327B" />
+              <CalendarIcon size={ms(18)} color="#00327B" />
             </TouchableOpacity>
 
             {grounds.length > 0 && (
@@ -332,8 +332,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: vs(6),
-    marginBottom: vs(6),
+    paddingVertical: vs(12),
+    paddingHorizontal: hs(12),
+    marginBottom: vs(10),
+    borderRadius: ms(12),
+    backgroundColor: "rgba(99, 161, 253, 0.08)",
   },
   groundTabs: { marginTop: -vs(10), marginBottom: vs(10) },
   emptySlotsText: { textAlign: "center", marginVertical: vs(20) },
@@ -364,10 +367,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   calendarContainer: {
-    width: "90%",
+    width: "95%",
+    maxWidth: ms(420),
     backgroundColor: COLORS.background,
-    borderRadius: ms(12),
-    padding: ms(10),
+    borderRadius: ms(16),
+    padding: ms(16),
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,

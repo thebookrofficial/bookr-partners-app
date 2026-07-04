@@ -19,6 +19,7 @@ interface CreateOfflineBookingPayload {
   roomType?: string;
   groupType?: string;
   unitCount?: number;
+  bookingSource?: "offline" | "online";
 }
 
 export const useCreateStaycationOfflineBooking = () => {
@@ -80,9 +81,11 @@ export const useCreateStaycationOfflineBooking = () => {
       let assignedRoomStr = payload.roomType || "-";
       let assignedRoomsToBlock: string[] = [];
 
-      if (bookingTypeValue === "per_room" && !assignedRoomId && payload.roomType) {
-        // Fetch all rooms of this type ordered sequentially (PRI-111, PRI-112...)
-        const { data: availableRooms, error: roomErr } = await supabase
+      if (bookingTypeValue === "per_room") {
+        if (!payload.roomType) throw new Error("Room type is required.");
+
+        // Fetch ALL available units for this room type
+        const { data: allRooms, error: roomErr } = await supabase
           .from("staycation_rooms")
           .select("id, room_name, room_number")
           .eq("venue_id", payload.venueId)
@@ -90,49 +93,43 @@ export const useCreateStaycationOfflineBooking = () => {
           .eq("is_active", true)
           .order("room_number", { ascending: true });
 
-        if (roomErr) throw new Error("Could not fetch available rooms. Please try again.");
+        if (roomErr) throw new Error("Could not fetch rooms.");
 
-        if (availableRooms && availableRooms.length > 0) {
-          // Fetch overlapping bookings for these specific dates
-          const { data: overlaps, error: overlapErr } = await supabase
-            .from("staycation_bookings")
-            .select("room_id, unit_count")
-            .eq("venue_id", payload.venueId)
-            .neq("booking_status", "cancelled")
-            .lte("check_in_date", checkOutStr)
-            .gte("check_out_date", checkInStr);
+        // Check availability on the calendar
+        const { data: blocks, error: blockErr } = await supabase
+          .from("staycation_availability")
+          .select("room_id, date")
+          .eq("venue_id", payload.venueId)
+          .eq("is_blocked", true)
+          .gte("date", checkInStr)
+          .lt("date", checkOutStr);
 
-          if (overlapErr) throw new Error("Could not verify room availability. Please try again.");
+        if (blockErr) throw new Error("Could not verify availability.");
 
-          const occupiedIds = new Set(overlaps?.map(o => o.room_id));
+        // Build a map of blocked rooms per date
+        const blockedPerDate: Record<string, Set<string>> = {};
+        blocks?.forEach(b => {
+          if (!blockedPerDate[b.date]) blockedPerDate[b.date] = new Set();
+          if (b.room_id) blockedPerDate[b.date].add(b.room_id);
+        });
 
-          // FIXED: Added validation to check if specifically provided roomId is occupied
-          if (assignedRoomId && overlaps?.some(o => o.room_id === assignedRoomId)) {
-            console.error("[DEBUG: Booking] Conflict detected for room:", assignedRoomId);
-            throw new Error("This room is already booked for these dates. Please select another.");
-          }
+        // Find rooms that are free on ALL days in the requested range
+        const freeRooms =
+          allRooms?.filter(room => {
+            return Object.values(blockedPerDate).every(blockedSet => !blockedSet.has(room.id));
+          }) || [];
 
-          const freeRooms = availableRooms.filter(r => !occupiedIds.has(r.id));
-          if (freeRooms.length < requiredUnits) {
-            throw new Error(`Not enough units of this type available.`);
-          }
-
-          const selectedUnits = freeRooms.slice(0, requiredUnits);
-          assignedRoomId = selectedUnits[0].id;
-          assignedRoomsToBlock = selectedUnits.map(r => r.id);
-          assignedRoomStr = selectedUnits.map(r => `${r.room_name} (${r.room_number})`).join(", ");
-        }
-        // CORRECTED: 'elseif' -> 'else if'
-        else if (bookingTypeValue === "per_room" && !assignedRoomId) {
-          throw new Error("Room selection is required.");
+        if (freeRooms.length < requiredUnits) {
+          throw new Error(`Only ${freeRooms.length} units available for these dates.`);
         }
 
-        // ---------------------------------------------------------
-        // ADD THIS BLOCK BEFORE TRY/CATCH block starts
-        // ---------------------------------------------------------
-        if (payload.checkOutDate <= payload.checkInDate) {
-          throw new Error("Check-out date must be after check-in date.");
-        }
+        // Take the required number of units
+        const selectedUnits = freeRooms.slice(0, requiredUnits);
+
+        // Use the first room as the primary reference for the booking row
+        assignedRoomId = selectedUnits[0].id;
+        assignedRoomsToBlock = selectedUnits.map(r => r.id);
+        assignedRoomStr = selectedUnits.map(r => `${r.room_name} (${r.room_number})`).join(", ");
       }
 
       const safeGuestCount = Math.max(1, payload.guestCount || 1);
@@ -162,6 +159,7 @@ export const useCreateStaycationOfflineBooking = () => {
         special_requests: `Booking For: ${payload.bookingType}, Type: ${assignedRoomStr}, Group: ${
           payload.groupType || "-"
         }`,
+        booking_source: "offline",
       });
 
       if (insertError) {

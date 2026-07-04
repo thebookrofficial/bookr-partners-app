@@ -64,6 +64,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         // Include the end date for closed dates
         while (curr <= end) {
           const dStr = formatDate(curr);
+
           newClosedDates.add(dStr);
           newMarkedDates[dStr] = {
             customStyles: {
@@ -83,14 +84,14 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         .select(
           `
             id, user_id, booking_type, booking_status, platform_fee, check_in_date, check_out_date,
-            guest_count, total_amount, paid_amount, guest_name, guest_phone,
+            guest_count, total_amount, paid_amount, guest_name, guest_phone, booking_source,
             profiles ( full_name, phone, avatar_url )
           `,
         )
         .eq("venue_id", activeVenue.venueId)
         .eq("booking_type", "full_property")
-        .neq("booking_status", "cancelled")
-        .gte("check_out_date", todayStr);
+        .neq("booking_status", "cancelled");
+      // .gte("check_in_date", todayStr);
 
       if (bookingsError) throw bookingsError;
       let bookings = bookingsData || [];
@@ -119,6 +120,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
 
       const todayList: StaycationBooking[] = [];
       const upcomingList: StaycationBooking[] = [];
+      const pastList: StaycationBooking[] = [];
 
       bookings.forEach(b => {
         // 4. Map the data safely
@@ -127,12 +129,14 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         const finalDisplayName = b.guest_name || profile?.full_name || "Guest";
         const finalPhone = b.guest_phone || profile?.phone || "N/A";
 
-        const isOnline = !!b.user_id;
-        const rangeColor = isOnline ? COLORS.primary : COLORS.danger;
+        const isOnline = b.booking_source === "online";
+        const isPast = new Date(b.check_out_date) < new Date();
+        const rangeColor = isPast ? "#aaa" : isOnline ? COLORS.primary : COLORS.danger;
 
         // Calendar marking
         let curr = new Date(b.check_in_date);
         const end = new Date(b.check_out_date);
+
         while (curr < end) {
           const dStr = formatDate(curr);
           newMarkedDates[dStr] = {
@@ -158,7 +162,9 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           guestCount: b.guest_count,
         };
 
-        if (b.check_in_date === todayStr) {
+        if (isPast) {
+          pastList.push(formatted);
+        } else if (b.check_in_date === todayStr) {
           todayList.push(formatted);
         } else {
           upcomingList.push(formatted);
@@ -216,6 +222,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
       const sections = [];
       if (todayList.length) sections.push({ title: "Today's Check-ins", data: todayList });
       if (upcomingList.length) sections.push({ title: "Upcoming Bookings", data: upcomingList });
+      if (pastList.length) sections.push({ title: "Past Bookings", data: pastList });
 
       setGroupedBookings(sections);
     } catch (err) {

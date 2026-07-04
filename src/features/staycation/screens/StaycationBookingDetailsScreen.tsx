@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  Platform,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Avatar, TextInput } from "@/components/ui";
@@ -26,13 +27,12 @@ import {
   Minus,
   CheckCircle2,
   ChevronRight,
-  FileText,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useStaycationBookingDetails } from "../hooks/useStaycationBookingDetails";
-import { supabase } from "@/lib/supabase";
+// import { supabase } from "@/lib/supabase";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -141,13 +141,6 @@ export const StaycationBookingDetailsScreen = () => {
     return null;
   };
 
-  // Check if it's a farmhouse
-  const staycationVenues = (bookingDetails?.venues as any)?.staycation_venues;
-  const propertyType = Array.isArray(staycationVenues)
-    ? staycationVenues[0]?.property_type
-    : staycationVenues?.property_type;
-  const isFarmhouse = propertyType?.toLowerCase() === "farmhouse";
-
   const groupType = getGroupType(bookingDetails?.special_requests);
 
   // 2. The CORRECT way to check if a booking is online
@@ -187,67 +180,107 @@ export const StaycationBookingDetailsScreen = () => {
   };
 
   // Direct WhatsApp Share Handler
+  // const handleWhatsAppShare = async () => {
+  //   let venueName = "our venue";
+
+  //   // 1. Dynamically fetch the venue name
+  //   if (bookingDetails?.id) {
+  //     try {
+  //       const { data } = await supabase
+  //         .from("staycation_bookings")
+  //         .select("venues(name)")
+  //         .eq("id", bookingDetails.id)
+  //         .single();
+  //       const vName = (data?.venues as any)?.name;
+  //       if (vName) venueName = vName;
+  //     } catch (e) {
+  //       console.warn("Could not fetch venue name for Sharing");
+  //     }
+  //   }
+
+  //   // 2. Build the message
+  //   const shareMessage = `Booking Confirmed! 🎉
+  //     Hi ${bookingData.name},
+  //     Your slot at ${venueName} is locked in via Bookr.
+  //     Date: ${bookingData.checkIn} to ${bookingData.checkOut}
+  //     Payment Summary:
+  //     Total: ₹${bookingData.totalPayment}
+  //     Paid: ₹${bookingData.amountPaid}
+  //     Due at Venue: ₹${bookingData.remainingAmount}
+  //     Thank you for booking with Bookr!`;
+
+  //   // 3. Try to open WhatsApp directly if we have a valid phone number
+  //   if (bookingData.phone && bookingData.phone !== "N/A") {
+  //     // Remove all non-numeric characters
+  //     let cleanPhone = bookingData.phone.replace(/\D/g, "");
+
+  //     // If it's a standard 10 digit Indian number, append the 91 country code
+  //     if (cleanPhone.length === 10) {
+  //       cleanPhone = `91${cleanPhone}`;
+  //     }
+
+  //     const encodedMessage = encodeURIComponent(shareMessage);
+  //     const whatsappUrl = `whatsapp://send?phone=${cleanPhone}&text=${encodedMessage}`;
+
+  //     try {
+  //       const canOpen = await Linking.canOpenURL(whatsappUrl);
+  //       if (canOpen) {
+  //         await Linking.openURL(whatsappUrl);
+  //         return; // Stop here if WhatsApp successfully opened
+  //       }
+  //     } catch (err) {
+  //       console.warn("Could not check/open WhatsApp URL", err);
+  //     }
+  //   }
+
+  //   // 4. Fallback to standard share if WhatsApp isn't installed or number is invalid
+  //   try {
+  //     await Share.share({
+  //       message: shareMessage,
+  //     });
+  //   } catch (error) {
+  //     Alert.alert("Error", "Could not open the share menu.");
+  //   }
+  // };
+
   const handleWhatsAppShare = async () => {
-    let venueName = "our venue";
+    const spicyLine =
+      "🔥 Don't let your slot get snatched! Lock in your favorite time instantly on the Bookr app.";
+    const appLink =
+      Platform.OS === "ios"
+        ? "https://apps.apple.com/app/bookr/idYOUR_APP_ID"
+        : "https://play.google.com/store/apps/details?id=com.bookr_mobile";
 
-    // 1. Dynamically fetch the venue name
-    if (bookingDetails?.id) {
-      try {
-        const { data } = await supabase
-          .from("staycation_bookings")
-          .select("venues(name)")
-          .eq("id", bookingDetails.id)
-          .single();
-        const vName = (data?.venues as any)?.name;
-        if (vName) venueName = vName;
-      } catch (e) {
-        console.warn("Could not fetch venue name for Sharing");
-      }
-    }
+    const shareMessage = `Booking Confirmed! 🎉\nHi ${bookingData.name},\nYour slot at ${
+      bookingDetails?.venues?.name || "the venue"
+    } is locked in via Bookr.\n\nDate: ${bookingData.checkIn} to ${
+      bookingData.checkOut
+    }\n\nPayment Summary:\nTotal: ₹${bookingData.totalPayment}\nPaid: ₹${
+      bookingData.amountPaid
+    }\nDue: ₹${bookingData.remainingAmount}\n\n${spicyLine}\n${appLink}\n\nThank you!`;
 
-    // 2. Build the message
-    const shareMessage = `Booking Confirmed! 🎉
-Hi ${bookingData.name},
-Your slot at ${venueName} is locked in via Bookr.
-Date: ${bookingData.checkIn} to ${bookingData.checkOut}
-Payment Summary:
-Total: ₹${bookingData.totalPayment}
-Paid: ₹${bookingData.amountPaid}
-Due at Venue: ₹${bookingData.remainingAmount}
-Thank you for booking with Bookr!`;
+    const cleanPhone = bookingData.phone.replace(/\D/g, "");
+    const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    const whatsappUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(
+      shareMessage,
+    )}`;
 
-    // 3. Try to open WhatsApp directly if we have a valid phone number
-    if (bookingData.phone && bookingData.phone !== "N/A") {
-      // Remove all non-numeric characters
-      let cleanPhone = bookingData.phone.replace(/\D/g, "");
+    Linking.canOpenURL(whatsappUrl)
+      .then(supported =>
+        Linking.openURL(
+          supported
+            ? whatsappUrl
+            : `https://wa.me/${formattedPhone}?text=${encodeURIComponent(shareMessage)}`,
+        ),
+      )
+      .catch(() => Share.share({ message: shareMessage }));
+  };
 
-      // If it's a standard 10 digit Indian number, append the 91 country code
-      if (cleanPhone.length === 10) {
-        cleanPhone = `91${cleanPhone}`;
-      }
-
-      const encodedMessage = encodeURIComponent(shareMessage);
-      const whatsappUrl = `whatsapp://send?phone=${cleanPhone}&text=${encodedMessage}`;
-
-      try {
-        const canOpen = await Linking.canOpenURL(whatsappUrl);
-        if (canOpen) {
-          await Linking.openURL(whatsappUrl);
-          return; // Stop here if WhatsApp successfully opened
-        }
-      } catch (err) {
-        console.warn("Could not check/open WhatsApp URL", err);
-      }
-    }
-
-    // 4. Fallback to standard share if WhatsApp isn't installed or number is invalid
-    try {
-      await Share.share({
-        message: shareMessage,
-      });
-    } catch (error) {
-      Alert.alert("Error", "Could not open the share menu.");
-    }
+  const getGroupInfo = (requests: string) => {
+    if (!requests) return null;
+    // This matches "Group: Family" or "Group Type: friends"
+    const match = requests.match(/(?:Group|Group Type):\s*([^|]+)/i);
+    return match ? match[1].trim() : null;
   };
 
   return (
@@ -282,14 +315,14 @@ Thank you for booking with Bookr!`;
         </View>
 
         {/* Group Type Section */}
-        {isFarmhouse && bookingData.groupType && (
+        {getGroupInfo(bookingDetails?.special_requests) && (
           <View style={styles.section}>
             <View style={styles.labelRow}>
-              <FileText size={ms(18)} color={COLORS.text?.primary || "black"} />
-              <Text style={styles.labelText}>Group Type</Text>
+              <User size={ms(18)} color="black" />
+              <Text style={styles.labelText}>Group</Text>
             </View>
             <View style={styles.valueBox}>
-              <Text style={styles.valueText}>{bookingData.groupType}</Text>
+              <Text style={styles.valueText}>{getGroupInfo(bookingDetails?.special_requests)}</Text>
             </View>
           </View>
         )}
@@ -436,7 +469,7 @@ Thank you for booking with Bookr!`;
         </TouchableOpacity>
 
         {/* Removed the !isOnline check so vendors can cancel ANY active booking */}
-        {!isFromHistory && !isCancelled && (
+        {!isFromHistory && !isCancelled && !isOnline && (
           <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} disabled={isUpdating}>
             <View style={styles.cancelContent}>
               {isUpdating ? (

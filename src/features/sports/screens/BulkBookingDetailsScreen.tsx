@@ -34,6 +34,7 @@ import { supabase } from "@/lib/supabase";
 
 // IMPORT THE NEW VIEW COMPONENT
 import { ViewBulkBooking } from "../components/ViewBulkBooking";
+import { TimePickerModal } from "../components/TimePickerModal";
 
 const HOURS = [
   "6 AM",
@@ -108,7 +109,7 @@ const CreateBulkBooking = ({
   const [toDate, setToDate] = useState(new Date());
   const [fromTime, setFromTime] = useState("7 AM");
   const [toTime, setToTime] = useState("8 AM");
-  const [pricePerHour] = useState(1000);
+  const [pricePerHour, setPricePerHour] = useState(1000);
   const [cashInput, setCashInput] = useState("");
   const [onlineInput, setOnlineInput] = useState("");
   const [stagedPayments, setStagedPayments] = useState<{ mode: "cash" | "upi"; amount: number }[]>(
@@ -117,6 +118,39 @@ const CreateBulkBooking = ({
   const [showDatePicker, setShowDatePicker] = useState<"from" | "to" | null>(null);
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
+
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchBookedSlots = async () => {
+      setBookedSlots([]);
+      if (!selectedGroundId || !fromDate) return;
+
+      const year = fromDate.getFullYear();
+      const month = String(fromDate.getMonth() + 1).padStart(2, "0");
+      const day = String(fromDate.getDate()).padStart(2, "0");
+      const formattedDate = `${year}-${month}-${day}`;
+
+      const { data, error } = await supabase
+        .from("sports_slots")
+        .select("start_time, status")
+        .eq("ground_id", selectedGroundId)
+        .eq("slot_date", formattedDate);
+
+      if (error) {
+        console.error("[DEBUG] Error fetching slots:", error);
+        return;
+      }
+
+      if (data) {
+        const unavailable = data
+          .filter(slot => slot.status === "booked")
+          .map(slot => slot.start_time);
+        setBookedSlots(unavailable);
+      }
+    };
+    fetchBookedSlots();
+  }, [selectedGroundId, fromDate]);
 
   const { confirmBulkBooking, isSubmitting } = useBulkBooking();
 
@@ -353,9 +387,21 @@ const CreateBulkBooking = ({
 
         <View style={styles.fieldGroup}>
           <Text style={styles.labelBold}>Total Payment</Text>
-          <View style={styles.inputBoxFill}>
-            <Text style={styles.inputText}>₹ {totalPayment}</Text>
-          </View>
+          <TextInput
+            variant="filled"
+            value={String(totalPayment)} // Display totalPayment
+            onChangeText={text => {
+              const newTotalPayment = parseFloat(text || "0");
+              if (!isNaN(newTotalPayment) && totalSlots > 0) {
+                setPricePerHour(newTotalPayment / totalSlots); // Calculate pricePerHour
+              } else if (isNaN(newTotalPayment) && text === "") {
+                setPricePerHour(0);
+              }
+            }}
+            keyboardType="numeric"
+            placeholder="₹ 0"
+            style={styles.inputFill}
+          />
         </View>
 
         <View style={styles.fieldGroup}>
@@ -431,27 +477,42 @@ const CreateBulkBooking = ({
         />
       )}
 
-      {/* --- TIME PICKER MODAL --- */}
-      <Modal visible={!!showHourPicker} transparent animationType="fade">
-        <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowHourPicker(null)}>
-          <View style={styles.pickerContainer}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {HOURS.map(hour => (
-                <TouchableOpacity
-                  key={hour}
-                  style={styles.pickerItem}
-                  onPress={() => {
-                    if (showHourPicker === "from") setFromTime(hour);
-                    else setToTime(hour);
-                    setShowHourPicker(null);
-                  }}>
-                  <Text style={styles.inputText}>{hour}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      <TimePickerModal
+        visible={!!showHourPicker}
+        onClose={() => setShowHourPicker(null)}
+        title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
+        hours={HOURS}
+        selectedTime={showHourPicker === "from" ? fromTime : toTime}
+        onSelectTime={hour => {
+          if (showHourPicker === "from") {
+            setFromTime(hour);
+          } else {
+            setToTime(hour);
+          }
+        }}
+        isHourDisabled={(hour, _index) => {
+          const now = new Date();
+          const currentHour24 = now.getHours();
+          const currentMinute = now.getMinutes();
+
+          const hour12h = hour;
+          let [h, ampm] = hour12h.split(" ");
+          let hour24 = parseInt(h, 10);
+          if (ampm === "PM" && hour24 !== 12) hour24 += 12;
+          if (ampm === "AM" && hour24 === 12) hour24 = 0;
+
+          const isPast =
+            fromDate.toDateString() === now.toDateString() &&
+            (hour24 < currentHour24 || (hour24 === currentHour24 && currentMinute > 0));
+
+          const isBooked = bookedSlots.some(bookedTime => {
+            const [bookedHour] = bookedTime.split(":").map(Number);
+            return bookedHour === hour24;
+          });
+
+          return isPast || isBooked;
+        }}
+      />
 
       {/* --- NEW GROUND PICKER MODAL --- */}
       <Modal visible={showGroundPicker} transparent animationType="fade">
@@ -533,10 +594,10 @@ const styles = StyleSheet.create({
 
   /* --- FONTS --- */
   bisonText: {
-    fontFamily: "MDNichromeTest-Bold",
-    fontWeight: "700",
-    fontSize: fs(20),
+    fontFamily: "Bison-Bold",
+    fontSize: fs(22),
     color: "#FFF",
+    letterSpacing: 1,
   },
   tabText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(12) },
   bookingTypeTitle: {
@@ -653,6 +714,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#EEE",
     alignItems: "center",
+  },
+  textDisabled: {
+    color: "#A0A0A0",
   },
 
   /* --- FIXED OVERLAY DROPDOWN STYLES --- */

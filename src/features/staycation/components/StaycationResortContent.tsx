@@ -17,6 +17,7 @@ import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
 import { Plus, Calendar as CalendarIcon, ChevronDown, ChevronUp } from "lucide-react-native";
+import { useServiceStore } from "@/store";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { StaycationBooking } from "../types/staycation.types";
@@ -34,6 +35,7 @@ type ListEntry =
   | { type: "booking"; data: StaycationBooking; sectionTitle: string };
 
 export const StaycationResortContent = ({ initialVenueId }: StaycationResortContentProps) => {
+  const { activeVenueName } = useServiceStore();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [activeRoomType, setActiveRoomType] = useState("All");
@@ -112,7 +114,7 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
       if (activeRoomType !== "All") {
         filteredBookings = filteredBookings.filter((b: any) =>
-          b.roomName?.includes(activeRoomType),
+          (b.roomName || "").toLowerCase().includes(activeRoomType.toLowerCase()),
         );
       }
 
@@ -121,13 +123,16 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
       const isCheckOutSection = section.title.toLowerCase().includes("check out");
       const isUpcomingSection = section.title.includes("Upcoming");
 
+      // Determine if the selected date is in the future
+      const isFutureDate = selectedDate > new Date(new Date().setHours(0, 0, 0, 0));
+
       let shouldShow = false;
       if (activeRoomStatus === "Check Outs") {
         // Today tab: Show Check-ins and Check-outs
         shouldShow = isCheckOutSection || isTargetSection;
       } else {
         // Upcoming tab: Only show Upcoming sections
-        shouldShow = isUpcomingSection;
+        shouldShow = isUpcomingSection || (isTargetSection && isFutureDate);
       }
 
       if (shouldShow && filteredBookings.length > 0) {
@@ -146,9 +151,8 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
         }
       }
     });
-
     return data;
-  }, [groupedBookings, activeRoomStatus, activeRoomType, collapsedSections]);
+  }, [groupedBookings, activeRoomType, selectedDate, activeRoomStatus, collapsedSections]);
 
   const renderItem = ({ item }: { item: ListEntry }) => {
     if (item.type === "header") {
@@ -177,14 +181,14 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
           <View style={styles.headerRow}>
             <Text style={styles.sectionTitle}>{displayTitle}</Text>
 
-            {isUpcoming && (
+            {(isUpcoming || isCheckIn || isCheckOut) && (
               <View style={styles.headerRight}>
                 <View style={styles.occupancyBadge}>
                   <Text weight="semiBold" style={styles.occupancyText}>
                     {item.occupiedCount}/{item.totalCount}
                   </Text>
                 </View>
-                {isCollapsed ? (
+                {isUpcoming && isCollapsed ? (
                   <ChevronDown size={ms(20)} color={COLORS.text.primary} />
                 ) : (
                   <ChevronUp size={ms(20)} color={COLORS.text.primary} />
@@ -215,13 +219,13 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
   };
 
   const listHeader = useMemo(() => {
-    const isToday = new Date().toDateString() === selectedDate.toDateString();
-    const dateLabel = isToday ? "(Today)" : "";
+    // const isToday = new Date().toDateString() === selectedDate.toDateString();
+    // const dateLabel = isToday ? "(Today)" : "";
 
     return (
       <View style={styles.headerContainer}>
         <StaycationHeader
-          title={activeVenue?.name || "Staycation Venue"}
+          title={activeVenue?.name || activeVenueName}
           subtitle="Bookings"
           imageSource={
             activeVenue?.cover_image_url ? { uri: activeVenue.cover_image_url } : USER_PROFILE
@@ -294,15 +298,16 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
             <TouchableOpacity
               style={styles.dateRight}
-              activeOpacity={0.7}
-              onPress={() => setShowDatePicker(true)}>
+              activeOpacity={activeRoomStatus === "Check Outs" ? 1 : 0.7}
+              onPress={() => activeRoomStatus !== "Check Outs" && setShowDatePicker(true)}>
               <Text weight="semiBold" style={styles.todayText}>
                 {selectedDate.toLocaleDateString("en-GB", {
                   day: "2-digit",
                   month: "short",
                   year: "numeric",
-                })}{" "}
-                {dateLabel}
+                })}
+                {activeRoomStatus === "Check Outs" && " (Today)"}
+                {/* {dateLabel} */}
               </Text>
               <CalendarIcon size={ms(16)} color={COLORS.text.primary} />
             </TouchableOpacity>
@@ -329,6 +334,7 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
     );
   }, [
     activeVenue,
+    activeVenueName,
     activeRoomStatus,
     selectedDate,
     showDatePicker,

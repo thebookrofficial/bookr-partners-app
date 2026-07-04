@@ -19,7 +19,7 @@ import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ChevronDown, ChevronUp } from "lucide-react-native";
+import { ChevronDown, ChevronUp, ArrowLeft } from "lucide-react-native";
 import { useServiceStore } from "@/store/serviceStore";
 import { usePayoutDetails } from "../hooks/usePayoutDetails";
 import { DownloadPayoutsModal } from "../components/DownloadPayoutsModal";
@@ -151,12 +151,17 @@ export const PayoutDetailsScreen = () => {
     return (
       <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
         <View style={styles.header}>
-          <Text variant="h3" weight="bold">
-            {activeVenueName}
-          </Text>
-          <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
-            Payouts
-          </Text>
+          <TouchableOpacity onPress={() => _navigation.goBack()} style={styles.backButton}>
+            <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
+          </TouchableOpacity>
+          <View>
+            <Text variant="h3" weight="bold">
+              {activeVenueName}
+            </Text>
+            <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
+              Payouts
+            </Text>
+          </View>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator color={COLORS.primary} size="large" />
@@ -171,12 +176,17 @@ export const PayoutDetailsScreen = () => {
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <View style={styles.header}>
-        <Text variant="h3" weight="bold">
-          {activeVenueName}
-        </Text>
-        <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
-          Payouts
-        </Text>
+        <TouchableOpacity onPress={() => _navigation.goBack()} style={styles.backButton}>
+          <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
+        </TouchableOpacity>
+        <View>
+          <Text variant="h3" weight="bold">
+            {activeVenueName}
+          </Text>
+          <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
+            Payouts
+          </Text>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -192,8 +202,7 @@ export const PayoutDetailsScreen = () => {
         <View style={styles.detailsCard}>
           <ExpandableSection
             title="Total Customer Paid"
-            amount={`+₹${(breakdown?.totalPaid || 0).toFixed(2)}`}
-            defaultExpanded>
+            amount={`+₹${(breakdown?.totalPaid || 0).toFixed(2)}`}>
             <DetailRow
               label={`${breakdown?.full.count || 0} Full payments`}
               value={`₹${(breakdown?.full.total || 0).toFixed(2)}`}
@@ -210,13 +219,7 @@ export const PayoutDetailsScreen = () => {
             title="Bookr fees"
             amount={`-₹${(breakdown?.commission || 0).toFixed(2)}`}>
             <DetailRow
-              label={
-                onlineCount > 0
-                  ? `₹${((breakdown?.commission || 0) / onlineCount).toFixed(
-                      2,
-                    )} × ${onlineCount} Bookings`
-                  : "Commission"
-              }
+              label="bookr commission fees"
               value={`-₹${(breakdown?.commission || 0).toFixed(2)}`}
               weight="semiBold"
             />
@@ -271,6 +274,12 @@ const styles = StyleSheet.create({
   header: {
     marginTop: vs(10),
     marginBottom: vs(15),
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(12),
+  },
+  backButton: {
+    padding: ms(4),
   },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: { paddingBottom: vs(20) },

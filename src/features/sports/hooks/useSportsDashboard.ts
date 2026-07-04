@@ -97,8 +97,12 @@ export const useSportsDashboard = (
         startDate.setDate(startDate.getDate() - 1);
         endDate.setDate(endDate.getDate() - 1);
       } else if (timeFilter === "Last week") {
-        startDate.setDate(startDate.getDate() - 7);
-        endDate.setDate(endDate.getDate() - 1);
+        const currentDay = startDate.getDay();
+        const dayOffset = currentDay === 0 ? 7 : currentDay; // Monday is 1, Sunday is 7
+        startDate.setDate(startDate.getDate() - (dayOffset + 6));
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        endDate.setHours(23, 59, 59, 999);
       } else if (timeFilter === "Last Month") {
         startDate = new Date(startDate.getFullYear(), startDate.getMonth() - 1, 1);
         endDate = new Date(endDate.getFullYear(), endDate.getMonth(), 0);
@@ -201,7 +205,7 @@ export const useSportsDashboard = (
 
         if (isOffline) {
           offlineCount++;
-          totalOfflineRevenue += Number(b.total_amount || 0);
+          totalOfflineRevenue += Number(b.paid_amount || 0);
         } else {
           onlineCount++;
 
@@ -303,7 +307,7 @@ export const useSportsDashboard = (
       maxBookingValue: 0,
       dateRangeLabel: "",
     });
-  }, [venueId, timeFilter, groundFilter]);
+  }, [venueId, timeFilter, groundFilter, customRange]);
 
   useEffect(() => {
     fetchDashboardData();

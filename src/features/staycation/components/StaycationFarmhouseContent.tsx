@@ -16,6 +16,7 @@ import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
 import { Plus, X } from "lucide-react-native";
+import { useServiceStore } from "@/store";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { Calendar } from "react-native-calendars";
@@ -31,6 +32,7 @@ interface StaycationFarmhouseContentProps {
 type ListEntry = { type: "header"; title: string } | { type: "booking"; data: StaycationBooking };
 
 export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhouseContentProps) => {
+  const { activeVenueName } = useServiceStore();
   const {
     isLoading,
     markedDates,
@@ -63,12 +65,18 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
 
   const flatListData = useMemo(() => {
     const data: ListEntry[] = [];
+    const todayStr = new Date().toISOString().split("T")[0]; // Get current date
+
     groupedBookings.forEach(section => {
-      if (section.data.length > 0) {
+      // Filter out sections or bookings that are in the past
+      const filteredSectionData = section.data.filter(b => b.checkOut > todayStr);
+
+      if (filteredSectionData.length > 0) {
         data.push({ type: "header", title: section.title });
 
-        // Sort bookings by check-in date ascending
-        const sortedBookings = [...section.data].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+        const sortedBookings = [...filteredSectionData].sort((a, b) =>
+          a.checkIn.localeCompare(b.checkIn),
+        );
 
         sortedBookings.forEach(b => {
           data.push({ type: "booking", data: b });
@@ -113,7 +121,7 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
     () => (
       <View style={styles.headerContainer}>
         <StaycationHeader
-          title={activeVenue?.name || "Staycation Venue"}
+          title={activeVenue?.name || activeVenueName}
           subtitle="Bookings"
           imageSource={
             activeVenue?.cover_image_url ? { uri: activeVenue.cover_image_url } : USER_PROFILE
@@ -143,6 +151,12 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
             <View style={[styles.dot, styles.closedDot]} />
             <Text weight="bold" style={styles.legendText}>
               Closed
+            </Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, styles.passedDot]} />
+            <Text weight="bold" style={styles.legendText}>
+              Past
             </Text>
           </View>
         </View>
@@ -189,7 +203,7 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
         </View>
       </View>
     ),
-    [activeVenue, markedDates, selectedDate, setSelectedDate, isDateClosed],
+    [activeVenue, activeVenueName, markedDates, selectedDate, setSelectedDate, isDateClosed],
   );
 
   return (
@@ -334,6 +348,9 @@ const styles = StyleSheet.create({
   },
   closedDot: {
     backgroundColor: "black",
+  },
+  passedDot: {
+    backgroundColor: "#aaa",
   },
   legendText: {
     fontSize: fs(14),

@@ -10,7 +10,6 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Pressable,
 } from "react-native";
 import { Text, TextInput } from "@/components/ui";
 import {
@@ -28,6 +27,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { Calendar } from "react-native-calendars";
+import { TimePickerModal } from "./TimePickerModal";
 import { z } from "zod";
 import { SportsService } from "../services/sports.service";
 
@@ -58,8 +58,9 @@ const offlineBookingSchema = z
         message: "Advance paid must be a valid number.",
       })
       .optional(),
-    fromTime: z.string().min(1, "Start time is required."),
-    toTime: z.string().min(1, "End time is required."),
+    // UPDATE THESE TWO LINES:
+    fromTime: z.string().refine(val => val !== "Start Time", "Please select a Start Time."),
+    toTime: z.string().refine(val => val !== "End Time", "Please select an End Time."),
   })
   .refine(
     data => {
@@ -73,8 +74,10 @@ const offlineBookingSchema = z
     },
   );
 
-const parseTimeTo24Hour = (time12h: string) => {
-  if (time12h === "12 AM") return "00:00:00";
+const parseTimeTo24Hour = (time12h: string, isEnd = false) => {
+  // If it's 12 AM and it's the end time, make it 24:00:00
+  if (time12h === "12 AM") return isEnd ? "24:00:00" : "00:00:00";
+
   const [time, modifier] = time12h.split(" ");
   let hours = parseInt(time, 10);
   if (hours === 12 && modifier === "AM") hours = 0;
@@ -308,8 +311,8 @@ export const OfflineBookingSheet = ({
     setIsSubmitting(true);
     try {
       const formattedDate = getLocalDateString(currentDate);
-      const startTime24 = parseTimeTo24Hour(fromTime);
-      const endTime24 = parseTimeTo24Hour(toTime);
+      const startTime24 = parseTimeTo24Hour(fromTime, false);
+      const endTime24 = parseTimeTo24Hour(toTime, true);
       const numericTotal = parseFloat(totalPayment);
       const numericAdvance = parseFloat(advancePaid || "0");
 
@@ -383,22 +386,22 @@ export const OfflineBookingSheet = ({
               keyboardType="phone-pad"
               value={mobile}
               onChangeText={text => {
-                const clean = text.replace(/[^\d]/g, "");
+                const clean = text.replace(/[^\d]/g, "").slice(0, 10);
                 setMobile(clean);
                 if (clean.length < 10) {
                   setName("");
                 }
               }}
             />
-            {mobile.length >= 10 && (
-              <TextInput
-                variant="filled"
-                label={<CustomLabel icon={UserIcon} text="Name" />}
-                placeholder="Guest Name"
-                value={name}
-                onChangeText={setName}
-              />
-            )}
+            {/* {mobile.length >= 10 && ( */}
+            <TextInput
+              variant="filled"
+              label={<CustomLabel icon={UserIcon} text="Name" />}
+              placeholder="Guest Name"
+              value={name}
+              onChangeText={setName}
+            />
+            {/* )} */}
             <View style={styles.row}>
               <View style={styles.flex1}>
                 <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("from")}>
@@ -447,6 +450,12 @@ export const OfflineBookingSheet = ({
                   placeholder="₹"
                   keyboardType="numeric"
                   value={advancePaid}
+                  // ADD THIS LINE:
+                  onFocus={() => {
+                    if (advancePaid === "0" || advancePaid === "0.00") {
+                      setAdvancePaid("");
+                    }
+                  }}
                   onChangeText={text => {
                     const val = parseFloat(text) || 0;
                     const total = parseFloat(totalPayment) || 0;
@@ -473,6 +482,7 @@ export const OfflineBookingSheet = ({
                     guestId: mobile,
                     bookingId: "",
                     vertical: "sports",
+                    venueId: venueId,
                   });
                 }}>
                 <FileText size={ms(20)} color={COLORS.text.primary} />
@@ -503,114 +513,46 @@ export const OfflineBookingSheet = ({
         </TouchableOpacity>
       </TouchableOpacity>
 
-      {/* FIXED HOUR PICKER MODAL */}
-      <Modal visible={!!showHourPicker} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowHourPicker(null)} />
-          <View style={styles.hourPickerContainer}>
-            <Text variant="body1" weight="bold" style={styles.pickerHeader}>
-              Select {showHourPicker === "from" ? "Start" : "End"} Time
-            </Text>
-            {isFetchingSlots ? (
-              <ActivityIndicator color={COLORS.primary} style={{ margin: vs(20) }} />
-            ) : (
-              <ScrollView
-                style={styles.hourList}
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled={true}>
-                {HOURS.map((hour, index) => {
-                  const isBooked = bookedHours.includes(hour);
+      <TimePickerModal
+        visible={!!showHourPicker}
+        onClose={() => setShowHourPicker(null)}
+        title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
+        hours={HOURS}
+        selectedTime={showHourPicker === "from" ? fromTime : toTime}
+        onSelectTime={hour => {
+          if (showHourPicker === "from") {
+            setFromTime(hour);
+            setToTime("End Time");
+          } else {
+            setToTime(hour);
+          }
+        }}
+        isHourDisabled={(hour, index) => {
+          const isBooked = bookedHours.includes(hour);
 
-                  // FIX: Treat 12 AM as the end of the day (24:00) so it isn't incorrectly marked as past
-                  const hour24 =
-                    hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
-                  const isPast = isToday && hour24 <= currentHour;
+          // FIX: Treat 12 AM as the end of the day (24:00) so it isn't incorrectly marked as past
+          const hour24 =
+            hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
+          const isPast = isToday && hour24 <= currentHour;
 
-                  let isDisabled = false;
-                  let reasonText = "";
+          if (showHourPicker === "from") {
+            return isBooked || isPast;
+          } else {
+            const fromIndex = HOURS.indexOf(fromTime);
+            if (index <= fromIndex) {
+              return true;
+            } else {
+              // For "to" time, we check if any slot strictly between the start time
+              // and this end time is booked.
+              const intermediateHours = HOURS.slice(fromIndex, index);
+              const hasBookingInBetween = intermediateHours.some(h => bookedHours.includes(h));
 
-                  if (showHourPicker === "from") {
-                    if (isBooked) {
-                      isDisabled = true;
-                      reasonText = "(Booked)";
-                    } else if (isPast) {
-                      isDisabled = true;
-                      reasonText = "(Unavailable)";
-                    }
-                  } else {
-                    const fromIndex = HOURS.indexOf(fromTime);
-                    if (index <= fromIndex) {
-                      isDisabled = true;
-                    } else {
-                      // For "to" time, we check if any slot strictly between the start time
-                      // and this end time is booked.
-                      // A slot starting at `hour` is fine to be an end time for an earlier slot.
-                      // We check from `fromIndex` up to `index - 1`.
-                      const intermediateHours = HOURS.slice(fromIndex, index);
-                      const hasBookingInBetween = intermediateHours.some(h =>
-                        bookedHours.includes(h),
-                      );
-
-                      if (hasBookingInBetween) {
-                        isDisabled = true;
-                        reasonText = "(Unavailable)";
-                      } else if (isPast && !isBooked) {
-                        // Standard past time check
-                        isDisabled = true;
-                        reasonText = "(Unavailable)";
-                      }
-                    }
-                  }
-
-                  return (
-                    <TouchableOpacity
-                      key={hour}
-                      style={[
-                        styles.hourItem,
-                        isDisabled && styles.hourItemDisabled,
-                        (fromTime === hour || toTime === hour) && {
-                          backgroundColor: COLORS.surface.primary,
-                        },
-                      ]}
-                      disabled={isDisabled}
-                      onPress={() => {
-                        if (showHourPicker === "from") {
-                          setFromTime(hour);
-                          setToTime("End Time");
-                        } else {
-                          setToTime(hour);
-                        }
-                        setShowHourPicker(null);
-                      }}>
-                      <Text
-                        variant="body1"
-                        weight="bold"
-                        color={
-                          isDisabled && reasonText !== "(Booked)"
-                            ? COLORS.text.secondary
-                            : COLORS.text.primary
-                        }>
-                        {hour}
-                        {reasonText ? (
-                          <Text
-                            variant="body1"
-                            weight="bold"
-                            color={
-                              reasonText === "(Booked)" ? COLORS.danger : COLORS.text.secondary
-                            }>
-                            {" "}
-                            {reasonText}
-                          </Text>
-                        ) : null}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
+              return hasBookingInBetween || (isPast && !isBooked);
+            }
+          }
+        }}
+        isFetching={isFetchingSlots}
+      />
 
       <Modal
         visible={isDatePickerOpen}
@@ -707,20 +649,4 @@ const styles = StyleSheet.create({
     borderRadius: ms(12),
     padding: ms(10),
   },
-  hourPickerContainer: {
-    width: "80%",
-    backgroundColor: COLORS.background,
-    borderRadius: ms(12),
-    padding: ms(20),
-    maxHeight: "60%",
-  },
-  pickerHeader: { marginBottom: vs(15), textAlign: "center", textTransform: "uppercase" },
-  hourList: { width: "100%" },
-  hourItem: {
-    paddingVertical: vs(12),
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.navBar,
-    alignItems: "center",
-  },
-  hourItemDisabled: { backgroundColor: COLORS.surface.fallback, opacity: 0.6 },
 });

@@ -2,14 +2,7 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Modal,
-  ActivityIndicator,
-} from "react-native";
+import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -23,6 +16,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 // Sub-components & Hooks
 import { ClosedDatesAlert } from "../components/block-unblock/ClosedDatesAlert";
+import { TimePickerModal } from "../components/TimePickerModal";
 import { useBlockUnblock, BlockedEntry } from "../hooks/useBlockUnblock";
 import { SportsService } from "../services/sports.service";
 
@@ -433,57 +427,28 @@ export const BlockUnblockScreen = () => {
         />
       )}
 
-      {/* Hourly Picker Modal */}
-      <Modal visible={!!showHourPicker} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          {/* 1. The invisible background overlay that closes the modal */}
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => setShowHourPicker(null)}
-          />
-
-          {/* 2. The actual modal container (NO LONGER wrapped in a button) */}
-          <View style={styles.hourPickerContainer}>
-            <Text variant="body1" weight="bold" style={styles.pickerHeader}>
-              Select {showHourPicker === "from" ? "Start" : "End"} Time
-            </Text>
-
-            <ScrollView style={styles.hourList} showsVerticalScrollIndicator={false}>
-              {HOURS.map((hour, index) => {
-                let isDisabled = false;
-                if (showHourPicker === "to") {
-                  const fromIndex = HOURS.indexOf(fromTime);
-                  if (index <= fromIndex) isDisabled = true;
-                }
-
-                return (
-                  <TouchableOpacity
-                    key={hour}
-                    style={[styles.hourItem, isDisabled && styles.hourItemDisabled]}
-                    disabled={isDisabled}
-                    onPress={() => {
-                      if (showHourPicker === "from") {
-                        setFromTime(hour);
-                        setToTime("End Time");
-                      } else {
-                        setToTime(hour);
-                      }
-                      setShowHourPicker(null);
-                    }}>
-                    <Text
-                      variant="body1"
-                      weight={fromTime === hour || toTime === hour ? "bold" : "medium"}
-                      color={isDisabled ? COLORS.text.muted : COLORS.text.primary}>
-                      {hour}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <TimePickerModal
+        visible={!!showHourPicker}
+        onClose={() => setShowHourPicker(null)}
+        title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
+        hours={HOURS}
+        selectedTime={showHourPicker === "from" ? fromTime : toTime}
+        onSelectTime={hour => {
+          if (showHourPicker === "from") {
+            setFromTime(hour);
+            setToTime("End Time");
+          } else {
+            setToTime(hour);
+          }
+        }}
+        isHourDisabled={(hour, index) => {
+          if (showHourPicker === "to") {
+            const fromIndex = HOURS.indexOf(fromTime);
+            return index <= fromIndex;
+          }
+          return false;
+        }}
+      />
     </ScreenContainer>
   );
 };
@@ -576,23 +541,5 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  hourPickerContainer: {
-    width: "80%",
-    backgroundColor: COLORS.background,
-    borderRadius: ms(12),
-    padding: ms(20),
-    maxHeight: "60%",
-  },
-  pickerHeader: { marginBottom: vs(15), textAlign: "center", textTransform: "uppercase" },
-  hourList: { width: "100%" },
-  hourItem: {
-    paddingVertical: vs(12),
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.navBar,
-    alignItems: "center",
-  },
-  hourItemDisabled: {
-    opacity: 0.5,
   },
 });

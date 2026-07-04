@@ -28,6 +28,7 @@ jest.mock("lucide-react-native", () => ({
   Calendar: "Calendar",
   ChevronDown: "ChevronDown",
   ChevronUp: "ChevronUp",
+  ArrowLeft: "ArrowLeft",
 }));
 
 // Mock store
@@ -102,7 +103,7 @@ describe("Finance UI Tests", () => {
 
       // Expand commission section
       fireEvent.press(getByText("Bookr fees"));
-      expect(getByText(/₹28.02 × 1 Bookings/)).toBeTruthy();
+      expect(getByText("bookr commission fees")).toBeTruthy();
       expect(getAllByText("-₹28.02").length).toBe(2); // One in header, one in detail row
     });
   });

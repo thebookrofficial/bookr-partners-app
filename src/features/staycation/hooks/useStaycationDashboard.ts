@@ -47,9 +47,9 @@ export interface DashboardStats {
 
 export const useStaycationDashboard = (
   venueId: string,
-  startDate: Date,
-  endDate: Date,
+  timeFilter: string,
   selectedRoomName: string = "All Rooms",
+  customRange?: { start: Date; end: Date },
 ) => {
   const { clientProfile } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
@@ -124,6 +124,33 @@ export const useStaycationDashboard = (
       if (!actualVenueId) {
         setIsLoading(false);
         return;
+      }
+
+      // Calculate Date Range
+      let startDate = new Date();
+      let endDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+
+      if (timeFilter === "Yesterday") {
+        startDate.setDate(startDate.getDate() - 1);
+        endDate.setDate(endDate.getDate() - 1);
+      } else if (timeFilter === "Last week") {
+        const currentDay = startDate.getDay();
+        const dayOffset = currentDay === 0 ? 7 : currentDay;
+        startDate.setDate(startDate.getDate() - (dayOffset + 6));
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        endDate.setHours(23, 59, 59, 999);
+      } else if (timeFilter === "Last Month") {
+        startDate = new Date(startDate.getFullYear(), startDate.getMonth() - 1, 1);
+        endDate = new Date(endDate.getFullYear(), endDate.getMonth(), 0);
+        endDate.setHours(23, 59, 59, 999);
+      } else if (timeFilter === "Custom" && customRange) {
+        startDate = new Date(customRange.start);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(customRange.end);
+        endDate.setHours(23, 59, 59, 999);
       }
 
       const startStr = formatDate(startDate);
@@ -330,7 +357,7 @@ export const useStaycationDashboard = (
     } finally {
       setIsLoading(false);
     }
-  }, [venueId, startDate, endDate, selectedRoomName, clientProfile, rooms]);
+  }, [venueId, timeFilter, customRange, selectedRoomName, clientProfile, rooms]);
 
   useEffect(() => {
     fetchRooms();

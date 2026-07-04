@@ -102,17 +102,54 @@ export const useAuthLogic = () => {
       return;
     }
 
-    const { error } = await supabase.auth.verifyOtp({
-      email: email.trim().toLowerCase(),
+    // 1. Verify the OTP
+    const { data: authData, error: authError } = await supabase.auth.verifyOtp({
+      email: formattedEmail,
       token: code,
       type: "email",
     });
 
-    setIsLoading(false);
-
-    if (error) {
-      Alert.alert("Verification Failed", error.message);
+    if (authError) {
+      setIsLoading(false);
+      Alert.alert("Verification Failed", authError.message);
+      return;
     }
+
+    // 2. Ensure we have a user
+    const user = authData.user;
+    if (!user) {
+      setIsLoading(false);
+      Alert.alert("Error", "User session not found after verification.");
+      return;
+    }
+
+    // 3. IMPORTANT: Check the client_profiles table for a valid business role
+    const { data: clientProfile } = await supabase
+      .from("client_profiles")
+      .select("client_role, account_status")
+      .eq("user_id", user.id)
+      .single();
+
+    // 4. Determine if they are authorized
+    const isAuthorized =
+      clientProfile &&
+      (clientProfile.client_role === "owner" || clientProfile.client_role === "staff") &&
+      clientProfile.account_status !== "suspended" &&
+      clientProfile.account_status !== "banned";
+
+    if (!isAuthorized) {
+      // If they are just a 'user' or have no client profile, boot them out
+      await supabase.auth.signOut();
+      setIsLoading(false);
+      Alert.alert(
+        "Access Denied",
+        "This app is strictly for Bookr Business Partners. Please use the main Bookr app to book venues.",
+      );
+      return;
+    }
+
+    // If they made it here, they are an owner/staff, and the session is valid!
+    setIsLoading(false);
   };
 
   const resendOtpCode = async (email: string, onResent: () => void) => {
