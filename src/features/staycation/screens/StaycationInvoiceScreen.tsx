@@ -12,16 +12,7 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
-import {
-  ArrowLeft,
-  Phone,
-  Calendar,
-  Clock,
-  FileText,
-  ChevronRight,
-  User,
-  Home,
-} from "lucide-react-native";
+import { ArrowLeft, Phone, Calendar, Clock, User, Home } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -223,26 +214,6 @@ export const StaycationInvoiceScreen = () => {
             </View>
           </View>
         )}
-
-        {/* Previous History Link */}
-        <TouchableOpacity
-          style={styles.historyLink}
-          activeOpacity={0.7}
-          onPress={() =>
-            navigation.navigate("GuestHistory" as any, {
-              guestId: guestPhone === "N/A" ? undefined : guestPhone,
-              bookingId: booking.id,
-              vertical: "staycation",
-            })
-          }>
-          <View style={styles.historyLeft}>
-            <FileText size={ms(20)} color={COLORS.text.primary} />
-            <Text variant="body2" weight="semiBold" style={styles.historyText}>
-              Previous History
-            </Text>
-          </View>
-          <ChevronRight size={ms(20)} color={COLORS.text.primary} />
-        </TouchableOpacity>
 
         {/* Total Payout Section */}
         {isOnline && (
