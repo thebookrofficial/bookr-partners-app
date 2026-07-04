@@ -72,8 +72,15 @@ export const useBulkBooking = () => {
 
       const dates: string[] = [];
       let curr = new Date(params.fromDate);
-      while (curr <= params.toDate) {
-        dates.push(curr.toISOString().split("T")[0]);
+      curr.setHours(0, 0, 0, 0);
+      let end = new Date(params.toDate);
+      end.setHours(0, 0, 0, 0);
+
+      while (curr <= end) {
+        const year = curr.getFullYear();
+        const month = String(curr.getMonth() + 1).padStart(2, "0");
+        const day = String(curr.getDate()).padStart(2, "0");
+        dates.push(`${year}-${month}-${day}`);
         curr.setDate(curr.getDate() + 1);
       }
 

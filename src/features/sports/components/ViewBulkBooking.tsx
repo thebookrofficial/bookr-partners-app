@@ -103,7 +103,12 @@ export const ViewBulkBooking = ({ bookingId: _bookingId, type }: ViewBulkBooking
 
       const slots = (batchBookings || []).map((b: any) => b.sports_slots);
 
-      const dates = slots.map((s: any) => new Date(s.slot_date).getTime());
+      const parseSlotDate = (dateStr: string) => {
+        const [year, month, day] = dateStr.split("-").map(Number);
+        return new Date(year, month - 1, day);
+      };
+
+      const dates = slots.map((s: any) => parseSlotDate(s.slot_date).getTime());
       const minDate = new Date(Math.min(...dates));
       const maxDate = new Date(Math.max(...dates));
       const formatDate = (d: Date) =>

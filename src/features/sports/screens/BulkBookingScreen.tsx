@@ -146,7 +146,12 @@ export const BulkBookingScreen = () => {
         const uniqueDates = new Set(slots.map((s: any) => s.slot_date));
         const isMultiDay = uniqueDates.size > 1;
 
-        const dates = slots.map((s: any) => new Date(s.slot_date).getTime());
+        const parseSlotDate = (dateStr: string) => {
+          const [year, month, day] = dateStr.split("-").map(Number);
+          return new Date(year, month - 1, day);
+        };
+
+        const dates = slots.map((s: any) => parseSlotDate(s.slot_date).getTime());
         const minDate = new Date(Math.min(...dates));
         const maxDate = new Date(Math.max(...dates));
 
