@@ -97,46 +97,59 @@ const DineTab = createBottomTabNavigator<DineTabParamList>();
 const StaycationTab = createBottomTabNavigator<StaycationTabParamList>();
 const EventTab = createBottomTabNavigator<EventTabParamList>();
 
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 const TabIcon =
   (IconComponent: any) =>
   ({ color }: { color: string }) =>
     <IconComponent color={color} size={ms(24)} />;
 
-const COMMON_TAB_SCREEN_OPTIONS = {
-  headerShown: false,
-  tabBarActiveTintColor: COLORS.primary,
-  tabBarInactiveTintColor: COLORS.text.muted,
-  tabBarStyle: {
-    position: "absolute" as const,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.surface.primary,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border.navBar,
-    borderTopLeftRadius: ms(20),
-    borderTopRightRadius: ms(20),
-    height: vs(73),
-    paddingTop: vs(10),
-    paddingBottom: vs(25),
-    paddingHorizontal: hs(10),
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  tabBarItemStyle: {
-    marginHorizontal: 0,
-  },
-  tabBarLabelStyle: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(12),
-    lineHeight: fs(12),
-    marginTop: vs(2),
-  },
+const useTabScreenOptions = () => {
+  const insets = useSafeAreaInsets();
+  const bottomInset = insets.bottom;
+  const paddingBottom = bottomInset > 0 ? bottomInset + vs(8) : vs(25);
+  const height = vs(52) + paddingBottom;
+
+  return React.useMemo(
+    () => ({
+      headerShown: false,
+      tabBarActiveTintColor: COLORS.primary,
+      tabBarInactiveTintColor: COLORS.text.muted,
+      tabBarStyle: {
+        position: "absolute" as const,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: COLORS.surface.primary,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border.navBar,
+        borderTopLeftRadius: ms(20),
+        borderTopRightRadius: ms(20),
+        height: height,
+        paddingTop: vs(10),
+        paddingBottom: paddingBottom,
+        paddingHorizontal: hs(10),
+        elevation: 0,
+        shadowOpacity: 0,
+      },
+      tabBarItemStyle: {
+        marginHorizontal: 0,
+      },
+      tabBarLabelStyle: {
+        fontFamily: "Gilroy-Bold",
+        fontSize: fs(12),
+        lineHeight: fs(12),
+        marginTop: vs(2),
+      },
+    }),
+    [height, paddingBottom],
+  );
 };
 
 const SportsTabNavigator = () => {
+  const tabScreenOptions = useTabScreenOptions();
   return (
-    <SportsTab.Navigator screenOptions={COMMON_TAB_SCREEN_OPTIONS}>
+    <SportsTab.Navigator screenOptions={tabScreenOptions}>
       <SportsTab.Screen
         name="SportsHome"
         component={SportsHomeScreen}
@@ -167,8 +180,9 @@ const SportsTabNavigator = () => {
 };
 
 const DineTabNavigator = () => {
+  const tabScreenOptions = useTabScreenOptions();
   return (
-    <DineTab.Navigator screenOptions={COMMON_TAB_SCREEN_OPTIONS}>
+    <DineTab.Navigator screenOptions={tabScreenOptions}>
       <DineTab.Screen
         name="DineHome"
         component={DineHomeScreen}
@@ -199,8 +213,9 @@ const DineTabNavigator = () => {
 };
 
 const StaycationTabNavigator = () => {
+  const tabScreenOptions = useTabScreenOptions();
   return (
-    <StaycationTab.Navigator screenOptions={COMMON_TAB_SCREEN_OPTIONS}>
+    <StaycationTab.Navigator screenOptions={tabScreenOptions}>
       <StaycationTab.Screen
         name="StaycationHome"
         component={StaycationHomeScreen}
@@ -247,12 +262,13 @@ const ScanTabIcon = () => (
 );
 
 const EventTabNavigator = () => {
+  const tabScreenOptions = useTabScreenOptions();
   return (
     <EventTab.Navigator
       screenOptions={{
-        ...COMMON_TAB_SCREEN_OPTIONS,
+        ...tabScreenOptions,
         tabBarStyle: {
-          ...COMMON_TAB_SCREEN_OPTIONS.tabBarStyle,
+          ...tabScreenOptions.tabBarStyle,
           paddingTop: vs(4), // Slightly less padding to accommodate elevated scan button
         },
       }}>
