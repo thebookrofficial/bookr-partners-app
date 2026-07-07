@@ -143,9 +143,9 @@ export const useStaycationResort = (
 
       // Sort candidateRooms: requested room first, then others of same type
       if (targetRoom) {
-        candidateRooms.sort((a, b) => {
-          if (a.id === targetRoom.id) return -1;
-          if (b.id === targetRoom.id) return 1;
+        candidateRooms.sort((roomA, roomB) => {
+          if (roomA.id === targetRoom.id) return -1;
+          if (roomB.id === targetRoom.id) return 1;
           return 0;
         });
       }

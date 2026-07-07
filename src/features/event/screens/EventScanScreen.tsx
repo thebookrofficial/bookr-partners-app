@@ -198,7 +198,6 @@ export const EventScanScreen = () => {
 
       const realEventId = event.id;
       setActiveEventId(realEventId);
-      console.log("DEBUG: Active Event ID:", realEventId);
 
       // B. Pre-fill categories from passes and zones so the tabs ALWAYS exist
       const cats = new Set<string>();
@@ -237,13 +236,6 @@ export const EventScanScreen = () => {
 
       if (bookingsRes.error) throw bookingsRes.error;
       if (invitesRes.error) throw invitesRes.error;
-
-      console.log("DEBUG: Bookings found:", bookingsRes.data?.length);
-      console.log(
-        "DEBUG: Booking IDs:",
-        bookingsRes.data?.map(b => b.id),
-      );
-      console.log("DEBUG: Invites found:", invitesRes.data?.length);
 
       const formattedBookings: Attendee[] = (bookingsRes.data || []).map((b: any) => {
         const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
@@ -426,7 +418,6 @@ export const EventScanScreen = () => {
     async (code: string) => {
       if (!activeEventId) return;
       try {
-        console.log("DEBUG: Scanned Code:", code);
         const { data: booking } = await supabase
           .from("event_bookings")
           .select(
@@ -441,7 +432,6 @@ export const EventScanScreen = () => {
           .maybeSingle();
 
         if (booking) {
-          console.log("DEBUG: Booking found:", booking.id, "Status:", booking.booking_status);
           if (booking.booking_status === "completed") {
             Alert.alert("Already Scanned", "This ticket has already been used for entry.");
             return;
@@ -475,7 +465,6 @@ export const EventScanScreen = () => {
             .maybeSingle();
 
           if (invite) {
-            console.log("DEBUG: Invite found:", invite.id, "Status:", invite.status);
             if (invite.status === "completed") {
               Alert.alert("Already Scanned", "This invite has already been used.");
               return;
