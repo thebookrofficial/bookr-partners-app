@@ -10,6 +10,7 @@ export type AuthStackParamList = {
   Login: undefined;
   Otp: { email: string };
   Signup: undefined;
+  AcceptInvite: undefined;
   LegalView: { title: string; content: string };
 };
 
@@ -60,6 +61,8 @@ export type MainStackParamList = {
   Dashboard: undefined;
   VendorProfile: undefined;
   AddStaff: undefined;
+  EditStaff: { staffId: string; staffData?: any };
+  StaffManagement: { venueId?: string; serviceCategory?: string } | undefined;
   EditProfile: undefined;
   AddService: undefined;
   Settings: undefined;
@@ -108,6 +111,7 @@ export type MainStackParamList = {
   };
   SportsInvoice: { bookingId: string };
   FAQ: { vertical: "sports" | "staycation" };
+  AcceptInvite: undefined;
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

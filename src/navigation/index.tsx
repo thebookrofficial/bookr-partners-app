@@ -23,14 +23,18 @@ import {
   MoreHorizontal,
   User,
 } from "lucide-react-native";
-import { Linking } from "react-native";
+import { Linking, Alert } from "react-native";
 import messaging from "@react-native-firebase/messaging";
 import { LinkingOptions } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { StaffService } from "@/features/profile/services/staff.service";
 
 import { VendorProfileScreen } from "@/features/profile/screens/VendorProfileScreen";
 import { SettingsScreen } from "@/features/settings/screens/SettingsScreen";
 import { EditProfileScreen } from "@/features/profile/screens/EditProfileScreen";
 import { AddStaffScreen } from "@/features/profile/screens/AddStaffScreen";
+import { EditStaffScreen } from "@/features/profile/screens/EditStaffScreen";
+import { StaffManagementScreen } from "@/features/profile/screens/StaffManagementScreen";
 import { SportsHomeScreen } from "@/features/sports/screens/SportsHomeScreen";
 import { BookingDetailsScreen } from "@/features/sports/screens/BookingDetailsScreen";
 import { GuestHistoryScreen } from "@/features/sports/screens/GuestHistoryScreen";
@@ -70,6 +74,7 @@ import { NotificationSettingsScreen } from "@/features/settings/screens/Notifica
 import { FAQScreen } from "@/features/settings/screens/FAQScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
+import { AcceptInviteScreen } from "@/features/auth/screens/AcceptInviteScreen";
 import { PayoutsScreen } from "@/features/finance/screens/PayoutsScreen";
 import { PayoutDetailsScreen } from "@/features/finance/screens/PayoutDetailsScreen";
 import { SportsInvoiceScreen } from "@/features/sports/screens/SportsInvoiceScreen";
@@ -148,28 +153,45 @@ const useTabScreenOptions = () => {
 
 const SportsTabNavigator = () => {
   const tabScreenOptions = useTabScreenOptions();
+  const { clientProfile } = useAuthStore();
+  const isOwner = clientProfile?.client_role === "owner" || !clientProfile; // fallback
+  const perms = clientProfile?.permissions || [];
+  const canAccess = (perm: string) => isOwner || perms.includes(perm);
+
   return (
     <SportsTab.Navigator screenOptions={tabScreenOptions}>
-      <SportsTab.Screen
-        name="SportsHome"
-        component={SportsHomeScreen}
-        options={{ title: "Home", tabBarIcon: TabIcon(CalendarCheck) }}
-      />
-      <SportsTab.Screen
-        name="SportsHistory"
-        component={SportsHistoryScreen}
-        options={{ title: "History", tabBarIcon: TabIcon(HistoryIcon) }}
-      />
-      <SportsTab.Screen
-        name="SportsDashboard"
-        component={SportsDashboardScreen}
-        options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
-      />
-      <SportsTab.Screen
-        name="SportsEssentials"
-        component={SportsEssentialsScreen}
-        options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
-      />
+      {canAccess("sports:View Sports Home") && (
+        <SportsTab.Screen
+          name="SportsHome"
+          component={SportsHomeScreen}
+          options={{ title: "Home", tabBarIcon: TabIcon(CalendarCheck) }}
+        />
+      )}
+      {canAccess("sports:View Sports History") && (
+        <SportsTab.Screen
+          name="SportsHistory"
+          component={SportsHistoryScreen}
+          options={{ title: "History", tabBarIcon: TabIcon(HistoryIcon) }}
+        />
+      )}
+      {/* Dashboard is typically owner-only unless explicitly granted */}
+      {isOwner && (
+        <SportsTab.Screen
+          name="SportsDashboard"
+          component={SportsDashboardScreen}
+          options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
+        />
+      )}
+      {(isOwner ||
+        canAccess("sports:Manage Bulk Bookings") ||
+        canAccess("sports:Block / Unblock Slots")) && (
+        <SportsTab.Screen
+          name="SportsEssentials"
+          component={SportsEssentialsScreen}
+          options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
+        />
+      )}
+      {/* Profile can be accessed by everyone */}
       <SportsTab.Screen
         name="SportsProfile"
         component={VendorProfileScreen}
@@ -214,33 +236,47 @@ const DineTabNavigator = () => {
 
 const StaycationTabNavigator = () => {
   const tabScreenOptions = useTabScreenOptions();
+  const { clientProfile } = useAuthStore();
+  const isOwner = clientProfile?.client_role === "owner" || !clientProfile; // fallback
+  const perms = clientProfile?.permissions || [];
+  const canAccess = (perm: string) => isOwner || perms.includes(perm);
+
   return (
     <StaycationTab.Navigator screenOptions={tabScreenOptions}>
-      <StaycationTab.Screen
-        name="StaycationHome"
-        component={StaycationHomeScreen}
-        options={{ title: "Home", tabBarIcon: TabIcon(CalendarCheck) }}
-      />
-      <StaycationTab.Screen
-        name="StaycationHistory"
-        component={StaycationHistoryScreen}
-        options={{ title: "History", tabBarIcon: TabIcon(HistoryIcon) }}
-      />
-      <StaycationTab.Screen
-        name="StaycationDashboard"
-        component={StaycationDashboardScreen}
-        options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
-      />
-      <StaycationTab.Screen
-        name="StaycationEssentials"
-        component={StaycationEssentialsScreen}
-        options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
-      />
+      {canAccess("staycation:View Staycation Home") && (
+        <StaycationTab.Screen
+          name="StaycationHome"
+          component={StaycationHomeScreen}
+          options={{ title: "Home", tabBarIcon: TabIcon(CalendarCheck) }}
+        />
+      )}
+      {canAccess("staycation:View Staycation History") && (
+        <StaycationTab.Screen
+          name="StaycationHistory"
+          component={StaycationHistoryScreen}
+          options={{ title: "History", tabBarIcon: TabIcon(HistoryIcon) }}
+        />
+      )}
+      {isOwner && (
+        <StaycationTab.Screen
+          name="StaycationDashboard"
+          component={StaycationDashboardScreen}
+          options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
+        />
+      )}
+      {isOwner && (
+        <StaycationTab.Screen
+          name="StaycationEssentials"
+          component={StaycationEssentialsScreen}
+          options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
+        />
+      )}
       <StaycationTab.Screen
         name="StaycationProfile"
         component={VendorProfileScreen}
         options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
       />
+      {/* Hidden tab for deep linking or programmatic navigation without showing icon */}
       <StaycationTab.Screen
         name="StaycationCloseDate"
         component={StaycationCloseDateScreen}
@@ -317,6 +353,7 @@ const AuthNavigator = () => (
     <AuthStack.Screen name="Login" component={LoginScreen} />
     <AuthStack.Screen name="Otp" component={OtpScreen} />
     <AuthStack.Screen name="Signup" component={SignupScreen} />
+    <AuthStack.Screen name="AcceptInvite" component={AcceptInviteScreen} />
     <AuthStack.Screen name="LegalView" component={LegalViewScreen} />
   </AuthStack.Navigator>
 );
@@ -327,7 +364,9 @@ const MainNavigator = () => (
     <MainStack.Screen name="Settings" component={SettingsScreen} />
     <MainStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
     <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
+    <MainStack.Screen name="StaffManagement" component={StaffManagementScreen} />
     <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
+    <MainStack.Screen name="EditStaff" component={EditStaffScreen} />
     <MainStack.Screen name="LegalView" component={LegalViewScreen} />
     <MainStack.Screen name="SportsServiceTabs" component={SportsTabNavigator} />
     <MainStack.Screen name="DineServiceTabs" component={DineTabNavigator} />
@@ -354,13 +393,14 @@ const MainNavigator = () => (
     <MainStack.Screen name="Payouts" component={PayoutsScreen} />
     <MainStack.Screen name="PayoutDetails" component={PayoutDetailsScreen} />
     <MainStack.Screen name="SportsInvoice" component={SportsInvoiceScreen} />
+    <MainStack.Screen name="AcceptInvite" component={AcceptInviteScreen} />
     <MainStack.Screen name="FAQ" component={FAQScreen} />
   </MainStack.Navigator>
 );
 
 const linking: LinkingOptions<RootStackParamList> = {
   // Your custom URL schemes
-  prefixes: ["bookrpartner://", "https://partners.thebookr.in"],
+  prefixes: ["bookrpartner://", "https://partners.thebookr.in", "https://thebookr.in"],
 
   // Handles deep links when the app is completely closed (cold start)
   async getInitialURL() {
@@ -393,6 +433,11 @@ const linking: LinkingOptions<RootStackParamList> = {
   // Maps the URL paths to your actual screens
   config: {
     screens: {
+      Auth: {
+        screens: {
+          AcceptInvite: "invite",
+        },
+      },
       Main: {
         screens: {
           Settings: "settings",
@@ -409,19 +454,65 @@ export const AppNavigator = () => {
   const { session, isInitialized, setSession, setInitialized } = useAuthStore();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session?.user) {
+        try {
+          const { data: clientData } = await supabase
+            .from("client_profiles")
+            .select("*")
+            .eq("user_id", data.session.user.id)
+            .maybeSingle();
+
+          if (clientData) {
+            useAuthStore.getState().setClientProfile(clientData);
+          }
+        } catch (error) {
+          console.error("Error fetching initial client profile:", error);
+        }
+      }
       setSession(data.session);
       setInitialized(true);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (newSession?.user && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
+        try {
+          const { data: clientData } = await supabase
+            .from("client_profiles")
+            .select("*")
+            .eq("user_id", newSession.user.id)
+            .maybeSingle();
+          if (clientData) {
+            useAuthStore.getState().setClientProfile(clientData);
+          }
+        } catch (error) {}
+      } else if (!newSession) {
+        useAuthStore.getState().setClientProfile(null);
+      }
       setSession(newSession);
     });
 
     return () => subscription.unsubscribe();
   }, [setSession, setInitialized]);
+
+  useEffect(() => {
+    if (session) {
+      AsyncStorage.getItem("@pending_invite_token").then(async token => {
+        if (token) {
+          try {
+            await StaffService.acceptStaffInvite(token);
+            Alert.alert("Success", "You have successfully joined the business account!");
+          } catch (error: any) {
+            Alert.alert("Invite Error", error.message || "Failed to accept the pending invite.");
+          } finally {
+            await AsyncStorage.removeItem("@pending_invite_token");
+          }
+        }
+      });
+    }
+  }, [session]);
 
   if (!isInitialized) {
     return (

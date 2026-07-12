@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { Alert } from "react-native";
 import { supabase } from "@/lib/supabase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   GoogleSignin,
   statusCodes,
@@ -137,7 +138,9 @@ export const useAuthLogic = () => {
       clientProfile.account_status !== "suspended" &&
       clientProfile.account_status !== "banned";
 
-    if (!isAuthorized) {
+    const pendingInviteToken = await AsyncStorage.getItem("@pending_invite_token");
+
+    if (!isAuthorized && !pendingInviteToken) {
       // If they are just a 'user' or have no client profile, boot them out
       await supabase.auth.signOut();
       setIsLoading(false);

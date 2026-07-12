@@ -12,6 +12,7 @@ import { AuthTextInput } from "../components/AuthTextInput";
 import { LEGAL_TEXT } from "@/constants/legal";
 import { Alert } from "react-native";
 import { supabase } from "@/lib/supabase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Assets
 import LoginIllustration from "@/assets/images/login-screen-client-side.svg";
@@ -45,8 +46,10 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
     const cp = profile?.client_profiles as any;
     const isClient = cp?.client_role === "owner" || cp?.client_role === "staff";
 
-    // 2. If they are not a client, block them immediately
-    if (!isClient) {
+    const pendingInviteToken = await AsyncStorage.getItem("@pending_invite_token");
+
+    // 2. If they are not a client, block them immediately, UNLESS they have a pending invite
+    if (!isClient && !pendingInviteToken) {
       setIsCheckingUser(false);
       Alert.alert(
         "Access Denied",
@@ -55,7 +58,7 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
       return;
     }
 
-    // 3. If they are a client, proceed with the normal OTP flow
+    // 3. If they are a client (or have an invite), proceed with the normal OTP flow
     loginWithEmail(email, isBypass => {
       setIsCheckingUser(false);
       if (!isBypass) {
@@ -331,6 +334,14 @@ const styles = StyleSheet.create({
   footerLinks: {
     flexDirection: "row",
     marginTop: vs(4),
+  },
+  registerLink: {
+    marginTop: vs(10),
+    fontSize: fs(12),
+  },
+  acceptInviteButton: {
+    marginTop: vs(15),
+    alignItems: "center",
   },
   linkText: {
     textDecorationLine: "underline",
