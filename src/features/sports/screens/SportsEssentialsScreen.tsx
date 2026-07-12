@@ -6,7 +6,7 @@ import { View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "re
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
-import { ChevronRight, Files, Ban, Banknote, HelpCircle } from "lucide-react-native";
+import { ChevronRight, Files, Ban, Banknote, HelpCircle, User } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
@@ -17,6 +17,7 @@ import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.
 import { supabase } from "@/lib/supabase";
 
 import { useServiceStore } from "@/store/serviceStore";
+import { useAuthStore } from "@/store";
 
 const EssentialActionRow = ({ title, icon: Icon, onPress }: any) => (
   <TouchableOpacity style={styles.actionRow} onPress={onPress} activeOpacity={0.7}>
@@ -41,6 +42,11 @@ export const SportsEssentialsScreen = () => {
   const routeCategory = route.params?.category;
   const storedCategory = selectedCategories[venueId];
   const selectedCategory = routeCategory || storedCategory || "Football";
+
+  const { clientProfile } = useAuthStore();
+  const isOwner = clientProfile?.client_role === "owner" || !clientProfile;
+  const perms = clientProfile?.permissions || [];
+  const canAccess = (perm: string) => isOwner || perms.includes(perm);
 
   // Sync route param with store if we arrived via a deep link or specific tab click
   useEffect(() => {
@@ -99,52 +105,69 @@ export const SportsEssentialsScreen = () => {
         </Text>
       ) : (
         <View style={styles.listSection}>
-          <EssentialActionRow
-            title="Bulk Booking"
-            icon={Files}
-            onPress={() =>
-              navigation.navigate("BulkBooking", {
-                venueId: currentVenueId,
-              })
-            }
-          />
-          <EssentialActionRow
-            title="Block / Unblock"
-            icon={Ban}
-            onPress={() => {
-              if (currentVenueId && activeGroundId) {
-                navigation.navigate("BlockUnblock", {
+          {(isOwner || canAccess("sports:Manage Bulk Bookings")) && (
+            <EssentialActionRow
+              title="Bulk Booking"
+              icon={Files}
+              onPress={() =>
+                navigation.navigate("BulkBooking", {
                   venueId: currentVenueId,
-                  groundId: activeGroundId,
-                });
-              } else if (!currentVenueId) {
-                Alert.alert(
-                  "Error",
-                  "Venue ID is missing. Please go back and re-enter this screen.",
-                );
-              } else {
-                Alert.alert("No Ground Found", "We couldn't find a sports ground for this venue.");
+                })
               }
-            }}
-          />
-          <EssentialActionRow
-            title="Payouts"
-            icon={Banknote}
-            onPress={() =>
-              navigation.navigate("Payouts", {
-                venueId: currentVenueId,
-              })
-            }
-          />
+            />
+          )}
+          {(isOwner || canAccess("sports:Block / Unblock Slots")) && (
+            <EssentialActionRow
+              title="Block / Unblock"
+              icon={Ban}
+              onPress={() => {
+                if (currentVenueId && activeGroundId) {
+                  navigation.navigate("BlockUnblock", {
+                    venueId: currentVenueId,
+                    groundId: activeGroundId,
+                  });
+                } else if (!currentVenueId) {
+                  Alert.alert(
+                    "Error",
+                    "Venue ID is missing. Please go back and re-enter this screen.",
+                  );
+                } else {
+                  Alert.alert(
+                    "No Ground Found",
+                    "We couldn't find a sports ground for this venue.",
+                  );
+                }
+              }}
+            />
+          )}
+          {isOwner && (
+            <EssentialActionRow
+              title="Payouts"
+              icon={Banknote}
+              onPress={() =>
+                navigation.navigate("Payouts", {
+                  venueId: currentVenueId,
+                })
+              }
+            />
+          )}
           <EssentialActionRow
             title="FAQ's"
             icon={HelpCircle}
             onPress={() => navigation.navigate("FAQ", { vertical: "sports" })}
           />
-          {/* 
-          <EssentialActionRow title="Offers" icon={CalendarDays} onPress={() => {}} />
-          <EssentialActionRow title="Update Venue Info" icon={RefreshCw} onPress={() => {}} /> 
-          */}
+          {isOwner && (
+            <EssentialActionRow
+              title="Staff Management"
+              icon={User}
+              onPress={() =>
+                navigation.navigate("StaffManagement", {
+                  venueId: currentVenueId,
+                  serviceCategory: "sports",
+                })
+              }
+            />
+          )}
         </View>
       )}
     </ScreenContainer>

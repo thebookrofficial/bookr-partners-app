@@ -18,10 +18,10 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
+import { useAuthStore, useServiceStore } from "@/store";
 import { useStaycationHistory } from "../hooks/useStaycationHistory";
 import { DateFilterOption } from "../hooks/useStaycationHistory";
 import { FilterBottomSheet } from "../../sports/components/FilterBottomSheet";
-import { useServiceStore } from "@/store";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -107,6 +107,8 @@ export const StaycationHistoryScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationHistory">>();
   const { activeVenueName } = useServiceStore();
+  const { clientProfile } = useAuthStore();
+  const isOwner = clientProfile?.client_role === "owner" || !clientProfile;
 
   // Extract serviceId with fallback from parent navigator
   let serviceId = route.params?.serviceId;
@@ -214,11 +216,13 @@ export const StaycationHistoryScreen = () => {
             guests={item.guestCount}
             price={item.paidAmount}
             status={item.status}
-            onPress={() =>
-              navigation.navigate("StaycationInvoice", {
-                bookingId: item.id,
-              })
-            }
+            onPress={() => {
+              if (isOwner) {
+                navigation.navigate("StaycationInvoice", {
+                  bookingId: item.id,
+                });
+              }
+            }}
           />
         )}
         renderSectionHeader={({ section }) => (

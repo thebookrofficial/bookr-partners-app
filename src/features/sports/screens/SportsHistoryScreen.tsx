@@ -24,6 +24,7 @@ import { FilterBottomSheet, DateFilterOption } from "../components/FilterBottomS
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
+import { useAuthStore } from "@/store";
 
 // ==========================================
 // 1. NEW HISTORY CARD
@@ -96,6 +97,8 @@ const DateSectionHeader = ({
 export const SportsHistoryScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, any>>();
+  const { clientProfile } = useAuthStore();
+  const isOwner = clientProfile?.client_role === "owner" || !clientProfile;
 
   const { selectedCategories, setServiceCategory, activeServiceId } = useServiceStore();
 
@@ -217,9 +220,11 @@ export const SportsHistoryScreen = () => {
                             time={booking.timeRanges}
                             price={`₹${booking.price}`}
                             status={booking.status}
-                            onPress={() =>
-                              navigation.navigate("SportsInvoice", { bookingId: booking.id })
-                            }
+                            onPress={() => {
+                              if (isOwner) {
+                                navigation.navigate("SportsInvoice", { bookingId: booking.id });
+                              }
+                            }}
                           />
                         ))}
                     </View>
