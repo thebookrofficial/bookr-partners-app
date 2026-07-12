@@ -137,7 +137,7 @@ export const VendorProfileScreen = () => {
           />
           <View style={styles.nameWrapper}>
             <Text variant="body2" weight="semiBold" style={styles.greeting}>
-              {STRINGS.profile.greeting}
+              {clientProfile?.client_role === "staff" ? "Hello, Staff" : STRINGS.profile.greeting}
             </Text>
             <Text variant="body1" weight="semiBold">
               {clientProfile?.business_name || user?.user_metadata?.full_name || "Bookr Partner"}

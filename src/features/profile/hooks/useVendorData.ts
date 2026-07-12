@@ -54,12 +54,25 @@ export const useVendorData = () => {
         setClientProfile(clientData);
 
         // 3. Fetch Venues (Blueprint Table 6.1)
-        const { data: venuesData, error: venuesError } = await supabase
+        let venuesQuery = supabase
           .from("venues")
           .select("*, sports_venues(sports_type)")
-          .eq("owner_id", clientData.id)
           .eq("status", "active")
           .is("deleted_at", null);
+
+        if (clientData.client_role === "owner") {
+          venuesQuery = venuesQuery.eq("owner_id", clientData.id);
+        } else if (clientData.client_role === "staff") {
+          if (clientData.assigned_venue_ids && clientData.assigned_venue_ids.length > 0) {
+            venuesQuery = venuesQuery.in("id", clientData.assigned_venue_ids);
+          } else {
+            // Staff with no assigned venues sees no venues
+            setVenues([]);
+            return;
+          }
+        }
+
+        const { data: venuesData, error: venuesError } = await venuesQuery;
 
         if (venuesError) throw venuesError;
         setVenues((venuesData as Venue[]) || []);
