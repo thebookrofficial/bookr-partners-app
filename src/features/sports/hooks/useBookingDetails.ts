@@ -260,7 +260,6 @@ export const useBookingDetails = (bookingId: string) => {
       if (slotError) console.warn("Slot update issue:", slotError);
 
       Alert.alert("Success", "Booking cancelled successfully.");
-      await fetchDetails();
       return true;
     } catch (error: any) {
       Alert.alert("Cancellation Failed", error.message);

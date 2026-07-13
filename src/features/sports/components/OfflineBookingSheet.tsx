@@ -22,6 +22,7 @@ import {
   FileText,
   ChevronRight,
   ChevronDown,
+  ArrowLeft,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -32,6 +33,7 @@ import { Calendar } from "react-native-calendars";
 import { TimePickerModal } from "./TimePickerModal";
 import { z } from "zod";
 import { SportsService } from "../services/sports.service";
+import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
 
 interface OfflineBookingSheetProps {
   isVisible: boolean;
@@ -76,17 +78,6 @@ const offlineBookingSchema = z
     },
   );
 
-const parseTimeTo24Hour = (time12h: string, isEnd = false) => {
-  // If it's 12 AM and it's the end time, make it 24:00:00
-  if (time12h === "12 AM") return isEnd ? "24:00:00" : "00:00:00";
-
-  const [time, modifier] = time12h.split(" ");
-  let hours = parseInt(time, 10);
-  if (hours === 12 && modifier === "AM") hours = 0;
-  if (hours < 12 && modifier === "PM") hours += 12;
-  return `${hours.toString().padStart(2, "0")}:00:00`;
-};
-
 const CustomLabel = ({ icon: Icon, text }: { icon: any; text: string }) => (
   <View style={styles.labelRow}>
     <Icon size={ms(16)} color={COLORS.primary} />
@@ -120,7 +111,7 @@ export const OfflineBookingSheet = ({
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
 
   // Pricing State
-  const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0 });
+  const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0, slotDurationMinutes: 60 });
 
   // Hour Selection State
   const [fromTime, setFromTime] = useState("Start Time");
@@ -128,28 +119,8 @@ export const OfflineBookingSheet = ({
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
 
   const HOURS = useMemo(
-    () => [
-      "6 AM",
-      "7 AM",
-      "8 AM",
-      "9 AM",
-      "10 AM",
-      "11 AM",
-      "12 PM",
-      "1 PM",
-      "2 PM",
-      "3 PM",
-      "4 PM",
-      "5 PM",
-      "6 PM",
-      "7 PM",
-      "8 PM",
-      "9 PM",
-      "10 PM",
-      "11 PM",
-      "12 AM",
-    ],
-    [],
+    () => generateTimeSlots(6, 24, pricing.slotDurationMinutes),
+    [pricing.slotDurationMinutes],
   );
 
   const getLocalDateString = (date: Date) => {
@@ -182,10 +153,16 @@ export const OfflineBookingSheet = ({
         const dateStr = getLocalDateString(currentDate);
         const data = await SportsService.getUnavailableSlotsForDate(_groundId, dateStr);
         const formattedBooked = (data || []).map((slot: any) => {
-          const [h] = slot.start_time.split(":");
+          // Keep it as 'H:MM AM/PM' to match the generated HOURS format.
+          const [h, m] = slot.start_time.split(":");
           const hourInt = parseInt(h, 10);
-          const ampm = hourInt >= 12 ? "PM" : "AM";
-          const displayHour = hourInt % 12 || 12;
+          const ampm = hourInt >= 12 && hourInt < 24 ? "PM" : "AM";
+          let displayHour = hourInt % 12;
+          if (displayHour === 0) displayHour = 12;
+
+          if (pricing.slotDurationMinutes < 60) {
+            return `${displayHour}:${m} ${ampm}`;
+          }
           return `${displayHour} ${ampm}`;
         });
         setBookedHours(formattedBooked);
@@ -196,7 +173,7 @@ export const OfflineBookingSheet = ({
       }
     };
     fetchUnavailableSlots();
-  }, [currentDate, _groundId, isVisible]);
+  }, [currentDate, _groundId, isVisible, pricing.slotDurationMinutes]);
 
   const prevGroundId = React.useRef<string | null>(null);
 
@@ -248,6 +225,7 @@ export const OfflineBookingSheet = ({
             day: data.day_price || data.price_per_hour || 0,
             night: data.night_price || data.price_per_hour || 0,
             default: data.price_per_hour || 0,
+            slotDurationMinutes: data.slot_duration_minutes || 60,
           });
           setAdvancePaid(data.min_advance_amount?.toString() || "");
         }
@@ -282,12 +260,16 @@ export const OfflineBookingSheet = ({
       // Day Session: 6 AM to 5 PM
       // Night Session: 5 PM to 12 AM
       const hIdx = HOURS.indexOf(hour);
-      const fivePMIdx = HOURS.indexOf("5 PM");
+      // For fallback comparison, find the index of 5 PM or closest match
+      const fivePMIdx = HOURS.findIndex(h => h.includes("5 PM") || h.includes("5:00 PM"));
 
-      if (hIdx < fivePMIdx) {
-        total += pricing.day || pricing.default;
+      const boundaryIdx = fivePMIdx !== -1 ? fivePMIdx : HOURS.length / 2;
+      const multiplier = (pricing.slotDurationMinutes || 60) / 60;
+
+      if (hIdx < boundaryIdx) {
+        total += (pricing.day || pricing.default) * multiplier;
       } else {
-        total += pricing.night || pricing.default;
+        total += (pricing.night || pricing.default) * multiplier;
       }
     });
 
@@ -330,6 +312,7 @@ export const OfflineBookingSheet = ({
         guestPhone: cleanMobile,
         bookingSource: "offline",
         sportsBookingType: "offline",
+        slotDurationMinutes: pricing.slotDurationMinutes,
       };
 
       // CRITICAL FIX: Removed profile lookup and userId passing
@@ -360,13 +343,15 @@ export const OfflineBookingSheet = ({
       transparent={true}
       onRequestClose={onClose}
       statusBarTranslucent={true}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity style={styles.overlay} activeOpacity={1}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "padding"}
           style={styles.keyboardAvoid}>
-          <TouchableOpacity activeOpacity={1} style={styles.bottomSheetContainer}>
-            <View style={styles.handle} />
+          <View style={styles.bottomSheetContainer}>
             <View style={styles.sheetHeader}>
+              <TouchableOpacity onPress={onClose} style={styles.backButton}>
+                <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
+              </TouchableOpacity>
               <Text variant="body1" weight="bold" style={styles.headerText}>
                 Offline Booking
               </Text>
@@ -497,25 +482,25 @@ export const OfflineBookingSheet = ({
                   <ChevronRight size={ms(20)} color={COLORS.text.primary} />
                 </TouchableOpacity>
               )}
-              <TouchableOpacity
-                style={[styles.saveButton, isSubmitting && styles.saveButtonDisabled]}
-                activeOpacity={0.8}
-                onPress={handleBookNow}
-                disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <ActivityIndicator color={COLORS.text.inverse} />
-                ) : (
-                  <Text
-                    variant="h3"
-                    family="nichrome"
-                    color={COLORS.text.inverse}
-                    style={styles.saveText}>
-                    BOOK NOW
-                  </Text>
-                )}
-              </TouchableOpacity>
             </ScrollView>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.saveButton, isSubmitting && styles.saveButtonDisabled]}
+              activeOpacity={0.8}
+              onPress={handleBookNow}
+              disabled={isSubmitting}>
+              {isSubmitting ? (
+                <ActivityIndicator color={COLORS.text.inverse} />
+              ) : (
+                <Text
+                  variant="h3"
+                  family="nichrome"
+                  color={COLORS.text.inverse}
+                  style={styles.saveText}>
+                  BOOK NOW
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </KeyboardAvoidingView>
       </TouchableOpacity>
 
@@ -528,7 +513,14 @@ export const OfflineBookingSheet = ({
         onSelectTime={hour => {
           if (showHourPicker === "from") {
             setFromTime(hour);
-            setToTime("End Time");
+            const idx = HOURS.indexOf(hour);
+            const step = Math.max(1, Math.round(60 / pricing.slotDurationMinutes));
+            const nextIdx = idx + step;
+            if (nextIdx < HOURS.length) {
+              setToTime(HOURS[nextIdx]);
+            } else {
+              setToTime("End Time");
+            }
           } else {
             setToTime(hour);
           }
@@ -592,28 +584,25 @@ export const OfflineBookingSheet = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  keyboardAvoid: { width: "100%", justifyContent: "flex-end" },
+  overlay: { flex: 1, backgroundColor: COLORS.background },
+  keyboardAvoid: { flex: 1 },
   saveButtonDisabled: { opacity: 0.7 },
   bottomSheetContainer: {
-    width: "100%",
+    flex: 1,
     backgroundColor: COLORS.background,
-    borderTopLeftRadius: ms(20),
-    borderTopRightRadius: ms(20),
-    paddingTop: vs(12),
+    paddingTop: vs(80), // SafeArea for status bar
     paddingHorizontal: hs(12),
     paddingBottom: vs(30),
-    maxHeight: "85%",
   },
-  handle: {
-    width: hs(40),
-    height: vs(4),
-    backgroundColor: COLORS.surface.fallback,
-    borderRadius: ms(2),
-    alignSelf: "center",
-    marginBottom: vs(12),
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: vs(16),
+    paddingHorizontal: hs(6),
   },
-  sheetHeader: { marginBottom: vs(16), paddingHorizontal: hs(6) },
+  backButton: {
+    marginRight: hs(12),
+  },
   headerText: { textTransform: "uppercase" },
   sheetContent: { paddingBottom: vs(20) },
   mobileLabelContainer: {
@@ -642,6 +631,7 @@ const styles = StyleSheet.create({
     height: vs(44),
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: vs(20),
   },
   saveText: { fontSize: fs(20), textTransform: "uppercase" },
   modalOverlay: {

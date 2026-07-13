@@ -35,28 +35,8 @@ import { supabase } from "@/lib/supabase";
 // IMPORT THE NEW VIEW COMPONENT
 import { ViewBulkBooking } from "../components/ViewBulkBooking";
 import { TimePickerModal } from "../components/TimePickerModal";
-
-const HOURS = [
-  "6 AM",
-  "7 AM",
-  "8 AM",
-  "9 AM",
-  "10 AM",
-  "11 AM",
-  "12 PM",
-  "1 PM",
-  "2 PM",
-  "3 PM",
-  "4 PM",
-  "5 PM",
-  "6 PM",
-  "7 PM",
-  "8 PM",
-  "9 PM",
-  "10 PM",
-  "11 PM",
-  "12 AM",
-];
+import { generateTimeSlots } from "../utils/time.utils";
+import { SportsService } from "../services/sports.service";
 
 // ==========================================
 // CREATE MODE (Internal Component)
@@ -118,6 +98,26 @@ const CreateBulkBooking = ({
   const [showDatePicker, setShowDatePicker] = useState<"from" | "to" | null>(null);
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [slotDurationMinutes, setSlotDurationMinutes] = useState(60);
+
+  useEffect(() => {
+    const fetchPricing = async () => {
+      try {
+        const data = await SportsService.getVenuePricing(venueId);
+        if (data && data.slot_duration_minutes) {
+          setSlotDurationMinutes(data.slot_duration_minutes);
+        }
+      } catch (err) {
+        console.error("Failed to fetch venue config:", err);
+      }
+    };
+    fetchPricing();
+  }, [venueId]);
+
+  const HOURS = React.useMemo(
+    () => generateTimeSlots(6, 24, slotDurationMinutes),
+    [slotDurationMinutes],
+  );
 
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
 
@@ -225,6 +225,7 @@ const CreateBulkBooking = ({
       toTime,
       totalAmountPerSlot: pricePerHour,
       initialPayments: stagedPayments,
+      slotDurationMinutes,
     });
     if (success) navigation.goBack();
   };

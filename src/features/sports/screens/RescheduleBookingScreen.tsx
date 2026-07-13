@@ -24,28 +24,7 @@ import { Calendar as CalendarPicker } from "react-native-calendars";
 import { TimePickerModal } from "../components/TimePickerModal";
 import { SportsService } from "../services/sports.service";
 import { useBookingDetails } from "../hooks/useBookingDetails";
-
-const HOURS = [
-  "6 AM",
-  "7 AM",
-  "8 AM",
-  "9 AM",
-  "10 AM",
-  "11 AM",
-  "12 PM",
-  "1 PM",
-  "2 PM",
-  "3 PM",
-  "4 PM",
-  "5 PM",
-  "6 PM",
-  "7 PM",
-  "8 PM",
-  "9 PM",
-  "10 PM",
-  "11 PM",
-  "12 AM",
-];
+import { generateTimeSlots } from "../utils/time.utils";
 
 export const RescheduleBookingScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -64,7 +43,12 @@ export const RescheduleBookingScreen = () => {
   const [cashAmount, setCashAmount] = useState("");
   const [onlineAmount, setOnlineAmount] = useState("");
   const [isRescheduling, setIsRescheduling] = useState(false);
-  const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0 });
+  const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0, slotDurationMinutes: 60 });
+
+  const HOURS = React.useMemo(
+    () => generateTimeSlots(6, 24, pricing.slotDurationMinutes),
+    [pricing.slotDurationMinutes],
+  );
 
   const currentPaid = Number(booking?.paid_amount) || 0;
   const totalDiscount = Number(booking?.discount_amount) || 0;
@@ -128,6 +112,7 @@ export const RescheduleBookingScreen = () => {
             day: data.day_price || data.price_per_hour || 0,
             night: data.night_price || data.price_per_hour || 0,
             default: data.price_per_hour || 0,
+            slotDurationMinutes: data.slot_duration_minutes || 60,
           });
         }
       } catch (err) {
@@ -158,8 +143,10 @@ export const RescheduleBookingScreen = () => {
 
     selectedHours.forEach(hour => {
       const hIdx = HOURS.indexOf(hour);
-      const fivePMIdx = HOURS.indexOf("5 PM");
-      if (hIdx < fivePMIdx) {
+      const fivePMIdx = HOURS.findIndex(h => h.includes("5 PM") || h.includes("5:00 PM"));
+      const boundaryIdx = fivePMIdx !== -1 ? fivePMIdx : HOURS.length / 2;
+
+      if (hIdx < boundaryIdx) {
         total += pricing.day || pricing.default;
       } else {
         total += pricing.night || pricing.default;
@@ -167,7 +154,7 @@ export const RescheduleBookingScreen = () => {
     });
 
     setTotalPrice(total.toString());
-  }, [fromTime, toTime, pricing]);
+  }, [fromTime, toTime, pricing, HOURS]);
 
   const handleConfirmReschedule = async () => {
     if (fromTime === "Start Time" || toTime === "End Time") {

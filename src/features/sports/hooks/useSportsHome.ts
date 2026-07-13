@@ -170,7 +170,8 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         localDateString,
       );
 
-      const formattedSlots: SlotData[] = (slotsData || []).map((slot: any) => {
+      const rawSlots = slotsData || [];
+      const formattedSlots: SlotData[] = rawSlots.map((slot: any) => {
         const [startHStr, startMStr] = slot.start_time.split(":");
         const hourInt = parseInt(startHStr, 10);
         const ampm = hourInt >= 12 ? "PM" : "AM";
@@ -249,7 +250,17 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             const hourInt = parseInt(h, 10);
             const ampm = hourInt >= 12 ? "PM" : "AM";
             const displayHour = hourInt % 12 || 12;
-            const displayMins = m === "00" ? "" : `:${m}`;
+
+            const isHalfHourVenue = (bookingsData || []).some((bk: any) => {
+              if (!bk.start_time || !bk.end_time) return false;
+              const [sH, sM] = bk.start_time.split(":").map(Number);
+              const [eH, eM] = bk.end_time.split(":").map(Number);
+              let diff = eH * 60 + eM - (sH * 60 + sM);
+              if (diff < 0) diff += 24 * 60;
+              return diff === 30;
+            });
+
+            const displayMins = isHalfHourVenue || m !== "00" ? `:${m}` : m === "00" ? "" : `:${m}`;
             return `${displayHour}${displayMins} ${ampm}`;
           };
 

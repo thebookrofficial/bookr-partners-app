@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Alert } from "react-native";
+import { generateTimeSlots, parseTimeTo24Hour as parseTimeTo24 } from "../utils/time.utils";
 
 interface BulkBookingParams {
   ownerId: string | undefined; // Added to securely identify the vendor
@@ -18,45 +19,17 @@ interface BulkBookingParams {
   toTime: string;
   totalAmountPerSlot: number;
   initialPayments: { mode: "cash" | "upi"; amount: number }[];
+  slotDurationMinutes?: number;
 }
-
-const HOURS = [
-  "6 AM",
-  "7 AM",
-  "8 AM",
-  "9 AM",
-  "10 AM",
-  "11 AM",
-  "12 PM",
-  "1 PM",
-  "2 PM",
-  "3 PM",
-  "4 PM",
-  "5 PM",
-  "6 PM",
-  "7 PM",
-  "8 PM",
-  "9 PM",
-  "10 PM",
-  "11 PM",
-  "12 AM",
-];
 
 export const useBulkBooking = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const parseTimeTo24 = (time12h: string) => {
-    if (!time12h || time12h === "12 AM") return "00:00:00";
-    const [time, modifier] = time12h.split(" ");
-    let hours = parseInt(time, 10);
-    if (hours === 12 && modifier === "AM") hours = 0;
-    if (hours < 12 && modifier === "PM") hours += 12;
-    return `${hours.toString().padStart(2, "0")}:00:00`;
-  };
-
   const confirmBulkBooking = async (params: BulkBookingParams) => {
     setIsSubmitting(true);
     try {
+      const slotDuration = params.slotDurationMinutes || 60;
+      const HOURS = generateTimeSlots(6, 24, slotDuration);
       if (!params.ownerId) throw new Error("Authentication error: Could not identify vendor.");
 
       const { venueId, groundId } = params;
@@ -95,9 +68,10 @@ export const useBulkBooking = () => {
 
       for (const d of dates) {
         for (const hour of hourlySlots) {
-          const startTime24 = parseTimeTo24(hour);
-          const nextHour = HOURS[HOURS.indexOf(hour) + 1] || "12 AM";
-          const endTime24 = parseTimeTo24(nextHour);
+          const startTime24 = parseTimeTo24(hour, false);
+          const nextHour =
+            HOURS[HOURS.indexOf(hour) + 1] || (slotDuration < 60 ? "12:00 AM" : "12 AM");
+          const endTime24 = parseTimeTo24(nextHour, true);
 
           // 1. Explicitly check if slot exists first to avoid ghost-slot errors
           const { data: existingSlot } = await supabase

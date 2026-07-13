@@ -129,11 +129,12 @@ export const BookingDetailsScreen = () => {
 
   const formatHour = (timeStr: string) => {
     if (!timeStr) return "";
-    const [h] = timeStr.split(":");
+    const [h, m] = timeStr.split(":");
     const hourInt = parseInt(h, 10);
     const ampm = hourInt >= 12 ? "PM" : "AM";
     const displayHour = hourInt % 12 || 12;
-    return `${displayHour} ${ampm}`;
+    const displayMins = m === "00" ? "" : `:${m}`;
+    return `${displayHour}${displayMins} ${ampm}`;
   };
 
   const isOnline = booking.booking_source === "online" || !!booking.user_id;

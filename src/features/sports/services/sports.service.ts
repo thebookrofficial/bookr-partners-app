@@ -109,7 +109,7 @@ export const SportsService = {
   async getVenuePricing(venueId: string) {
     const { data, error } = await supabase
       .from("sports_venues")
-      .select("price_per_slot, weekend_price_per_slot")
+      .select("price_per_slot, weekend_price_per_slot, slot_duration_minutes")
       .eq("venue_id", venueId)
       .single();
 
@@ -120,6 +120,7 @@ export const SportsService = {
       day_price: data.price_per_slot,
       night_price: data.price_per_slot,
       min_advance_amount: 0,
+      slot_duration_minutes: data.slot_duration_minutes || 60,
     };
   },
 
@@ -190,17 +191,22 @@ export const SportsService = {
     guestPhone: string;
     bookingSource: string;
     sportsBookingType: string;
+    slotDurationMinutes?: number;
   }) {
-    const startH = parseInt(params.startTime24.split(":")[0], 10);
-    const endH = parseInt(params.endTime24.split(":")[0], 10);
-    const totalHours = endH - startH;
+    const [startH, startM] = params.startTime24.split(":").map(Number);
+    const [endH, endM] = params.endTime24.split(":").map(Number);
+    const startTotalM = startH * 60 + startM;
+    const endTotalM = endH * 60 + endM;
+    const durationM = endTotalM - startTotalM;
+    const slotDuration = params.slotDurationMinutes || 60;
+    const totalSlots = durationM / slotDuration;
 
-    if (totalHours <= 0) throw new Error("Invalid time range selected.");
+    if (durationM <= 0) throw new Error("Invalid time range selected.");
 
-    const isMultiSlot = totalHours > 1;
+    const isMultiSlot = totalSlots > 1;
     const finalBookingType = isMultiSlot ? "multi_slot" : "standard";
-    const hourlyPrice = params.numericTotal / totalHours;
-    const hourlyAdvance = params.advancePaid / totalHours;
+    const hourlyPrice = params.numericTotal / totalSlots;
+    const hourlyAdvance = params.advancePaid / totalSlots;
 
     const generateUUID = () => {
       return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -215,11 +221,20 @@ export const SportsService = {
     const bookingGroupId = isMultiSlot ? generateUUID() : null;
     let firstBookingId = "";
 
-    for (let i = 0; i < totalHours; i++) {
-      const currentStart = `${(startH + i).toString().padStart(2, "0")}:00:00`;
-      const endHour = startH + i + 1;
+    for (let i = 0; i < totalSlots; i++) {
+      const currentStartM = startTotalM + i * slotDuration;
+      const currentEndM = currentStartM + slotDuration;
+
+      const sh = Math.floor(currentStartM / 60);
+      const sm = currentStartM % 60;
+      const currentStart = `${sh.toString().padStart(2, "0")}:${sm.toString().padStart(2, "0")}:00`;
+
+      const eh = Math.floor(currentEndM / 60);
+      const em = currentEndM % 60;
       const currentEnd =
-        endHour === 24 ? "23:59:59" : `${endHour.toString().padStart(2, "0")}:00:00`;
+        eh === 24
+          ? "23:59:59"
+          : `${eh.toString().padStart(2, "0")}:${em.toString().padStart(2, "0")}:00`;
 
       const { data: newSlot, error: insertError } = await supabase
         .from("sports_slots")
@@ -252,6 +267,11 @@ export const SportsService = {
           throw new Error(`Slot ${currentStart} is already taken or blocked.`);
         }
         slotId = foundSlot?.id;
+
+        // CRITICAL FIX: Update the existing slot's status to booked!
+        if (slotId) {
+          await supabase.from("sports_slots").update({ status: "booked" }).eq("id", slotId);
+        }
       }
 
       if (!slotId) throw new Error(`Could not resolve slot for ${currentStart}`);
@@ -277,7 +297,7 @@ export const SportsService = {
           booking_group_id: bookingGroupId,
           parent_booking_id: i === 0 ? null : firstBookingId,
           sequence_number: i + 1,
-          notes: `Manual Offline Booking ${isMultiSlot ? `(Slot ${i + 1}/${totalHours})` : ""}`,
+          notes: `Manual Offline Booking ${isMultiSlot ? `(Slot ${i + 1}/${totalSlots})` : ""}`,
         })
         .select("id")
         .single();

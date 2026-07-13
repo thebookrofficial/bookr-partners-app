@@ -19,37 +19,7 @@ import { ClosedDatesAlert } from "../components/block-unblock/ClosedDatesAlert";
 import { TimePickerModal } from "../components/TimePickerModal";
 import { useBlockUnblock, BlockedEntry } from "../hooks/useBlockUnblock";
 import { SportsService } from "../services/sports.service";
-
-const HOURS = [
-  "6 AM",
-  "7 AM",
-  "8 AM",
-  "9 AM",
-  "10 AM",
-  "11 AM",
-  "12 PM",
-  "1 PM",
-  "2 PM",
-  "3 PM",
-  "4 PM",
-  "5 PM",
-  "6 PM",
-  "7 PM",
-  "8 PM",
-  "9 PM",
-  "10 PM",
-  "11 PM",
-  "12 AM",
-];
-
-const parseTimeTo24Hour = (time12h: string) => {
-  if (time12h === "12 AM") return "00:00:00";
-  const [time, modifier] = time12h.split(" ");
-  let hours = parseInt(time, 10);
-  if (hours === 12 && modifier === "AM") hours = 0;
-  if (hours < 12 && modifier === "PM") hours += 12;
-  return `${hours.toString().padStart(2, "0")}:00:00`;
-};
+import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
 
 const formatDisplayDate = (dateStr: string) => {
   const d = new Date(dateStr);
@@ -98,6 +68,26 @@ export const BlockUnblockScreen = () => {
   const [isSelectingRange, setIsSelectingRange] = useState(false);
   const [slotType, setSlotType] = useState<"Custom" | "All">("All");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [slotDurationMinutes, setSlotDurationMinutes] = useState(60);
+
+  useEffect(() => {
+    const fetchPricing = async () => {
+      try {
+        const data = await SportsService.getVenuePricing(venueId);
+        if (data && data.slot_duration_minutes) {
+          setSlotDurationMinutes(data.slot_duration_minutes);
+        }
+      } catch (err) {
+        console.error("Failed to fetch venue config:", err);
+      }
+    };
+    fetchPricing();
+  }, [venueId]);
+
+  const HOURS = React.useMemo(
+    () => generateTimeSlots(6, 24, slotDurationMinutes),
+    [slotDurationMinutes],
+  );
 
   // --- NATIVE DATE PICKER STATES ---
   const [fromDate, setFromDate] = useState<Date>(new Date());
