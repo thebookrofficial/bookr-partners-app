@@ -406,8 +406,11 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
   useEffect(() => {
     if (!currentVenueId) return;
 
+    const channelId = `sports_sync_${currentVenueId}_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(7)}`;
     const channel = supabase
-      .channel(`sports_sync_${currentVenueId}`)
+      .channel(channelId)
       .on(
         "postgres_changes",
         {

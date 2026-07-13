@@ -81,7 +81,7 @@ export const useVendorData = () => {
         setVenues([]);
       }
     } catch (error) {
-      console.error("Error fetching vendor data:", error);
+      console.error("Error fetching vendor data:", JSON.stringify(error, null, 2));
     } finally {
       setLoading(false);
     }

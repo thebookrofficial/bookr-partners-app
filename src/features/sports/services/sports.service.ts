@@ -288,4 +288,113 @@ export const SportsService = {
 
     return firstBookingId;
   },
+
+  async rescheduleBooking(bookingId: string, newSlotId: string) {
+    try {
+      const { error } = await supabase.rpc("reschedule_sports_booking", {
+        p_booking_id: bookingId,
+        p_new_slot_id: newSlotId,
+      });
+
+      if (error) {
+        console.error("Reschedule RPC Error:", error);
+        throw new Error(error.message || "Failed to reschedule booking");
+      }
+
+      return true;
+    } catch (err: any) {
+      console.error("rescheduleBooking Error:", err);
+      throw err;
+    }
+  },
+
+  async rescheduleBookingWithRange(params: {
+    bookingId: string;
+    venueId: string;
+    groundId: string;
+    dateStr: string;
+    fromTime: string;
+    toTime: string;
+    totalPrice: number;
+    addAmount: number;
+  }) {
+    try {
+      // Parse "6 PM" or "6:30 PM" to "18:00:00" or "18:30:00"
+      const timeMatch = params.fromTime.match(/^(\d+)(?::(\d+))?\s*(AM|PM)?/i);
+      if (!timeMatch) throw new Error("Invalid time format");
+
+      let startH = parseInt(timeMatch[1], 10);
+      const startM = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+      const ampm = timeMatch[3]?.toUpperCase();
+
+      if (ampm === "PM" && startH !== 12) startH += 12;
+      if (ampm === "AM" && startH === 12) startH = 0;
+
+      const startStr = `${startH.toString().padStart(2, "0")}:${startM
+        .toString()
+        .padStart(2, "0")}:00`;
+
+      // 1. Find the new slot
+      const { data: newSlot, error: slotError } = await supabase
+        .from("sports_slots")
+        .select("id, status")
+        .eq("venue_id", params.venueId)
+        .eq("ground_id", params.groundId)
+        .eq("slot_date", params.dateStr)
+        .eq("start_time", startStr)
+        .maybeSingle();
+
+      if (slotError) {
+        console.error("Slot Lookup Error:", slotError);
+        throw new Error("Failed to lookup slot.");
+      }
+
+      if (!newSlot) {
+        throw new Error(
+          `No slot found for ${params.fromTime} on ${params.dateStr}. Please ensure slots are generated.`,
+        );
+      }
+
+      if (newSlot.status !== "available") {
+        throw new Error("The selected slot is already booked or unavailable.");
+      }
+
+      // 2. Reschedule using the existing RPC
+      const { error: rpcError } = await supabase.rpc("reschedule_sports_booking", {
+        p_booking_id: params.bookingId,
+        p_new_slot_id: newSlot.id,
+      });
+
+      if (rpcError) {
+        console.error("Reschedule RPC Error:", rpcError);
+        throw new Error(rpcError.message || "Failed to reschedule booking");
+      }
+
+      // 3. Update pricing if needed
+      if (params.addAmount > 0 || params.totalPrice > 0) {
+        const { data: booking } = await supabase
+          .from("sports_bookings")
+          .select("total_amount, paid_amount")
+          .eq("id", params.bookingId)
+          .single();
+
+        if (booking) {
+          const newTotal = params.totalPrice > 0 ? params.totalPrice : booking.total_amount;
+          const added = params.addAmount > 0 ? params.addAmount : 0;
+
+          await supabase
+            .from("sports_bookings")
+            .update({
+              total_amount: newTotal + added,
+            })
+            .eq("id", params.bookingId);
+        }
+      }
+
+      return true;
+    } catch (err: any) {
+      console.error("Reschedule Error:", err);
+      throw new Error(err.message || "An unexpected error occurred during rescheduling");
+    }
+  },
 };

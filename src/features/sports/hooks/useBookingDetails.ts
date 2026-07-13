@@ -31,7 +31,8 @@ export interface BookingDetailData {
   venues: {
     name: string;
     vertical: string;
-    sports_venues: { sports_type: string }[];
+    allow_cancellation?: boolean;
+    sports_venues?: { sports_type: string }[];
   };
   combined_time?: string;
   idChain: string[];

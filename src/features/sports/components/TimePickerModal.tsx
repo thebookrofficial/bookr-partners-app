@@ -37,6 +37,10 @@ export const TimePickerModal = ({
   isFetching,
 }: TimePickerModalProps) => {
   const formatDisplayHour = (hr: string) => {
+    // If it already contains a colon, we assume it has minutes and just lowercase the AM/PM
+    if (hr.includes(":")) {
+      return hr.toLowerCase();
+    }
     const parts = hr.split(" ");
     if (parts.length === 2) {
       return `${parts[0]}:00 ${parts[1].toLowerCase()}`;

@@ -8,15 +8,14 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  TextInput,
   Alert,
   Linking,
+  Platform,
   Modal,
   Pressable,
-  Platform,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, TextInput } from "@/components/ui";
 import {
   ArrowLeft,
   Phone,
@@ -30,10 +29,11 @@ import {
   Send,
   Trash2,
   X,
+  RefreshCw,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { useBookingDetails } from "../hooks/useBookingDetails";
@@ -47,8 +47,14 @@ export const BookingDetailsScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "BookingDetails">>();
   const { bookingId } = route.params;
 
-  const { booking, paymentLogs, loading, isSaving, logPayment, cancelBooking } =
+  const { booking, paymentLogs, loading, isSaving, logPayment, cancelBooking, refresh } =
     useBookingDetails(bookingId);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
 
   const lottie = useMemo(() => {
     try {
@@ -92,6 +98,7 @@ export const BookingDetailsScreen = () => {
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [cashInput, setCashInput] = useState("");
   const [onlineInput, setOnlineInput] = useState("");
@@ -196,13 +203,11 @@ export const BookingDetailsScreen = () => {
     const bookingTime = `${formatHour(booking.sports_slots.start_time)} to ${formatHour(
       booking.sports_slots.end_time,
     )}`;
-    // Spicy Marketing Line
     const spicyLine =
       "🔥 Don't let your slot get snatched! Lock in your favorite time instantly on the Bookr app.";
 
-    // Platform-Strict Link Logic
     const playStoreLink = "https://play.google.com/store/apps/details?id=com.bookr_mobile";
-    const appStoreLink = "https://apps.apple.com/app/bookr/idYOUR_APP_ID"; // Remember to update this!
+    const appStoreLink = "https://apps.apple.com/app/bookr/idYOUR_APP_ID";
     const appLink = Platform.OS === "ios" ? appStoreLink : playStoreLink;
 
     const message = encodeURIComponent(
@@ -211,8 +216,8 @@ export const BookingDetailsScreen = () => {
         `Your booking at ${venueName} is reserved.\n\n` +
         `Date: ${bookingDate}\n` +
         `Time: ${bookingTime}\n\n` +
-        `${spicyLine}\n\n` + // <--- Double newline ensures the link is distinct
-        `${appLink}\n\n` + // <--- The link is now clickable
+        `${spicyLine}\n\n` +
+        `${appLink}\n\n` +
         `Thank you for playing with us!`,
     );
 
@@ -473,6 +478,37 @@ export const BookingDetailsScreen = () => {
         </Text>
         <ChevronRight size={ms(20)} color={COLORS.text.primary} />
       </TouchableOpacity>
+
+      {booking.booking_status !== "cancelled" && (
+        <TouchableOpacity
+          style={styles.actionCard}
+          activeOpacity={0.7}
+          onPress={() => {
+            navigation.navigate("RescheduleBooking", {
+              bookingId,
+              venueId: booking.venue_id,
+              groundId: booking.sports_slots?.ground_id || "",
+            });
+          }}>
+          <Text variant="body2" weight="bold" style={styles.actionCardText}>
+            Reschedule Booking
+          </Text>
+          <RefreshCw size={ms(20)} color={COLORS.text.primary} />
+        </TouchableOpacity>
+      )}
+      {booking.booking_status !== "cancelled" &&
+        (!isOnline || booking.venues?.allow_cancellation) && (
+          <TouchableOpacity
+            style={styles.actionCard}
+            activeOpacity={0.7}
+            onPress={() => setShowCancelModal(true)}>
+            <Text variant="body2" weight="bold" style={styles.actionCardText}>
+              Cancel Your Booking
+            </Text>
+            <Trash2 size={ms(20)} color={COLORS.text.primary} />
+          </TouchableOpacity>
+        )}
+
       <TouchableOpacity
         style={styles.shareWhatsappBtn}
         activeOpacity={0.8}
@@ -491,17 +527,7 @@ export const BookingDetailsScreen = () => {
         </Text>
         <Send size={ms(20)} color={COLORS.text.inverse} />
       </TouchableOpacity>
-      {booking.booking_status !== "cancelled" && !isOnline && (
-        <TouchableOpacity
-          style={styles.actionCard}
-          activeOpacity={0.7}
-          onPress={() => setShowCancelModal(true)}>
-          <Text variant="body2" weight="bold" style={styles.actionCardText}>
-            Cancel Your Booking
-          </Text>
-          <Trash2 size={ms(20)} color={COLORS.text.primary} />
-        </TouchableOpacity>
-      )}
+
       <Modal visible={showCancelModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCancelModal(false)} />
@@ -539,7 +565,6 @@ export const BookingDetailsScreen = () => {
                   setShowCancelModal(false);
                   const success = await cancelBooking();
 
-                  // If cancellation was successful in the database, close this screen!
                   if (success) {
                     navigation.goBack();
                   }
@@ -564,6 +589,12 @@ const styles = StyleSheet.create({
   },
   centered: {
     justifyContent: "center",
+    alignItems: "center",
+  },
+  confirmCancelBtn: {
+    backgroundColor: COLORS.danger,
+    padding: ms(15),
+    borderRadius: ms(30),
     alignItems: "center",
   },
   flex1: {

@@ -101,6 +101,7 @@ export type MainStackParamList = {
     venueId: string;
     groundId: string;
   };
+  RescheduleBooking: { bookingId: string; venueId: string; groundId: string };
   Payouts: { venueId: string };
   PayoutDetails: {
     venueId: string;
