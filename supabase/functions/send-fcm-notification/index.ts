@@ -9,59 +9,66 @@ const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 serve(async req => {
   try {
     const payload = await req.json();
-    const record = payload.record;
+    let record = payload.record;
     const type = payload.type;
+    const table = payload.table;
 
-    // eslint-disable-next-line no-console
-    console.log(
-      `[EVENT] Type: ${type}, RecordID: ${record?.id}, UserID: ${record?.user_id}, Title: "${record?.title}"`,
-    );
-
-    // 1. STOPS THE INFINITE LOGS: Only process initial INSERTS
-    if (type && type !== "INSERT") {
+    if (type !== "INSERT") {
       return new Response(JSON.stringify({ message: "Skipping non-insert" }), { status: 200 });
     }
 
-    if (!record || record.status !== "pending") {
-      return new Response(JSON.stringify({ message: "Skipping non-pending" }), { status: 200 });
-    }
-
-    // 2. STOPS THE RACE CONDITION: Stagger executions
-    const jitter = Math.floor(Math.random() * 1000);
-    await new Promise(resolve => setTimeout(resolve, jitter));
-
     const supabase = createClient(supabaseUrl!, supabaseKey!);
-    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+    let finalToken = null;
+    let userId = record?.user_id;
+    let title = record?.title;
+    let body = record?.body;
 
-    // 3. BROAD DEDUPLICATION: User + Title only
-    let winnerQuery = supabase
-      .from("notification_queue")
-      .select("id")
-      .eq("title", record.title)
-      .gte("created_at", oneMinuteAgo);
+    // --- HANDLE DIRECT BOOKINGS ---
+    if (table && table.includes("bookings")) {
+      // Find the vendor (user_id) for this booking via the venue_id
+      const { data: venue, error: venueError } = await supabase
+        .from("venues")
+        .select("owner_id")
+        .eq("id", record.venue_id)
+        .maybeSingle();
 
-    if (record.user_id) winnerQuery = winnerQuery.eq("user_id", record.user_id);
-    else winnerQuery = winnerQuery.is("user_id", null);
+      if (venueError) {
+        console.error(`[VENUE ERROR]`, venueError);
+      }
 
-    const { data: winner } = await winnerQuery
-      .order("id", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      if (!venue || !venue.owner_id) {
+        return new Response(JSON.stringify({ message: "No vendor found for this venue" }), {
+          status: 200,
+        });
+      }
 
-    if (winner && winner.id !== record.id) {
-      // eslint-disable-next-line no-console
-      console.log(`[DEDUPE] Skipping duplicate: ${record.id}`);
-      await supabase.from("notification_queue").update({ status: "skipped" }).eq("id", record.id);
-      return new Response(JSON.stringify({ success: true }), { status: 200 });
+      // We have the client_profile ID (owner_id). Now we need the Supabase Auth user_id.
+      const { data: profile } = await supabase
+        .from("client_profiles")
+        .select("user_id")
+        .eq("id", venue.owner_id)
+        .maybeSingle();
+
+      userId = profile?.user_id;
+
+      if (!userId) {
+        return new Response(JSON.stringify({ message: "No auth user_id found for vendor" }), {
+          status: 200,
+        });
+      }
+
+      title = "New Booking!";
+      body = "You have received a new booking.";
+    } else {
+      return new Response(JSON.stringify({ message: "Unsupported table" }), { status: 200 });
     }
 
-    // 4. TOKEN REPAIR: Fetch the CURRENT token, don't trust the one in the record
-    let finalToken = record.fcm_token;
-    if (record.user_id) {
+    // --- FETCH FCM TOKEN ---
+    if (userId) {
       const { data: dev } = await supabase
         .from("user_devices")
         .select("fcm_token")
-        .eq("user_id", record.user_id)
+        .eq("user_id", userId)
         .order("last_seen_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -71,12 +78,11 @@ serve(async req => {
     }
 
     if (!finalToken) {
-      console.error(`[ERROR] No valid token found for user ${record.user_id}`);
-      await supabase.from("notification_queue").update({ status: "failed" }).eq("id", record.id);
+      console.error(`[ERROR] No valid token found for user ${userId}`);
       return new Response(JSON.stringify({ error: "No valid token" }), { status: 200 });
     }
 
-    // 5. HIGH PRIORITY PAYLOAD
+    // --- SEND FCM PUSH ---
     const serviceAccount = JSON.parse(serviceAccountString!);
     const jwtClient = new JWT({
       email: serviceAccount.client_email,
@@ -88,11 +94,12 @@ serve(async req => {
     const fcmPayload = {
       message: {
         token: finalToken,
-        notification: { title: record.title, body: record.body },
+        notification: { title, body },
         android: {
           priority: "high",
           notification: {
-            sound: "default",
+            channelId: "booking_alerts_v2", // Plays the custom sound!
+            sound: "notification_audio", // Don't use .wav extension in FCM payload
           },
         },
         apns: {
@@ -119,16 +126,7 @@ serve(async req => {
     );
 
     const fcmData = await res.json();
-    const status = res.ok ? "sent" : "failed";
-
     if (!res.ok) console.error(`[FCM ERROR]`, fcmData);
-
-    await supabase
-      .from("notification_queue")
-      .update({ status, sent_at: new Date().toISOString() })
-      .eq("id", record.id);
-    // eslint-disable-next-line no-console
-    console.log(`[${status.toUpperCase()}] Record ${record.id}`);
 
     return new Response(JSON.stringify({ success: res.ok, data: fcmData }), { status: 200 });
   } catch (err: any) {

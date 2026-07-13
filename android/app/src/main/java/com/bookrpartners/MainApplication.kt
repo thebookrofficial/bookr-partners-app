@@ -36,8 +36,31 @@ class MainApplication : Application(), ReactApplication {
   override val reactHost: ReactHost
     get() = getDefaultReactHost(applicationContext, reactNativeHost)
 
+  private fun createNotificationChannel() {
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+      val channelId = "booking_alerts_v2"
+      val channelName = "Booking Alerts"
+      val channelDescription = "Notifications for new bookings"
+      
+      val importance = android.app.NotificationManager.IMPORTANCE_HIGH
+      val channel = android.app.NotificationChannel(channelId, channelName, importance).apply {
+        description = channelDescription
+        // Use the explicit string path which is more reliable across Android versions
+        val soundUri = android.content.ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + packageName + "/raw/notification_audio"
+        val audioAttributes = android.media.AudioAttributes.Builder()
+          .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+          .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+          .build()
+        setSound(android.net.Uri.parse(soundUri), audioAttributes)
+      }
+      val notificationManager = getSystemService(android.app.NotificationManager::class.java)
+      notificationManager?.createNotificationChannel(channel)
+    }
+  }
+
   override fun onCreate() {
     super.onCreate()
+    createNotificationChannel()
     loadReactNative(this)
   }
 }

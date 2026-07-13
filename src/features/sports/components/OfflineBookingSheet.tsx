@@ -10,6 +10,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Text, TextInput } from "@/components/ui";
 import {
@@ -359,158 +361,162 @@ export const OfflineBookingSheet = ({
       onRequestClose={onClose}
       statusBarTranslucent={true}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.bottomSheetContainer}>
-          <View style={styles.handle} />
-          <View style={styles.sheetHeader}>
-            <Text variant="body1" weight="bold" style={styles.headerText}>
-              Offline Booking
-            </Text>
-          </View>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.sheetContent}>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => setIsDatePickerOpen(true)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "padding"}
+          style={styles.keyboardAvoid}>
+          <TouchableOpacity activeOpacity={1} style={styles.bottomSheetContainer}>
+            <View style={styles.handle} />
+            <View style={styles.sheetHeader}>
+              <Text variant="body1" weight="bold" style={styles.headerText}>
+                Offline Booking
+              </Text>
+            </View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.sheetContent}>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => setIsDatePickerOpen(true)}>
+                <TextInput
+                  variant="filled"
+                  label={<CustomLabel icon={CalendarIcon} text="Selected Date" />}
+                  value={currentDate.toLocaleDateString("en-GB")}
+                  rightIcon={<ChevronDown size={ms(16)} color={COLORS.text.primary} />}
+                  editable={false}
+                  pointerEvents="none"
+                />
+              </TouchableOpacity>
               <TextInput
                 variant="filled"
-                label={<CustomLabel icon={CalendarIcon} text="Selected Date" />}
-                value={currentDate.toLocaleDateString("en-GB")}
-                rightIcon={<ChevronDown size={ms(16)} color={COLORS.text.primary} />}
-                editable={false}
-                pointerEvents="none"
+                label={<CustomLabel icon={Phone} text="Mobile No" />}
+                placeholder="+91 00000 00000"
+                keyboardType="phone-pad"
+                value={mobile}
+                onChangeText={text => {
+                  const clean = text.replace(/[^\d]/g, "").slice(0, 10);
+                  setMobile(clean);
+                  if (clean.length < 10) {
+                    setName("");
+                  }
+                }}
               />
-            </TouchableOpacity>
-            <TextInput
-              variant="filled"
-              label={<CustomLabel icon={Phone} text="Mobile No" />}
-              placeholder="+91 00000 00000"
-              keyboardType="phone-pad"
-              value={mobile}
-              onChangeText={text => {
-                const clean = text.replace(/[^\d]/g, "").slice(0, 10);
-                setMobile(clean);
-                if (clean.length < 10) {
-                  setName("");
-                }
-              }}
-            />
-            {/* {mobile.length >= 10 && ( */}
-            <TextInput
-              variant="filled"
-              label={<CustomLabel icon={UserIcon} text="Name" />}
-              placeholder="Guest Name"
-              value={name}
-              onChangeText={setName}
-            />
-            {/* )} */}
-            <View style={styles.row}>
-              <View style={styles.flex1}>
-                <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("from")}>
+              {/* {mobile.length >= 10 && ( */}
+              <TextInput
+                variant="filled"
+                label={<CustomLabel icon={UserIcon} text="Name" />}
+                placeholder="Guest Name"
+                value={name}
+                onChangeText={setName}
+              />
+              {/* )} */}
+              <View style={styles.row}>
+                <View style={styles.flex1}>
+                  <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("from")}>
+                    <TextInput
+                      variant="filled"
+                      label={<CustomLabel icon={Clock} text="From" />}
+                      value={fromTime}
+                      rightIcon={<ChevronDown size={ms(16)} color={COLORS.text.primary} />}
+                      editable={false}
+                      pointerEvents="none"
+                    />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.flex1}>
+                  <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("to")}>
+                    <TextInput
+                      variant="filled"
+                      label={<CustomLabel icon={Clock} text="To" />}
+                      value={toTime}
+                      rightIcon={<ChevronDown size={ms(16)} color={COLORS.text.primary} />}
+                      editable={false}
+                      pointerEvents="none"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.row}>
+                <View style={styles.flex1}>
                   <TextInput
                     variant="filled"
-                    label={<CustomLabel icon={Clock} text="From" />}
-                    value={fromTime}
-                    rightIcon={<ChevronDown size={ms(16)} color={COLORS.text.primary} />}
-                    editable={false}
-                    pointerEvents="none"
+                    label={<CustomLabel icon={Clock} text="Total Payment" />}
+                    placeholder="₹ 1000"
+                    keyboardType="numeric"
+                    value={totalPayment}
+                    onChangeText={setTotalPayment}
                   />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.flex1}>
-                <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("to")}>
+                </View>
+                <View style={styles.flex1}>
                   <TextInput
                     variant="filled"
-                    label={<CustomLabel icon={Clock} text="To" />}
-                    value={toTime}
-                    rightIcon={<ChevronDown size={ms(16)} color={COLORS.text.primary} />}
-                    editable={false}
-                    pointerEvents="none"
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-            <View style={styles.row}>
-              <View style={styles.flex1}>
-                <TextInput
-                  variant="filled"
-                  label={<CustomLabel icon={Clock} text="Total Payment" />}
-                  placeholder="₹ 1000"
-                  keyboardType="numeric"
-                  value={totalPayment}
-                  onChangeText={setTotalPayment}
-                />
-              </View>
-              <View style={styles.flex1}>
-                <TextInput
-                  variant="filled"
-                  label={
-                    <Text variant="body2" weight="medium">
-                      Advance Paid
-                    </Text>
-                  }
-                  placeholder="₹"
-                  keyboardType="numeric"
-                  value={advancePaid}
-                  // ADD THIS LINE:
-                  onFocus={() => {
-                    if (advancePaid === "0" || advancePaid === "0.00") {
-                      setAdvancePaid("");
+                    label={
+                      <Text variant="body2" weight="medium">
+                        Advance Paid
+                      </Text>
                     }
-                  }}
-                  onChangeText={text => {
-                    const val = parseFloat(text) || 0;
-                    const total = parseFloat(totalPayment) || 0;
-                    if (val > total) {
-                      setAdvancePaid(total.toString());
+                    placeholder="₹"
+                    keyboardType="numeric"
+                    value={advancePaid}
+                    // ADD THIS LINE:
+                    onFocus={() => {
+                      if (advancePaid === "0" || advancePaid === "0.00") {
+                        setAdvancePaid("");
+                      }
+                    }}
+                    onChangeText={text => {
+                      const val = parseFloat(text) || 0;
+                      const total = parseFloat(totalPayment) || 0;
+                      if (val > total) {
+                        setAdvancePaid(total.toString());
+                      } else {
+                        setAdvancePaid(text);
+                      }
+                    }}
+                  />
+                </View>
+              </View>
+              {hasHistory && (
+                <TouchableOpacity
+                  style={styles.historyRow}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    if (onCheckHistory) {
+                      onCheckHistory();
                     } else {
-                      setAdvancePaid(text);
+                      onClose();
                     }
-                  }}
-                />
-              </View>
-            </View>
-            {hasHistory && (
-              <TouchableOpacity
-                style={styles.historyRow}
-                activeOpacity={0.7}
-                onPress={() => {
-                  if (onCheckHistory) {
-                    onCheckHistory();
-                  } else {
-                    onClose();
-                  }
-                  navigation.navigate("GuestHistory", {
-                    guestId: mobile,
-                    bookingId: "",
-                    vertical: "sports",
-                    venueId: venueId,
-                  });
-                }}>
-                <FileText size={ms(20)} color={COLORS.text.primary} />
-                <Text variant="body2" weight="semiBold" style={styles.historyText}>
-                  Previous History
-                </Text>
-                <ChevronRight size={ms(20)} color={COLORS.text.primary} />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[styles.saveButton, isSubmitting && styles.saveButtonDisabled]}
-              activeOpacity={0.8}
-              onPress={handleBookNow}
-              disabled={isSubmitting}>
-              {isSubmitting ? (
-                <ActivityIndicator color={COLORS.text.inverse} />
-              ) : (
-                <Text
-                  variant="h3"
-                  family="nichrome"
-                  color={COLORS.text.inverse}
-                  style={styles.saveText}>
-                  BOOK NOW
-                </Text>
+                    navigation.navigate("GuestHistory", {
+                      guestId: mobile,
+                      bookingId: "",
+                      vertical: "sports",
+                      venueId: venueId,
+                    });
+                  }}>
+                  <FileText size={ms(20)} color={COLORS.text.primary} />
+                  <Text variant="body2" weight="semiBold" style={styles.historyText}>
+                    Previous History
+                  </Text>
+                  <ChevronRight size={ms(20)} color={COLORS.text.primary} />
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
-          </ScrollView>
-        </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveButton, isSubmitting && styles.saveButtonDisabled]}
+                activeOpacity={0.8}
+                onPress={handleBookNow}
+                disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <ActivityIndicator color={COLORS.text.inverse} />
+                ) : (
+                  <Text
+                    variant="h3"
+                    family="nichrome"
+                    color={COLORS.text.inverse}
+                    style={styles.saveText}>
+                    BOOK NOW
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </TouchableOpacity>
 
       <TimePickerModal
@@ -587,6 +593,7 @@ export const OfflineBookingSheet = ({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
+  keyboardAvoid: { width: "100%", justifyContent: "flex-end" },
   saveButtonDisabled: { opacity: 0.7 },
   bottomSheetContainer: {
     width: "100%",
