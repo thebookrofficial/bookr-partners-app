@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { SportsService } from "../services/sports.service";
 
@@ -413,6 +413,15 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     fetchBookings();
   }, [fetchSlots, fetchBookings]);
 
+  // Refs to hold the latest fetch callbacks so the Supabase subscription doesn't re-trigger on date/ground changes
+  const fetchBookingsRef = useRef(fetchBookings);
+  const fetchSlotsRef = useRef(fetchSlots);
+
+  useEffect(() => {
+    fetchBookingsRef.current = fetchBookings;
+    fetchSlotsRef.current = fetchSlots;
+  }, [fetchBookings, fetchSlots]);
+
   // Real-time listener for BOTH bookings AND slots
   useEffect(() => {
     if (!currentVenueId) return;
@@ -431,7 +440,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           filter: `venue_id=eq.${currentVenueId}`,
         },
         () => {
-          fetchBookings();
+          fetchBookingsRef.current();
         },
       )
       .on(
@@ -443,7 +452,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           filter: `venue_id=eq.${currentVenueId}`,
         },
         () => {
-          fetchSlots();
+          fetchSlotsRef.current();
         },
       )
       .subscribe();
@@ -451,7 +460,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentVenueId, fetchSlots, fetchBookings]);
+  }, [currentVenueId]);
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([fetchSlots(), fetchBookings()]);

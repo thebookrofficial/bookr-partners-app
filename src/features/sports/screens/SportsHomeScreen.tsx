@@ -12,13 +12,7 @@ import { BookingCard } from "../components/BookingCard";
 import { Calendar as CalendarIcon, Plus } from "lucide-react-native";
 import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import {
-  RouteProp,
-  useNavigation,
-  useRoute,
-  useFocusEffect,
-  useIsFocused,
-} from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute, useIsFocused } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { OfflineBookingSheet } from "../components/OfflineBookingSheet";
@@ -78,11 +72,18 @@ export const SportsHomeScreen = () => {
   const { activeVenueName, setActiveVenueName } = useServiceStore();
   const isFocused = useIsFocused();
 
-  useFocusEffect(
-    React.useCallback(() => {
-      refresh();
-    }, [refresh]),
-  );
+  const hasRefreshedOnFocus = React.useRef(false);
+
+  useEffect(() => {
+    if (isFocused) {
+      if (!hasRefreshedOnFocus.current) {
+        refresh();
+        hasRefreshedOnFocus.current = true;
+      }
+    } else {
+      hasRefreshedOnFocus.current = false;
+    }
+  }, [isFocused, refresh]);
 
   useEffect(() => {
     if (isFocused && shouldReOpenSheet.current) {

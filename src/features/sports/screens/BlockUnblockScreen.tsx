@@ -13,6 +13,7 @@ import { RouteProp, useRoute } from "@react-navigation/native";
 import { SportsTabParamList } from "@/navigation/navigation.types";
 import { useServiceStore } from "@/store/serviceStore";
 import { CustomDatePickerModal } from "@/components/ui";
+import { supabase } from "@/lib/supabase";
 
 // Sub-components & Hooks
 import { ClosedDatesAlert } from "../components/block-unblock/ClosedDatesAlert";
@@ -27,16 +28,21 @@ const formatDisplayDate = (dateStr: string) => {
 };
 
 const formatDisplayTime = (time24: string) => {
-  const [h] = time24.split(":");
+  if (!time24) return "";
+  const [h, m] = time24.split(":");
   const hourInt = parseInt(h, 10);
   const ampm = hourInt >= 12 ? "PM" : "AM";
   const displayHour = hourInt % 12 || 12;
-  return `${displayHour} ${ampm}`;
+  const minutes = m && m !== "00" ? `:${m}` : "";
+  return `${displayHour}${minutes} ${ampm}`;
 };
 
 export const BlockUnblockScreen = () => {
   const route = useRoute<RouteProp<SportsTabParamList, "BlockUnblock">>();
   const { venueId, groundId } = route.params || { venueId: "", groundId: "" };
+
+  const { activeVenueName, selectedCategories } = useServiceStore();
+  const selectedCategory = selectedCategories[venueId] || "Football";
 
   const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
   const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId || "");
@@ -54,7 +60,9 @@ export const BlockUnblockScreen = () => {
         const data = await SportsService.getGrounds(venueId);
         if (data && data.length > 0) {
           setGrounds(data);
-          if (!selectedGroundId) {
+          if (groundId) {
+            setSelectedGroundId(groundId);
+          } else {
             setSelectedGroundId(data[0].id);
           }
         }
@@ -63,7 +71,7 @@ export const BlockUnblockScreen = () => {
       }
     };
     fetchGrounds();
-  }, [venueId, selectedGroundId]);
+  }, [venueId, groundId]);
 
   const [isSelectingRange, setIsSelectingRange] = useState(false);
   const [slotType, setSlotType] = useState<"Custom" | "All">("All");
@@ -71,9 +79,42 @@ export const BlockUnblockScreen = () => {
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(60);
 
   useEffect(() => {
-    const fetchPricing = async () => {
+    const detectSlotDuration = async () => {
+      if (!selectedGroundId) return;
       try {
-        const data = await SportsService.getVenuePricing(venueId);
+        const { data: slotData } = await supabase
+          .from("sports_slots")
+          .select("start_time, end_time")
+          .eq("ground_id", selectedGroundId)
+          .limit(1)
+          .maybeSingle();
+
+        if (slotData && slotData.start_time && slotData.end_time) {
+          const [sh, sm] = slotData.start_time.split(":").map(Number);
+          const [eh, em] = slotData.end_time.split(":").map(Number);
+          let diff = eh * 60 + em - (sh * 60 + sm);
+          if (diff < 0) diff += 24 * 60;
+          if (diff > 0) {
+            setSlotDurationMinutes(diff);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to detect slot duration from slot:", err);
+      }
+
+      // Fallback: use venue config filtered by the active sport type
+      try {
+        const dbSportType = selectedCategory.toLowerCase().replace(" ", "_");
+        const { data, error } = await supabase
+          .from("sports_venues")
+          .select("price_per_slot, weekend_price_per_slot, slot_duration_minutes")
+          .eq("venue_id", venueId)
+          .eq("sports_type", dbSportType)
+          .single();
+
+        if (error) throw error;
+
         if (data && data.slot_duration_minutes) {
           setSlotDurationMinutes(data.slot_duration_minutes);
         }
@@ -81,8 +122,8 @@ export const BlockUnblockScreen = () => {
         console.error("Failed to fetch venue config:", err);
       }
     };
-    fetchPricing();
-  }, [venueId]);
+    detectSlotDuration();
+  }, [selectedGroundId, venueId, selectedCategory]);
 
   const HOURS = React.useMemo(
     () => generateTimeSlots(6, 24, slotDurationMinutes),
@@ -98,8 +139,6 @@ export const BlockUnblockScreen = () => {
   const [fromTime, setFromTime] = useState("6 AM");
   const [toTime, setToTime] = useState("4 PM");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
-
-  const { activeVenueName } = useServiceStore();
 
   const handleDateChange = (selectedDate: Date) => {
     const activePicker = showDatePicker;
