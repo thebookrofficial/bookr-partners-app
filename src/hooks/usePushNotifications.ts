@@ -40,17 +40,24 @@ export const usePushNotifications = () => {
           data: { session },
         } = await supabase.auth.getSession();
 
-        // 3. Save the token to the database
+        // 3. Save the token to the database asynchronously (non-blocking)
         if (session?.user?.id && token) {
-          await supabase.from("user_devices").upsert(
-            {
-              user_id: session.user.id,
-              fcm_token: token,
-              platform: Platform.OS,
-              last_seen_at: new Date().toISOString(),
-            },
-            { onConflict: "fcm_token" },
-          );
+          supabase
+            .from("user_devices")
+            .upsert(
+              {
+                user_id: session.user.id,
+                fcm_token: token,
+                platform: Platform.OS,
+                last_seen_at: new Date().toISOString(),
+              },
+              { onConflict: "fcm_token" },
+            )
+            .then(({ error }) => {
+              if (error) {
+                console.error("Failed to store FCM token asynchronously:", error);
+              }
+            });
         }
       } catch (error) {
         console.error("Failed to get or store FCM token:", error);
