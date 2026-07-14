@@ -341,7 +341,7 @@ export const OfflineBookingSheet = ({
       visible={isVisible}
       animationType="slide"
       transparent={true}
-      onRequestClose={onClose}
+      onRequestClose={() => {}}
       statusBarTranslucent={true}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1}>
         <KeyboardAvoidingView

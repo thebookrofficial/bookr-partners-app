@@ -163,11 +163,12 @@ export const BulkBookingScreen = () => {
             : `${formatDate(minDate)} - ${formatDate(maxDate)}`;
 
         const formatTime = (t: string) => {
-          const [h] = t.split(":");
+          const [h, m] = t.split(":");
           const hour = parseInt(h, 10);
           const ampm = hour >= 12 ? "PM" : "AM";
           const displayHour = hour % 12 || 12;
-          return `${displayHour} ${ampm}`;
+          const displayMins = m === "00" ? "" : `:${m}`;
+          return `${displayHour}${displayMins} ${ampm}`;
         };
 
         const times = slots.map((s: any) => s.start_time).sort();

@@ -12,7 +12,7 @@ import { COLORS } from "@/constants/theme";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { SportsTabParamList } from "@/navigation/navigation.types";
 import { useServiceStore } from "@/store/serviceStore";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { CustomDatePickerModal } from "@/components/ui";
 
 // Sub-components & Hooks
 import { ClosedDatesAlert } from "../components/block-unblock/ClosedDatesAlert";
@@ -101,11 +101,11 @@ export const BlockUnblockScreen = () => {
 
   const { activeVenueName } = useServiceStore();
 
-  const handleDateChange = (event: any, selectedDate?: Date) => {
+  const handleDateChange = (selectedDate: Date) => {
     const activePicker = showDatePicker;
-    setShowDatePicker(null); // Hide picker (Android behavior)
+    setShowDatePicker(null); // Hide picker
 
-    if (selectedDate && event.type !== "dismissed") {
+    if (selectedDate) {
       if (activePicker === "from") {
         setFromDate(selectedDate);
         // Automatically push 'toDate' forward if it's earlier than the new 'fromDate'
@@ -406,16 +406,14 @@ export const BlockUnblockScreen = () => {
         </View>
       </ScrollView>
 
-      {/* --- NATIVE DATE PICKER --- */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={showDatePicker === "from" ? fromDate : toDate}
-          mode="date"
-          display="default"
-          minimumDate={showDatePicker === "to" ? fromDate : new Date()}
-          onChange={handleDateChange}
-        />
-      )}
+      {/* --- CUSTOM DATE PICKER --- */}
+      <CustomDatePickerModal
+        isVisible={!!showDatePicker}
+        onClose={() => setShowDatePicker(null)}
+        selectedDate={showDatePicker === "from" ? fromDate : toDate}
+        minDate={showDatePicker === "to" ? fromDate : new Date()}
+        onSelectDate={handleDateChange}
+      />
 
       <TimePickerModal
         visible={!!showHourPicker}

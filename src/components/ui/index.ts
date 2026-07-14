@@ -4,3 +4,4 @@ export * from "./Text";
 export * from "./TextInput";
 export * from "./Avatar";
 export * from "./PillTabs";
+export * from "./CustomDatePickerModal";

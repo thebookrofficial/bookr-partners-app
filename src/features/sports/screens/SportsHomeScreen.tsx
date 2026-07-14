@@ -2,9 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Modal } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, PillTabs } from "@/components/ui";
+import { Text, PillTabs, CustomDatePickerModal } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { LegendIndicator } from "../components/LegendIndicator";
 import { TimeSlotGrid } from "../components/TimeSlotGrid";
@@ -24,7 +24,6 @@ import { MainStackParamList } from "@/navigation/navigation.types";
 import { OfflineBookingSheet } from "../components/OfflineBookingSheet";
 import { useSportsHome } from "../hooks/useSportsHome";
 import { useServiceStore } from "@/store/serviceStore";
-import { Calendar } from "react-native-calendars";
 
 export const SportsHomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -129,13 +128,6 @@ export const SportsHomeScreen = () => {
     });
 
     return isToday ? `Today, ${dateString}` : dateString;
-  };
-
-  const getLocalISODate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
   };
 
   return (
@@ -281,40 +273,12 @@ export const SportsHomeScreen = () => {
         />
       )}
 
-      <Modal
-        visible={isDatePickerOpen}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsDatePickerOpen(false)}>
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsDatePickerOpen(false)}>
-          <View style={styles.calendarContainer}>
-            <Calendar
-              current={getLocalISODate(selectedDate)}
-              minDate={getLocalISODate(new Date())}
-              onDayPress={(day: any) => {
-                setSelectedDate(new Date(day.year, day.month - 1, day.day));
-                setIsDatePickerOpen(false);
-              }}
-              markedDates={{
-                [getLocalISODate(selectedDate)]: {
-                  selected: true,
-                  selectedColor: COLORS.primary,
-                },
-              }}
-              theme={{
-                todayTextColor: COLORS.primary,
-                arrowColor: COLORS.primary,
-                textDayFontFamily: "Gilroy-SemiBold",
-                textMonthFontFamily: "Gilroy-ExtraBold",
-                textDayHeaderFontFamily: "Gilroy-SemiBold",
-              }}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      <CustomDatePickerModal
+        isVisible={isDatePickerOpen}
+        onClose={() => setIsDatePickerOpen(false)}
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+      />
     </View>
   );
 };
@@ -359,24 +323,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     zIndex: 10,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  calendarContainer: {
-    width: "95%",
-    maxWidth: ms(420),
-    backgroundColor: COLORS.background,
-    borderRadius: ms(16),
-    padding: ms(16),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   emptyVenueText: {
     textAlign: "center",
