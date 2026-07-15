@@ -219,7 +219,8 @@ export const SportsService = {
     };
 
     const bookingGroupId = isMultiSlot ? generateUUID() : null;
-    let firstBookingId = "";
+    const firstBookingId = generateUUID();
+    const bookingsToInsert: any[] = [];
 
     for (let i = 0; i < totalSlots; i++) {
       const currentStartM = startTotalM + i * slotDuration;
@@ -276,34 +277,45 @@ export const SportsService = {
 
       if (!slotId) throw new Error(`Could not resolve slot for ${currentStart}`);
 
-      const { data: booking, error: bookingError } = await supabase
-        .from("sports_bookings")
-        .insert({
-          user_id: null,
-          guest_name: params.guestName,
-          guest_phone: params.guestPhone,
-          venue_id: params.venueId,
-          slot_id: slotId,
-          booking_status: "confirmed",
-          subtotal: hourlyPrice,
-          discount_amount: 0,
-          platform_fee: 0,
-          gateway_fee: 0,
-          total_amount: hourlyPrice,
-          vendor_payout: hourlyPrice,
-          paid_amount: hourlyAdvance,
-          booking_source: params.bookingSource,
-          sports_booking_type: finalBookingType,
-          booking_group_id: bookingGroupId,
-          parent_booking_id: i === 0 ? null : firstBookingId,
-          sequence_number: i + 1,
-          notes: `Manual Offline Booking ${isMultiSlot ? `(Slot ${i + 1}/${totalSlots})` : ""}`,
-        })
-        .select("id")
-        .single();
+      bookingsToInsert.push({
+        id: i === 0 ? firstBookingId : generateUUID(),
+        user_id: null,
+        guest_name: params.guestName,
+        guest_phone: params.guestPhone,
+        venue_id: params.venueId,
+        slot_id: slotId,
+        booking_status: "confirmed",
+        subtotal: hourlyPrice,
+        discount_amount: 0,
+        platform_fee: 0,
+        gateway_fee: 0,
+        total_amount: hourlyPrice,
+        vendor_payout: hourlyPrice,
+        paid_amount: hourlyAdvance,
+        booking_source: params.bookingSource,
+        sports_booking_type: finalBookingType,
+        booking_group_id: bookingGroupId,
+        parent_booking_id: i === 0 ? null : firstBookingId,
+        sequence_number: i + 1,
+        notes: `Manual Offline Booking ${isMultiSlot ? `(Slot ${i + 1}/${totalSlots})` : ""}`,
+      });
+    }
 
-      if (bookingError) throw bookingError;
-      if (i === 0) firstBookingId = booking.id;
+    const { error: bookingError } = await supabase.from("sports_bookings").insert(bookingsToInsert);
+
+    if (bookingError) throw bookingError;
+
+    // Update all historical bookings for this phone number at this venue to reflect the new/updated name
+    try {
+      if (params.guestPhone) {
+        await supabase
+          .from("sports_bookings")
+          .update({ guest_name: params.guestName })
+          .eq("venue_id", params.venueId)
+          .eq("guest_phone", params.guestPhone);
+      }
+    } catch (err) {
+      console.error("Failed to update historical guest names:", err);
     }
 
     return firstBookingId;
@@ -415,6 +427,43 @@ export const SportsService = {
     } catch (err: any) {
       console.error("Reschedule Error:", err);
       throw new Error(err.message || "An unexpected error occurred during rescheduling");
+    }
+  },
+
+  async lookupGuestsByName(venueId: string, nameQuery: string) {
+    if (!nameQuery || nameQuery.trim().length < 2) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from("sports_bookings")
+        .select("guest_name, guest_phone")
+        .eq("venue_id", venueId)
+        .ilike("guest_name", `%${nameQuery}%`)
+        .not("guest_name", "is", null)
+        .order("guest_name", { ascending: true })
+        .limit(30);
+
+      if (error) throw error;
+
+      const uniqueResults: { name: string; phone: string }[] = [];
+      const seen = new Set<string>();
+
+      (data || []).forEach((item: any) => {
+        const name = item.guest_name?.trim();
+        const phone = item.guest_phone?.trim();
+        if (name && phone) {
+          const key = `${name.toLowerCase()}_${phone}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniqueResults.push({ name, phone });
+          }
+        }
+      });
+
+      return uniqueResults;
+    } catch (err) {
+      console.error("Error looking up guests by name:", err);
+      return [];
     }
   },
 };

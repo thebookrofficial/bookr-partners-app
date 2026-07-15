@@ -113,7 +113,7 @@ const TabIcon =
 const useTabScreenOptions = () => {
   const insets = useSafeAreaInsets();
   const bottomInset = insets.bottom;
-  const paddingBottom = bottomInset > 0 ? bottomInset + vs(8) : vs(25);
+  const paddingBottom = bottomInset > 0 ? bottomInset + vs(20) : vs(30);
   const height = vs(52) + paddingBottom;
 
   return React.useMemo(
@@ -456,24 +456,27 @@ export const AppNavigator = () => {
   const { session, isInitialized, setSession, setInitialized } = useAuthStore();
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session?.user) {
-        try {
-          const { data: clientData } = await supabase
-            .from("client_profiles")
-            .select("*")
-            .eq("user_id", data.session.user.id)
-            .maybeSingle();
-
-          if (clientData) {
-            useAuthStore.getState().setClientProfile(clientData);
-          }
-        } catch (error) {
-          console.error("Error fetching initial client profile:", error);
-        }
-      }
+    supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setInitialized(true);
+
+      if (data.session?.user) {
+        (async () => {
+          try {
+            const { data: clientData } = await supabase
+              .from("client_profiles")
+              .select("*")
+              .eq("user_id", data.session.user.id)
+              .maybeSingle();
+
+            if (clientData) {
+              useAuthStore.getState().setClientProfile(clientData);
+            }
+          } catch (error) {
+            console.error("Error fetching initial client profile:", error);
+          }
+        })();
+      }
     });
 
     const {

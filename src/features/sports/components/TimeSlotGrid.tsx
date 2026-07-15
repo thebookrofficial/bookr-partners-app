@@ -134,12 +134,65 @@ const SlotAccordion = ({ title, data, selectedDate, onSlotPress, slotWidth }: an
 };
 
 export const TimeSlotGrid = ({
-  slots,
+  slots: rawSlots,
   selectedDate,
   onSlotPress,
   isNested = false,
 }: TimeSlotGridProps) => {
   const [containerWidth, setContainerWidth] = useState(0);
+
+  const slots = useMemo(() => {
+    const slotsByHour: { [hour: number]: TimeSlotData[] } = {};
+
+    rawSlots.forEach(slot => {
+      if (!slot.raw_start_time) return;
+      const h = parseInt(slot.raw_start_time.split(":")[0], 10);
+      if (!slotsByHour[h]) {
+        slotsByHour[h] = [];
+      }
+      slotsByHour[h].push(slot);
+    });
+
+    const result: TimeSlotData[] = [];
+    const hours = Object.keys(slotsByHour)
+      .map(Number)
+      .sort((a, b) => a - b);
+
+    hours.forEach(h => {
+      const group = slotsByHour[h];
+      let status: DbSlotStatus = "available";
+      let isManualBooking = false;
+
+      const hasBooked = group.some(s => s.status === "booked");
+      const hasBlocked = group.some(s => s.status === "blocked");
+      const hasMaintenance = group.some(s => s.status === "maintenance");
+
+      if (hasBooked) {
+        status = "booked";
+        isManualBooking = group.some(s => s.status === "booked" && s.isManualBooking);
+      } else if (hasBlocked) {
+        status = "blocked";
+      } else if (hasMaintenance) {
+        status = "maintenance";
+      }
+
+      const displayHour = h % 12 === 0 ? 12 : h % 12;
+      const ampm = h >= 12 && h < 24 ? "PM" : "AM";
+      const timeStr = `${displayHour} ${ampm}`;
+
+      const representative = group[0];
+
+      result.push({
+        id: representative.id,
+        time: timeStr,
+        status,
+        raw_start_time: `${h.toString().padStart(2, "0")}:00:00`,
+        isManualBooking,
+      });
+    });
+
+    return result;
+  }, [rawSlots]);
 
   const onLayout = (event: LayoutChangeEvent) => {
     setContainerWidth(event.nativeEvent.layout.width);

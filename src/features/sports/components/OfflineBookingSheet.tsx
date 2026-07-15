@@ -110,6 +110,11 @@ export const OfflineBookingSheet = ({
   const [bookedHours, setBookedHours] = useState<string[]>([]);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
 
+  // Guest Autocomplete Search State
+  const [searchResults, setSearchResults] = useState<{ name: string; phone: string }[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isSelectingFromResults, setIsSelectingFromResults] = useState(false);
+
   // Pricing State
   const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0, slotDurationMinutes: 60 });
 
@@ -118,10 +123,33 @@ export const OfflineBookingSheet = ({
   const [toTime, setToTime] = useState("End Time");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
 
-  const HOURS = useMemo(
-    () => generateTimeSlots(6, 24, pricing.slotDurationMinutes),
-    [pricing.slotDurationMinutes],
-  );
+  // Database slots cache for exact bounds matching
+  const [allDbSlots, setAllDbSlots] = useState<any[]>([]);
+
+  const detectedSlotDuration = useMemo(() => {
+    if (allDbSlots.length === 0) {
+      return pricing.slotDurationMinutes || 60;
+    }
+    let minDur = pricing.slotDurationMinutes || 60;
+    allDbSlots.forEach((slot: any) => {
+      const [sh, sm] = slot.start_time.split(":").map(Number);
+      const [eh, em] = slot.end_time.split(":").map(Number);
+      let diff = eh * 60 + em - (sh * 60 + sm);
+      if (diff < 0) diff += 24 * 60;
+      if (diff > 0 && diff < minDur) {
+        minDur = diff;
+      }
+    });
+    return minDur;
+  }, [allDbSlots, pricing.slotDurationMinutes]);
+
+  const startTimes = useMemo(() => {
+    return generateTimeSlots(6, 24, detectedSlotDuration);
+  }, [detectedSlotDuration]);
+
+  const endTimes = useMemo(() => {
+    return generateTimeSlots(6, 24, detectedSlotDuration);
+  }, [detectedSlotDuration]);
 
   const getLocalDateString = (date: Date) => {
     const year = date.getFullYear();
@@ -139,32 +167,71 @@ export const OfflineBookingSheet = ({
     setFromTime("Start Time");
     setToTime("End Time");
     setHasHistory(false);
+    setSearchResults([]);
+    setShowSearchResults(false);
+    setIsSelectingFromResults(false);
+    setIsFetchingSlots(false);
+    setAllDbSlots([]);
   }, [initialDate]);
+
+  const handleNameChange = async (text: string) => {
+    setName(text);
+    if (isSelectingFromResults) {
+      setIsSelectingFromResults(false);
+      return;
+    }
+
+    if (text.trim().length >= 2) {
+      const results = await SportsService.lookupGuestsByName(venueId, text);
+      setSearchResults(results);
+      setShowSearchResults(results.length > 0);
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  };
 
   useEffect(() => {
     setCurrentDate(initialDate);
   }, [initialDate]);
 
   useEffect(() => {
-    const fetchUnavailableSlots = async () => {
-      if (!isVisible || !_groundId) return;
+    const fetchSlotsData = async () => {
+      if (!isVisible || !_groundId) {
+        setIsFetchingSlots(false);
+        return;
+      }
       setIsFetchingSlots(true);
       try {
         const dateStr = getLocalDateString(currentDate);
-        const data = await SportsService.getUnavailableSlotsForDate(_groundId, dateStr);
-        const formattedBooked = (data || []).map((slot: any) => {
-          // Keep it as 'H:MM AM/PM' to match the generated HOURS format.
-          const [h, m] = slot.start_time.split(":");
-          const hourInt = parseInt(h, 10);
-          const ampm = hourInt >= 12 && hourInt < 24 ? "PM" : "AM";
-          let displayHour = hourInt % 12;
-          if (displayHour === 0) displayHour = 12;
+        const data = await SportsService.getSlots(venueId, _groundId, dateStr);
+        setAllDbSlots(data || []);
 
-          if (pricing.slotDurationMinutes < 60) {
-            return `${displayHour}:${m} ${ampm}`;
+        let minDur = pricing.slotDurationMinutes || 60;
+        (data || []).forEach((slot: any) => {
+          const [sh, sm] = slot.start_time.split(":").map(Number);
+          const [eh, em] = slot.end_time.split(":").map(Number);
+          let diff = eh * 60 + em - (sh * 60 + sm);
+          if (diff < 0) diff += 24 * 60;
+          if (diff > 0 && diff < minDur) {
+            minDur = diff;
           }
-          return `${displayHour} ${ampm}`;
         });
+
+        const formattedBooked = (data || [])
+          .filter((slot: any) => slot.status !== "available")
+          .map((slot: any) => {
+            const [h, m] = slot.start_time.split(":");
+            const hourInt = parseInt(h, 10);
+            const ampm = hourInt >= 12 && hourInt < 24 ? "PM" : "AM";
+            let displayHour = hourInt % 12;
+            if (displayHour === 0) displayHour = 12;
+
+            if (minDur < 60) {
+              return `${displayHour}:${m} ${ampm}`;
+            }
+            return `${displayHour} ${ampm}`;
+          });
         setBookedHours(formattedBooked);
       } catch (err) {
         console.error("Error checking slot availability:", err);
@@ -172,8 +239,8 @@ export const OfflineBookingSheet = ({
         setIsFetchingSlots(false);
       }
     };
-    fetchUnavailableSlots();
-  }, [currentDate, _groundId, isVisible, pricing.slotDurationMinutes]);
+    fetchSlotsData();
+  }, [currentDate, _groundId, isVisible, pricing.slotDurationMinutes, venueId]);
 
   const prevGroundId = React.useRef<string | null>(null);
 
@@ -248,23 +315,23 @@ export const OfflineBookingSheet = ({
       return;
     }
 
-    const startIdx = HOURS.indexOf(fromTime);
-    const endIdx = HOURS.indexOf(toTime);
+    const startIdx = startTimes.indexOf(fromTime);
+    const endIdx = endTimes.indexOf(toTime);
 
     if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) return;
 
-    const selectedHours = HOURS.slice(startIdx, endIdx);
+    const selectedHours = startTimes.slice(startIdx, endIdx);
     let total = 0;
 
     selectedHours.forEach(hour => {
       // Day Session: 6 AM to 5 PM
       // Night Session: 5 PM to 12 AM
-      const hIdx = HOURS.indexOf(hour);
+      const hIdx = startTimes.indexOf(hour);
       // For fallback comparison, find the index of 5 PM or closest match
-      const fivePMIdx = HOURS.findIndex(h => h.includes("5 PM") || h.includes("5:00 PM"));
+      const fivePMIdx = startTimes.findIndex(h => h.includes("5 PM") || h.includes("5:00 PM"));
 
-      const boundaryIdx = fivePMIdx !== -1 ? fivePMIdx : HOURS.length / 2;
-      const multiplier = (pricing.slotDurationMinutes || 60) / 60;
+      const boundaryIdx = fivePMIdx !== -1 ? fivePMIdx : startTimes.length / 2;
+      const multiplier = (detectedSlotDuration || 60) / 60;
 
       if (hIdx < boundaryIdx) {
         total += (pricing.day || pricing.default) * multiplier;
@@ -274,7 +341,7 @@ export const OfflineBookingSheet = ({
     });
 
     setTotalPayment(total.toString());
-  }, [fromTime, toTime, pricing, HOURS]);
+  }, [fromTime, toTime, pricing, startTimes, endTimes, detectedSlotDuration]);
 
   const handleBookNow = async () => {
     const cleanMobile = mobile.replace(/[^\d]/g, "");
@@ -312,7 +379,7 @@ export const OfflineBookingSheet = ({
         guestPhone: cleanMobile,
         bookingSource: "offline",
         sportsBookingType: "offline",
-        slotDurationMinutes: pricing.slotDurationMinutes,
+        slotDurationMinutes: detectedSlotDuration,
       };
 
       // CRITICAL FIX: Removed profile lookup and userId passing
@@ -341,7 +408,7 @@ export const OfflineBookingSheet = ({
       visible={isVisible}
       animationType="slide"
       transparent={true}
-      onRequestClose={() => {}}
+      onRequestClose={onClose}
       statusBarTranslucent={true}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1}>
         <KeyboardAvoidingView
@@ -358,6 +425,7 @@ export const OfflineBookingSheet = ({
             </View>
             <ScrollView
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.sheetContent}>
               <TouchableOpacity activeOpacity={0.7} onPress={() => setIsDatePickerOpen(true)}>
                 <TextInput
@@ -383,15 +451,48 @@ export const OfflineBookingSheet = ({
                   }
                 }}
               />
-              {/* {mobile.length >= 10 && ( */}
-              <TextInput
-                variant="filled"
-                label={<CustomLabel icon={UserIcon} text="Name" />}
-                placeholder="Guest Name"
-                value={name}
-                onChangeText={setName}
-              />
-              {/* )} */}
+              <View style={styles.autocompleteContainer}>
+                <TextInput
+                  variant="filled"
+                  label={<CustomLabel icon={UserIcon} text="Name" />}
+                  placeholder="Guest Name"
+                  value={name}
+                  onChangeText={handleNameChange}
+                  onFocus={() => {
+                    if (name.trim().length >= 2 && searchResults.length > 0) {
+                      setShowSearchResults(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowSearchResults(false), 300);
+                  }}
+                />
+                {showSearchResults && searchResults.length > 0 && (
+                  <View style={styles.dropdownContainer}>
+                    <ScrollView keyboardShouldPersistTaps="always" style={styles.dropdownScroll}>
+                      {searchResults.map((item, index) => (
+                        <TouchableOpacity
+                          key={`${item.name}_${item.phone}_${index}`}
+                          style={[
+                            styles.dropdownItem,
+                            index < searchResults.length - 1 && styles.dropdownItemDivider,
+                          ]}
+                          onPress={() => {
+                            setIsSelectingFromResults(true);
+                            setName(item.name);
+                            const cleanPhone = item.phone.replace(/[^\d]/g, "").slice(-10);
+                            setMobile(cleanPhone);
+                            setSearchResults([]);
+                            setShowSearchResults(false);
+                          }}>
+                          <Text style={styles.dropdownItemTextLeft}>{item.name}</Text>
+                          <Text style={styles.dropdownItemTextRight}>{item.phone}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
               <View style={styles.row}>
                 <View style={styles.flex1}>
                   <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("from")}>
@@ -508,16 +609,14 @@ export const OfflineBookingSheet = ({
         visible={!!showHourPicker}
         onClose={() => setShowHourPicker(null)}
         title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
-        hours={HOURS}
+        hours={showHourPicker === "from" ? startTimes : endTimes}
         selectedTime={showHourPicker === "from" ? fromTime : toTime}
         onSelectTime={hour => {
           if (showHourPicker === "from") {
             setFromTime(hour);
-            const idx = HOURS.indexOf(hour);
-            const step = Math.max(1, Math.round(60 / pricing.slotDurationMinutes));
-            const nextIdx = idx + step;
-            if (nextIdx < HOURS.length) {
-              setToTime(HOURS[nextIdx]);
+            const idx = startTimes.indexOf(hour);
+            if (idx !== -1 && idx + 1 < startTimes.length) {
+              setToTime(startTimes[idx + 1]);
             } else {
               setToTime("End Time");
             }
@@ -526,27 +625,21 @@ export const OfflineBookingSheet = ({
           }
         }}
         isHourDisabled={(hour, index) => {
-          const isBooked = bookedHours.includes(hour);
-
-          // FIX: Treat 12 AM as the end of the day (24:00) so it isn't incorrectly marked as past
           const hour24 =
             hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
           const isPast = isToday && hour24 <= currentHour;
 
           if (showHourPicker === "from") {
+            const isBooked = bookedHours.includes(hour);
             return isBooked || isPast;
           } else {
-            const fromIndex = HOURS.indexOf(fromTime);
-            if (index <= fromIndex) {
-              return true;
-            } else {
-              // For "to" time, we check if any slot strictly between the start time
-              // and this end time is booked.
-              const intermediateHours = HOURS.slice(fromIndex, index);
-              const hasBookingInBetween = intermediateHours.some(h => bookedHours.includes(h));
+            const fromIndex = startTimes.indexOf(fromTime);
+            if (fromIndex === -1) return true;
+            if (index <= fromIndex) return true;
 
-              return hasBookingInBetween || (isPast && !isBooked);
-            }
+            const intermediateHours = startTimes.slice(fromIndex, index);
+            const hasBookingInBetween = intermediateHours.some(h => bookedHours.includes(h));
+            return hasBookingInBetween || (isPast && !bookedHours.includes(hour));
           }
         }}
         isFetching={isFetchingSlots}
@@ -645,5 +738,47 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderRadius: ms(12),
     padding: ms(10),
+  },
+  autocompleteContainer: {
+    position: "relative",
+    zIndex: 1000,
+  },
+  dropdownContainer: {
+    position: "absolute",
+    top: vs(64),
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.background,
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: COLORS.border.navBar,
+    maxHeight: vs(180),
+    zIndex: 1001,
+    elevation: 5,
+    overflow: "hidden",
+  },
+  dropdownScroll: {
+    width: "100%",
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: vs(12),
+    paddingHorizontal: hs(12),
+    backgroundColor: COLORS.background,
+  },
+  dropdownItemDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border.navBar,
+  },
+  dropdownItemTextLeft: {
+    fontSize: fs(14),
+    fontWeight: "500",
+    color: COLORS.text.primary,
+  },
+  dropdownItemTextRight: {
+    fontSize: fs(12),
+    color: COLORS.text.secondary,
   },
 });
