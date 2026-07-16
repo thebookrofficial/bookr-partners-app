@@ -98,6 +98,10 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
           <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>
             Login
           </Text>
+          <Text style={styles.subtitle}>
+            Enter the 6-digit code sent to{"\n"}
+            <Text style={styles.emailText}>{email}</Text>
+          </Text>
 
           <View style={styles.otpContainer}>
             {new Array(OTP_LENGTH).fill(0).map((_, index) => {
@@ -265,11 +269,23 @@ const styles = StyleSheet.create({
     fontFamily: "Gilroy-Bold",
     fontSize: fs(34),
     color: COLORS.danger,
-    marginBottom: vs(28),
+    marginBottom: vs(12),
     textAlign: "center",
     width: "100%",
     lineHeight: fs(42), // Added explicit line height
     paddingTop: vs(4), // Added padding to prevent clipping
+  },
+  subtitle: {
+    fontFamily: "Gilroy-Medium",
+    fontSize: fs(14),
+    color: COLORS.text.muted,
+    textAlign: "center",
+    marginBottom: vs(28),
+    lineHeight: fs(20),
+  },
+  emailText: {
+    fontFamily: "Gilroy-Bold",
+    color: COLORS.text.primary,
   },
   otpContainer: {
     flexDirection: "row",

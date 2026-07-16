@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -14,7 +14,7 @@ import {
   StaycationTabParamList,
   EventTabParamList,
 } from "./navigation.types";
-import { View, StyleSheet, ActivityIndicator, Text as RNText } from "react-native";
+import { View, StyleSheet, Text as RNText } from "react-native";
 import {
   CalendarCheck,
   FileText,
@@ -81,11 +81,13 @@ import { PayoutDetailsScreen } from "@/features/finance/screens/PayoutDetailsScr
 import { SportsInvoiceScreen } from "@/features/sports/screens/SportsInvoiceScreen";
 
 import { COLORS } from "@/constants/theme";
+
+import { useAuthStore } from "@/store";
+import { SplashScreen } from "@/screens/SplashScreen";
 import { vs, ms, fs, hs } from "@/utils/responsive.utils";
 
 // --- AUTHENTICATION IMPORTS ---
 import { supabase } from "@/lib/supabase";
-import { useAuthStore } from "@/store";
 
 const PlaceholderScreen = ({ title }: { title: string }) => (
   <View style={styles.placeholderContainer}>
@@ -454,6 +456,7 @@ const linking: LinkingOptions<RootStackParamList> = {
 
 export const AppNavigator = () => {
   const { session, isInitialized, setSession, setInitialized } = useAuthStore();
+  const [isSplashAnimationFinished, setIsSplashAnimationFinished] = useState(false);
 
   /**
    * @section Auth Initialisation — ⚠️ DO NOT MODIFY WITHOUT POOJA'S APPROVAL ⚠️
@@ -585,12 +588,8 @@ export const AppNavigator = () => {
     }
   }, [session]);
 
-  if (!isInitialized) {
-    return (
-      <View style={styles.placeholderContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+  if (!isInitialized || !isSplashAnimationFinished) {
+    return <SplashScreen onFinish={() => setIsSplashAnimationFinished(true)} />;
   }
 
   return (
