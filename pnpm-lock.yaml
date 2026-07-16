@@ -64,9 +64,6 @@ importers:
       react-native-calendars:
         specifier: ^1.1314.0
         version: 1.1314.0(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0)
-      react-native-call-log:
-        specifier: ^3.0.0
-        version: 3.0.0(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0)
       react-native-camera-kit:
         specifier: ^18.0.0
         version: 18.0.0(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0)
@@ -7845,16 +7842,6 @@ packages:
       }
     engines: { node: ">=18" }
 
-  react-native-call-log@3.0.0:
-    resolution:
-      {
-        integrity: sha512-Z+1V3GE38bKBKxd8qwLiL9ttCovEIme4LypYFgMpDLniuqIob/uIgXsbKFwgknbglSsT89fx6VMu5U4+T+od7g==,
-      }
-    engines: { node: ">=18.0.0" }
-    peerDependencies:
-      react: ">=18.0.0"
-      react-native: ">=0.71.0"
-
   react-native-camera-kit@18.0.0:
     resolution:
       {
@@ -15333,11 +15320,6 @@ snapshots:
     transitivePeerDependencies:
       - react
       - react-native
-
-  react-native-call-log@3.0.0(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0):
-    dependencies:
-      react: 19.1.0
-      react-native: 0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0)
 
   react-native-camera-kit@18.0.0(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0):
     dependencies:

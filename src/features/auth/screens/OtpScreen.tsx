@@ -20,7 +20,6 @@ import { LEGAL_TEXT } from "@/constants/legal";
 
 // Assets
 import LoginIllustration from "@/assets/images/login-screen-client-side.svg";
-import WhiteBookrLogo from "@/assets/images/white_bookr_logo.png";
 import DividerLine from "@/assets/icons/ic_divider_line.svg";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -86,11 +85,6 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <Image source={WhiteBookrLogo} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.partnerText}>Partner</Text>
-        </View>
-
         <View style={styles.illustrationContainer}>
           <LoginIllustration width={hs(380)} height={vs(345)} />
         </View>
@@ -181,14 +175,6 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
               style={styles.socialIcon}
             />
             <Text style={styles.socialButtonText}>Sign in with Google</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.socialButton}>
-            <Image
-              source={{ uri: "https://img.icons8.com/ios-filled/50/000000/mac-os.png" }}
-              style={styles.socialIcon}
-            />
-            <Text style={styles.socialButtonText}>Sign in with Apple</Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>

@@ -25,29 +25,44 @@ export const useAuthLogic = () => {
     const formattedEmail = email.trim().toLowerCase();
     setIsLoading(true);
 
-    // --- TEST ACCOUNT PASSWORD BYPASS ---
-    if (formattedEmail === "test.client@gmail.com") {
-      // Simulation delay for realism
-      setTimeout(() => {
+    try {
+      /**
+       * ⚠️ DO NOT REMOVE — Google Play Store Reviewer Bypass (Step 1 of 2)
+       *
+       * The Play Store review team uses test.client@gmail.com to evaluate the app.
+       * Real OTP emails cannot be sent to reviewer accounts, so we skip the OTP
+       * send for this address and route them straight to the OTP screen.
+       * Step 2 is in verifyOtpCode() below where code "123456" triggers a real login.
+       *
+       * Removing this will cause Play Store review rejection.
+       */
+      if (formattedEmail === "test.client@gmail.com") {
+        // Simulation delay for realism
+        setTimeout(() => {
+          setIsLoading(false);
+          onSuccess(false); // Navigate to OTP screen; reviewer enters 123456 there
+        }, 800);
+        return;
+      }
+
+      // --- NORMAL OTP FLOW FOR EVERYONE ELSE ---
+      const { error } = await supabase.auth.signInWithOtp({
+        email: formattedEmail,
+      });
+
+      if (error) {
+        Alert.alert("Login Error", error.message);
+      } else {
+        // Pass 'false' so the UI knows to navigate to the OTP screen
+        onSuccess(false);
+      }
+    } catch (e: any) {
+      console.error("loginWithEmail error:", e);
+      Alert.alert("Login Error", e.message || "Failed to request OTP.");
+    } finally {
+      if (formattedEmail !== "test.client@gmail.com") {
         setIsLoading(false);
-        onSuccess(false); // Force navigation to OTP screen even for test account
-      }, 800);
-      return;
-    }
-    // ------------------------------------
-
-    // --- NORMAL OTP FLOW FOR EVERYONE ELSE ---
-    const { error } = await supabase.auth.signInWithOtp({
-      email: formattedEmail,
-    });
-
-    setIsLoading(false);
-
-    if (error) {
-      Alert.alert("Login Error", error.message);
-    } else {
-      // Pass 'false' so the UI knows to navigate to the OTP screen
-      onSuccess(false);
+      }
     }
   };
 
@@ -92,67 +107,105 @@ export const useAuthLogic = () => {
     setIsLoading(true);
     const formattedEmail = email.trim().toLowerCase();
 
-    // HARDCODED BYPASS FOR GOOGLE REVIEWER
-    if (formattedEmail === "test.client@gmail.com" && code === "123456") {
-      const { error } = await supabase.auth.signInWithPassword({
+    try {
+      /**
+       * ⚠️ DO NOT REMOVE — Google Play Store Reviewer Bypass (Step 2 of 2)
+       *
+       * When the reviewer enters OTP code "123456" for test.client@gmail.com,
+       * we use signInWithPassword() to authenticate them directly against Supabase.
+       * This bypasses the real OTP flow which requires an actual email inbox.
+       *
+       * IMPORTANT — Do NOT wrap this call with AbortController or a timeout.
+       * Any abortion of this request will prevent the session token from being
+       * written to AsyncStorage, causing the login to silently fail.
+       *
+       * The real session is created here and persisted by the Supabase SDK.
+       * onAuthStateChange (in navigation/index.tsx) then navigates the user.
+       *
+       * Removing or modifying this will cause Play Store review rejection.
+       */
+      if (formattedEmail === "test.client@gmail.com" && code === "123456") {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: formattedEmail,
+          password: "@TheBookr!official18",
+        });
+        if (error) {
+          Alert.alert("Reviewer Login Error", error.message);
+        }
+        return;
+      }
+
+      // 1. Verify the OTP
+      const { data: authData, error: authError } = await supabase.auth.verifyOtp({
         email: formattedEmail,
-        password: "@TheBookr!official18",
+        token: code,
+        type: "email",
       });
+
+      if (authError) {
+        Alert.alert("Verification Failed", authError.message);
+        return;
+      }
+
+      // 2. Ensure we have a user
+      const user = authData.user;
+      if (!user) {
+        Alert.alert("Error", "User session not found after verification.");
+        return;
+      }
+
+      /**
+       * ⚠️ DO NOT REMOVE — Business Partner Authorization Gate
+       *
+       * This check ensures that only valid Bookr Business Partners (owners or
+       * staff with an active account) can access this app. Regular Bookr users
+       * (customers who book venues) share the same Supabase auth system but
+       * must NOT be able to log into this partner-facing app.
+       *
+       * Logic:
+       *  - Fetches client_profiles for the authenticated user.
+       *  - If client_role is NOT "owner" or "staff", or account_status is
+       *    "suspended" or "banned", signs them out immediately.
+       *  - Exception: users with a pending staff @pending_invite_token are
+       *    allowed through so they can complete the invite flow.
+       *
+       * Removing this gate would allow any regular Bookr customer to log in.
+       */
+      const { data: clientProfile, error: profileError } = await supabase
+        .from("client_profiles")
+        .select("client_role, account_status")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profileError) {
+        Alert.alert("Error", "Could not fetch user profile details.");
+        return;
+      }
+
+      // Authorized = active owner or staff; suspended/banned accounts are rejected
+      const isAuthorized =
+        clientProfile &&
+        (clientProfile.client_role === "owner" || clientProfile.client_role === "staff") &&
+        clientProfile.account_status !== "suspended" &&
+        clientProfile.account_status !== "banned";
+
+      const pendingInviteToken = await AsyncStorage.getItem("@pending_invite_token");
+
+      if (!isAuthorized && !pendingInviteToken) {
+        // Regular Bookr user — boot them out and direct to the consumer app
+        await supabase.auth.signOut();
+        Alert.alert(
+          "Access Denied",
+          "This app is strictly for Bookr Business Partners. Please use the main Bookr app to book venues.",
+        );
+        return;
+      }
+    } catch (e: any) {
+      console.error("verifyOtpCode error:", e);
+      Alert.alert("Verification Error", e.message || "An unexpected error occurred.");
+    } finally {
       setIsLoading(false);
-      if (error) Alert.alert("Reviewer Login Error", error.message);
-      return;
     }
-
-    // 1. Verify the OTP
-    const { data: authData, error: authError } = await supabase.auth.verifyOtp({
-      email: formattedEmail,
-      token: code,
-      type: "email",
-    });
-
-    if (authError) {
-      setIsLoading(false);
-      Alert.alert("Verification Failed", authError.message);
-      return;
-    }
-
-    // 2. Ensure we have a user
-    const user = authData.user;
-    if (!user) {
-      setIsLoading(false);
-      Alert.alert("Error", "User session not found after verification.");
-      return;
-    }
-
-    // 3. IMPORTANT: Check the client_profiles table for a valid business role
-    const { data: clientProfile } = await supabase
-      .from("client_profiles")
-      .select("client_role, account_status")
-      .eq("user_id", user.id)
-      .single();
-
-    // 4. Determine if they are authorized
-    const isAuthorized =
-      clientProfile &&
-      (clientProfile.client_role === "owner" || clientProfile.client_role === "staff") &&
-      clientProfile.account_status !== "suspended" &&
-      clientProfile.account_status !== "banned";
-
-    const pendingInviteToken = await AsyncStorage.getItem("@pending_invite_token");
-
-    if (!isAuthorized && !pendingInviteToken) {
-      // If they are just a 'user' or have no client profile, boot them out
-      await supabase.auth.signOut();
-      setIsLoading(false);
-      Alert.alert(
-        "Access Denied",
-        "This app is strictly for Bookr Business Partners. Please use the main Bookr app to book venues.",
-      );
-      return;
-    }
-
-    // If they made it here, they are an owner/staff, and the session is valid!
-    setIsLoading(false);
   };
 
   const resendOtpCode = async (email: string, onResent: () => void) => {

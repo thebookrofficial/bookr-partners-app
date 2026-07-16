@@ -455,51 +455,117 @@ const linking: LinkingOptions<RootStackParamList> = {
 export const AppNavigator = () => {
   const { session, isInitialized, setSession, setInitialized } = useAuthStore();
 
+  /**
+   * @section Auth Initialisation — ⚠️ DO NOT MODIFY WITHOUT POOJA'S APPROVAL ⚠️
+   *
+   * ╔══════════════════════════════════════════════════════════════════════════╗
+   * ║              CRITICAL AUTH INITIALISATION — DO NOT TOUCH               ║
+   * ║                                                                        ║
+   * ║  This useEffect uses the Supabase v2 INITIAL_SESSION event pattern     ║
+   * ║  as the SINGLE source of truth for app boot.                           ║
+   * ║                                                                        ║
+   * ║  WHY THIS PATTERN WAS CHOSEN (post-1.1.3 regression analysis):        ║
+   * ║  ──────────────────────────────────────────────────────────────────    ║
+   * ║  The previous approach called getSession() AND subscribed to           ║
+   * ║  onAuthStateChange simultaneously. This created a race condition:      ║
+   * ║                                                                        ║
+   * ║  1. When the JWT access token is expired, getSession() makes a         ║
+   * ║     network call to refresh it (not an instant AsyncStorage read).     ║
+   * ║  2. While the refresh was in-flight, onAuthStateChange fired           ║
+   * ║     SIGNED_OUT with a null session.                                    ║
+   * ║  3. setSession(null) was called → user shown the Login screen.         ║
+   * ║  4. The refresh eventually completed but the app was already on the    ║
+   * ║     wrong screen.                                                      ║
+   * ║  → Result: random, intermittent logouts 1-2 out of every 7 app opens. ║
+   * ║                                                                        ║
+   * ║  HOW IT IS FIXED NOW:                                                  ║
+   * ║  • INITIAL_SESSION fires exactly ONCE after the SDK has fully          ║
+   * ║    resolved the startup session (including any token refresh).         ║
+   * ║  • SIGNED_OUT is only handled AFTER init and only for genuine          ║
+   * ║    sign-out actions — not transient mid-refresh null sessions.         ║
+   * ║  • A 12-second safety timer calls setInitialized(true) as a last       ║
+   * ║    resort if INITIAL_SESSION never fires (e.g. network fully dead),    ║
+   * ║    so the user always sees a screen and never gets a frozen spinner.   ║
+   * ║                                                                        ║
+   * ║  DO NOT:                                                               ║
+   * ║  • Call getSession() here in addition to onAuthStateChange             ║
+   * ║  • Call setSession(null) on SIGNED_OUT before init is complete         ║
+   * ║  • Wrap the Supabase client with AbortController or custom fetch       ║
+   * ║  • Remove or shorten the safety timer without testing 10+ app opens   ║
+   * ║                                                                        ║
+   * ║  Changed: 2026-07-16  |  Approved by: Prasad                             ║
+   * ╚══════════════════════════════════════════════════════════════════════════╝
+   */
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setInitialized(true);
+    let initialized = false;
 
-      if (data.session?.user) {
-        (async () => {
-          try {
-            const { data: clientData } = await supabase
-              .from("client_profiles")
-              .select("*")
-              .eq("user_id", data.session.user.id)
-              .maybeSingle();
-
-            if (clientData) {
-              useAuthStore.getState().setClientProfile(clientData);
-            }
-          } catch (error) {
-            console.error("Error fetching initial client profile:", error);
-          }
-        })();
+    // Safety net: if INITIAL_SESSION never fires (network fully dead), unblock
+    // the spinner after 12 seconds so the user at least sees a login screen.
+    const safetyTimer = setTimeout(() => {
+      if (!initialized) {
+        initialized = true;
+        setInitialized(true);
       }
-    });
+    }, 12000);
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      if (newSession?.user && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
-        try {
-          const { data: clientData } = await supabase
-            .from("client_profiles")
-            .select("*")
-            .eq("user_id", newSession.user.id)
-            .maybeSingle();
-          if (clientData) {
-            useAuthStore.getState().setClientProfile(clientData);
-          }
-        } catch (error) {}
-      } else if (!newSession) {
+      if (event === "INITIAL_SESSION") {
+        // Fires once on startup with the final resolved session (after refresh if needed).
+        // setSession is called UNCONDITIONALLY so that even if the safety timer fired
+        // first (showing the login screen), the valid session still gets applied and
+        // the navigator auto-switches to the home screen without a manual reopen.
+        setSession(newSession);
+
+        if (!initialized) {
+          initialized = true;
+          clearTimeout(safetyTimer);
+          setInitialized(true);
+        }
+
+        // Non-blocking: fetch client profile in the background
+        if (newSession?.user) {
+          const userId = newSession.user.id;
+          (async () => {
+            try {
+              const { data: clientData } = await supabase
+                .from("client_profiles")
+                .select("*")
+                .eq("user_id", userId)
+                .maybeSingle();
+              if (clientData) {
+                useAuthStore.getState().setClientProfile(clientData);
+              }
+            } catch (error) {
+              console.error("Error fetching initial client profile:", error);
+            }
+          })();
+        }
+      } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        if (newSession?.user) {
+          try {
+            const { data: clientData } = await supabase
+              .from("client_profiles")
+              .select("*")
+              .eq("user_id", newSession.user.id)
+              .maybeSingle();
+            if (clientData) {
+              useAuthStore.getState().setClientProfile(clientData);
+            }
+          } catch (error) {}
+        }
+        setSession(newSession);
+      } else if (event === "SIGNED_OUT") {
         useAuthStore.getState().setClientProfile(null);
+        setSession(null);
       }
-      setSession(newSession);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+    };
   }, [setSession, setInitialized]);
 
   useEffect(() => {
