@@ -178,7 +178,6 @@ export const GuestHistoryScreen = () => {
                   isDisabled={activeTab === "past"}
                   // Use 'as any' to bypass the strict prop type constraint
                   status={(item.booking_status === "cancelled" ? "Cancelled" : item.status) as any}
-                  hideCallButton={true}
                   onPress={() => navigateToHistoryItem(item)}
                 />
               ))}

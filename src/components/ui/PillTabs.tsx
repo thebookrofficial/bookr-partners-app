@@ -4,7 +4,7 @@
 import React from "react";
 import { ScrollView, TouchableOpacity, StyleSheet, View, ViewStyle, StyleProp } from "react-native";
 import { Text } from "./Text";
-import { hs, vs, ms } from "@/utils/responsive.utils";
+import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
 export interface PillTabsProps {
@@ -73,7 +73,11 @@ export const PillTabs = ({
               onPress={() => onTabChange(tabLabel)}
               style={[baseStyle, isActive ? activeStyle : inactiveStyle]}>
               <View style={styles.tabContent}>
-                <Text variant="body2" weight="semiBold" color={textColor} style={styles.tabText}>
+                <Text
+                  variant="body2"
+                  weight="semiBold"
+                  color={textColor}
+                  style={[styles.tabText, isPrimary && { fontSize: fs(16) }]}>
                   {tabLabel}
                 </Text>
                 {tabCount !== undefined && (
@@ -122,8 +126,8 @@ const styles = StyleSheet.create({
 
   // --- PRIMARY VARIANT (SportsHomeScreen Ground Selector) ---
   primaryPill: {
-    paddingHorizontal: hs(18),
-    height: vs(33),
+    paddingHorizontal: hs(30),
+    height: vs(40),
     borderRadius: ms(25),
     justifyContent: "center",
     alignItems: "center",

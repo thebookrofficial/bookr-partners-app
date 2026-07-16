@@ -298,10 +298,10 @@ const styles = StyleSheet.create({
     width: "100%",
     marginBottom: vs(15),
   },
-  tabText: { textTransform: "capitalize", fontSize: fs(14) },
+  tabText: { textTransform: "capitalize", fontSize: fs(16) },
 
   slot: {
-    height: vs(25),
+    height: vs(34),
     borderRadius: ms(25),
     justifyContent: "center",
     alignItems: "center",

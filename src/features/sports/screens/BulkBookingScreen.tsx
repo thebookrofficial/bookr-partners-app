@@ -230,7 +230,6 @@ export const BulkBookingScreen = () => {
             time={item.timeRange}
             price=""
             status={item.status}
-            hideCallButton={false}
             onPress={() =>
               navigation.navigate("BulkBookingDetails", {
                 bookingId: item.ids[0],

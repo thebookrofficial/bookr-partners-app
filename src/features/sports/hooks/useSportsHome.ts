@@ -76,7 +76,11 @@ const formatCategoryName = (dbName: string) => {
     .join(" ");
 };
 
-export const useSportsHome = (initialVenueId: string, category: string) => {
+export const useSportsHome = (
+  initialVenueId: string,
+  category: string,
+  selectedView: string = "Today Bookings",
+) => {
   const [currentVenueId, setCurrentVenueId] = useState<string>(initialVenueId);
   const [venue, setVenue] = useState<VenueData | null>(null);
   const [grounds, setGrounds] = useState<GroundData[]>([]);
@@ -215,11 +219,20 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     if (!activeGroundId || !currentVenueId) return;
     setBookingsLoading(true);
     try {
-      const localDateString = getLocalDateString(selectedDate);
+      let mode: "exact" | "gt" = "exact";
+      let targetDate = selectedDate;
+
+      if (selectedView === "Upcoming Bookings") {
+        mode = "gt";
+        targetDate = new Date(); // fetch > today
+      }
+
+      const localDateString = getLocalDateString(targetDate);
       const bookingsData = await SportsService.getBookings(
         currentVenueId,
         activeGroundId,
         localDateString,
+        mode,
       );
       const now = new Date();
 
@@ -268,7 +281,6 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             weekday: "short",
             day: "numeric",
             month: "short",
-            year: "numeric",
           });
 
           // DETERMINING OFFLINE VS ONLINE
@@ -402,7 +414,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     } finally {
       setBookingsLoading(false);
     }
-  }, [currentVenueId, activeGroundId, selectedDate, category]);
+  }, [currentVenueId, activeGroundId, selectedDate, category, selectedView]);
 
   useEffect(() => {
     if (initialVenueId) fetchVenueDetails();

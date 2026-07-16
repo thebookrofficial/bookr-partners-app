@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React, { useEffect, useRef } from "react";
-import { View, StyleSheet, TouchableOpacity, Image, Linking, Alert, Animated } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image, Animated } from "react-native";
 import { Text } from "@/components/ui";
 import { Phone, Calendar, Clock } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -18,13 +18,12 @@ interface BookingCardProps {
   status: "Online" | "Offline" | "Settlement";
   avatarUrl?: string;
   isOfflineRecord?: boolean;
-  hideCallButton?: boolean;
   hideDateText?: boolean;
   useClockIcon?: boolean;
   isDisabled?: boolean; // NEW: Triggers the greyed-out state
   isPaymentPending?: boolean; // NEW: Triggers the red blinking text
+  isHighlighted?: boolean;
   onPress?: () => void;
-  onCallPress?: () => void;
 }
 
 export const BookingCard = ({
@@ -36,17 +35,27 @@ export const BookingCard = ({
   price,
   status,
   avatarUrl,
-  hideCallButton = false,
   hideDateText = false,
   useClockIcon = false,
   isDisabled = false,
   isPaymentPending = false,
+  isHighlighted = false,
   onPress,
-  onCallPress,
 }: BookingCardProps) => {
   const textColor = isDisabled ? COLORS.text.secondary : COLORS.text.primary;
   const iconColor = COLORS.text.muted;
-  const cardBg = isDisabled ? "#E0E0E0" : COLORS.surface.primary; // Light grey for disabled state
+  const cardBg = isHighlighted ? "#E8F0FE" : isDisabled ? "#E0E0E0" : COLORS.surface.primary;
+
+  const highlightStyle = isHighlighted
+    ? {
+        borderColor: COLORS.primary,
+        borderWidth: 2,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      }
+    : {};
 
   // Blinking Animation Logic
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -72,24 +81,6 @@ export const BookingCard = ({
     }
   }, [isPaymentPending, fadeAnim]);
 
-  const handleCall = () => {
-    if (onCallPress) {
-      onCallPress();
-      return;
-    }
-
-    if (phone) {
-      const cleanPhone = phone.replace(/[^\d+]/g, "");
-      const url = `tel:${cleanPhone}`;
-
-      Linking.openURL(url).catch(() => {
-        Alert.alert("Error", "Could not open dialer.");
-      });
-    } else {
-      Alert.alert("Notice", "No phone number available for this booking.");
-    }
-  };
-
   const getStatusColor = () => {
     if (isDisabled) return COLORS.text.muted; // Mute status color if past
     if (status === "Offline") return COLORS.danger;
@@ -106,28 +97,39 @@ export const BookingCard = ({
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={onPress}
-      style={[styles.cardContainer, { backgroundColor: cardBg }]}>
+      style={[styles.cardContainer, { backgroundColor: cardBg }, highlightStyle]}>
       <View style={[styles.avatarContainer, isDisabled && styles.avatarDisabled]}>
-        <Image source={{ uri: avatarUrl || "https://placeholder.com/50" }} style={styles.avatar} />
+        <Image
+          source={avatarUrl ? { uri: avatarUrl } : require("@/assets/images/avatar_man.png")}
+          style={styles.avatar}
+        />
       </View>
 
       <View style={styles.rightContent}>
         <View style={styles.topRow}>
           <View style={styles.namePhoneWrapper}>
-            <Text variant="body1" weight="bold" color={textColor}>
+            <Text variant="body1" weight="bold" color={textColor} style={{ fontSize: fs(20) }}>
               {name}
             </Text>
 
             {phone ? (
               <View style={styles.phoneRow}>
                 <Phone size={ms(18)} color={iconColor} fill={iconColor} />
-                <Text variant="body2" weight="medium" color={textColor}>
+                <Text
+                  variant="body2"
+                  weight="medium"
+                  color={textColor}
+                  style={{ fontSize: fs(16) }}>
                   {phone}
                 </Text>
               </View>
             ) : subtitle ? (
               <View style={styles.phoneRow}>
-                <Text variant="body2" weight="medium" color={textColor}>
+                <Text
+                  variant="body2"
+                  weight="medium"
+                  color={textColor}
+                  style={{ fontSize: fs(16) }}>
                   {subtitle}
                 </Text>
               </View>
@@ -141,7 +143,11 @@ export const BookingCard = ({
                   Payment Pending
                 </Animated.Text>
               )}
-              <Text variant="body2" weight="semiBold" color={getPriceColor()}>
+              <Text
+                variant="body2"
+                weight="semiBold"
+                color={getPriceColor()}
+                style={{ fontSize: fs(16) }}>
                 {price}
               </Text>
             </View>
@@ -164,7 +170,11 @@ export const BookingCard = ({
           )}
 
           {!hideDateText && (
-            <Text variant="body2" weight="semiBold" color={textColor} style={styles.dateText}>
+            <Text
+              variant="body2"
+              weight="semiBold"
+              color={textColor}
+              style={[styles.dateText, { fontSize: fs(16) }]}>
               {date}
             </Text>
           )}
@@ -173,24 +183,13 @@ export const BookingCard = ({
             variant="body2"
             weight="semiBold"
             color={textColor}
-            style={[styles.timeText, hideDateText && styles.timeTextExpanded]}>
+            style={[
+              styles.timeText,
+              { fontSize: fs(16) },
+              hideDateText && styles.timeTextExpanded,
+            ]}>
             {time}
           </Text>
-
-          {!hideCallButton && (
-            <TouchableOpacity
-              style={[styles.callButton, isDisabled && styles.callButtonDisabled]}
-              onPress={handleCall}
-              activeOpacity={0.7}>
-              <Text
-                variant="caption"
-                weight="bold"
-                color={isDisabled ? COLORS.text.secondary : COLORS.text.inverse}
-                style={styles.callText}>
-                Call
-              </Text>
-            </TouchableOpacity>
-          )}
         </View>
       </View>
     </TouchableOpacity>

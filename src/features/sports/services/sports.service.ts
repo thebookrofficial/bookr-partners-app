@@ -49,8 +49,13 @@ export const SportsService = {
     return data;
   },
 
-  async getBookings(venueId: string, groundId: string, dateStr: string) {
-    const { data, error } = await supabase
+  async getBookings(
+    venueId: string,
+    groundId: string,
+    dateStr: string,
+    mode: "exact" | "gt" = "exact",
+  ) {
+    let query = supabase
       .from("sports_bookings")
       .select(
         `
@@ -61,8 +66,15 @@ export const SportsService = {
       `,
       )
       .eq("venue_id", venueId)
-      .eq("sports_slots.ground_id", groundId)
-      .eq("sports_slots.slot_date", dateStr);
+      .eq("sports_slots.ground_id", groundId);
+
+    if (mode === "exact") {
+      query = query.eq("sports_slots.slot_date", dateStr);
+    } else {
+      query = query.gt("sports_slots.slot_date", dateStr);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 

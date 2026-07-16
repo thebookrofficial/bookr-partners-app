@@ -2,15 +2,27 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  LayoutAnimation,
+  UIManager,
+  Platform,
+} from "react-native";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs, CustomDatePickerModal } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { LegendIndicator } from "../components/LegendIndicator";
 import { TimeSlotGrid } from "../components/TimeSlotGrid";
 import { BookingCard } from "../components/BookingCard";
-import { Calendar as CalendarIcon, Plus } from "lucide-react-native";
-import { hs, vs, ms } from "@/utils/responsive.utils";
+import { Calendar as CalendarIcon, Plus, ChevronDown, ChevronUp } from "lucide-react-native";
+import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { RouteProp, useNavigation, useRoute, useIsFocused } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -48,6 +60,10 @@ export const SportsHomeScreen = () => {
     }
   }, [routeCategory, serviceId, storedCategory, setServiceCategory]);
 
+  const [selectedView, setSelectedView] = useState<
+    "Today Bookings" | "Upcoming Bookings" | "Bookings"
+  >("Today Bookings");
+
   const {
     venue,
     grounds,
@@ -62,10 +78,12 @@ export const SportsHomeScreen = () => {
     loading,
     availableCategories,
     refresh,
-  } = useSportsHome(serviceId, selectedCategory);
+  } = useSportsHome(serviceId, selectedCategory, selectedView);
 
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [highlightedBookingId, setHighlightedBookingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const shouldReOpenSheet = React.useRef(false);
 
@@ -142,6 +160,8 @@ export const SportsHomeScreen = () => {
         {/* Dropdown action removed, now it functions as a static label */}
         <ServiceHeader
           title={venue?.name || activeVenueName}
+          subtitle="Home"
+          category={selectedCategory}
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
         />
 
@@ -161,15 +181,107 @@ export const SportsHomeScreen = () => {
           </View>
         ) : (
           <>
-            <TouchableOpacity
-              style={styles.dateRow}
-              onPress={() => setIsDatePickerOpen(true)}
-              activeOpacity={0.7}>
-              <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
-                {getFormattedDate(selectedDate)}
-              </Text>
-              <CalendarIcon size={ms(18)} color="#00327B" />
-            </TouchableOpacity>
+            {isDropdownOpen ? (
+              <View style={styles.expandedDateRowContainer}>
+                <View style={styles.expandedDateHeaderRow}>
+                  <TouchableOpacity
+                    style={styles.expandedDateTitle}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      setIsDropdownOpen(false);
+                    }}>
+                    <Text
+                      variant="body1"
+                      weight="bold"
+                      color={COLORS.text.primary}
+                      style={{ fontSize: fs(20) }}>
+                      Bookings
+                    </Text>
+                    <ChevronUp size={ms(20)} color={COLORS.text.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.expandedDateSelector}
+                    activeOpacity={0.7}
+                    onPress={() => setIsDatePickerOpen(true)}>
+                    <Text
+                      variant="body1"
+                      weight="semiBold"
+                      color={COLORS.text.primary}
+                      style={{ fontSize: fs(16) }}>
+                      {getFormattedDate(selectedDate)}
+                    </Text>
+                    <CalendarIcon size={ms(20)} color="#00327B" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.expandedDivider} />
+                <TouchableOpacity
+                  style={styles.expandedDropdownItem}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setSelectedDate(new Date());
+                    setSelectedView("Upcoming Bookings");
+                    setIsDropdownOpen(false);
+                  }}>
+                  <Text
+                    variant="body1"
+                    weight="bold"
+                    color={COLORS.text.primary}
+                    style={{ fontSize: fs(16) }}>
+                    Upcoming Bookings
+                  </Text>
+                  <Text style={styles.expandedPlusIcon}>+</Text>
+                </TouchableOpacity>
+                <View style={styles.expandedDivider} />
+                <TouchableOpacity
+                  style={styles.expandedDropdownItem}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setSelectedDate(new Date());
+                    setSelectedView("Today Bookings");
+                    setIsDropdownOpen(false);
+                  }}>
+                  <Text
+                    variant="body1"
+                    weight="bold"
+                    color={COLORS.text.primary}
+                    style={{ fontSize: fs(16) }}>
+                    Today Bookings
+                  </Text>
+                  <Text style={styles.expandedPlusIcon}>+</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.dateRow}>
+                <TouchableOpacity
+                  style={styles.dateRowLeft}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setIsDropdownOpen(true);
+                  }}>
+                  <Text
+                    variant="body1"
+                    weight="bold"
+                    color={COLORS.text.primary}
+                    style={{ fontSize: fs(18) }}>
+                    {selectedView}
+                  </Text>
+                  <ChevronDown size={ms(20)} color={COLORS.text.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.dateSelector}
+                  onPress={() => setIsDatePickerOpen(true)}
+                  activeOpacity={0.7}>
+                  <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
+                    {getFormattedDate(selectedDate)}
+                  </Text>
+                  <CalendarIcon size={ms(20)} color="#00327B" />
+                </TouchableOpacity>
+              </View>
+            )}
 
             {grounds.length > 0 && (
               <View style={styles.groundTabs}>
@@ -185,35 +297,55 @@ export const SportsHomeScreen = () => {
               </View>
             )}
 
-            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              TIME SLOT
-            </Text>
-            <LegendIndicator />
+            {(selectedView === "Today Bookings" || selectedView === "Bookings") && (
+              <>
+                <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+                  TIME SLOT
+                </Text>
+                <LegendIndicator />
 
-            {slotsLoading ? (
-              <ActivityIndicator size="small" color={COLORS.primary} style={styles.loaderStyle} />
-            ) : slots.length === 0 ? (
-              <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
-                No slots generated for this date/ground yet.
-              </Text>
-            ) : (
-              <TimeSlotGrid
-                slots={slots as any}
-                selectedDate={selectedDate}
-                isNested={
-                  selectedCategory === "Pickleball" &&
-                  slots.some((s: any) => s.duration_minutes === 30)
-                }
-                onSlotPress={_slot => {}}
-              />
+                {slotsLoading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={COLORS.primary}
+                    style={styles.loaderStyle}
+                  />
+                ) : slots.length === 0 ? (
+                  <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
+                    No slots generated for this date/ground yet.
+                  </Text>
+                ) : (
+                  <TimeSlotGrid
+                    slots={slots as any}
+                    selectedDate={selectedDate}
+                    isNested={
+                      selectedCategory === "Pickleball" &&
+                      slots.some((s: any) => s.duration_minutes === 30)
+                    }
+                    onSlotPress={slot => {
+                      if (slot.status === "booked" || slot.status === "blocked") {
+                        if (!slot.raw_start_time) return; // Prevent TS undefined error
+                        const foundBooking = bookings.find(b => {
+                          if (!b.startTimeRaw || !b.endTimeRaw) return false;
+                          // Non-null assertion (!) is safe here since we just checked
+                          return (
+                            slot.raw_start_time! >= b.startTimeRaw &&
+                            slot.raw_start_time! < b.endTimeRaw
+                          );
+                        });
+
+                        if (foundBooking) {
+                          setHighlightedBookingId(foundBooking.id);
+                          setTimeout(() => setHighlightedBookingId(null), 3000);
+                        }
+                      }
+                    }}
+                  />
+                )}
+              </>
             )}
 
-            <Text
-              variant="body1"
-              weight="bold"
-              style={[styles.sectionTitle, { marginTop: vs(24) }]}>
-              BOOKINGS
-            </Text>
+            {/* Bookings Title Removed per Figma */}
 
             <View style={styles.bookingsContainer}>
               {bookingsLoading ? (
@@ -223,22 +355,32 @@ export const SportsHomeScreen = () => {
                   No bookings found for this date.
                 </Text>
               ) : (
-                bookings.map(booking => (
-                  <BookingCard
-                    key={booking.id}
-                    name={booking.name}
-                    phone={booking.phone}
-                    date={booking.date}
-                    time={booking.time}
-                    price={booking.price}
-                    status={booking.status}
-                    avatarUrl={booking.avatarUrl}
-                    isOfflineRecord={booking.isOfflineRecord}
-                    isDisabled={booking.isDisabled}
-                    isPaymentPending={booking.isPaymentPending}
-                    onPress={() => navigation.navigate("BookingDetails", { bookingId: booking.id })}
-                  />
-                ))
+                <>
+                  {(selectedView === "Upcoming Bookings" || selectedView === "Bookings") && (
+                    <Text variant="body2" weight="bold" style={styles.dateGroupHeader}>
+                      {getFormattedDate(selectedDate)}
+                    </Text>
+                  )}
+                  {bookings.map(booking => (
+                    <BookingCard
+                      key={booking.id}
+                      name={booking.name}
+                      phone={booking.phone}
+                      date={booking.date}
+                      time={booking.time}
+                      price={booking.price}
+                      status={booking.status}
+                      avatarUrl={booking.avatarUrl}
+                      isOfflineRecord={booking.isOfflineRecord}
+                      isDisabled={booking.isDisabled}
+                      isPaymentPending={booking.isPaymentPending}
+                      isHighlighted={highlightedBookingId === booking.id}
+                      onPress={() =>
+                        navigation.navigate("BookingDetails", { bookingId: booking.id })
+                      }
+                    />
+                  ))}
+                </>
               )}
             </View>
           </>
@@ -278,7 +420,11 @@ export const SportsHomeScreen = () => {
         isVisible={isDatePickerOpen}
         onClose={() => setIsDatePickerOpen(false)}
         selectedDate={selectedDate}
-        onSelectDate={setSelectedDate}
+        onSelectDate={date => {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setSelectedDate(date);
+          setSelectedView("Bookings");
+        }}
       />
     </View>
   );
@@ -297,13 +443,70 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: vs(12),
-    paddingHorizontal: hs(12),
+    paddingVertical: vs(10),
+    paddingHorizontal: hs(10),
     marginBottom: vs(10),
-    borderRadius: ms(12),
-    backgroundColor: "rgba(99, 161, 253, 0.08)",
+    borderRadius: ms(10),
+    backgroundColor: "#F4F7FC",
   },
-  groundTabs: { marginTop: -vs(10), marginBottom: vs(10) },
+  dateRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(8),
+  },
+  dateSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+  },
+  groundTabs: {
+    marginBottom: vs(15),
+  },
+  expandedDateRowContainer: {
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(9),
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(14),
+    marginBottom: vs(15),
+    width: "100%",
+  },
+  expandedDateHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: vs(10),
+  },
+  expandedDateTitle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(8),
+  },
+  expandedDateSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+  },
+  expandedDivider: {
+    height: 1,
+    backgroundColor: "#E5E5E5",
+    width: "100%",
+  },
+  expandedDropdownItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: vs(12),
+  },
+  expandedPlusIcon: {
+    fontSize: fs(24),
+    fontWeight: "600",
+    color: COLORS.text.primary,
+  },
+  dateGroupHeader: {
+    marginTop: vs(5),
+    marginBottom: vs(10),
+    fontSize: fs(14),
+  },
   emptySlotsText: { textAlign: "center", marginVertical: vs(20) },
   loaderStyle: { marginVertical: vs(20) },
   sectionTitle: { textTransform: "uppercase", marginBottom: vs(6) },
