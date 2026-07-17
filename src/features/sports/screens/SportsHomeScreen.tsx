@@ -58,7 +58,7 @@ export const SportsHomeScreen = () => {
     if (routeCategory && routeCategory !== storedCategory) {
       setServiceCategory(serviceId, routeCategory);
     }
-  }, [routeCategory, serviceId, storedCategory, setServiceCategory]);
+  }, [routeCategory, storedCategory, serviceId, setServiceCategory]);
 
   const [selectedView, setSelectedView] = useState<
     "Today Bookings" | "Upcoming Bookings" | "Bookings"
@@ -79,6 +79,14 @@ export const SportsHomeScreen = () => {
     availableCategories,
     refresh,
   } = useSportsHome(serviceId, selectedCategory, selectedView);
+
+  // Handle incoming targetDate for navigation redirects (e.g. from Reschedule/Repeat)
+  useEffect(() => {
+    if (route.params?.targetDate) {
+      setSelectedDate(new Date(route.params.targetDate));
+      navigation.setParams({ targetDate: undefined } as any);
+    }
+  }, [route.params?.targetDate, setSelectedDate, navigation]);
 
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -165,7 +173,9 @@ export const SportsHomeScreen = () => {
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
         />
 
-        {loading ? (
+        {loading ||
+        (slotsLoading && slots.length === 0) ||
+        (bookingsLoading && bookings.length === 0) ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
@@ -304,7 +314,7 @@ export const SportsHomeScreen = () => {
                 </Text>
                 <LegendIndicator />
 
-                {slotsLoading ? (
+                {slotsLoading && slots.length > 0 ? (
                   <ActivityIndicator
                     size="small"
                     color={COLORS.primary}
@@ -348,7 +358,7 @@ export const SportsHomeScreen = () => {
             {/* Bookings Title Removed per Figma */}
 
             <View style={styles.bookingsContainer}>
-              {bookingsLoading ? (
+              {bookingsLoading && bookings.length > 0 ? (
                 <ActivityIndicator size="small" color={COLORS.primary} style={styles.loaderStyle} />
               ) : bookings.length === 0 ? (
                 <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>

@@ -182,6 +182,7 @@ export const OfflineBookingSheet = ({
   const [name, setName] = useState("");
   const [totalPayment, setTotalPayment] = useState("");
   const [advancePaid, setAdvancePaid] = useState("");
+  const [isAdvanceFocused, setIsAdvanceFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasHistory, setHasHistory] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
@@ -640,9 +641,13 @@ export const OfflineBookingSheet = ({
                       isInput={true}
                       keyboardType="numeric"
                       onFocus={() => {
+                        setIsAdvanceFocused(true);
                         if (advancePaid === "0" || advancePaid === "0.00") {
                           setAdvancePaid("");
                         }
+                      }}
+                      onBlur={() => {
+                        setIsAdvanceFocused(false);
                       }}
                       onChangeText={(text: string) => {
                         const clean = text.replace(/[^\d.]/g, "");
@@ -660,109 +665,111 @@ export const OfflineBookingSheet = ({
                 </View>
 
                 {/* Inline Payment Method Selection */}
-                <View style={{ marginTop: vs(10), marginBottom: vs(-10) }}>
-                  <Text variant="body2" weight="bold" style={styles.inputLabel}>
-                    Payment Method
-                  </Text>
-                  <View style={styles.methodsRow}>
-                    {/* Cash */}
-                    <TouchableOpacity
-                      style={[
-                        styles.methodBox,
-                        selectedMethod === "cash" && styles.methodBoxSelectedBlue,
-                      ]}
-                      onPress={() => setSelectedMethod("cash")}>
-                      <Image
-                        source={icCash}
+                {(isAdvanceFocused || parseFloat(advancePaid) > 0) && (
+                  <View style={{ marginTop: vs(10), marginBottom: vs(-10) }}>
+                    <Text variant="body2" weight="bold" style={styles.inputLabel}>
+                      Payment Method
+                    </Text>
+                    <View style={styles.methodsRow}>
+                      {/* Cash */}
+                      <TouchableOpacity
                         style={[
-                          styles.methodIcon,
-                          selectedMethod === "cash" && styles.methodIconSelected,
+                          styles.methodBox,
+                          selectedMethod === "cash" && styles.methodBoxSelectedBlue,
                         ]}
-                      />
-                      <Text
-                        variant="body2"
-                        weight="bold"
+                        onPress={() => setSelectedMethod("cash")}>
+                        <Image
+                          source={icCash}
+                          style={[
+                            styles.methodIcon,
+                            selectedMethod === "cash" && styles.methodIconSelected,
+                          ]}
+                        />
+                        <Text
+                          variant="body2"
+                          weight="bold"
+                          style={[
+                            styles.methodText,
+                            selectedMethod === "cash" && styles.methodTextSelected,
+                          ]}>
+                          Cash
+                        </Text>
+                      </TouchableOpacity>
+                      {/* GPay */}
+                      <TouchableOpacity
                         style={[
-                          styles.methodText,
-                          selectedMethod === "cash" && styles.methodTextSelected,
-                        ]}>
-                        Cash
-                      </Text>
-                    </TouchableOpacity>
-                    {/* GPay */}
-                    <TouchableOpacity
-                      style={[
-                        styles.methodBox,
-                        selectedMethod === "gpay" && styles.methodBoxSelectedBlue,
-                      ]}
-                      onPress={() => setSelectedMethod("gpay")}>
-                      <Image
-                        source={icGpay}
-                        style={[
-                          styles.methodIcon,
-                          selectedMethod === "gpay" && styles.methodIconSelected,
+                          styles.methodBox,
+                          selectedMethod === "gpay" && styles.methodBoxSelectedBlue,
                         ]}
-                      />
-                      <Text
-                        variant="body2"
-                        weight="bold"
+                        onPress={() => setSelectedMethod("gpay")}>
+                        <Image
+                          source={icGpay}
+                          style={[
+                            styles.methodIcon,
+                            selectedMethod === "gpay" && styles.methodIconSelected,
+                          ]}
+                        />
+                        <Text
+                          variant="body2"
+                          weight="bold"
+                          style={[
+                            styles.methodText,
+                            selectedMethod === "gpay" && styles.methodTextSelected,
+                          ]}>
+                          GPay
+                        </Text>
+                      </TouchableOpacity>
+                      {/* PhonePe */}
+                      <TouchableOpacity
                         style={[
-                          styles.methodText,
-                          selectedMethod === "gpay" && styles.methodTextSelected,
-                        ]}>
-                        GPay
-                      </Text>
-                    </TouchableOpacity>
-                    {/* PhonePe */}
-                    <TouchableOpacity
-                      style={[
-                        styles.methodBox,
-                        selectedMethod === "phonepe" && styles.methodBoxSelectedBlue,
-                      ]}
-                      onPress={() => setSelectedMethod("phonepe")}>
-                      <Image
-                        source={icPhonepe}
-                        style={[
-                          styles.methodIcon,
-                          selectedMethod === "phonepe" && styles.methodIconSelected,
+                          styles.methodBox,
+                          selectedMethod === "phonepe" && styles.methodBoxSelectedBlue,
                         ]}
-                      />
-                      <Text
-                        variant="body2"
-                        weight="bold"
+                        onPress={() => setSelectedMethod("phonepe")}>
+                        <Image
+                          source={icPhonepe}
+                          style={[
+                            styles.methodIcon,
+                            selectedMethod === "phonepe" && styles.methodIconSelected,
+                          ]}
+                        />
+                        <Text
+                          variant="body2"
+                          weight="bold"
+                          style={[
+                            styles.methodText,
+                            selectedMethod === "phonepe" && styles.methodTextSelected,
+                          ]}>
+                          PhonePe
+                        </Text>
+                      </TouchableOpacity>
+                      {/* Paytm */}
+                      <TouchableOpacity
                         style={[
-                          styles.methodText,
-                          selectedMethod === "phonepe" && styles.methodTextSelected,
-                        ]}>
-                        PhonePe
-                      </Text>
-                    </TouchableOpacity>
-                    {/* Paytm */}
-                    <TouchableOpacity
-                      style={[
-                        styles.methodBox,
-                        selectedMethod === "paytm" && styles.methodBoxSelectedBlue,
-                      ]}
-                      onPress={() => setSelectedMethod("paytm")}>
-                      <Image
-                        source={icPaytm}
-                        style={[
-                          styles.methodIcon,
-                          selectedMethod === "paytm" && styles.methodIconSelected,
+                          styles.methodBox,
+                          selectedMethod === "paytm" && styles.methodBoxSelectedBlue,
                         ]}
-                      />
-                      <Text
-                        variant="body2"
-                        weight="bold"
-                        style={[
-                          styles.methodText,
-                          selectedMethod === "paytm" && styles.methodTextSelected,
-                        ]}>
-                        Paytm
-                      </Text>
-                    </TouchableOpacity>
+                        onPress={() => setSelectedMethod("paytm")}>
+                        <Image
+                          source={icPaytm}
+                          style={[
+                            styles.methodIcon,
+                            selectedMethod === "paytm" && styles.methodIconSelected,
+                          ]}
+                        />
+                        <Text
+                          variant="body2"
+                          weight="bold"
+                          style={[
+                            styles.methodText,
+                            selectedMethod === "paytm" && styles.methodTextSelected,
+                          ]}>
+                          Paytm
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
+                )}
 
                 {hasHistory && (
                   <TouchableOpacity

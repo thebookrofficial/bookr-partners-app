@@ -204,6 +204,10 @@ export const SportsService = {
     bookingSource: string;
     sportsBookingType: string;
     slotDurationMinutes?: number;
+    notesOverride?: string;
+    bookingGroupIdOverride?: string | null;
+    isRescheduled?: boolean;
+    originalBookingId?: string | null;
   }) {
     const [startH, startM] = params.startTime24.split(":").map(Number);
     const [endH, endM] = params.endTime24.split(":").map(Number);
@@ -232,9 +236,7 @@ export const SportsService = {
 
     const bookingGroupId = isMultiSlot ? generateUUID() : null;
     const firstBookingId = generateUUID();
-    const bookingsToInsert: any[] = [];
-
-    for (let i = 0; i < totalSlots; i++) {
+    const slotPromises = Array.from({ length: totalSlots }).map(async (_, i) => {
       const currentStartM = startTotalM + i * slotDuration;
       const currentEndM = currentStartM + slotDuration;
 
@@ -277,7 +279,20 @@ export const SportsService = {
           .single();
 
         if (foundSlot && foundSlot.status !== "available") {
-          throw new Error(`Slot ${currentStart} is already taken or blocked.`);
+          const format12H = (t: string) => {
+            const [hStr, mStr] = t.split(":");
+            const h = parseInt(hStr, 10);
+            const m = parseInt(mStr, 10);
+            const ampm = h >= 12 ? "PM" : "AM";
+            const displayH = h % 12 || 12;
+            const displayM = m === 0 ? "" : `:${m.toString().padStart(2, "0")}`;
+            return `${displayH}${displayM} ${ampm}`;
+          };
+          throw new Error(
+            `The time slot from ${format12H(currentStart)} to ${format12H(
+              currentEnd,
+            )} is already booked.`,
+          );
         }
         slotId = foundSlot?.id;
 
@@ -295,29 +310,41 @@ export const SportsService = {
 
       if (!slotId) throw new Error(`Could not resolve slot for ${currentStart}`);
 
-      bookingsToInsert.push({
-        id: i === 0 ? firstBookingId : generateUUID(),
-        user_id: null,
-        guest_name: params.guestName,
-        guest_phone: params.guestPhone,
-        venue_id: params.venueId,
-        slot_id: slotId,
-        booking_status: "confirmed",
-        subtotal: hourlyPrice,
-        discount_amount: 0,
-        platform_fee: 0,
-        gateway_fee: 0,
-        total_amount: hourlyPrice,
-        vendor_payout: hourlyPrice,
-        paid_amount: hourlyAdvance,
-        booking_source: params.bookingSource,
-        sports_booking_type: finalBookingType,
-        booking_group_id: bookingGroupId,
-        parent_booking_id: i === 0 ? null : firstBookingId,
-        sequence_number: i + 1,
-        notes: `Manual Offline Booking ${isMultiSlot ? `(Slot ${i + 1}/${totalSlots})` : ""}`,
-      });
-    }
+      return { slotId, i };
+    });
+
+    // Run all slot inserts/updates concurrently to drastically reduce loading time
+    const resolvedSlots = await Promise.all(slotPromises);
+
+    const bookingsToInsert = resolvedSlots.map(({ slotId, i }) => ({
+      id: i === 0 ? firstBookingId : generateUUID(),
+      user_id: null,
+      guest_name: params.guestName,
+      guest_phone: params.guestPhone,
+      venue_id: params.venueId,
+      slot_id: slotId,
+      booking_status: "confirmed",
+      subtotal: hourlyPrice,
+      discount_amount: 0,
+      platform_fee: 0,
+      gateway_fee: 0,
+      total_amount: hourlyPrice,
+      vendor_payout: hourlyPrice,
+      paid_amount: hourlyAdvance,
+      booking_source: params.bookingSource,
+      sports_booking_type: finalBookingType,
+      booking_group_id:
+        params.bookingGroupIdOverride !== undefined
+          ? params.bookingGroupIdOverride
+          : bookingGroupId,
+      parent_booking_id: i === 0 ? null : firstBookingId,
+      sequence_number: i + 1,
+      notes:
+        params.notesOverride ||
+        `Manual Offline Booking ${isMultiSlot ? `(Slot ${i + 1}/${totalSlots})` : ""}`,
+      is_rescheduled: params.isRescheduled || false,
+      original_booking_id: params.originalBookingId || null,
+    }));
 
     const { error: bookingError } = await supabase.from("sports_bookings").insert(bookingsToInsert);
 
@@ -404,18 +431,9 @@ export const SportsService = {
           oldSlotIds.push(b.slot_id);
           totalPreviousPaid += Number(b.paid_amount || 0);
         }
-
-        // 3. Mark old bookings as rescheduled (or cancelled)
-        await supabase
-          .from("sports_bookings")
-          .update({ booking_status: "rescheduled" })
-          .in("id", oldBookingIds);
-
-        // 4. Free up the old slots
-        await supabase.from("sports_slots").update({ status: "available" }).in("id", oldSlotIds);
       }
 
-      // 5. Convert times to 24-hour format for createOfflineBooking
+      // 3. Pre-check slot availability before cancelling the old ones!
       const parseTime = (timeStr: string) => {
         const timeMatch = timeStr.match(/^(\d+)(?::(\d+))?\s*(AM|PM)?/i);
         if (!timeMatch) return "00:00";
@@ -429,6 +447,68 @@ export const SportsService = {
 
       const startTime24 = parseTime(params.fromTime);
       const endTime24 = parseTime(params.toTime);
+
+      const [startH, startM] = startTime24.split(":").map(Number);
+      const [endH, endM] = endTime24.split(":").map(Number);
+      const startTotalM = startH * 60 + startM;
+      const endTotalM = endH * 60 + endM;
+      const slotDuration = params.slotDurationMinutes || 60;
+      const totalSlots = (endTotalM - startTotalM) / slotDuration;
+
+      const newStartTimes = Array.from({ length: totalSlots }).map((_, i) => {
+        const currentM = startTotalM + i * slotDuration;
+        const sh = Math.floor(currentM / 60);
+        const sm = currentM % 60;
+        return `${sh.toString().padStart(2, "0")}:${sm.toString().padStart(2, "0")}:00`;
+      });
+
+      const { data: existingSlots } = await supabase
+        .from("sports_slots")
+        .select("id, start_time, status")
+        .eq("venue_id", params.venueId)
+        .eq("ground_id", params.groundId)
+        .eq("slot_date", params.dateStr)
+        .in("start_time", newStartTimes);
+
+      if (existingSlots) {
+        for (const slot of existingSlots) {
+          if (slot.status !== "available" && !oldSlotIds.includes(slot.id)) {
+            const format12H = (t: string) => {
+              const [hStr, mStr] = t.split(":");
+              const h = parseInt(hStr, 10);
+              const m = parseInt(mStr, 10);
+              const ampm = h >= 12 ? "PM" : "AM";
+              const displayH = h % 12 || 12;
+              const displayM = m === 0 ? "" : `:${m.toString().padStart(2, "0")}`;
+              return `${displayH}${displayM} ${ampm}`;
+            };
+            const cm =
+              parseInt(slot.start_time.split(":")[0]) * 60 +
+              parseInt(slot.start_time.split(":")[1]);
+            const em = cm + slotDuration;
+            const endHStr = Math.floor(em / 60)
+              .toString()
+              .padStart(2, "0");
+            const endMStr = (em % 60).toString().padStart(2, "0");
+            throw new Error(
+              `The time slot from ${format12H(slot.start_time)} to ${format12H(
+                `${endHStr}:${endMStr}:00`,
+              )} is already booked.`,
+            );
+          }
+        }
+      }
+
+      if (oldBookings && oldBookings.length > 0) {
+        // 4. Mark old bookings and free up slots concurrently
+        await Promise.all([
+          supabase
+            .from("sports_bookings")
+            .update({ booking_status: "rescheduled" })
+            .in("id", oldBookingIds),
+          supabase.from("sports_slots").update({ status: "available" }).in("id", oldSlotIds),
+        ]);
+      }
 
       // 6. Create the new booking using the exact same flow as offline bookings
       await this.createOfflineBooking({
@@ -445,6 +525,10 @@ export const SportsService = {
         bookingSource: oldBooking.booking_source || "vendor_app",
         sportsBookingType: oldBooking.sports_booking_type || "standard",
         slotDurationMinutes: params.slotDurationMinutes,
+        bookingGroupIdOverride: oldBooking.booking_group_id || oldBooking.id,
+        notesOverride: `Rescheduled from Booking ID: ${oldBooking.id}`,
+        isRescheduled: true,
+        originalBookingId: oldBooking.id,
       });
 
       return true;

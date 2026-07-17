@@ -25,8 +25,6 @@ import { MainStackParamList } from "@/navigation/navigation.types";
 import { Calendar as CalendarPicker } from "react-native-calendars";
 import { TimePickerModal } from "../components/TimePickerModal";
 import { SportsService } from "../services/sports.service";
-import { TimeSlotGrid } from "../components/TimeSlotGrid";
-import { LegendIndicator } from "../components/LegendIndicator";
 import { useBookingDetails } from "../hooks/useBookingDetails";
 import { generateTimeSlots } from "../utils/time.utils";
 
@@ -52,9 +50,6 @@ export const RescheduleBookingScreen = () => {
   const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
   const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId);
 
-  const [slots, setSlots] = useState<any[]>([]);
-  const [isFetchingSlots, setIsFetchingSlots] = useState(false);
-
   const HOURS = useMemo(
     () => generateTimeSlots(6, 24, pricing.slotDurationMinutes),
     [pricing.slotDurationMinutes],
@@ -71,37 +66,6 @@ export const RescheduleBookingScreen = () => {
     };
     fetchGrounds();
   }, [venueId, groundId]);
-
-  useEffect(() => {
-    const fetchSlotsData = async () => {
-      if (!selectedGroundId) return;
-      setIsFetchingSlots(true);
-      try {
-        const dateStr = getLocalISODate(rescheduleDate);
-        const data = await SportsService.getSlots(venueId, selectedGroundId, dateStr);
-        const formattedSlots = (data || []).map((slot: any) => {
-          const isManualBooking = slot.sports_bookings?.some(
-            (b: any) =>
-              b.booking_status !== "cancelled" &&
-              b.booking_status !== "refunded" &&
-              b.booking_source !== "online" &&
-              b.booking_source !== "app",
-          );
-          return {
-            ...slot,
-            raw_start_time: slot.start_time,
-            isManualBooking,
-          };
-        });
-        setSlots(formattedSlots);
-      } catch (err) {
-        console.error("Failed to fetch slots:", err);
-      } finally {
-        setIsFetchingSlots(false);
-      }
-    };
-    fetchSlotsData();
-  }, [rescheduleDate, selectedGroundId, venueId]);
 
   const getFormattedDate = (date: Date) => {
     return date
@@ -228,10 +192,19 @@ export const RescheduleBookingScreen = () => {
         addAmount: Number(advanceAmount),
         slotDurationMinutes: pricing.slotDurationMinutes,
       });
-      Alert.alert("Success", "Booking rescheduled successfully!");
-      navigation.goBack();
+      Alert.alert("Success", "Booking rescheduled successfully!", [
+        {
+          text: "OK",
+          onPress: () => {
+            navigation.navigate("SportsServiceTabs" as any, {
+              screen: "SportsHome",
+              params: { targetDate: rescheduleDate.toISOString() },
+            });
+          },
+        },
+      ]);
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to reschedule booking");
+      Alert.alert("Slot Unavailable", err.message || "Failed to reschedule booking");
     } finally {
       setIsRescheduling(false);
     }
@@ -319,43 +292,6 @@ export const RescheduleBookingScreen = () => {
                 );
               })}
             </ScrollView>
-          </View>
-
-          {/* Time Slot Grid */}
-          <View style={[styles.section, { paddingHorizontal: 0 }]}>
-            <Text
-              variant="body1"
-              weight="bold"
-              style={[styles.sectionTitle, { marginLeft: hs(10) }]}>
-              TIME SLOT
-            </Text>
-            <View style={{ marginLeft: hs(10) }}>
-              <LegendIndicator />
-            </View>
-
-            {isFetchingSlots ? (
-              <ActivityIndicator
-                size="small"
-                color={COLORS.primary}
-                style={{ marginTop: vs(20) }}
-              />
-            ) : slots.length === 0 ? (
-              <Text
-                variant="body2"
-                color={COLORS.text.secondary}
-                style={{ marginTop: vs(10), marginLeft: hs(10) }}>
-                No slots generated for this date/ground yet.
-              </Text>
-            ) : (
-              <View style={{ marginTop: vs(10), paddingHorizontal: hs(10) }}>
-                <TimeSlotGrid
-                  slots={slots as any}
-                  selectedDate={rescheduleDate}
-                  isNested={pricing.slotDurationMinutes === 30}
-                  onSlotPress={() => {}}
-                />
-              </View>
-            )}
           </View>
 
           {/* Select Time */}

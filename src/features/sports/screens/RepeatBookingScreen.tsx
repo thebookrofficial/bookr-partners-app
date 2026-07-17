@@ -214,10 +214,19 @@ export const RepeatBookingScreen = () => {
         slotDurationMinutes: pricing.slotDurationMinutes,
       });
 
-      Alert.alert("Success", "Booking repeated successfully!");
-      navigation.goBack();
+      Alert.alert("Success", "Booking repeated successfully!", [
+        {
+          text: "OK",
+          onPress: () => {
+            navigation.navigate("SportsServiceTabs" as any, {
+              screen: "SportsHome",
+              params: { targetDate: repeatDate.toISOString() },
+            });
+          },
+        },
+      ]);
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to repeat booking");
+      Alert.alert("Slot Unavailable", err.message || "Failed to repeat booking");
     } finally {
       setIsRepeating(false);
     }

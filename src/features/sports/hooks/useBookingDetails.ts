@@ -210,10 +210,23 @@ export const useBookingDetails = (bookingId: string) => {
       }
 
       const vertical = booking?.venues?.vertical || "sports";
-
       const dbPaymentMode = mode === "online" ? "upi" : mode;
 
-      // Log payment against the main booking ID
+      // 1. Optimistically update UI
+      const optimisticLog: PaymentLog = {
+        id: `temp-${Date.now()}`,
+        amount,
+        payment_mode: dbPaymentMode as any,
+        note: note || "",
+        created_at: new Date().toISOString(),
+      };
+      setPaymentLogs(prev => [...prev, optimisticLog]);
+      setBooking(prev => {
+        if (!prev) return prev;
+        return { ...prev, paid_amount: Number(prev.paid_amount) + amount };
+      });
+
+      // 2. Perform backend mutation
       const { error } = await supabase.functions.invoke("log-offline-payment", {
         body: {
           bookingId: bookingId,
@@ -225,10 +238,21 @@ export const useBookingDetails = (bookingId: string) => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Rollback on error
+        setPaymentLogs(prev => prev.filter(l => l.id !== optimisticLog.id));
+        setBooking(prev => {
+          if (!prev) return prev;
+          return { ...prev, paid_amount: Number(prev.paid_amount) - amount };
+        });
+        throw error;
+      }
 
-      Alert.alert("Success", "Payment logged successfully.");
-      await fetchDetails();
+      // Do not block UI with an alert on success for a faster feel, or keep it if needed.
+      // Alert.alert("Success", "Payment logged successfully.");
+
+      // Re-fetch to ensure sync (runs silently in background without blocking UI)
+      fetchDetails();
       return true;
     } catch (error: any) {
       Alert.alert("Payment Failed", error.message);
@@ -248,13 +272,30 @@ export const useBookingDetails = (bookingId: string) => {
         throw new Error("You must be logged in to remove a payment.");
       }
 
+      const logToRemove = paymentLogs.find(l => l.id === logId);
+      const amountToRemove = logToRemove ? Number(logToRemove.amount) : 0;
+
+      // 1. Optimistic Update
+      setPaymentLogs(prev => prev.filter(l => l.id !== logId));
+      if (amountToRemove > 0) {
+        setBooking(prev => {
+          if (!prev) return prev;
+          return { ...prev, paid_amount: Math.max(0, Number(prev.paid_amount) - amountToRemove) };
+        });
+      }
+
+      // 2. Backend Mutation
       const { error } = await supabase.functions.invoke("remove-offline-payment", {
         body: { logId },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Rollback
+        await fetchDetails();
+        throw error;
+      }
 
-      await fetchDetails();
+      fetchDetails();
       return true;
     } catch (error: any) {
       Alert.alert("Remove Payment Failed", error.message);
@@ -268,6 +309,12 @@ export const useBookingDetails = (bookingId: string) => {
     if (!booking) return false;
     setIsSaving(true);
     try {
+      // 1. Optimistic Update
+      setBooking(prev => {
+        if (!prev) return prev;
+        return { ...prev, booking_status: "cancelled" };
+      });
+
       // Cancel ALL bookings in the chain
       const { error: bookingError } = await supabase
         .from("sports_bookings")
@@ -275,6 +322,8 @@ export const useBookingDetails = (bookingId: string) => {
         .in("id", booking.idChain);
 
       if (bookingError) {
+        // Rollback
+        await fetchDetails();
         console.error("Booking Cancellation Error:", bookingError);
         throw new Error("You do not have permission to cancel this booking.");
       }
