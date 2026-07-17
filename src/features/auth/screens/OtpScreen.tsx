@@ -47,6 +47,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
   useEffect(() => {
     if (code.length === OTP_LENGTH && !hasSubmitted.current) {
       hasSubmitted.current = true;
+      (globalThis as any).otpSubmitTime = Date.now(); // PERFORMANCE TRACKING
       verifyOtpCode(email, code);
     } else if (code.length < OTP_LENGTH) {
       hasSubmitted.current = false;
@@ -64,6 +65,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
 
   const handleLoginPress = () => {
     if (code.length === OTP_LENGTH) {
+      (globalThis as any).otpSubmitTime = Date.now(); // PERFORMANCE TRACKING
       verifyOtpCode(email, code);
     }
   };

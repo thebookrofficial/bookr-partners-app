@@ -84,7 +84,7 @@ import { SportsInvoiceScreen } from "@/features/sports/screens/SportsInvoiceScre
 
 import { COLORS } from "@/constants/theme";
 
-import { useAuthStore } from "@/store";
+import { useAuthStore, useServiceStore } from "@/store";
 import { SplashScreen } from "@/screens/SplashScreen";
 import { vs, ms, fs, hs } from "@/utils/responsive.utils";
 
@@ -363,49 +363,100 @@ const AuthNavigator = () => (
   </AuthStack.Navigator>
 );
 
-const MainNavigator = () => (
-  <MainStack.Navigator screenOptions={{ headerShown: false }}>
-    <MainStack.Screen name="VendorProfile" component={VendorProfileScreen} />
-    <MainStack.Screen name="Settings" component={SettingsScreen} />
-    <MainStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-    <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
-    <MainStack.Screen name="StaffManagement" component={StaffManagementScreen} />
-    <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
-    <MainStack.Screen name="EditStaff" component={EditStaffScreen} />
-    <MainStack.Screen name="LegalView" component={LegalViewScreen} />
-    <MainStack.Screen name="SportsServiceTabs" component={SportsTabNavigator} />
-    <MainStack.Screen name="DineServiceTabs" component={DineTabNavigator} />
-    <MainStack.Screen name="StaycationServiceTabs" component={StaycationTabNavigator} />
-    <MainStack.Screen name="EventServiceTabs" component={EventTabNavigator} />
-    <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
-    <MainStack.Screen name="StaycationBookingDetails" component={StaycationBookingDetailsScreen} />
-    <MainStack.Screen name="StaycationInvoice" component={StaycationInvoiceScreen} />
-    <MainStack.Screen name="StaycationOffers" component={StaycationOffersScreen} />
-    <MainStack.Screen name="DineBookingDetails" component={DineBookingDetailsScreen} />
-    <MainStack.Screen name="DinePaymentDetails" component={DinePaymentDetailsScreen} />
-    <MainStack.Screen name="DineCloseDate" component={DineCloseDateScreen} />
-    <MainStack.Screen name="DineOffers" component={DineOffersScreen} />
-    <MainStack.Screen name="EventOffers" component={EventOffersScreen} />
-    <MainStack.Screen name="EventGuestInvite" component={EventGuestInviteScreen} />
-    <MainStack.Screen name="EventExportBookings" component={EventExportBookingsScreen} />
-    <MainStack.Screen name="EventEntryDetails" component={EventEntryDetailsScreen} />
+const MainNavigator = () => {
+  const { lastSelectedService, hasNavigatedInitially, setHasNavigatedInitially } =
+    useServiceStore();
 
-    <MainStack.Screen name="EventScanConfirmation" component={EventScanConfirmationScreen} />
-    <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />
-    <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
-    <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />
-    <MainStack.Screen name="BulkBookingDetails" component={BulkBookingDetailsScreen} />
-    <MainStack.Screen name="RescheduleBooking" component={RescheduleBookingScreen} />
-    <MainStack.Screen name="RepeatBooking" component={RepeatBookingScreen} />
-    <MainStack.Screen name="Payouts" component={PayoutsScreen} />
+  let initialRouteName: keyof MainStackParamList = "VendorProfile";
+  let initialParams: any;
 
-    <MainStack.Screen name="PayoutDetails" component={PayoutDetailsScreen} />
-    <MainStack.Screen name="SportsInvoice" component={SportsInvoiceScreen} />
-    <MainStack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
-    <MainStack.Screen name="AcceptInvite" component={AcceptInviteScreen} />
-    <MainStack.Screen name="FAQ" component={FAQScreen} />
-  </MainStack.Navigator>
-);
+  if (!hasNavigatedInitially && lastSelectedService) {
+    const { vertical, serviceId, category } = lastSelectedService;
+    if (vertical === "sports") {
+      initialRouteName = "SportsServiceTabs";
+      initialParams = { screen: "SportsHome", params: { serviceId, category } };
+    } else if (vertical === "dining") {
+      initialRouteName = "DineServiceTabs";
+      initialParams = { screen: "DineHome", params: { serviceId } };
+    } else if (vertical === "staycation") {
+      initialRouteName = "StaycationServiceTabs";
+      initialParams = { screen: "StaycationHome", params: { serviceId } };
+    } else if (vertical === "events") {
+      initialRouteName = "EventServiceTabs";
+      initialParams = { screen: "EventHome", params: { serviceId } };
+    }
+  }
+
+  useEffect(() => {
+    if (!hasNavigatedInitially) {
+      // Delay flag to ensure initial route mounts cleanly
+      setTimeout(() => setHasNavigatedInitially(true), 100);
+    }
+  }, [hasNavigatedInitially, setHasNavigatedInitially]);
+
+  return (
+    <MainStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
+      <MainStack.Screen name="VendorProfile" component={VendorProfileScreen} />
+      <MainStack.Screen name="Settings" component={SettingsScreen} />
+      <MainStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
+      <MainStack.Screen name="StaffManagement" component={StaffManagementScreen} />
+      <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
+      <MainStack.Screen name="EditStaff" component={EditStaffScreen} />
+      <MainStack.Screen name="LegalView" component={LegalViewScreen} />
+      <MainStack.Screen
+        name="SportsServiceTabs"
+        component={SportsTabNavigator}
+        initialParams={initialRouteName === "SportsServiceTabs" ? initialParams : undefined}
+      />
+      <MainStack.Screen
+        name="DineServiceTabs"
+        component={DineTabNavigator}
+        initialParams={initialRouteName === "DineServiceTabs" ? initialParams : undefined}
+      />
+      <MainStack.Screen
+        name="StaycationServiceTabs"
+        component={StaycationTabNavigator}
+        initialParams={initialRouteName === "StaycationServiceTabs" ? initialParams : undefined}
+      />
+      <MainStack.Screen
+        name="EventServiceTabs"
+        component={EventTabNavigator}
+        initialParams={initialRouteName === "EventServiceTabs" ? initialParams : undefined}
+      />
+      <MainStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
+      <MainStack.Screen
+        name="StaycationBookingDetails"
+        component={StaycationBookingDetailsScreen}
+      />
+      <MainStack.Screen name="StaycationInvoice" component={StaycationInvoiceScreen} />
+      <MainStack.Screen name="StaycationOffers" component={StaycationOffersScreen} />
+      <MainStack.Screen name="DineBookingDetails" component={DineBookingDetailsScreen} />
+      <MainStack.Screen name="DinePaymentDetails" component={DinePaymentDetailsScreen} />
+      <MainStack.Screen name="DineCloseDate" component={DineCloseDateScreen} />
+      <MainStack.Screen name="DineOffers" component={DineOffersScreen} />
+      <MainStack.Screen name="EventOffers" component={EventOffersScreen} />
+      <MainStack.Screen name="EventGuestInvite" component={EventGuestInviteScreen} />
+      <MainStack.Screen name="EventExportBookings" component={EventExportBookingsScreen} />
+      <MainStack.Screen name="EventEntryDetails" component={EventEntryDetailsScreen} />
+
+      <MainStack.Screen name="EventScanConfirmation" component={EventScanConfirmationScreen} />
+      <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />
+      <MainStack.Screen name="BlockUnblock" component={BlockUnblockScreen} />
+      <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />
+      <MainStack.Screen name="BulkBookingDetails" component={BulkBookingDetailsScreen} />
+      <MainStack.Screen name="RescheduleBooking" component={RescheduleBookingScreen} />
+      <MainStack.Screen name="RepeatBooking" component={RepeatBookingScreen} />
+      <MainStack.Screen name="Payouts" component={PayoutsScreen} />
+
+      <MainStack.Screen name="PayoutDetails" component={PayoutDetailsScreen} />
+      <MainStack.Screen name="SportsInvoice" component={SportsInvoiceScreen} />
+      <MainStack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
+      <MainStack.Screen name="AcceptInvite" component={AcceptInviteScreen} />
+      <MainStack.Screen name="FAQ" component={FAQScreen} />
+    </MainStack.Navigator>
+  );
+};
 
 const linking: LinkingOptions<RootStackParamList> = {
   // Your custom URL schemes
@@ -552,16 +603,22 @@ export const AppNavigator = () => {
         }
       } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         if (newSession?.user) {
-          try {
-            const { data: clientData } = await supabase
-              .from("client_profiles")
-              .select("*")
-              .eq("user_id", newSession.user.id)
-              .maybeSingle();
-            if (clientData) {
-              useAuthStore.getState().setClientProfile(clientData);
+          // Non-blocking: fetch client profile in the background
+          const userId = newSession.user.id;
+          (async () => {
+            try {
+              const { data: clientData } = await supabase
+                .from("client_profiles")
+                .select("*")
+                .eq("user_id", userId)
+                .maybeSingle();
+              if (clientData) {
+                useAuthStore.getState().setClientProfile(clientData);
+              }
+            } catch (error) {
+              console.error("Error fetching client profile on SIGNED_IN:", error);
             }
-          } catch (error) {}
+          })();
         }
         setSession(newSession);
       } else if (event === "SIGNED_OUT") {

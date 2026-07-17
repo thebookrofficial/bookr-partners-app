@@ -98,6 +98,24 @@ export const SportsHomeScreen = () => {
   const { activeVenueName, setActiveVenueName } = useServiceStore();
   const isFocused = useIsFocused();
 
+  // --- PERFORMANCE TRACKING ---
+  const mountTime = React.useRef(Date.now());
+  useEffect(() => {
+    if (!loading && !slotsLoading && !bookingsLoading) {
+      const loadTime = ((Date.now() - mountTime.current) / 1000).toFixed(2);
+      console.warn(`[PERFORMANCE] SportsHomeScreen fully loaded in ${loadTime} seconds`);
+
+      if ((globalThis as any).otpSubmitTime) {
+        const totalLoginTime = ((Date.now() - (globalThis as any).otpSubmitTime) / 1000).toFixed(2);
+        console.warn(
+          `[PERFORMANCE] Loaded from OTP Submit to SportsHomeScreen in ${totalLoginTime} seconds`,
+        );
+        delete (globalThis as any).otpSubmitTime;
+      }
+    }
+  }, [loading, slotsLoading, bookingsLoading]);
+  // ----------------------------
+
   const hasRefreshedOnFocus = React.useRef(false);
 
   useEffect(() => {

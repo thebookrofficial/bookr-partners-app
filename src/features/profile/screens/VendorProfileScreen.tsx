@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Avatar, PillTabs } from "@/components/ui";
@@ -20,46 +20,9 @@ export const VendorProfileScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { user, clientProfile } = useAuthStore();
   const { loading, venues, refresh } = useVendorData();
-  const {
-    lastSelectedService,
-    hasNavigatedInitially,
-    setHasNavigatedInitially,
-    setLastSelectedService,
-  } = useServiceStore();
+  const { setLastSelectedService } = useServiceStore();
 
   const [activeTab, setActiveTab] = useState(STRINGS.profile.tabs[0]);
-
-  // Handle auto-navigation to last selected service on initial app load
-  useEffect(() => {
-    if (!hasNavigatedInitially && lastSelectedService) {
-      setHasNavigatedInitially(true);
-
-      const { vertical, serviceId, category } = lastSelectedService;
-      if (vertical === "sports") {
-        navigation.navigate("SportsServiceTabs", {
-          screen: "SportsHome",
-          params: { serviceId, category },
-        });
-      } else if (vertical === "dining") {
-        navigation.navigate("DineServiceTabs", {
-          screen: "DineHome",
-          params: { serviceId },
-        });
-      } else if (vertical === "staycation") {
-        navigation.navigate("StaycationServiceTabs", {
-          screen: "StaycationHome",
-          params: { serviceId },
-        });
-      } else if (vertical === "events") {
-        navigation.navigate("EventServiceTabs", {
-          screen: "EventHome",
-          params: { serviceId },
-        });
-      }
-    } else if (!hasNavigatedInitially) {
-      setHasNavigatedInitially(true);
-    }
-  }, [hasNavigatedInitially, lastSelectedService, navigation, setHasNavigatedInitially]);
 
   const availableTabs = useMemo(() => {
     const allTabs = STRINGS.profile.tabs;
@@ -78,6 +41,20 @@ export const VendorProfileScreen = () => {
       );
     });
   }, [venues]);
+
+  // --- PERFORMANCE TRACKING ---
+  React.useEffect(() => {
+    if (!loading) {
+      if ((globalThis as any).otpSubmitTime) {
+        const loadTime = ((Date.now() - (globalThis as any).otpSubmitTime) / 1000).toFixed(2);
+        console.warn(
+          `[PERFORMANCE] Loaded VendorProfileScreen from OTP Submit in ${loadTime} seconds`,
+        );
+        delete (globalThis as any).otpSubmitTime;
+      }
+    }
+  }, [loading]);
+  // ----------------------------
 
   React.useEffect(() => {
     if (!availableTabs.includes(activeTab)) {
@@ -114,7 +91,10 @@ export const VendorProfileScreen = () => {
           {/* <TouchableOpacity style={styles.iconBtn}>
             <Bell size={ms(24)} color={COLORS.text.primary} />
           </TouchableOpacity> */}
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate("Settings")}>
+          <TouchableOpacity
+            testID="settings-button"
+            style={styles.iconBtn}
+            onPress={() => navigation.navigate("Settings")}>
             <Settings size={ms(24)} color={COLORS.text.primary} />
           </TouchableOpacity>
         </View>
