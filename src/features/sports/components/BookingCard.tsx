@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     width: ms(50),
     height: ms(50),
     borderRadius: ms(25),
-    backgroundColor: COLORS.danger,
+    backgroundColor: "transparent",
   },
   rightContent: {
     flex: 1,

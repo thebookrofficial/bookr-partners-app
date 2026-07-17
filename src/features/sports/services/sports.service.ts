@@ -281,9 +281,15 @@ export const SportsService = {
         }
         slotId = foundSlot?.id;
 
-        // CRITICAL FIX: Update the existing slot's status to booked!
+        // CRITICAL FIX: Update the existing slot's status to booked and enforce the exact end_time selected!
         if (slotId) {
-          await supabase.from("sports_slots").update({ status: "booked" }).eq("id", slotId);
+          await supabase
+            .from("sports_slots")
+            .update({
+              status: "booked",
+              end_time: currentEnd,
+            })
+            .eq("id", slotId);
         }
       }
 
@@ -361,89 +367,95 @@ export const SportsService = {
     toTime: string;
     totalPrice: number;
     addAmount: number;
+    slotDurationMinutes?: number;
   }) {
     try {
-      // Parse "6 PM" or "6:30 PM" to "18:00:00" or "18:30:00"
-      const timeMatch = params.fromTime.match(/^(\d+)(?::(\d+))?\s*(AM|PM)?/i);
-      if (!timeMatch) throw new Error("Invalid time format");
+      // 1. Fetch the old booking to get guest info and booking group
+      const { data: oldBooking, error: oldBookingError } = await supabase
+        .from("sports_bookings")
+        .select("*")
+        .eq("id", params.bookingId)
+        .single();
 
-      let startH = parseInt(timeMatch[1], 10);
-      const startM = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-      const ampm = timeMatch[3]?.toUpperCase();
-
-      if (ampm === "PM" && startH !== 12) startH += 12;
-      if (ampm === "AM" && startH === 12) startH = 0;
-
-      const startStr = `${startH.toString().padStart(2, "0")}:${startM
-        .toString()
-        .padStart(2, "0")}:00`;
-
-      // 1. Find the new slot
-      const { data: newSlot, error: slotError } = await supabase
-        .from("sports_slots")
-        .select("id, status")
-        .eq("venue_id", params.venueId)
-        .eq("ground_id", params.groundId)
-        .eq("slot_date", params.dateStr)
-        .eq("start_time", startStr)
-        .maybeSingle();
-
-      if (slotError) {
-        console.error("Slot Lookup Error:", slotError);
-        throw new Error("Failed to lookup slot.");
+      if (oldBookingError || !oldBooking) {
+        throw new Error("Could not find the original booking to reschedule.");
       }
 
-      if (!newSlot) {
-        throw new Error(
-          `No slot found for ${params.fromTime} on ${params.dateStr}. Please ensure slots are generated.`,
-        );
+      // 2. Find all related bookings if it was a multi-slot booking
+      const query = supabase.from("sports_bookings").select("id, slot_id, paid_amount");
+      if (oldBooking.booking_group_id) {
+        query.eq("booking_group_id", oldBooking.booking_group_id);
+      } else {
+        query.eq("id", params.bookingId);
       }
 
-      if (newSlot.status !== "available") {
-        throw new Error("The selected slot is already booked or unavailable.");
+      const { data: oldBookings, error: oldBookingsError } = await query;
+      if (oldBookingsError) {
+        throw new Error("Failed to fetch related bookings for rescheduling.");
       }
 
-      // 2. Reschedule using the existing RPC
-      const { error: rpcError } = await supabase.rpc("reschedule_sports_booking", {
-        p_booking_id: params.bookingId,
-        p_new_slot_id: newSlot.id,
-      });
+      let totalPreviousPaid = 0;
+      const oldBookingIds: string[] = [];
+      const oldSlotIds: string[] = [];
 
-      if (rpcError) {
-        console.error("Reschedule RPC Error:", rpcError);
-        throw new Error(rpcError.message || "Failed to reschedule booking");
-      }
-
-      // 3. Update pricing if needed
-      if (params.addAmount > 0 || params.totalPrice > 0) {
-        const { data: booking } = await supabase
-          .from("sports_bookings")
-          .select("total_amount, paid_amount")
-          .eq("id", params.bookingId)
-          .single();
-
-        if (booking) {
-          const newTotal = params.totalPrice > 0 ? params.totalPrice : booking.total_amount;
-          const added = params.addAmount > 0 ? params.addAmount : 0;
-
-          await supabase
-            .from("sports_bookings")
-            .update({
-              total_amount: newTotal + added,
-            })
-            .eq("id", params.bookingId);
+      if (oldBookings && oldBookings.length > 0) {
+        for (const b of oldBookings) {
+          oldBookingIds.push(b.id);
+          oldSlotIds.push(b.slot_id);
+          totalPreviousPaid += Number(b.paid_amount || 0);
         }
+
+        // 3. Mark old bookings as rescheduled (or cancelled)
+        await supabase
+          .from("sports_bookings")
+          .update({ booking_status: "rescheduled" })
+          .in("id", oldBookingIds);
+
+        // 4. Free up the old slots
+        await supabase.from("sports_slots").update({ status: "available" }).in("id", oldSlotIds);
       }
+
+      // 5. Convert times to 24-hour format for createOfflineBooking
+      const parseTime = (timeStr: string) => {
+        const timeMatch = timeStr.match(/^(\d+)(?::(\d+))?\s*(AM|PM)?/i);
+        if (!timeMatch) return "00:00";
+        let h = parseInt(timeMatch[1], 10);
+        const m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+        const ampm = timeMatch[3]?.toUpperCase();
+        if (ampm === "PM" && h !== 12) h += 12;
+        if (ampm === "AM" && h === 12) h = 0;
+        return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+      };
+
+      const startTime24 = parseTime(params.fromTime);
+      const endTime24 = parseTime(params.toTime);
+
+      // 6. Create the new booking using the exact same flow as offline bookings
+      await this.createOfflineBooking({
+        venueId: params.venueId,
+        groundId: params.groundId,
+        dateStr: params.dateStr,
+        startTime24,
+        endTime24,
+        numericTotal:
+          params.totalPrice > 0 ? params.totalPrice : Number(oldBooking.total_amount || 0),
+        advancePaid: params.addAmount > 0 ? params.addAmount : totalPreviousPaid,
+        guestName: oldBooking.guest_name || "Guest",
+        guestPhone: oldBooking.guest_phone || "",
+        bookingSource: oldBooking.booking_source || "vendor_app",
+        sportsBookingType: oldBooking.sports_booking_type || "standard",
+        slotDurationMinutes: params.slotDurationMinutes,
+      });
 
       return true;
     } catch (err: any) {
       console.error("Reschedule Error:", err);
-      throw new Error(err.message || "An unexpected error occurred during rescheduling");
+      throw err;
     }
   },
 
   async lookupGuestsByName(venueId: string, nameQuery: string) {
-    if (!nameQuery || nameQuery.trim().length < 2) return [];
+    if (!nameQuery || nameQuery.trim().length < 1) return [];
 
     try {
       const { data, error } = await supabase

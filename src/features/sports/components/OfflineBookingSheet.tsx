@@ -12,8 +12,9 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from "react-native";
-import { Text, TextInput } from "@/components/ui";
+import { Text } from "@/components/ui";
 import {
   Calendar as CalendarIcon,
   Phone,
@@ -23,9 +24,18 @@ import {
   ChevronRight,
   ChevronDown,
   ArrowLeft,
+  Wallet,
+  X,
 } from "lucide-react-native";
+import { TextInput as RNTextInput } from "react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const icGpay = require("@/assets/icons/google-pay.png");
+const icPhonepe = require("@/assets/icons/icons8-phone-pe-48.png");
+const icPaytm = require("@/assets/icons/paytm.png");
+const icCash = require("@/assets/icons/pay-50.png");
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
@@ -78,14 +88,80 @@ const offlineBookingSchema = z
     },
   );
 
-const CustomLabel = ({ icon: Icon, text }: { icon: any; text: string }) => (
-  <View style={styles.labelRow}>
-    <Icon size={ms(16)} color={COLORS.primary} />
-    <Text variant="body2" weight="medium">
+const SectionHeader = ({ icon: Icon, text }: { icon: any; text: string }) => (
+  <View style={styles.sectionHeaderRow}>
+    <Icon size={ms(20)} color="#000" />
+    <Text variant="body1" weight="bold" color="#000">
       {text}
     </Text>
   </View>
 );
+
+const FieldBox = ({
+  icon: Icon,
+  iconColor = "#63A1FD",
+  iconBg = "#E8F0FE",
+  label,
+  value,
+  placeholder,
+  onPress,
+  rightElement,
+  isInput = false,
+  prefix,
+  hasBorder = false,
+  style,
+  ...textInputProps
+}: any) => {
+  const content = (
+    <View style={[styles.fieldBox, hasBorder && styles.fieldBoxBorder, style]}>
+      <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+        <Icon size={ms(18)} color={iconColor} />
+      </View>
+      <View style={styles.fieldContent}>
+        <Text
+          variant="body2"
+          weight="bold"
+          color="#000"
+          style={[(isInput || value || placeholder) && { marginBottom: vs(2) }]}>
+          {label}
+        </Text>
+        {isInput ? (
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {prefix ? (
+              <Text variant="body1" weight="semiBold" color="#000" style={{ marginRight: hs(4) }}>
+                {prefix}
+              </Text>
+            ) : null}
+            <RNTextInput
+              style={styles.fieldInput}
+              placeholder={placeholder}
+              placeholderTextColor={COLORS.text.muted}
+              value={value}
+              {...textInputProps}
+            />
+          </View>
+        ) : value || placeholder ? (
+          <Text
+            variant="body1"
+            weight="semiBold"
+            color={value && value !== placeholder ? "#000" : COLORS.text.muted}>
+            {value || placeholder}
+          </Text>
+        ) : null}
+      </View>
+      {rightElement}
+    </View>
+  );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={{ width: "100%" }}>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+  return content;
+};
 
 export const OfflineBookingSheet = ({
   isVisible,
@@ -98,6 +174,7 @@ export const OfflineBookingSheet = ({
   _sportsType,
 }: OfflineBookingSheetProps) => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const insets = useSafeAreaInsets();
 
   const [currentDate, setCurrentDate] = useState<Date>(initialDate);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -107,6 +184,9 @@ export const OfflineBookingSheet = ({
   const [advancePaid, setAdvancePaid] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasHistory, setHasHistory] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
+    "cash",
+  );
   const [bookedHours, setBookedHours] = useState<string[]>([]);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
 
@@ -181,7 +261,7 @@ export const OfflineBookingSheet = ({
       return;
     }
 
-    if (text.trim().length >= 2) {
+    if (text.trim().length >= 1) {
       const results = await SportsService.lookupGuestsByName(venueId, text);
       setSearchResults(results);
       setShowSearchResults(results.length > 0);
@@ -414,36 +494,32 @@ export const OfflineBookingSheet = ({
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "padding"}
           style={styles.keyboardAvoid}>
-          <View style={styles.bottomSheetContainer}>
+          <View style={[styles.bottomSheetContainer, { paddingBottom: vs(30) + insets.bottom }]}>
             <View style={styles.sheetHeader}>
               <TouchableOpacity onPress={onClose} style={styles.backButton}>
                 <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
               </TouchableOpacity>
-              <Text variant="body1" weight="bold" style={styles.headerText}>
-                Offline Booking
-              </Text>
+              <View style={styles.venueInfo}>
+                <Text variant="h3" weight="bold" color="#000" style={styles.headerTitle}>
+                  OFFLINE BOOKING
+                </Text>
+              </View>
             </View>
+
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.sheetContent}>
-              <TouchableOpacity activeOpacity={0.7} onPress={() => setIsDatePickerOpen(true)}>
-                <TextInput
-                  variant="filled"
-                  label={<CustomLabel icon={CalendarIcon} text="Selected Date" />}
-                  value={currentDate.toLocaleDateString("en-GB")}
-                  rightIcon={<ChevronDown size={ms(16)} color={COLORS.text.primary} />}
-                  editable={false}
-                  pointerEvents="none"
-                />
-              </TouchableOpacity>
-              <TextInput
-                variant="filled"
-                label={<CustomLabel icon={Phone} text="Mobile No" />}
-                placeholder="+91 00000 00000"
-                keyboardType="phone-pad"
+              <SectionHeader icon={UserIcon} text="CUSTOMER DETAILS" />
+              <FieldBox
+                icon={Phone}
+                label="Mobile No"
+                placeholder="Enter Mobile No"
                 value={mobile}
-                onChangeText={text => {
+                isInput={true}
+                prefix=""
+                keyboardType="phone-pad"
+                onChangeText={(text: string) => {
                   const clean = text.replace(/[^\d]/g, "").slice(0, 10);
                   setMobile(clean);
                   if (clean.length < 10) {
@@ -451,32 +527,43 @@ export const OfflineBookingSheet = ({
                   }
                 }}
               />
+
               <View style={styles.autocompleteContainer}>
-                <TextInput
-                  variant="filled"
-                  label={<CustomLabel icon={UserIcon} text="Name" />}
-                  placeholder="Guest Name"
+                <FieldBox
+                  icon={UserIcon}
+                  label="Name"
+                  placeholder="Enter customers name"
                   value={name}
+                  isInput={true}
                   onChangeText={handleNameChange}
                   onFocus={() => {
-                    if (name.trim().length >= 2 && searchResults.length > 0) {
+                    if (name.trim().length >= 1 && searchResults.length > 0) {
                       setShowSearchResults(true);
                     }
                   }}
                   onBlur={() => {
                     setTimeout(() => setShowSearchResults(false), 300);
                   }}
+                  autoCorrect={false}
+                  spellCheck={false}
+                  autoComplete="off"
                 />
                 {showSearchResults && searchResults.length > 0 && (
                   <View style={styles.dropdownContainer}>
+                    <View style={styles.dropdownHeader}>
+                      <Text style={styles.dropdownHeaderText}>Select Customer</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowSearchResults(false);
+                        }}>
+                        <X size={ms(20)} color="#000" />
+                      </TouchableOpacity>
+                    </View>
                     <ScrollView keyboardShouldPersistTaps="always" style={styles.dropdownScroll}>
                       {searchResults.map((item, index) => (
                         <TouchableOpacity
                           key={`${item.name}_${item.phone}_${index}`}
-                          style={[
-                            styles.dropdownItem,
-                            index < searchResults.length - 1 && styles.dropdownItemDivider,
-                          ]}
+                          style={styles.dropdownItem}
                           onPress={() => {
                             setIsSelectingFromResults(true);
                             setName(item.name);
@@ -493,96 +580,218 @@ export const OfflineBookingSheet = ({
                   </View>
                 )}
               </View>
-              <View style={styles.row}>
-                <View style={styles.flex1}>
-                  <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("from")}>
-                    <TextInput
-                      variant="filled"
-                      label={<CustomLabel icon={Clock} text="From" />}
-                      value={fromTime}
-                      rightIcon={<ChevronDown size={ms(16)} color={COLORS.text.primary} />}
-                      editable={false}
-                      pointerEvents="none"
+
+              <View style={{ marginTop: vs(16) }}>
+                <SectionHeader icon={CalendarIcon} text="BOOKING DETAILS" />
+                <FieldBox
+                  icon={CalendarIcon}
+                  label="Date"
+                  value={currentDate.toLocaleDateString("en-GB").replace(/\//g, " / ")}
+                  onPress={() => setIsDatePickerOpen(true)}
+                  rightElement={<ChevronDown size={ms(16)} color="#000" />}
+                />
+                <View style={styles.row}>
+                  <View style={styles.flex1}>
+                    <FieldBox
+                      icon={Clock}
+                      label="From"
+                      value={fromTime === "Start Time" ? "" : fromTime}
+                      placeholder="Start Time"
+                      onPress={() => setShowHourPicker("from")}
                     />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.flex1}>
-                  <TouchableOpacity activeOpacity={0.7} onPress={() => setShowHourPicker("to")}>
-                    <TextInput
-                      variant="filled"
-                      label={<CustomLabel icon={Clock} text="To" />}
-                      value={toTime}
-                      rightIcon={<ChevronDown size={ms(16)} color={COLORS.text.primary} />}
-                      editable={false}
-                      pointerEvents="none"
+                  </View>
+                  <View style={styles.flex1}>
+                    <FieldBox
+                      icon={Clock}
+                      label="To"
+                      value={toTime === "End Time" ? "" : toTime}
+                      placeholder="End Time"
+                      onPress={() => setShowHourPicker("to")}
                     />
-                  </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-              <View style={styles.row}>
-                <View style={styles.flex1}>
-                  <TextInput
-                    variant="filled"
-                    label={<CustomLabel icon={Clock} text="Total Payment" />}
-                    placeholder="₹ 1000"
-                    keyboardType="numeric"
-                    value={totalPayment}
-                    onChangeText={setTotalPayment}
-                  />
+
+              <View style={{ marginTop: vs(16) }}>
+                <SectionHeader icon={Wallet} text="PAYMENT DETAILS" />
+                <View style={styles.row}>
+                  <View style={styles.flex1}>
+                    <FieldBox
+                      icon={Wallet}
+                      iconColor="#00B562"
+                      iconBg="#E6F7F0"
+                      label="Total Amount"
+                      placeholder="₹ 1000"
+                      value={totalPayment ? `₹${totalPayment}` : ""}
+                      isInput={true}
+                      keyboardType="numeric"
+                      onChangeText={(text: string) => setTotalPayment(text.replace(/[^\d.]/g, ""))}
+                      hasBorder={true}
+                    />
+                  </View>
+                  <View style={styles.flex1}>
+                    <FieldBox
+                      icon={Wallet}
+                      iconColor="#00B562"
+                      iconBg="#E6F7F0"
+                      label="Advance"
+                      placeholder="₹0"
+                      value={advancePaid ? `₹${advancePaid}` : ""}
+                      isInput={true}
+                      keyboardType="numeric"
+                      onFocus={() => {
+                        if (advancePaid === "0" || advancePaid === "0.00") {
+                          setAdvancePaid("");
+                        }
+                      }}
+                      onChangeText={(text: string) => {
+                        const clean = text.replace(/[^\d.]/g, "");
+                        const val = parseFloat(clean) || 0;
+                        const total = parseFloat(totalPayment) || 0;
+                        if (val > total) {
+                          setAdvancePaid(total.toString());
+                        } else {
+                          setAdvancePaid(clean);
+                        }
+                      }}
+                      hasBorder={true}
+                    />
+                  </View>
                 </View>
-                <View style={styles.flex1}>
-                  <TextInput
-                    variant="filled"
-                    label={
-                      <Text variant="body2" weight="medium">
-                        Advance Paid
-                      </Text>
-                    }
-                    placeholder="₹"
-                    keyboardType="numeric"
-                    value={advancePaid}
-                    // ADD THIS LINE:
-                    onFocus={() => {
-                      if (advancePaid === "0" || advancePaid === "0.00") {
-                        setAdvancePaid("");
-                      }
-                    }}
-                    onChangeText={text => {
-                      const val = parseFloat(text) || 0;
-                      const total = parseFloat(totalPayment) || 0;
-                      if (val > total) {
-                        setAdvancePaid(total.toString());
-                      } else {
-                        setAdvancePaid(text);
-                      }
-                    }}
-                  />
-                </View>
-              </View>
-              {hasHistory && (
-                <TouchableOpacity
-                  style={styles.historyRow}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    if (onCheckHistory) {
-                      onCheckHistory();
-                    } else {
-                      onClose();
-                    }
-                    navigation.navigate("GuestHistory", {
-                      guestId: mobile,
-                      bookingId: "",
-                      vertical: "sports",
-                      venueId: venueId,
-                    });
-                  }}>
-                  <FileText size={ms(20)} color={COLORS.text.primary} />
-                  <Text variant="body2" weight="semiBold" style={styles.historyText}>
-                    Previous History
+
+                {/* Inline Payment Method Selection */}
+                <View style={{ marginTop: vs(10), marginBottom: vs(-10) }}>
+                  <Text variant="body2" weight="bold" style={styles.inputLabel}>
+                    Payment Method
                   </Text>
-                  <ChevronRight size={ms(20)} color={COLORS.text.primary} />
-                </TouchableOpacity>
-              )}
+                  <View style={styles.methodsRow}>
+                    {/* Cash */}
+                    <TouchableOpacity
+                      style={[
+                        styles.methodBox,
+                        selectedMethod === "cash" && styles.methodBoxSelectedBlue,
+                      ]}
+                      onPress={() => setSelectedMethod("cash")}>
+                      <Image
+                        source={icCash}
+                        style={[
+                          styles.methodIcon,
+                          selectedMethod === "cash" && styles.methodIconSelected,
+                        ]}
+                      />
+                      <Text
+                        variant="body2"
+                        weight="bold"
+                        style={[
+                          styles.methodText,
+                          selectedMethod === "cash" && styles.methodTextSelected,
+                        ]}>
+                        Cash
+                      </Text>
+                    </TouchableOpacity>
+                    {/* GPay */}
+                    <TouchableOpacity
+                      style={[
+                        styles.methodBox,
+                        selectedMethod === "gpay" && styles.methodBoxSelectedBlue,
+                      ]}
+                      onPress={() => setSelectedMethod("gpay")}>
+                      <Image
+                        source={icGpay}
+                        style={[
+                          styles.methodIcon,
+                          selectedMethod === "gpay" && styles.methodIconSelected,
+                        ]}
+                      />
+                      <Text
+                        variant="body2"
+                        weight="bold"
+                        style={[
+                          styles.methodText,
+                          selectedMethod === "gpay" && styles.methodTextSelected,
+                        ]}>
+                        GPay
+                      </Text>
+                    </TouchableOpacity>
+                    {/* PhonePe */}
+                    <TouchableOpacity
+                      style={[
+                        styles.methodBox,
+                        selectedMethod === "phonepe" && styles.methodBoxSelectedBlue,
+                      ]}
+                      onPress={() => setSelectedMethod("phonepe")}>
+                      <Image
+                        source={icPhonepe}
+                        style={[
+                          styles.methodIcon,
+                          selectedMethod === "phonepe" && styles.methodIconSelected,
+                        ]}
+                      />
+                      <Text
+                        variant="body2"
+                        weight="bold"
+                        style={[
+                          styles.methodText,
+                          selectedMethod === "phonepe" && styles.methodTextSelected,
+                        ]}>
+                        PhonePe
+                      </Text>
+                    </TouchableOpacity>
+                    {/* Paytm */}
+                    <TouchableOpacity
+                      style={[
+                        styles.methodBox,
+                        selectedMethod === "paytm" && styles.methodBoxSelectedBlue,
+                      ]}
+                      onPress={() => setSelectedMethod("paytm")}>
+                      <Image
+                        source={icPaytm}
+                        style={[
+                          styles.methodIcon,
+                          selectedMethod === "paytm" && styles.methodIconSelected,
+                        ]}
+                      />
+                      <Text
+                        variant="body2"
+                        weight="bold"
+                        style={[
+                          styles.methodText,
+                          selectedMethod === "paytm" && styles.methodTextSelected,
+                        ]}>
+                        Paytm
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {hasHistory && (
+                  <TouchableOpacity
+                    style={styles.historyButton}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      if (onCheckHistory) {
+                        onCheckHistory();
+                      } else {
+                        onClose();
+                      }
+                      navigation.navigate("GuestHistory", {
+                        guestId: mobile,
+                        bookingId: "",
+                        vertical: "sports",
+                        venueId: venueId,
+                      });
+                    }}>
+                    <FieldBox
+                      icon={FileText}
+                      label="Previous History"
+                      rightElement={<ChevronRight size={ms(20)} color="#000" />}
+                      hasBorder={true}
+                      iconBg="#E8F0FE"
+                      style={{ paddingVertical: vs(10) }}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
             </ScrollView>
             <TouchableOpacity
               style={[styles.saveButton, isSubmitting && styles.saveButtonDisabled]}
@@ -592,11 +801,7 @@ export const OfflineBookingSheet = ({
               {isSubmitting ? (
                 <ActivityIndicator color={COLORS.text.inverse} />
               ) : (
-                <Text
-                  variant="h3"
-                  family="nichrome"
-                  color={COLORS.text.inverse}
-                  style={styles.saveText}>
+                <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
                   BOOK NOW
                 </Text>
               )}
@@ -680,53 +885,82 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: COLORS.background },
   keyboardAvoid: { flex: 1 },
   saveButtonDisabled: { opacity: 0.7 },
-  bottomSheetContainer: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    paddingTop: vs(80), // SafeArea for status bar
-    paddingHorizontal: hs(12),
-    paddingBottom: vs(30),
-  },
   sheetHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: vs(16),
-    paddingHorizontal: hs(6),
+    marginBottom: vs(24),
   },
   backButton: {
     marginRight: hs(12),
   },
-  headerText: { textTransform: "uppercase" },
-  sheetContent: { paddingBottom: vs(20) },
-  mobileLabelContainer: {
+  venueInfo: {
+    flex: 1,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+  },
+  venueImage: {
+    width: ms(40),
+    height: ms(40),
+    borderRadius: ms(20),
+    marginRight: hs(10),
+  },
+  sportDropdown: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerTitle: {
+    textTransform: "uppercase",
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(8),
+    marginBottom: vs(8),
+  },
+  fieldBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F6F8FB",
+    borderRadius: ms(12),
+    padding: ms(14),
+    marginBottom: vs(8),
+  },
+  fieldBoxBorder: {
+    borderWidth: 1,
+    borderColor: "#A9C7F9",
+  },
+  iconWrapper: {
+    width: ms(40),
+    height: ms(40),
+    borderRadius: ms(10),
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: hs(12),
+  },
+  fieldContent: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  fieldInput: {
+    fontSize: fs(16),
+    fontFamily: "Gilroy-SemiBold",
+    color: "#000",
+    padding: 0,
+    flex: 1,
+  },
+  sheetContent: { paddingBottom: vs(40) },
+  row: { flexDirection: "row", gap: hs(12), width: "100%" },
+  flex1: { flex: 1 },
+  historyButton: {
     width: "100%",
   },
-  labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6) },
-  row: { flexDirection: "row", gap: hs(20), width: "100%" },
-  flex1: { flex: 1 },
-  historyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    height: vs(44),
-    marginBottom: vs(16),
-  },
-  historyText: { flex: 1, marginLeft: hs(6) },
   saveButton: {
     backgroundColor: "#000000",
     borderRadius: ms(10),
-    height: vs(44),
+    height: vs(50),
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: vs(20),
   },
-  saveText: { fontSize: fs(20), textTransform: "uppercase" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -746,39 +980,164 @@ const styles = StyleSheet.create({
   dropdownContainer: {
     position: "absolute",
     top: vs(64),
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.background,
+    left: vs(6),
+    right: vs(6),
+    backgroundColor: "#F4F7FC",
     borderRadius: ms(10),
-    borderWidth: 1,
-    borderColor: COLORS.border.navBar,
-    maxHeight: vs(180),
+    maxHeight: vs(280),
     zIndex: 1001,
     elevation: 5,
-    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 15,
+  },
+  dropdownHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(12),
+    borderBottomWidth: 1,
+    borderBottomColor: "#cbdffe",
+  },
+  dropdownHeaderText: {
+    fontFamily: "Gilroy-Bold",
+    fontSize: fs(16),
+    color: "#000",
   },
   dropdownScroll: {
     width: "100%",
+    padding: ms(10),
   },
   dropdownItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: vs(12),
-    paddingHorizontal: hs(12),
-    backgroundColor: COLORS.background,
-  },
-  dropdownItemDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.navBar,
+    paddingHorizontal: ms(10),
+    borderRadius: ms(5),
+    backgroundColor: "transparent",
+    minHeight: vs(36),
+    marginBottom: vs(4),
   },
   dropdownItemTextLeft: {
-    fontSize: fs(14),
-    fontWeight: "500",
-    color: COLORS.text.primary,
+    fontSize: fs(16),
+    fontFamily: "Gilroy-Medium",
+    color: "#000",
   },
   dropdownItemTextRight: {
-    fontSize: fs(12),
+    fontSize: fs(16),
+    fontFamily: "Gilroy-Medium",
     color: COLORS.text.secondary,
+  },
+  paymentModalContainer: {
+    width: "90%",
+    backgroundColor: COLORS.background,
+    borderRadius: ms(12),
+    padding: ms(16),
+  },
+  amountBoxesRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: vs(24),
+  },
+  amountBox: {
+    flex: 1,
+    backgroundColor: "#F4F7FC",
+    borderWidth: 2,
+    borderColor: "#A9C7F9",
+    borderRadius: ms(8),
+    paddingVertical: vs(12),
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: hs(4),
+  },
+  amountBoxLabel: {
+    color: "#000",
+    marginBottom: vs(4),
+  },
+  amountBoxValueRed: {
+    color: "#E55959",
+  },
+  amountBoxValueGreen: {
+    color: "#00B562",
+  },
+  inputLabel: {
+    marginBottom: vs(8),
+    color: "#000",
+    fontSize: fs(18),
+  },
+  amountInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(8),
+    borderWidth: 1,
+    borderColor: "#A9C7F9",
+    paddingHorizontal: hs(12),
+    height: vs(48),
+    marginBottom: vs(24),
+  },
+  rupeePrefix: {
+    marginRight: hs(8),
+    color: "#000",
+    fontSize: fs(16),
+  },
+  amountInput: {
+    flex: 1,
+    fontSize: fs(16),
+    color: "#000",
+  },
+  methodsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: vs(32),
+  },
+  methodBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: "23%",
+    aspectRatio: 1,
+    backgroundColor: "#fff",
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: "#D1E0FB",
+  },
+  methodBoxSelectedBlue: {
+    backgroundColor: "#63A1FD",
+    borderColor: "#63A1FD",
+  },
+  methodIcon: {
+    width: ms(36),
+    height: ms(36),
+    resizeMode: "contain",
+  },
+  methodIconSelected: {
+    tintColor: undefined, // ensure native colors unless strictly needed
+  },
+  methodText: {
+    fontSize: fs(12),
+    marginTop: vs(4),
+    color: "#000",
+  },
+  methodTextSelected: {
+    color: "#fff",
+  },
+  addMoneyBtn: {
+    backgroundColor: "#63A1FD",
+    borderRadius: ms(12),
+    paddingVertical: vs(14),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addMoneyBtnText: {
+    color: "#fff",
+    fontSize: fs(18),
+  },
+  bottomSheetContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    paddingTop: vs(60),
+    paddingHorizontal: hs(10),
   },
 });

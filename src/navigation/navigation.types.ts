@@ -94,14 +94,16 @@ export type MainStackParamList = {
     venueId?: string;
   };
   BlockUnblock: { venueId: string; groundId: string };
-  BulkBooking: { venueId: string; groundId?: string };
+  BulkBooking: { venueId: string; groundId?: string; type?: "multi" | "single" };
   BulkBookingDetails: {
     bookingId: string;
-    type: "multi" | "single";
     venueId: string;
     groundId: string;
+    refreshKey?: string;
+    type?: "multi" | "single";
   };
   RescheduleBooking: { bookingId: string; venueId: string; groundId: string };
+  RepeatBooking: { bookingId: string; venueId: string; groundId: string };
   Payouts: { venueId: string };
   PayoutDetails: {
     venueId: string;
@@ -113,6 +115,7 @@ export type MainStackParamList = {
   SportsInvoice: { bookingId: string };
   FAQ: { vertical: "sports" | "staycation" };
   AcceptInvite: undefined;
+  PaymentHistory: { bookingId: string };
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

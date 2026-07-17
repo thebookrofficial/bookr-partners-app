@@ -197,6 +197,7 @@ export const useBookingDetails = (bookingId: string) => {
   const logPayment = async (
     amount: number,
     mode: "cash" | "online" | "upi" | "card" | "bank_transfer" | "other",
+    note?: string,
   ) => {
     setIsSaving(true);
     try {
@@ -220,6 +221,7 @@ export const useBookingDetails = (bookingId: string) => {
           amount: amount,
           mode: dbPaymentMode,
           loggedBy: userId,
+          note: note,
         },
       });
 
@@ -230,6 +232,32 @@ export const useBookingDetails = (bookingId: string) => {
       return true;
     } catch (error: any) {
       Alert.alert("Payment Failed", error.message);
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const removePaymentLog = async (logId: string) => {
+    setIsSaving(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (!token) {
+        throw new Error("You must be logged in to remove a payment.");
+      }
+
+      const { error } = await supabase.functions.invoke("remove-offline-payment", {
+        body: { logId },
+      });
+
+      if (error) throw error;
+
+      await fetchDetails();
+      return true;
+    } catch (error: any) {
+      Alert.alert("Remove Payment Failed", error.message);
       return false;
     } finally {
       setIsSaving(false);
@@ -279,6 +307,7 @@ export const useBookingDetails = (bookingId: string) => {
     loading,
     isSaving,
     logPayment,
+    removePaymentLog,
     cancelBooking,
     refresh: fetchDetails,
   };

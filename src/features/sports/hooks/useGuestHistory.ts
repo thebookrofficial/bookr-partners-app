@@ -27,9 +27,11 @@ const formatDisplayDate = (dateStr: string) => {
 
 const formatTime = (timeStr: string) => {
   if (!timeStr) return "";
-  const [h] = timeStr.split(":");
+  const [h, m] = timeStr.split(":");
   const hourInt = parseInt(h, 10);
-  return `${hourInt % 12 || 12} ${hourInt >= 12 ? "PM" : "AM"}`;
+  const ampm = hourInt >= 12 && hourInt < 24 ? "PM" : "AM";
+  const displayHour = hourInt % 12 || 12;
+  return m && m !== "00" ? `${displayHour}:${m} ${ampm}` : `${displayHour} ${ampm}`;
 };
 
 export const useGuestHistory = (identifier: string, vertical: string, currentVenueId?: string) => {
@@ -126,13 +128,19 @@ export const useGuestHistory = (identifier: string, vertical: string, currentVen
         let rawDate, displayDate, displayTime, vName, isOnline;
 
         if (vertical === "sports") {
-          const slot = Array.isArray(b.sports_slots) ? b.sports_slots[0] : b.sports_slots;
-          if (!slot) return;
+          const slots = Array.isArray(b.sports_slots)
+            ? b.sports_slots
+            : [b.sports_slots].filter(Boolean);
+          if (slots.length === 0) return;
 
-          rawDate = slot.slot_date;
+          slots.sort((s1: any, s2: any) => s1.start_time.localeCompare(s2.start_time));
+          const firstSlot = slots[0];
+          const lastSlot = slots[slots.length - 1];
+
+          rawDate = firstSlot.slot_date;
           displayDate = formatDisplayDate(rawDate);
-          displayTime = `${formatTime(slot.start_time)} - ${formatTime(slot.end_time)}`;
-          vName = slot.sports_grounds?.name || "Sports Ground";
+          displayTime = `${formatTime(firstSlot.start_time)} - ${formatTime(lastSlot.end_time)}`;
+          vName = firstSlot.sports_grounds?.name || "Sports Ground";
           isOnline = b.platform_fee > 0;
         } else {
           rawDate = b.check_in_date;

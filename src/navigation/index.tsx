@@ -37,6 +37,7 @@ import { EditStaffScreen } from "@/features/profile/screens/EditStaffScreen";
 import { StaffManagementScreen } from "@/features/profile/screens/StaffManagementScreen";
 import { BookingDetailsScreen } from "@/features/sports/screens/BookingDetailsScreen";
 import { GuestHistoryScreen } from "@/features/sports/screens/GuestHistoryScreen";
+import { PaymentHistoryScreen } from "@/features/sports/screens/PaymentHistoryScreen";
 import { SportsHistoryScreen } from "@/features/sports/screens/SportsHistoryScreen";
 import { SportsHomeScreen } from "@/features/sports/screens/SportsHomeScreen";
 import { SportsDashboardScreen } from "@/features/sports/screens/SportsDashboardScreen";
@@ -45,6 +46,7 @@ import { BlockUnblockScreen } from "@/features/sports/screens/BlockUnblockScreen
 import { BulkBookingScreen } from "@/features/sports/screens/BulkBookingScreen";
 import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingDetailsScreen";
 import { RescheduleBookingScreen } from "@/features/sports/screens/RescheduleBookingScreen";
+import { RepeatBookingScreen } from "@/features/sports/screens/RepeatBookingScreen";
 import { StaycationBookingDetailsScreen } from "@/features/staycation/screens/StaycationBookingDetailsScreen";
 import { StaycationInvoiceScreen } from "@/features/staycation/screens/StaycationInvoiceScreen";
 import { StaycationOffersScreen } from "@/features/staycation/screens/StaycationOffersScreen";
@@ -394,9 +396,12 @@ const MainNavigator = () => (
     <MainStack.Screen name="BulkBooking" component={BulkBookingScreen} />
     <MainStack.Screen name="BulkBookingDetails" component={BulkBookingDetailsScreen} />
     <MainStack.Screen name="RescheduleBooking" component={RescheduleBookingScreen} />
+    <MainStack.Screen name="RepeatBooking" component={RepeatBookingScreen} />
     <MainStack.Screen name="Payouts" component={PayoutsScreen} />
+
     <MainStack.Screen name="PayoutDetails" component={PayoutDetailsScreen} />
     <MainStack.Screen name="SportsInvoice" component={SportsInvoiceScreen} />
+    <MainStack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
     <MainStack.Screen name="AcceptInvite" component={AcceptInviteScreen} />
     <MainStack.Screen name="FAQ" component={FAQScreen} />
   </MainStack.Navigator>

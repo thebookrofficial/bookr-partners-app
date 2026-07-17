@@ -17,7 +17,7 @@ serve(async req => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const { bookingId, vertical, amount, mode, loggedBy } = await req.json();
+    const { bookingId, vertical, amount, mode, loggedBy, note } = await req.json();
     const tableName = vertical === "staycation" ? "staycation_bookings" : "sports_bookings";
 
     // 1. Fetch current booking, pulling group IDs
@@ -69,7 +69,7 @@ serve(async req => {
       booking_vertical: vertical,
       amount: amount,
       payment_mode: mode,
-      note: `Manual ${mode} payment added via vendor app`,
+      note: note || `Manual ${mode} payment added via vendor app`,
       logged_by: loggedBy,
     });
 

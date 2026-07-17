@@ -23,6 +23,7 @@ export interface ScreenContainerProps {
   backgroundColor?: string;
   refreshing?: boolean;
   onRefresh?: () => void;
+  footer?: React.ReactNode;
 }
 
 export const ScreenContainer = ({
@@ -33,6 +34,7 @@ export const ScreenContainer = ({
   backgroundColor = COLORS.background,
   refreshing = false,
   onRefresh,
+  footer,
 }: ScreenContainerProps) => {
   const Container = scrollable ? ScrollView : View;
 
@@ -59,6 +61,7 @@ export const ScreenContainer = ({
         <Container {...containerProps} style={!scrollable ? containerProps.style : undefined}>
           <View style={[styles.wrapper, style]}>{children}</View>
         </Container>
+        {footer && <View style={styles.footerContainer}>{footer}</View>}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -76,5 +79,8 @@ const styles = StyleSheet.create({
   },
   wrapper: {
     flex: 1,
+  },
+  footerContainer: {
+    width: "100%",
   },
 });

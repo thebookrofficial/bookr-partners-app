@@ -579,9 +579,9 @@ export const BulkBookingDetailsScreen = () => {
   return (
     <ScreenContainer backgroundColor="#FFFFFF" paddingHorizontal={hs(12)}>
       {bookingId === "new" ? (
-        <CreateBulkBooking type={type} venueId={venueId} groundId={groundId} />
+        <CreateBulkBooking type={type || "multi"} venueId={venueId} groundId={groundId} />
       ) : (
-        <ViewBulkBooking bookingId={bookingId} type={type} />
+        <ViewBulkBooking bookingId={bookingId} type={type || "multi"} />
       )}
     </ScreenContainer>
   );
