@@ -27,6 +27,7 @@ import { TimePickerModal } from "../components/TimePickerModal";
 import { SportsService } from "../services/sports.service";
 import { useBookingDetails } from "../hooks/useBookingDetails";
 import { generateTimeSlots } from "../utils/time.utils";
+import perf from "@react-native-firebase/perf";
 
 export const RescheduleBookingScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -180,6 +181,7 @@ export const RescheduleBookingScreen = () => {
       return;
     }
     setIsRescheduling(true);
+    const trace = await perf().startTrace("reschedule_booking");
     try {
       await SportsService.rescheduleBookingWithRange({
         bookingId,
@@ -206,6 +208,7 @@ export const RescheduleBookingScreen = () => {
     } catch (err: any) {
       Alert.alert("Slot Unavailable", err.message || "Failed to reschedule booking");
     } finally {
+      await trace.stop();
       setIsRescheduling(false);
     }
   };

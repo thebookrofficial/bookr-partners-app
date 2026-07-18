@@ -27,6 +27,7 @@ import { TimePickerModal } from "../components/TimePickerModal";
 import { SportsService } from "../services/sports.service";
 import { useBookingDetails } from "../hooks/useBookingDetails";
 import { generateTimeSlots } from "../utils/time.utils";
+import perf from "@react-native-firebase/perf";
 
 export const RepeatBookingScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -179,6 +180,7 @@ export const RepeatBookingScreen = () => {
     }
 
     setIsRepeating(true);
+    const trace = await perf().startTrace("repeat_booking");
     try {
       const timeMatchFrom = fromTime.match(/^(\d+)(?::(\d+))?\s*(AM|PM)?/i);
       const timeMatchTo = toTime.match(/^(\d+)(?::(\d+))?\s*(AM|PM)?/i);
@@ -228,6 +230,7 @@ export const RepeatBookingScreen = () => {
     } catch (err: any) {
       Alert.alert("Slot Unavailable", err.message || "Failed to repeat booking");
     } finally {
+      await trace.stop();
       setIsRepeating(false);
     }
   };

@@ -30,6 +30,7 @@ import { MainStackParamList } from "@/navigation/navigation.types";
 import { OfflineBookingSheet } from "../components/OfflineBookingSheet";
 import { useSportsHome } from "../hooks/useSportsHome";
 import { useServiceStore } from "@/store/serviceStore";
+import perf from "@react-native-firebase/perf";
 
 export const SportsHomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -148,8 +149,13 @@ export const SportsHomeScreen = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refresh();
-    setRefreshing(false);
+    const trace = await perf().startTrace("home_data_refresh");
+    try {
+      await refresh();
+    } finally {
+      await trace.stop();
+      setRefreshing(false);
+    }
   };
 
   // Auto-select the first available category if the current one isn't valid for this vendor
@@ -314,10 +320,10 @@ export const SportsHomeScreen = () => {
             {grounds.length > 0 && (
               <View style={styles.groundTabs}>
                 <PillTabs
-                  tabs={grounds.map(g => g.name)}
-                  activeTab={grounds.find(g => g.id === activeGroundId)?.name || ""}
+                  tabs={grounds.map((g: any) => g.name)}
+                  activeTab={grounds.find((g: any) => g.id === activeGroundId)?.name || ""}
                   onTabChange={selectedName => {
-                    const selectedGround = grounds.find(g => g.name === selectedName);
+                    const selectedGround = grounds.find((g: any) => g.name === selectedName);
                     if (selectedGround) setActiveGroundId(selectedGround.id);
                   }}
                   variant="primary"
@@ -353,7 +359,7 @@ export const SportsHomeScreen = () => {
                     onSlotPress={slot => {
                       if (slot.status === "booked" || slot.status === "blocked") {
                         if (!slot.raw_start_time) return; // Prevent TS undefined error
-                        const foundBooking = bookings.find(b => {
+                        const foundBooking = bookings.find((b: any) => {
                           if (!b.startTimeRaw || !b.endTimeRaw) return false;
                           // Non-null assertion (!) is safe here since we just checked
                           return (
@@ -389,7 +395,7 @@ export const SportsHomeScreen = () => {
                       {getFormattedDate(selectedDate)}
                     </Text>
                   )}
-                  {bookings.map(booking => (
+                  {bookings.map((booking: any) => (
                     <BookingCard
                       key={booking.id}
                       name={booking.name}

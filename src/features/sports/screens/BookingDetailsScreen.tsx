@@ -32,6 +32,7 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navig
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { useBookingDetails } from "../hooks/useBookingDetails";
+import perf from "@react-native-firebase/perf";
 
 const icGpay = require("@/assets/icons/google-pay.png");
 const icPhonepe = require("@/assets/icons/icons8-phone-pe-48.png");
@@ -142,10 +143,15 @@ export const BookingDetailsScreen = () => {
     if (selectedMethod === "phonepe") noteText = "PHONEPE";
     if (selectedMethod === "paytm") noteText = "PAYTM";
 
-    const success = await logPayment(amountAdded, backendMethod, noteText);
+    const trace = await perf().startTrace("booking_add_money");
+    try {
+      const success = await logPayment(amountAdded, backendMethod, noteText);
 
-    if (success) {
-      setPaymentInput("");
+      if (success) {
+        setPaymentInput("");
+      }
+    } finally {
+      await trace.stop();
     }
   };
 
@@ -629,9 +635,14 @@ export const BookingDetailsScreen = () => {
                 style={styles.modalConfirmBtn}
                 onPress={async () => {
                   setShowCancelModal(false);
-                  const success = await cancelBooking();
-                  if (success) {
-                    navigation.goBack();
+                  const trace = await perf().startTrace("cancel_booking");
+                  try {
+                    const success = await cancelBooking();
+                    if (success) {
+                      navigation.goBack();
+                    }
+                  } finally {
+                    await trace.stop();
                   }
                 }}>
                 <Text variant="h3" family="nichrome" color="#FFF" style={styles.modalConfirmText}>

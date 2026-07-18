@@ -2,7 +2,14 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -14,6 +21,7 @@ import { SportsTabParamList } from "@/navigation/navigation.types";
 import { useServiceStore } from "@/store/serviceStore";
 import { CustomDatePickerModal } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
+import perf from "@react-native-firebase/perf";
 
 // Sub-components & Hooks
 import { ClosedDatesAlert } from "../components/block-unblock/ClosedDatesAlert";
@@ -47,7 +55,7 @@ export const BlockUnblockScreen = () => {
   const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
   const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId || "");
 
-  const { activeBlocks, pastBlocks, loading, blockSlots, unblockSlots } = useBlockUnblock(
+  const { activeBlocks, pastBlocks, loading, blockSlots, unblockSlots, refresh } = useBlockUnblock(
     venueId,
     selectedGroundId,
   );
@@ -159,6 +167,7 @@ export const BlockUnblockScreen = () => {
 
   const handleBlockSubmit = async () => {
     setIsSubmitting(true);
+    const trace = await perf().startTrace("block_time_slot");
     try {
       const selectedDates: string[] = [];
 
@@ -185,14 +194,35 @@ export const BlockUnblockScreen = () => {
       // Only reset the UI if it actually succeeded
       if (success) {
         setIsSelectingRange(false);
+        refresh();
       }
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to close slot");
     } finally {
+      await trace.stop();
       setIsSubmitting(false);
     }
   };
 
   const handleUnblock = (block: BlockedEntry) => {
-    unblockSlots(block.slotIds);
+    Alert.alert("Unblock Slot", `Are you sure you want to unblock this?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Unblock",
+        style: "destructive",
+        onPress: async () => {
+          const trace = await perf().startTrace("unblock_time_slot");
+          try {
+            await unblockSlots(block.slotIds);
+            refresh();
+          } catch (err: any) {
+            Alert.alert("Error", err.message || "Failed to unblock");
+          } finally {
+            await trace.stop();
+          }
+        },
+      },
+    ]);
   };
 
   if (loading) {

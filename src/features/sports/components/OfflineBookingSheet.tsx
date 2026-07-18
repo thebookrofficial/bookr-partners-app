@@ -44,6 +44,7 @@ import { TimePickerModal } from "./TimePickerModal";
 import { z } from "zod";
 import { SportsService } from "../services/sports.service";
 import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
+import perf from "@react-native-firebase/perf";
 
 interface OfflineBookingSheetProps {
   isVisible: boolean;
@@ -72,7 +73,6 @@ const offlineBookingSchema = z
         message: "Advance paid must be a valid number.",
       })
       .optional(),
-    // UPDATE THESE TWO LINES:
     fromTime: z.string().refine(val => val !== "Start Time", "Please select a Start Time."),
     toTime: z.string().refine(val => val !== "End Time", "Please select an End Time."),
   })
@@ -441,6 +441,7 @@ export const OfflineBookingSheet = ({
     }
 
     setIsSubmitting(true);
+    const trace = await perf().startTrace("create_offline_booking");
     try {
       const formattedDate = getLocalDateString(currentDate);
       const startTime24 = parseTimeTo24Hour(fromTime, false);
@@ -472,6 +473,7 @@ export const OfflineBookingSheet = ({
     } catch (error: any) {
       Alert.alert("Booking Failed", error.message || "Something went wrong.");
     } finally {
+      await trace.stop();
       setIsSubmitting(false);
     }
   };

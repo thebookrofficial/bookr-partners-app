@@ -19,6 +19,7 @@
     "@react-native-community/datetimepicker": "^9.1.0",
     "@react-native-firebase/app": "^24.0.0",
     "@react-native-firebase/messaging": "^24.0.0",
+    "@react-native-firebase/perf": "24.0.0",
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@react-native/new-app-screen": "0.81.0",
     "@react-navigation/bottom-tabs": "^7.15.9",

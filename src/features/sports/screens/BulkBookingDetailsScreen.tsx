@@ -31,6 +31,7 @@ import { useBulkBooking } from "../hooks/useBulkBooking";
 import { CustomDatePickerModal } from "@/components/ui";
 import { useServiceStore } from "@/store/serviceStore";
 import { supabase } from "@/lib/supabase";
+import perf from "@react-native-firebase/perf";
 
 // IMPORT THE NEW VIEW COMPONENT
 import { ViewBulkBooking } from "../components/ViewBulkBooking";
@@ -213,22 +214,27 @@ const CreateBulkBooking = ({
       Alert.alert("Missing Info", "Please ensure dates, times, ground, and guest info are valid.");
       return;
     }
-    const success = await confirmBulkBooking({
-      ownerId,
-      venueId,
-      groundId: selectedGroundId, // Pass the selected ground to the hook
-      category: selectedCategory,
-      mobile,
-      name,
-      fromDate,
-      toDate: bookingType === "single" ? fromDate : toDate,
-      fromTime,
-      toTime,
-      totalAmountPerSlot: pricePerHour * slotMultiplier,
-      initialPayments: stagedPayments,
-      slotDurationMinutes,
-    });
-    if (success) navigation.goBack();
+    const trace = await perf().startTrace("bulk_booking_confirm");
+    try {
+      const success = await confirmBulkBooking({
+        ownerId,
+        venueId,
+        groundId: selectedGroundId,
+        category: selectedCategory,
+        mobile,
+        name,
+        fromDate,
+        toDate: bookingType === "single" ? fromDate : toDate,
+        fromTime,
+        toTime,
+        totalAmountPerSlot: pricePerHour * slotMultiplier,
+        initialPayments: stagedPayments,
+        slotDurationMinutes,
+      });
+      if (success) navigation.goBack();
+    } finally {
+      await trace.stop();
+    }
   };
 
   // Helper to display current ground name
