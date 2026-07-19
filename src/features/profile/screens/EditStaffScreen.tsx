@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from "react";
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, TextInput } from "@/components/ui";
+import { Text, TextInput, FormSkeleton } from "@/components/ui";
 import {
   ArrowLeft,
   User,
@@ -156,8 +156,8 @@ export const EditStaffScreen = () => {
 
   if (initialLoading) {
     return (
-      <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: vs(60) }} />
+      <ScreenContainer scrollable backgroundColor={COLORS.background}>
+        <FormSkeleton />
       </ScreenContainer>
     );
   }

@@ -7,9 +7,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
 } from "react-native";
+import { FormSkeleton } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -228,7 +229,7 @@ export const BlockUnblockScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <FormSkeleton />
       </View>
     );
   }

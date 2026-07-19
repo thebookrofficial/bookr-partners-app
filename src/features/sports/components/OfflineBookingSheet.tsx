@@ -119,7 +119,7 @@ const FieldBox = ({
       </View>
       <View style={styles.fieldContent}>
         <Text
-          variant="body2"
+          variant="body1"
           weight="bold"
           color="#000"
           style={[(isInput || value || placeholder) && { marginBottom: vs(2) }]}>

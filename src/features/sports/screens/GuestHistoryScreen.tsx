@@ -1,13 +1,6 @@
 import React, { useState } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Image,
-  Alert,
-  ScrollView,
-} from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image, Alert, ScrollView } from "react-native";
+import { GuestHistorySkeleton } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ArrowLeft, Flag, Phone, ChevronDown, ChevronUp } from "lucide-react-native";
@@ -73,7 +66,7 @@ export const GuestHistoryScreen = () => {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <GuestHistorySkeleton />
       </View>
     );
   }

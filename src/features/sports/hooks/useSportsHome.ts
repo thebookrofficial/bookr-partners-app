@@ -90,9 +90,9 @@ export const useSportsHome = (
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [slots, setSlots] = useState<SlotData[]>([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsLoading, setSlotsLoading] = useState(true);
   const [bookings, setBookings] = useState<BookingData[]>([]);
-  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
 
   // Reset state when venue or category changes to avoid stale data leakage
   useEffect(() => {
@@ -102,6 +102,8 @@ export const useSportsHome = (
     setActiveGroundId("");
     setSlots([]);
     setBookings([]);
+    setSlotsLoading(true);
+    setBookingsLoading(true);
   }, [initialVenueId, category]);
 
   // Auto-select the first available category if the current one isn't valid for this vendor

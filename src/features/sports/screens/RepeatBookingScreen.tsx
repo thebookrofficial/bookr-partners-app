@@ -6,16 +6,16 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
   TextInput as RNTextInput,
   Image,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
+import { FormSkeleton, Text } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
 import { ArrowLeft, Calendar, Clock } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -273,7 +273,7 @@ export const RepeatBookingScreen = () => {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="small" color={COLORS.primary} style={styles.loader} />
+        <FormSkeleton />
       ) : (
         <View style={styles.content}>
           {/* Date Selector */}

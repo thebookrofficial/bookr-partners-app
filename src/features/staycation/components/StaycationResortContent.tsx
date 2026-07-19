@@ -11,7 +11,7 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
-import { Text, StaycationSkeleton } from "@/components/ui";
+import { Text, StaycationBookingsListSkeleton } from "@/components/ui";
 import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
@@ -72,6 +72,13 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
   }, [selectedDate, closedDates]);
 
   const [isOfflineSheetVisible, setIsOfflineSheetVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const onDateChange = (event: DateTimePickerEvent, date?: Date) => {
     setShowDatePicker(false);
@@ -336,35 +343,31 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
   return (
     <View style={styles.root}>
-      {isLoading && flatListData.length === 0 ? (
-        <View style={{ flex: 1 }}>
-          <StaycationSkeleton />
-        </View>
-      ) : (
-        <FlatList
-          data={flatListData}
-          keyExtractor={(item, index) =>
-            item.type === "header" ? item.title + index : item.data.id
-          }
-          renderItem={renderItem}
-          ListHeaderComponent={listHeader}
-          ListFooterComponent={<View style={{ height: vs(120) }} />}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isLoading && flatListData.length > 0}
-              onRefresh={refetch}
-              tintColor={COLORS.primary}
-            />
-          }
-          ListEmptyComponent={
+      <FlatList
+        data={flatListData}
+        keyExtractor={(item, index) => (item.type === "header" ? item.title + index : item.data.id)}
+        renderItem={renderItem}
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={<View style={{ height: vs(120) }} />}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+          />
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <StaycationBookingsListSkeleton />
+          ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No bookings found.</Text>
             </View>
-          }
-        />
-      )}
+          )
+        }
+      />
 
       <TouchableOpacity
         style={styles.fab}

@@ -7,12 +7,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   RefreshControl,
   Modal,
 } from "react-native";
+import { DashboardSkeleton, Text } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { Calendar, X } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -93,8 +92,12 @@ export const SportsDashboardScreen = () => {
 
   const { activeVenueName } = useServiceStore();
 
-  const onRefresh = React.useCallback(() => {
-    refetch();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
   }, [refetch]);
 
   useEffect(() => {
@@ -148,15 +151,13 @@ export const SportsDashboardScreen = () => {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={loading || dataLoading} onRefresh={onRefresh} />
-        }>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* 1. Header */}
         <ServiceHeader title={activeVenueName} subtitle="Dashboard" />
 
         {/* 2. Conditional Rendering for Dashboard Content */}
         {loading || dataLoading ? (
-          <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+          <DashboardSkeleton />
         ) : !currentVenueId ? (
           <Text style={styles.emptyStateText}>
             No {selectedCategory} facility setup for this club.

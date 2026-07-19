@@ -2,9 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, EssentialsSkeleton } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { ChevronRight, Files, Ban, Banknote, HelpCircle, User } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -98,7 +98,7 @@ export const SportsEssentialsScreen = () => {
 
       {/* 2. Conditional Rendering for Content */}
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+        <EssentialsSkeleton />
       ) : !currentVenueId ? (
         <Text style={styles.emptyStateText}>
           No {selectedCategory} facility setup for this club.

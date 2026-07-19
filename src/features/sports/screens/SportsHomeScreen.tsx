@@ -15,14 +15,7 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import {
-  Text,
-  PillTabs,
-  CustomDatePickerModal,
-  SportsHomeSkeleton,
-  Skeleton,
-  ListSkeleton,
-} from "@/components/ui";
+import { Text, PillTabs, CustomDatePickerModal, Skeleton, ListSkeleton } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { LegendIndicator } from "../components/LegendIndicator";
 import { TimeSlotGrid } from "../components/TimeSlotGrid";
@@ -203,11 +196,7 @@ export const SportsHomeScreen = () => {
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
         />
 
-        {loading && !venue ? (
-          <View style={{ marginTop: vs(0) }}>
-            <SportsHomeSkeleton />
-          </View>
-        ) : !venue ? (
+        {!loading && !venue ? (
           <View style={styles.centerContainer}>
             <Text
               variant="body1"

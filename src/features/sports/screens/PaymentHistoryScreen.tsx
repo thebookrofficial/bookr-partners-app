@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, PaymentHistorySkeleton } from "@/components/ui";
 import { ChevronLeft, MinusCircle } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -80,9 +80,7 @@ export const PaymentHistoryScreen = () => {
       </View>
 
       {loading ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
+        <PaymentHistorySkeleton />
       ) : (
         <ScrollView
           contentContainerStyle={styles.scrollContent}

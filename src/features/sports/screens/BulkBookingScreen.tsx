@@ -2,9 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, BulkBookingSkeleton } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { BookingCard } from "../components/BookingCard";
 import { Plus } from "lucide-react-native";
@@ -206,7 +206,7 @@ export const BulkBookingScreen = () => {
 
   const renderContent = () => {
     if (loading) {
-      return <ActivityIndicator color={COLORS.primary} style={{ marginTop: vs(20) }} />;
+      return <BulkBookingSkeleton />;
     }
 
     if (bookings.length === 0) {

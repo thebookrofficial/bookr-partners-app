@@ -16,7 +16,7 @@ import {
   TextInput,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, DetailsSkeleton } from "@/components/ui";
 import {
   Calendar,
   Clock,
@@ -90,8 +90,8 @@ export const BookingDetailsScreen = () => {
 
   if (loading || !booking) {
     return (
-      <View style={[styles.root, styles.centered]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={styles.root}>
+        <DetailsSkeleton />
       </View>
     );
   }

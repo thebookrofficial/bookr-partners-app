@@ -7,10 +7,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   Alert,
   RefreshControl,
 } from "react-native";
+import { StaffManagementSkeleton } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ArrowLeft, UserPlus } from "lucide-react-native";
@@ -126,7 +126,7 @@ export const StaffManagementScreen = () => {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: vs(60) }} />
+        <StaffManagementSkeleton />
       ) : staffList.length === 0 ? (
         <Text style={styles.emptyText}>No staff members found.</Text>
       ) : (

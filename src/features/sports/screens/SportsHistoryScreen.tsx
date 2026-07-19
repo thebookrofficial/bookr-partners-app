@@ -2,14 +2,8 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl,
-} from "react-native";
+import { View, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } from "react-native";
+import { HistorySkeleton } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, TextInput } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -189,7 +183,7 @@ export const SportsHistoryScreen = () => {
         {/* List Section */}
         <View style={styles.listSection}>
           {loading ? (
-            <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+            <HistorySkeleton />
           ) : !currentVenueId ? (
             <Text style={styles.emptyStateText}>
               No {selectedCategory} facility setup for this club.
