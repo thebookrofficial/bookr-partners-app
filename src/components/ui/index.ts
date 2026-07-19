@@ -5,3 +5,5 @@ export * from "./TextInput";
 export * from "./Avatar";
 export * from "./PillTabs";
 export * from "./CustomDatePickerModal";
+export * from "./Skeleton";
+export * from "./SkeletonLayouts";

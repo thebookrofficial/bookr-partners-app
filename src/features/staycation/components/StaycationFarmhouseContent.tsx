@@ -2,16 +2,8 @@
 // Confidential and Proprietary.
 
 import React, { useMemo, useState } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
-} from "react-native";
-import { Text } from "@/components/ui";
+import { View, StyleSheet, TouchableOpacity, FlatList, RefreshControl, Alert } from "react-native";
+import { Text, StaycationSkeleton } from "@/components/ui";
 import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
@@ -39,7 +31,6 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
     closedDates,
     groupedBookings,
     refetch,
-    venues,
     activeVenue,
     cancelBooking,
     selectedDate,
@@ -208,9 +199,9 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
 
   return (
     <View style={styles.root}>
-      {isLoading && venues.length === 0 ? (
+      {isLoading && flatListData.length === 0 ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <StaycationSkeleton />
         </View>
       ) : (
         <FlatList
@@ -224,7 +215,11 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={COLORS.primary} />
+            <RefreshControl
+              refreshing={isLoading && flatListData.length > 0}
+              onRefresh={refetch}
+              tintColor={COLORS.primary}
+            />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -411,12 +406,8 @@ const styles = StyleSheet.create({
   },
   loaderContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: vs(100),
   },
   emptyContainer: {
-    padding: ms(32),
     alignItems: "center",
     marginTop: vs(20),
   },

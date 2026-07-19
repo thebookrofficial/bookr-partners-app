@@ -2,7 +2,8 @@
 // Confidential and Proprietary.
 
 import React, { useEffect, useState } from "react";
-import { View, ActivityIndicator, StyleSheet, Text } from "react-native";
+import { View, StyleSheet, Text } from "react-native";
+import { EventHomeSkeleton } from "@/components/ui";
 import { EventHomeScreenOpen } from "./EventHomeScreenOpen";
 import { EventHomeScreenAssigned } from "./EventHomeScreenAssigned";
 import { supabase } from "@/lib/supabase";
@@ -104,8 +105,8 @@ export const EventHomeScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingWrapper}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={{ flex: 1 }}>
+        <EventHomeSkeleton />
       </View>
     );
   }

@@ -7,12 +7,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
   Alert,
   ScrollView,
 } from "react-native";
-import { Text } from "@/components/ui";
+import { Text, StaycationSkeleton } from "@/components/ui";
 import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
@@ -64,16 +63,8 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
   }, [activeRoomStatus, selectedDate]);
 
   // CRITICAL FIX: Passed activeRoomType to the hook so occupancy updates dynamically!
-  const {
-    isLoading,
-    closedDates,
-    groupedBookings,
-    refetch,
-    venues,
-    activeVenue,
-    rooms,
-    cancelBooking,
-  } = useStaycationResort(initialVenueId, effectiveDate, activeRoomType);
+  const { isLoading, closedDates, groupedBookings, refetch, activeVenue, rooms, cancelBooking } =
+    useStaycationResort(initialVenueId, effectiveDate, activeRoomType);
 
   const isDateClosed = useMemo(() => {
     const dStr = selectedDate.toISOString().split("T")[0];
@@ -345,9 +336,9 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
   return (
     <View style={styles.root}>
-      {isLoading && venues.length === 0 ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+      {isLoading && flatListData.length === 0 ? (
+        <View style={{ flex: 1 }}>
+          <StaycationSkeleton />
         </View>
       ) : (
         <FlatList
@@ -361,7 +352,11 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={COLORS.primary} />
+            <RefreshControl
+              refreshing={isLoading && flatListData.length > 0}
+              onRefresh={refetch}
+              tintColor={COLORS.primary}
+            />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>

@@ -2,9 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useState, useMemo } from "react";
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, Avatar, PillTabs } from "@/components/ui";
+import { Text, Avatar, PillTabs, ListSkeleton } from "@/components/ui";
 import { ServiceCard } from "../components/ServiceCard";
 import { Settings } from "lucide-react-native";
 import { vs, hs, ms } from "@/utils/responsive.utils";
@@ -79,7 +79,7 @@ export const VendorProfileScreen = () => {
       scrollable
       backgroundColor={COLORS.background}
       paddingHorizontal={hs(12)}
-      refreshing={loading}
+      refreshing={loading && venues.length > 0}
       onRefresh={refresh}>
       <View style={styles.appBar}>
         <View style={styles.appBarLeft}>
@@ -135,8 +135,10 @@ export const VendorProfileScreen = () => {
       <PillTabs tabs={availableTabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <View style={styles.servicesList}>
-        {loading ? (
-          <ActivityIndicator color={COLORS.primary} style={styles.loader} />
+        {loading && venues.length === 0 ? (
+          <View style={styles.loaderContainer}>
+            <ListSkeleton count={4} />
+          </View>
         ) : filteredVenues.length > 0 ? (
           filteredVenues.map(venue => (
             <ServiceCard
@@ -244,6 +246,9 @@ const styles = StyleSheet.create({
   sectionHeader: { width: "100%", height: vs(25), justifyContent: "center" },
   sectionTitle: { textTransform: "uppercase", fontWeight: "bold" },
   servicesList: { gap: vs(10), minHeight: vs(100) },
+  loaderContainer: {
+    marginTop: vs(20),
+  },
   loader: { marginTop: vs(20) },
   emptyState: {
     alignItems: "center",

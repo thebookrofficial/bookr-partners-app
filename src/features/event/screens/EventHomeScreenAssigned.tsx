@@ -2,9 +2,9 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import { View, StyleSheet, ActivityIndicator } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { PillTabs } from "@/components/ui";
+import { PillTabs, EventHomeSkeleton } from "@/components/ui";
 import { hs, vs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { EventHeader } from "../components/EventHeader";
@@ -45,7 +45,7 @@ export const EventHomeScreenAssigned = ({ eventId }: EventHomeScreenAssignedProp
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <EventHomeSkeleton />
       </View>
     );
   }
@@ -99,15 +99,9 @@ export const EventHomeScreenAssigned = ({ eventId }: EventHomeScreenAssignedProp
 };
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  root: { flex: 1, backgroundColor: COLORS.background },
   loadingContainer: {
     flex: 1,
-    backgroundColor: COLORS.background,
-    justifyContent: "center",
-    alignItems: "center",
   },
   tabWrapper: {
     marginBottom: vs(10),

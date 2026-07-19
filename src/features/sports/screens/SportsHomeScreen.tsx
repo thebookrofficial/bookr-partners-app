@@ -6,7 +6,6 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   LayoutAnimation,
   UIManager,
   Platform,
@@ -16,7 +15,14 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, PillTabs, CustomDatePickerModal } from "@/components/ui";
+import {
+  Text,
+  PillTabs,
+  CustomDatePickerModal,
+  SportsHomeSkeleton,
+  Skeleton,
+  ListSkeleton,
+} from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { LegendIndicator } from "../components/LegendIndicator";
 import { TimeSlotGrid } from "../components/TimeSlotGrid";
@@ -197,11 +203,9 @@ export const SportsHomeScreen = () => {
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
         />
 
-        {loading ||
-        (slotsLoading && slots.length === 0) ||
-        (bookingsLoading && bookings.length === 0) ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
+        {loading && !venue ? (
+          <View style={{ marginTop: vs(0) }}>
+            <SportsHomeSkeleton />
           </View>
         ) : !venue ? (
           <View style={styles.centerContainer}>
@@ -338,12 +342,19 @@ export const SportsHomeScreen = () => {
                 </Text>
                 <LegendIndicator />
 
-                {slotsLoading && slots.length > 0 ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={COLORS.primary}
-                    style={styles.loaderStyle}
-                  />
+                {slotsLoading && slots.length === 0 ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      justifyContent: "space-between",
+                      gap: vs(8),
+                      marginTop: vs(16),
+                    }}>
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <Skeleton key={i} width="23%" height={vs(40)} borderRadius={ms(8)} />
+                    ))}
+                  </View>
                 ) : slots.length === 0 ? (
                   <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
                     No slots generated for this date/ground yet.
@@ -382,8 +393,10 @@ export const SportsHomeScreen = () => {
             {/* Bookings Title Removed per Figma */}
 
             <View style={styles.bookingsContainer}>
-              {bookingsLoading && bookings.length > 0 ? (
-                <ActivityIndicator size="small" color={COLORS.primary} style={styles.loaderStyle} />
+              {bookingsLoading && bookings.length === 0 ? (
+                <View style={{ marginTop: vs(16) }}>
+                  <ListSkeleton count={3} />
+                </View>
               ) : bookings.length === 0 ? (
                 <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
                   No bookings found for this date.
