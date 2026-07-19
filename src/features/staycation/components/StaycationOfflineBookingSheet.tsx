@@ -16,7 +16,7 @@ import {
   Linking,
 } from "react-native";
 import { Text } from "@/components/ui";
-import { User, Phone, Calendar, ChevronDown, Wallet, Hash } from "lucide-react-native";
+import { User, Phone, Calendar, ChevronDown, Wallet, Hash, ArrowLeft } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
@@ -678,15 +678,16 @@ export const StaycationOfflineBookingSheet = ({
     <>
       <Modal
         visible={visible}
-        transparent
+        transparent={false}
         animationType="slide"
         onRequestClose={onClose}
         statusBarTranslucent={true}>
         <View style={styles.overlay}>
-          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-
           <View style={styles.sheetContainer}>
             <View style={styles.header}>
+              <TouchableOpacity onPress={onClose} style={styles.backButton}>
+                <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
+              </TouchableOpacity>
               <Text weight="bold" style={styles.title}>
                 OFFLINE BOOKING
               </Text>
@@ -1060,19 +1061,18 @@ export const StaycationOfflineBookingSheet = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0, 0, 0, 0.4)" },
+  overlay: { flex: 1, backgroundColor: COLORS.background },
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheetContainer: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: ms(20),
-    borderTopRightRadius: ms(20),
+    flex: 1,
+    backgroundColor: COLORS.background,
     paddingHorizontal: hs(16),
-    paddingTop: vs(20),
+    paddingTop: vs(60),
     paddingBottom: vs(30),
-    maxHeight: "90%",
   },
-  header: { marginBottom: vs(16) },
-  title: { fontSize: fs(16), color: COLORS.text.primary, textTransform: "uppercase" },
+  header: { flexDirection: "row", alignItems: "center", marginBottom: vs(24) },
+  backButton: { marginRight: hs(12) },
+  title: { fontSize: fs(18), color: COLORS.text.primary, textTransform: "uppercase" },
   scrollContent: { gap: vs(16) },
   inputGroup: { gap: vs(8) },
   row: { flexDirection: "row", gap: hs(16) },

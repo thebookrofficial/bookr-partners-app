@@ -187,10 +187,10 @@ export const useCreateStaycationOfflineBooking = () => {
             targetRoomIds = assignedRoomsToBlock;
           }
 
-          const upsertData = [];
+          const insertData = [];
           for (const roomId of targetRoomIds) {
             for (const date of targetDates) {
-              upsertData.push({
+              insertData.push({
                 venue_id: payload.venueId,
                 room_id: roomId,
                 date: date,
@@ -200,14 +200,33 @@ export const useCreateStaycationOfflineBooking = () => {
             }
           }
 
-          if (upsertData.length > 0) {
-            const { error: upsertErr } = await supabase
-              .from("staycation_availability")
-              .upsert(upsertData, {
-                onConflict: "venue_id, room_id, date",
-              });
+          if (insertData.length > 0) {
+            // First, delete any existing availability rows for these specific dates/rooms
+            // to avoid unique constraint conflicts on NULL room_ids
+            for (const roomId of targetRoomIds) {
+              if (roomId === null) {
+                await supabase
+                  .from("staycation_availability")
+                  .delete()
+                  .eq("venue_id", payload.venueId)
+                  .in("date", targetDates)
+                  .is("room_id", null);
+              } else {
+                await supabase
+                  .from("staycation_availability")
+                  .delete()
+                  .eq("venue_id", payload.venueId)
+                  .in("date", targetDates)
+                  .eq("room_id", roomId);
+              }
+            }
 
-            if (upsertErr) console.error("Upsert Availability Error:", upsertErr);
+            // Now insert the fresh blocked dates safely
+            const { error: insertErr } = await supabase
+              .from("staycation_availability")
+              .insert(insertData);
+
+            if (insertErr) console.error("Insert Availability Error:", insertErr);
           }
         }
       } catch (avErr) {
