@@ -194,6 +194,7 @@ export const SportsHomeScreen = () => {
           subtitle="Home"
           category={selectedCategory}
           imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
+          showBackBtn={false}
         />
 
         {!loading && !venue ? (

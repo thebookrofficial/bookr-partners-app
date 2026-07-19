@@ -553,6 +553,54 @@ export const PayoutListItemSkeleton = () => {
   );
 };
 
+export const InvoiceSkeleton = () => {
+  return (
+    <View style={{ flex: 1, paddingHorizontal: hs(16), paddingTop: vs(16) }}>
+      {/* Header Row */}
+      <View style={[styles.row, { marginBottom: vs(24) }]}>
+        <Skeleton
+          width={ms(24)}
+          height={ms(24)}
+          borderRadius={ms(12)}
+          style={{ marginRight: hs(12) }}
+        />
+        <Skeleton
+          width={ms(50)}
+          height={ms(50)}
+          borderRadius={ms(25)}
+          style={{ marginRight: hs(12) }}
+        />
+        <View style={{ flex: 1 }}>
+          <Skeleton width="60%" height={vs(20)} style={{ marginBottom: vs(8) }} />
+          <Skeleton width="30%" height={vs(14)} />
+        </View>
+      </View>
+
+      {/* Amount Banner */}
+      <View style={{ alignItems: "center", marginBottom: vs(24) }}>
+        <Skeleton width="30%" height={vs(16)} style={{ marginBottom: vs(8) }} />
+        <Skeleton width="50%" height={vs(36)} style={{ marginBottom: vs(12) }} />
+        <Skeleton width="20%" height={vs(24)} borderRadius={ms(12)} />
+      </View>
+
+      {/* Section Cards */}
+      <Skeleton
+        width="100%"
+        height={vs(80)}
+        borderRadius={ms(12)}
+        style={{ marginBottom: vs(16) }}
+      />
+      <Skeleton
+        width="100%"
+        height={vs(200)}
+        borderRadius={ms(12)}
+        style={{ marginBottom: vs(16) }}
+      />
+      <Skeleton width="100%" height={vs(150)} borderRadius={ms(12)} />
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

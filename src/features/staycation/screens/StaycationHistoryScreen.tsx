@@ -2,16 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useState, useMemo } from "react";
-import {
-  View,
-  StyleSheet,
-  SectionList,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-} from "react-native";
+import { View, StyleSheet, SectionList, TouchableOpacity, RefreshControl } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, ListSkeleton } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import { Phone, Calendar, User } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -148,7 +141,10 @@ export const StaycationHistoryScreen = () => {
   }, [getGroupedBookings]);
 
   return (
-    <ScreenContainer scrollable={false} backgroundColor={COLORS.background}>
+    <ScreenContainer
+      scrollable={false}
+      backgroundColor={COLORS.background}
+      paddingHorizontal={hs(10)}>
       <SectionList
         sections={listData}
         stickySectionHeadersEnabled={false}
@@ -229,22 +225,20 @@ export const StaycationHistoryScreen = () => {
           <MonthSectionHeader month={section.date} totalSettlement={(section as any).settlement} />
         )}
         ListEmptyComponent={
-          !isLoading ? (
+          isLoading ? (
+            <View style={{ paddingTop: vs(20) }}>
+              <ListSkeleton count={4} />
+            </View>
+          ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No past bookings found.</Text>
             </View>
-          ) : null
+          )
         }
         ListFooterComponent={<View style={{ height: vs(120) }} />}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
-
-      {isLoading && (
-        <View style={styles.loaderOverlay}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-      )}
 
       {/* Date Filter Bottom Sheet */}
       <FilterBottomSheet

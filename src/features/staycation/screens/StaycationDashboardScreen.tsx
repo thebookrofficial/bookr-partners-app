@@ -2,16 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  LayoutAnimation,
-  ActivityIndicator,
-  Modal,
-} from "react-native";
+import { View, StyleSheet, TouchableOpacity, LayoutAnimation, Modal } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, DashboardSkeleton } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import { Calendar, ChevronRight, ChevronDown, X } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -265,8 +258,8 @@ export const StaycationDashboardScreen = () => {
       />
 
       {isLoading ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+        <View style={{ flex: 1 }}>
+          <DashboardSkeleton />
         </View>
       ) : (
         <>

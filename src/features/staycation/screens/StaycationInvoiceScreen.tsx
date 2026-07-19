@@ -2,16 +2,9 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-  ActivityIndicator,
-} from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, InvoiceSkeleton } from "@/components/ui";
 import { ArrowLeft, Phone, Calendar, Clock, User, Home } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -28,8 +21,8 @@ export const StaycationInvoiceScreen = () => {
 
   if (loading || !booking) {
     return (
-      <View style={[styles.root, styles.centered]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={styles.root}>
+        <InvoiceSkeleton />
       </View>
     );
   }
@@ -71,7 +64,7 @@ export const StaycationInvoiceScreen = () => {
   };
 
   return (
-    <ScreenContainer backgroundColor={COLORS.background}>
+    <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(0)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Header Section */}
         <View style={styles.headerRow}>
