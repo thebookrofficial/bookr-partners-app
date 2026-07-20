@@ -45,6 +45,7 @@ export const RepeatBookingScreen = () => {
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">("cash");
+
   const [isRepeating, setIsRepeating] = useState(false);
   const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0, slotDurationMinutes: 60 });
 

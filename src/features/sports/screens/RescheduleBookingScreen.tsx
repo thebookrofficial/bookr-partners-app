@@ -7,13 +7,13 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
   TextInput as RNTextInput,
   Image,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { FormSkeleton, Text } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
@@ -46,6 +46,7 @@ export const RescheduleBookingScreen = () => {
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">("cash");
+
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0, slotDurationMinutes: 60 });
 
@@ -242,6 +243,7 @@ export const RescheduleBookingScreen = () => {
       Alert.alert("Error", "Please select a ground.");
       return;
     }
+
     setIsRescheduling(true);
     const trace = await perf().startTrace("reschedule_booking");
     try {
@@ -265,6 +267,7 @@ export const RescheduleBookingScreen = () => {
           .update({ booking_status: "rescheduled" })
           .in("id", oldIds);
       }
+
       Alert.alert("Success", "Booking rescheduled successfully!", [
         {
           text: "OK",
@@ -277,7 +280,7 @@ export const RescheduleBookingScreen = () => {
         },
       ]);
     } catch (err: any) {
-      Alert.alert("Slot Unavailable", err.message || "Failed to reschedule booking");
+      Alert.alert("Reschedule Failed", err.message || "Failed to reschedule booking");
     } finally {
       await trace.stop();
       setIsRescheduling(false);

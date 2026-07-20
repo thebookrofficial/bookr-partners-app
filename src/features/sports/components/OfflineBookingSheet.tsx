@@ -9,10 +9,10 @@ import {
   Modal,
   ScrollView,
   Alert,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { Text } from "@/components/ui";
 import {
@@ -464,10 +464,8 @@ export const OfflineBookingSheet = ({
         slotDurationMinutes: detectedSlotDuration,
       };
 
-      // CRITICAL FIX: Removed profile lookup and userId passing
       await SportsService.createOfflineBooking(bookingParams);
-
-      Alert.alert("Success", "Booking Saved!");
+      onClose();
       resetForm();
       onSuccess();
     } catch (error: any) {
@@ -803,7 +801,7 @@ export const OfflineBookingSheet = ({
               </View>
             </ScrollView>
             <TouchableOpacity
-              style={[styles.saveButton, isSubmitting && styles.saveButtonDisabled]}
+              style={styles.saveButton}
               activeOpacity={0.8}
               onPress={handleBookNow}
               disabled={isSubmitting}>

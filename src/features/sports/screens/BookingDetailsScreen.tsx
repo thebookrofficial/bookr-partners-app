@@ -146,9 +146,9 @@ export const BookingDetailsScreen = () => {
     const trace = await perf().startTrace("booking_add_money");
     try {
       const success = await logPayment(amountAdded, backendMethod, noteText);
-
       if (success) {
         setPaymentInput("");
+        setIsAddingPayment(false);
       }
     } finally {
       await trace.stop();
