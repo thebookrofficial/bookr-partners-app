@@ -18,14 +18,13 @@ serve(async req => {
     }
 
     const supabase = createClient(supabaseUrl!, supabaseKey!);
-    let finalToken = null;
-    let userId = record?.user_id;
+    const userIds: string[] = [];
     let title = record?.title;
     let body = record?.body;
 
     // --- HANDLE DIRECT BOOKINGS ---
     if (table && table.includes("bookings")) {
-      // Find the vendor (user_id) for this booking via the venue_id
+      // 1. Find the vendor (owner_id) for this booking via the venue_id
       const { data: venue, error: venueError } = await supabase
         .from("venues")
         .select("owner_id")
@@ -36,24 +35,35 @@ serve(async req => {
         console.error(`[VENUE ERROR]`, venueError);
       }
 
-      if (!venue || !venue.owner_id) {
-        return new Response(JSON.stringify({ message: "No vendor found for this venue" }), {
-          status: 200,
-        });
+      if (venue?.owner_id) {
+        // We have the client_profile ID (owner_id). Now we need the Supabase Auth user_id.
+        const { data: profile } = await supabase
+          .from("client_profiles")
+          .select("user_id")
+          .eq("id", venue.owner_id)
+          .maybeSingle();
+
+        if (profile?.user_id) {
+          userIds.push(profile.user_id);
+        }
       }
 
-      // We have the client_profile ID (owner_id). Now we need the Supabase Auth user_id.
-      const { data: profile } = await supabase
+      // 2. Find active staff members' auth user_ids for this venue
+      const { data: staffProfiles, error: staffError } = await supabase
         .from("client_profiles")
         .select("user_id")
-        .eq("id", venue.owner_id)
-        .maybeSingle();
+        .eq("venue_id", record.venue_id)
+        .eq("client_role", "staff");
 
-      userId = profile?.user_id;
+      if (staffError) {
+        console.error(`[STAFF ERROR]`, staffError);
+      }
 
-      if (!userId) {
-        return new Response(JSON.stringify({ message: "No auth user_id found for vendor" }), {
-          status: 200,
+      if (staffProfiles) {
+        staffProfiles.forEach(s => {
+          if (s.user_id && !userIds.includes(s.user_id)) {
+            userIds.push(s.user_id);
+          }
         });
       }
 
@@ -63,26 +73,34 @@ serve(async req => {
       return new Response(JSON.stringify({ message: "Unsupported table" }), { status: 200 });
     }
 
-    // --- FETCH FCM TOKEN ---
-    if (userId) {
-      const { data: dev } = await supabase
-        .from("user_devices")
-        .select("fcm_token")
-        .eq("user_id", userId)
-        .order("last_seen_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (dev?.fcm_token) {
-        finalToken = dev.fcm_token;
-      }
+    if (userIds.length === 0) {
+      return new Response(JSON.stringify({ message: "No users/staff found for notification" }), {
+        status: 200,
+      });
     }
 
-    if (!finalToken) {
-      console.error(`[ERROR] No valid token found for user ${userId}`);
-      return new Response(JSON.stringify({ error: "No valid token" }), { status: 200 });
+    // --- FETCH ALL FCM TOKENS FOR OWNER AND STAFF ---
+    const { data: devices, error: devError } = await supabase
+      .from("user_devices")
+      .select("fcm_token")
+      .in("user_id", userIds)
+      .not("fcm_token", "is", null);
+
+    if (devError) {
+      console.error(`[DEVICES ERROR]`, devError);
     }
 
-    // --- SEND FCM PUSH ---
+    const tokensToSend = (devices || []).map(d => d.fcm_token).filter(Boolean) as string[];
+
+    // Remove duplicates
+    const uniqueTokens = [...new Set(tokensToSend)];
+
+    if (uniqueTokens.length === 0) {
+      console.error(`[ERROR] No valid tokens found for users: ${JSON.stringify(userIds)}`);
+      return new Response(JSON.stringify({ error: "No valid tokens" }), { status: 200 });
+    }
+
+    // --- SEND FCM PUSH TO ALL TOKENS ---
     const serviceAccount = JSON.parse(serviceAccountString!);
     const jwtClient = new JWT({
       email: serviceAccount.client_email,
@@ -91,44 +109,60 @@ serve(async req => {
     });
     const tokens = await jwtClient.authorize();
 
-    const fcmPayload = {
-      message: {
-        token: finalToken,
-        notification: { title, body },
-        android: {
-          priority: "high",
-          notification: {
-            channelId: "booking_alerts_v2", // Plays the custom sound!
-            sound: "notification_audio", // Don't use .wav extension in FCM payload
+    const sendPromises = uniqueTokens.map(async token => {
+      const fcmPayload = {
+        message: {
+          token,
+          notification: { title, body },
+          android: {
+            priority: "high",
+            notification: {
+              channelId: "booking_alerts_v2", // Plays the custom sound!
+              sound: "notification_audio", // Don't use .wav extension in FCM payload
+            },
           },
-        },
-        apns: {
-          payload: {
-            aps: {
-              contentAvailable: true,
-              sound: "default",
+          apns: {
+            payload: {
+              aps: {
+                contentAvailable: true,
+                sound: "default",
+              },
             },
           },
         },
-      },
-    };
+      };
 
-    const res = await fetch(
-      `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${tokens.access_token}`,
+      const res = await fetch(
+        `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${tokens.access_token}`,
+          },
+          body: JSON.stringify(fcmPayload),
         },
-        body: JSON.stringify(fcmPayload),
-      },
+      );
+
+      const responseData = await res.json();
+      if (!res.ok) {
+        console.error(`[FCM ERROR for token ${token}]`, responseData);
+      }
+      return { token, ok: res.ok, data: responseData };
+    });
+
+    const sendResults = await Promise.all(sendPromises);
+    const successCount = sendResults.filter(r => r.ok).length;
+
+    return new Response(
+      JSON.stringify({
+        success: successCount > 0,
+        total_tokens: uniqueTokens.length,
+        success_count: successCount,
+        results: sendResults,
+      }),
+      { status: 200 },
     );
-
-    const fcmData = await res.json();
-    if (!res.ok) console.error(`[FCM ERROR]`, fcmData);
-
-    return new Response(JSON.stringify({ success: res.ok, data: fcmData }), { status: 200 });
   } catch (err: any) {
     console.error(`[FATAL ERROR]`, err);
     return new Response(JSON.stringify({ error: err.message }), { status: 200 });

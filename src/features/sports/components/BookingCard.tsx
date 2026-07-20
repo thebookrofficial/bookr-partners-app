@@ -4,7 +4,7 @@
 import React, { useEffect, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, Image, Animated } from "react-native";
 import { Text } from "@/components/ui";
-import { Phone, Calendar, Clock } from "lucide-react-native";
+import { Calendar, Clock, User as UserIcon } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
@@ -43,7 +43,6 @@ export const BookingCard = ({
   onPress,
 }: BookingCardProps) => {
   const textColor = isDisabled ? COLORS.text.secondary : COLORS.text.primary;
-  const iconColor = COLORS.text.muted;
   const cardBg = isHighlighted ? "#E8F0FE" : isDisabled ? "#E0E0E0" : COLORS.surface.primary;
 
   const highlightStyle = isHighlighted
@@ -57,7 +56,7 @@ export const BookingCard = ({
       }
     : {};
 
-  // Blinking Animation Logic
+  // Blinking Animation Logic for pending
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -77,15 +76,22 @@ export const BookingCard = ({
         ]),
       ).start();
     } else {
-      fadeAnim.setValue(1); // Reset to fully visible if not pending
+      fadeAnim.setValue(1);
     }
   }, [isPaymentPending, fadeAnim]);
 
   const getStatusColor = () => {
-    if (isDisabled) return COLORS.text.muted; // Mute status color if past
-    if (status === "Offline") return COLORS.danger;
-    if (status === "Online") return COLORS.primary;
+    if (isDisabled) return COLORS.text.muted;
+    if (status === "Offline") return "#E55959";
+    if (status === "Online") return "#63A1FD";
     return COLORS.text.muted;
+  };
+
+  const getStatusBgColor = () => {
+    if (isDisabled) return "#F3F4F6";
+    if (status === "Offline") return "#FDE8E8";
+    if (status === "Online") return "#E8F0FE";
+    return "#F3F4F6";
   };
 
   const getPriceColor = () => {
@@ -97,97 +103,79 @@ export const BookingCard = ({
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={onPress}
-      style={[styles.cardContainer, { backgroundColor: cardBg }, highlightStyle]}>
-      <View style={[styles.avatarContainer, isDisabled && styles.avatarDisabled]}>
-        <Image
-          source={avatarUrl ? { uri: avatarUrl } : require("@/assets/images/avatar_man.png")}
-          style={styles.avatar}
-        />
-      </View>
+      style={[
+        styles.cardContainer,
+        { backgroundColor: cardBg },
+        highlightStyle,
+        isDisabled && styles.cardDisabled,
+      ]}>
+      {/* Top Section */}
+      <View style={styles.topSection}>
+        <View style={[styles.avatarWrapper, isDisabled && styles.avatarDisabled]}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <UserIcon size={ms(20)} color="#63A1FD" />
+          )}
+        </View>
 
-      <View style={styles.rightContent}>
-        <View style={styles.topRow}>
-          <View style={styles.namePhoneWrapper}>
-            <Text variant="body1" weight="bold" color={textColor} style={{ fontSize: fs(20) }}>
-              {name}
+        <View style={styles.infoWrapper}>
+          <Text weight="bold" style={[styles.nameText, { color: textColor }]}>
+            {name}
+          </Text>
+          {phone ? (
+            <Text weight="medium" style={styles.phoneText}>
+              {phone}
             </Text>
+          ) : subtitle ? (
+            <Text weight="medium" style={styles.phoneText}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
 
-            {phone ? (
-              <View style={styles.phoneRow}>
-                <Phone size={ms(18)} color={iconColor} fill={iconColor} />
-                <Text
-                  variant="body2"
-                  weight="medium"
-                  color={textColor}
-                  style={{ fontSize: fs(16) }}>
-                  {phone}
-                </Text>
-              </View>
-            ) : subtitle ? (
-              <View style={styles.phoneRow}>
-                <Text
-                  variant="body2"
-                  weight="medium"
-                  color={textColor}
-                  style={{ fontSize: fs(16) }}>
-                  {subtitle}
-                </Text>
-              </View>
-            ) : null}
-          </View>
+        {isPaymentPending && (
+          <Animated.View style={[styles.paymentBadge, { opacity: fadeAnim }]}>
+            <Text weight="semiBold" style={styles.paymentBadgeText}>
+              Payment Pending
+            </Text>
+          </Animated.View>
+        )}
 
-          <View style={styles.priceStatusWrapper}>
-            <View style={styles.priceRow}>
-              {isPaymentPending && (
-                <Animated.Text style={[styles.blinkingText, { opacity: fadeAnim }]}>
-                  Payment Pending
-                </Animated.Text>
-              )}
-              <Text
-                variant="body2"
-                weight="semiBold"
-                color={getPriceColor()}
-                style={{ fontSize: fs(16) }}>
-                {price}
-              </Text>
-            </View>
-
-            <Text
-              variant="caption"
-              weight="semiBold"
-              color={getStatusColor()}
-              style={styles.statusText}>
+        <View style={styles.amountStatusWrapper}>
+          <Text weight="bold" style={[styles.amountText, { color: getPriceColor() }]}>
+            {price}
+          </Text>
+          <View style={[styles.statusLabelContainer, { backgroundColor: getStatusBgColor() }]}>
+            <Text weight="semiBold" style={[styles.statusLabel, { color: getStatusColor() }]}>
               {status}
             </Text>
           </View>
         </View>
+      </View>
 
-        <View style={styles.bottomRow}>
-          {useClockIcon ? (
-            <Clock size={ms(16)} color={iconColor} />
-          ) : (
-            <Calendar size={ms(20)} color={iconColor} />
-          )}
+      {/* Divider */}
+      <View style={styles.divider} />
 
+      {/* Bottom Section */}
+      <View style={styles.bottomSection}>
+        <View style={styles.dateContainer}>
+          <View style={styles.calendarIconWrapper}>
+            {useClockIcon ? (
+              <Clock size={ms(18)} color="#63A1FD" />
+            ) : (
+              <Calendar size={ms(18)} color="#63A1FD" />
+            )}
+          </View>
           {!hideDateText && (
-            <Text
-              variant="body2"
-              weight="semiBold"
-              color={textColor}
-              style={[styles.dateText, { fontSize: fs(16) }]}>
+            <Text weight="semiBold" style={[styles.dateText, { color: textColor }]}>
               {date}
             </Text>
           )}
+        </View>
 
-          <Text
-            variant="body2"
-            weight="semiBold"
-            color={textColor}
-            style={[
-              styles.timeText,
-              { fontSize: fs(16) },
-              hideDateText && styles.timeTextExpanded,
-            ]}>
+        <View style={styles.timeWrapper}>
+          <Text weight="semiBold" style={[styles.timeText, { color: textColor }]}>
             {time}
           </Text>
         </View>
@@ -198,107 +186,108 @@ export const BookingCard = ({
 
 const styles = StyleSheet.create({
   cardContainer: {
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(12),
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(12),
+    marginBottom: vs(12),
+    width: "100%",
+  },
+  cardDisabled: {
+    opacity: 0.6,
+  },
+  topSection: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: vs(10),
-    paddingHorizontal: hs(6),
-    gap: hs(10),
-    borderRadius: ms(10),
-    marginBottom: vs(10),
-    width: "100%",
-    minHeight: vs(97),
   },
-  avatarContainer: {
+  avatarWrapper: {
+    width: ms(44),
+    height: ms(44),
+    borderRadius: ms(8),
+    backgroundColor: "#E8F0FE",
+    alignItems: "center",
     justifyContent: "center",
+    marginRight: hs(10),
   },
   avatarDisabled: {
     opacity: 0.6,
   },
-  avatar: {
-    width: ms(50),
-    height: ms(50),
-    borderRadius: ms(25),
-    backgroundColor: "transparent",
+  avatarImage: {
+    width: ms(44),
+    height: ms(44),
+    borderRadius: ms(8),
   },
-  rightContent: {
+  infoWrapper: {
     flex: 1,
-    flexDirection: "column",
-    gap: vs(10),
-  },
-  topRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    width: "100%",
-  },
-  namePhoneWrapper: {
-    flex: 1,
-    flexDirection: "column",
-    alignItems: "flex-start",
-    paddingBottom: vs(4),
-    borderBottomWidth: 1,
-    borderBottomColor: "#CBDFFE",
-    marginRight: hs(10),
-  },
-  phoneRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(6),
-    marginTop: vs(2),
-  },
-  priceStatusWrapper: {
-    flexDirection: "column",
-    alignItems: "flex-end", // Align right to keep the pending text neat
     justifyContent: "center",
   },
-  priceRow: {
+  nameText: {
+    fontSize: fs(18),
+    marginBottom: vs(2),
+  },
+  phoneText: {
+    fontSize: fs(14),
+    color: "#6B7280",
+  },
+  paymentBadge: {
+    backgroundColor: "#FEE2E2",
+    borderRadius: ms(12),
+    paddingHorizontal: hs(8),
+    paddingVertical: vs(4),
+    marginHorizontal: hs(6),
+  },
+  paymentBadgeText: {
+    color: "#EF4444",
+    fontSize: fs(12),
+  },
+  amountStatusWrapper: {
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+  amountText: {
+    fontSize: fs(18),
+  },
+  statusLabelContainer: {
+    borderRadius: ms(12),
+    paddingHorizontal: hs(8),
+    paddingVertical: vs(2),
+    marginTop: vs(4),
+  },
+  statusLabel: {
+    fontSize: fs(12),
+    textTransform: "capitalize",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#CBDFFE",
+    marginVertical: vs(10),
+  },
+  bottomSection: {
     flexDirection: "row",
     alignItems: "center",
-    gap: hs(6),
+    justifyContent: "space-between",
   },
-  blinkingText: {
-    color: COLORS.danger,
-    fontSize: fs(10),
-    fontFamily: "Gilroy-Bold", // Match your app's font
-    textTransform: "uppercase",
-  },
-  statusText: {
-    fontSize: fs(10),
-    lineHeight: fs(12),
-    marginTop: vs(2),
-  },
-  bottomRow: {
+  dateContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: hs(8),
-    width: "100%",
+    flex: 1,
+  },
+  calendarIconWrapper: {
+    width: ms(32),
+    height: ms(32),
+    borderRadius: ms(6),
+    backgroundColor: "#E8F0FE",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: hs(8),
   },
   dateText: {
-    flex: 1,
+    fontSize: fs(15),
+  },
+  timeWrapper: {
+    justifyContent: "center",
   },
   timeText: {
-    marginRight: hs(6),
-  },
-  timeTextExpanded: {
-    flex: 1,
-    marginLeft: hs(4),
-  },
-  callButton: {
-    backgroundColor: "#000000",
-    paddingHorizontal: hs(14),
-    paddingVertical: vs(4),
-    borderRadius: ms(6),
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.25)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  callButtonDisabled: {
-    backgroundColor: "transparent",
-    borderColor: COLORS.text.muted,
-  },
-  callText: {
-    fontSize: fs(14),
-    lineHeight: fs(14),
+    fontSize: fs(15),
   },
 });

@@ -2,22 +2,14 @@
 // Confidential and Proprietary.
 
 import React, { useMemo } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Linking,
-  Alert,
-  ActivityIndicator,
-} from "react-native";
-import { Text, Avatar } from "@/components/ui";
-import { Calendar } from "lucide-react-native";
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from "react-native";
+import { Text } from "@/components/ui";
+import { Calendar, User as UserIcon } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { StaycationBooking } from "../types/staycation.types";
 import { useNavigation } from "@react-navigation/native";
 import { useStaycationBooking } from "../hooks/useStaycationBooking";
-import { Phone } from "lucide-react-native";
 
 interface StaycationBookingCardProps extends Partial<StaycationBooking> {
   bookingId?: string;
@@ -70,7 +62,6 @@ export const StaycationBookingCard = ({
     if (fetchedBooking) {
       return {
         ...fetchedBooking,
-        // CRITICAL FIX: Ensure the deep fetch doesn't overwrite the correctly mapped roomName
         roomName: fetchedBooking.roomName || roomName,
       };
     }
@@ -103,14 +94,6 @@ export const StaycationBookingCard = ({
     guestCount,
     roomName,
   ]);
-
-  const handleCall = () => {
-    if (displayData.phone) {
-      const cleanPhone = displayData.phone.replace(/[^\d+]/g, "");
-      const url = `tel:${cleanPhone}`;
-      Linking.openURL(url).catch(() => Alert.alert("Error", "Could not open dialer."));
-    }
-  };
 
   const handlePress = () => {
     if (onPress) {
@@ -145,6 +128,20 @@ export const StaycationBookingCard = ({
     }
   };
 
+  const getStatusBgColor = () => {
+    const s = displayData.status?.toLowerCase();
+    switch (s) {
+      case "online":
+        return "#E8F0FE";
+      case "offline":
+        return "#FDE8E8";
+      case "cancelled":
+        return "#FDE8E8";
+      default:
+        return "#F3F4F6";
+    }
+  };
+
   const isPaymentPending = useMemo(() => {
     if (displayData.status === "Cancelled") return false;
 
@@ -162,64 +159,16 @@ export const StaycationBookingCard = ({
 
     if (!displayData.checkOut) return false;
 
-    // Get today's local date in YYYY-MM-DD format for comparison
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}-${now
       .getDate()
       .toString()
       .padStart(2, "0")}`;
 
-    // Extract only the date part (YYYY-MM-DD) from the check-out string
     const checkOutDateOnly = displayData.checkOut.split("T")[0];
 
-    // Show pending status if today is the check-out day or later
     return todayStr >= checkOutDateOnly;
   }, [displayData.paidAmount, displayData.totalAmount, displayData.status, displayData.checkOut]);
-
-  const renderDetails = () => {
-    let dateRoomText = "";
-
-    if (isFarmhouse) {
-      dateRoomText = `${formatDisplayDate(displayData.checkIn || "")} - ${formatDisplayDate(
-        displayData.checkOut || "",
-      )}`;
-    } else {
-      const roomPrefix = displayData.roomName || "Room Assigned";
-
-      if (isUpcoming) {
-        dateRoomText = `${formatDisplayDateWithYear(displayData.checkIn || "")} | ${roomPrefix}`;
-      } else {
-        dateRoomText = roomPrefix;
-      }
-    }
-
-    return (
-      <View style={styles.detailsRow}>
-        <View style={styles.dateContainer}>
-          {isFarmhouse || isUpcoming ? (
-            <Calendar size={ms(20)} color={COLORS.text.primary} />
-          ) : null}
-          <Text weight="semiBold" style={[styles.dateText, !isFarmhouse && styles.roomsDateText]}>
-            {dateRoomText}
-          </Text>
-        </View>
-
-        <View style={styles.guestWrapper}>
-          <Text weight="semiBold" style={[styles.guestText, !isFarmhouse && styles.roomsGuestText]}>
-            {displayData.guestCount} Guest
-          </Text>
-        </View>
-
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.callButton} activeOpacity={0.7} onPress={handleCall}>
-            <Text weight="bold" style={styles.callButtonText}>
-              Call
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
 
   if (isLoading && bookingId && !displayData.id) {
     return (
@@ -231,69 +180,89 @@ export const StaycationBookingCard = ({
 
   if (!displayData.id && bookingId && !isLoading) return null;
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const isGreyBg = useMemo(() => {
-    const s = displayData.status?.toLowerCase();
-    const todayStr = new Date().toISOString().split("T")[0];
-    const isPast = (displayData.checkOut || "") < todayStr;
-
-    return s === "cancelled" || isPast;
-  }, [displayData.status, displayData.checkOut]);
+  const isGreyBg = displayData.status?.toLowerCase() === "cancelled";
 
   const getAmountColor = () => {
-    const s = displayData.status?.toLowerCase();
-    if (s === "advance") return "#00B562";
     return "#00B562";
   };
+
+  let dateRoomText = "";
+  if (isFarmhouse) {
+    dateRoomText = `${formatDisplayDate(displayData.checkIn || "")} - ${formatDisplayDate(
+      displayData.checkOut || "",
+    )}`;
+  } else {
+    const roomPrefix = displayData.roomName || "Room Assigned";
+    if (isUpcoming) {
+      dateRoomText = `${formatDisplayDateWithYear(displayData.checkIn || "")} | ${roomPrefix}`;
+    } else {
+      dateRoomText = roomPrefix;
+    }
+  }
 
   return (
     <TouchableOpacity
       activeOpacity={0.8}
       onPress={handlePress}
       style={[styles.cardContainer, isGreyBg && styles.cardContainerGrey]}>
-      <View style={styles.avatarWrapper}>
-        <Avatar
-          source={displayData.avatarUrl ? { uri: displayData.avatarUrl } : undefined}
-          size={ms(50)}
-        />
-      </View>
+      {/* Top Section */}
+      <View style={styles.topSection}>
+        <View style={styles.avatarWrapper}>
+          {displayData.avatarUrl ? (
+            <Image source={{ uri: displayData.avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <UserIcon size={ms(20)} color="#63A1FD" />
+          )}
+        </View>
 
-      <View style={styles.mainContent}>
-        <View style={styles.topHeader}>
-          <View style={styles.namePhoneContainer}>
-            <Text weight="bold" style={[styles.nameText, isGreyBg && styles.nameTextGrey]}>
-              {displayData.name}
+        <View style={styles.infoWrapper}>
+          <Text weight="bold" style={styles.nameText}>
+            {displayData.name}
+          </Text>
+          <Text weight="medium" style={styles.phoneText}>
+            {displayData.phone}
+          </Text>
+        </View>
+
+        {isPaymentPending && (
+          <View style={styles.paymentBadge}>
+            <Text weight="semiBold" style={styles.paymentBadgeText}>
+              Payment Pending
             </Text>
-            <View style={styles.phoneRow}>
-              <Phone
-                size={ms(20)}
-                color={isGreyBg ? "#8C8C8C" : COLORS.text.primary}
-                fill={isGreyBg ? "#8C8C8C" : COLORS.text.primary}
-              />
-              <Text weight="medium" style={[styles.phoneText, isGreyBg && styles.phoneTextGrey]}>
-                {displayData.phone}
-              </Text>
-              {isPaymentPending && (
-                <View style={styles.paymentBadge}>
-                  <Text weight="semiBold" style={styles.paymentBadgeText}>
-                    Payment Pending
-                  </Text>
-                </View>
-              )}
-            </View>
           </View>
+        )}
 
-          <View style={styles.amountStatusWrapper}>
-            <Text weight="semiBold" style={[styles.amountText, { color: getAmountColor() }]}>
-              ₹{displayData.paidAmount || 0}
-            </Text>
+        <View style={styles.amountStatusWrapper}>
+          <Text weight="bold" style={[styles.amountText, { color: getAmountColor() }]}>
+            ₹{displayData.totalAmount || displayData.amount || 0}
+          </Text>
+          <View style={[styles.statusLabelContainer, { backgroundColor: getStatusBgColor() }]}>
             <Text weight="semiBold" style={[styles.statusLabel, { color: getStatusColor() }]}>
               {displayData.status}
             </Text>
           </View>
         </View>
+      </View>
 
-        {renderDetails()}
+      {/* Divider */}
+      <View style={styles.divider} />
+
+      {/* Bottom Section */}
+      <View style={styles.bottomSection}>
+        <View style={styles.dateContainer}>
+          <View style={styles.calendarIconWrapper}>
+            <Calendar size={ms(18)} color="#63A1FD" />
+          </View>
+          <Text weight="semiBold" style={styles.dateText}>
+            {dateRoomText}
+          </Text>
+        </View>
+
+        <View style={styles.guestWrapper}>
+          <Text weight="semiBold" style={styles.guestText}>
+            {displayData.guestCount} Guest
+          </Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -301,144 +270,113 @@ export const StaycationBookingCard = ({
 
 const styles = StyleSheet.create({
   cardContainer: {
-    flexDirection: "row",
     backgroundColor: "#F4F7FC",
-    borderRadius: ms(10),
-    paddingHorizontal: hs(8),
-    paddingVertical: vs(10),
-    marginBottom: vs(10),
+    borderRadius: ms(12),
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(12),
+    marginBottom: vs(12),
     width: "100%",
-    alignItems: "center",
-    gap: hs(10),
   },
   cardContainerGrey: {
-    backgroundColor: "#E0E0E0",
+    opacity: 0.6,
   },
   loaderCard: {
     justifyContent: "center",
     minHeight: vs(80),
-  },
-  avatarWrapper: {},
-  mainContent: {
-    flex: 1,
-    gap: vs(10),
-  },
-  topHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
   },
-  namePhoneContainer: {
-    flex: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: "#CBDFFE",
-    paddingBottom: vs(4),
+  topSection: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatarWrapper: {
+    width: ms(44),
+    height: ms(44),
+    borderRadius: ms(8),
+    backgroundColor: "#E8F0FE",
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: hs(10),
-    gap: vs(6),
+  },
+  avatarImage: {
+    width: ms(44),
+    height: ms(44),
+    borderRadius: ms(8),
+  },
+  infoWrapper: {
+    flex: 1,
+    justifyContent: "center",
   },
   nameText: {
-    fontSize: fs(16),
+    fontSize: fs(20),
     color: COLORS.text.primary,
-    lineHeight: fs(16 * 0.93),
-  },
-  nameTextGrey: {
-    color: "#8C8C8C",
-  },
-  phoneRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(6),
+    marginBottom: vs(2),
   },
   phoneText: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
-  phoneTextGrey: {
-    color: "#8C8C8C",
+    fontSize: fs(16),
+    color: "#6B7280",
   },
   paymentBadge: {
-    borderWidth: 1,
-    borderColor: "#E55959",
-    borderRadius: ms(3),
-    paddingHorizontal: hs(4),
-    paddingVertical: vs(2),
-    marginLeft: hs(2),
+    backgroundColor: "#FEE2E2",
+    borderRadius: ms(12),
+    paddingHorizontal: hs(8),
+    paddingVertical: vs(4),
+    marginHorizontal: hs(6),
   },
   paymentBadgeText: {
-    color: "#E55959",
+    color: "#EF4444",
     fontSize: fs(12),
-    lineHeight: fs(12),
   },
   amountStatusWrapper: {
     alignItems: "flex-end",
     justifyContent: "center",
   },
   amountText: {
-    fontSize: fs(14),
-    lineHeight: fs(14),
+    fontSize: fs(18),
+  },
+  statusLabelContainer: {
+    borderRadius: ms(12),
+    paddingHorizontal: hs(8),
+    paddingVertical: vs(2),
+    marginTop: vs(4),
   },
   statusLabel: {
-    fontSize: fs(10),
-    lineHeight: fs(14),
+    fontSize: fs(12),
     textTransform: "capitalize",
   },
-  detailsRow: {
+  divider: {
+    height: 1,
+    backgroundColor: "#CBDFFE",
+    marginVertical: vs(10),
+  },
+  bottomSection: {
     flexDirection: "row",
     alignItems: "center",
-    gap: hs(8),
+    justifyContent: "space-between",
   },
   dateContainer: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: hs(8),
+    flex: 1,
+  },
+  calendarIconWrapper: {
+    width: ms(32),
+    height: ms(32),
+    borderRadius: ms(6),
+    backgroundColor: "#E8F0FE",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: hs(8),
   },
   dateText: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
-  roomsDateText: {
+    fontSize: fs(16),
     color: COLORS.text.primary,
   },
   guestWrapper: {
     justifyContent: "center",
-    alignItems: "center",
   },
   guestText: {
-    fontSize: fs(14),
+    fontSize: fs(16),
     color: COLORS.text.primary,
-  },
-  roomsGuestText: {
-    color: COLORS.text.primary,
-  },
-  actionButtons: {
-    flexDirection: "row",
-    gap: hs(8),
-    alignItems: "center",
-  },
-  cancelButton: {
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(4),
-    borderRadius: ms(6),
-    borderWidth: 1,
-    borderColor: COLORS.danger,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cancelButtonText: {
-    fontSize: fs(14),
-    color: COLORS.danger,
-    textAlign: "center",
-  },
-  callButton: {
-    backgroundColor: "black",
-    paddingHorizontal: hs(14),
-    paddingVertical: vs(6),
-    borderRadius: ms(6),
-  },
-  callButtonText: {
-    fontSize: fs(14),
-    color: "white",
-    textAlign: "center",
   },
 });
