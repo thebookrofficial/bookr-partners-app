@@ -26,7 +26,7 @@ import { Calendar as CalendarPicker } from "react-native-calendars";
 import { TimePickerModal } from "../components/TimePickerModal";
 import { SportsService } from "../services/sports.service";
 import { useBookingDetails } from "../hooks/useBookingDetails";
-import { generateTimeSlots } from "../utils/time.utils";
+import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
 import perf from "@react-native-firebase/perf";
 
 export const RepeatBookingScreen = () => {
@@ -50,6 +50,8 @@ export const RepeatBookingScreen = () => {
 
   const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
   const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId);
+  const [bookedHours, setBookedHours] = useState<string[]>([]);
+  const [isFetchingSlots, setIsFetchingSlots] = useState(false);
 
   const HOURS = useMemo(
     () => generateTimeSlots(6, 24, pricing.slotDurationMinutes),
@@ -84,6 +86,65 @@ export const RepeatBookingScreen = () => {
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
+
+  useEffect(() => {
+    const fetchSlotsData = async () => {
+      if (!selectedGroundId || !venueId) return;
+      setIsFetchingSlots(true);
+      try {
+        const dateStr = getLocalISODate(repeatDate);
+        const data = await SportsService.getSlots(venueId, selectedGroundId, dateStr);
+
+        let minDur = pricing.slotDurationMinutes || 60;
+        (data || []).forEach((slot: any) => {
+          const [sh, sm] = slot.start_time.split(":").map(Number);
+          const [eh, em] = slot.end_time.split(":").map(Number);
+          let diff = eh * 60 + em - (sh * 60 + sm);
+          if (diff < 0) diff += 24 * 60;
+          if (diff > 0 && diff < minDur) {
+            minDur = diff;
+          }
+        });
+
+        const formattedBooked = (data || [])
+          .filter((slot: any) => slot.status !== "available")
+          .map((slot: any) => {
+            const [h, m] = slot.start_time.split(":");
+            const hourInt = parseInt(h, 10);
+            const ampm = hourInt >= 12 && hourInt < 24 ? "PM" : "AM";
+            let displayHour = hourInt % 12;
+            if (displayHour === 0) displayHour = 12;
+
+            if (minDur < 60) {
+              return `${displayHour}:${m} ${ampm}`;
+            }
+            return `${displayHour} ${ampm}`;
+          });
+        setBookedHours(formattedBooked);
+      } catch (err) {
+        console.error("Error checking slot availability:", err);
+      } finally {
+        setIsFetchingSlots(false);
+      }
+    };
+    fetchSlotsData();
+  }, [repeatDate, selectedGroundId, venueId, pricing.slotDurationMinutes]);
+
+  const possibleBookableSlots = useMemo(() => {
+    if (fromTime === "Start Time" || !fromTime) return [];
+    const fromIndex = HOURS.indexOf(fromTime);
+    if (fromIndex === -1) return [];
+
+    const list: string[] = [];
+    for (let i = fromIndex + 1; i < HOURS.length; i++) {
+      const prevHour = HOURS[i - 1];
+      if (bookedHours.includes(prevHour)) {
+        break; // A booked slot starts here, so we cannot go any further!
+      }
+      list.push(HOURS[i]);
+    }
+    return list;
+  }, [fromTime, HOURS, bookedHours]);
 
   const formatHour = React.useCallback(
     (timeStr: string) => {
@@ -261,6 +322,13 @@ export const RepeatBookingScreen = () => {
     }
   };
 
+  const now = new Date();
+  const isToday =
+    repeatDate.getDate() === now.getDate() &&
+    repeatDate.getMonth() === now.getMonth() &&
+    repeatDate.getFullYear() === now.getFullYear();
+  const currentHour = now.getHours();
+
   return (
     <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(10)}>
       <View style={styles.header}>
@@ -357,6 +425,39 @@ export const RepeatBookingScreen = () => {
                 </View>
               </TouchableOpacity>
             </View>
+
+            {fromTime !== "Start Time" && possibleBookableSlots.length > 0 && (
+              <View style={{ marginTop: vs(12) }}>
+                <Text
+                  variant="body2"
+                  weight="bold"
+                  color={COLORS.text.secondary}
+                  style={{ marginBottom: vs(8) }}>
+                  Bookable End Times
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: hs(8) }}>
+                  {possibleBookableSlots.map(time => {
+                    const isSelected = toTime === time;
+                    return (
+                      <TouchableOpacity
+                        key={time}
+                        onPress={() => setToTime(time)}
+                        style={[styles.slotPill, isSelected && styles.slotPillSelected]}>
+                        <Text
+                          variant="body2"
+                          weight="semiBold"
+                          color={isSelected ? "#FFF" : "#000"}>
+                          {time}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
           </View>
 
           {/* Payment Card */}
@@ -521,16 +622,40 @@ export const RepeatBookingScreen = () => {
         visible={!!showHourPicker}
         onClose={() => setShowHourPicker(null)}
         title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
-        hours={HOURS}
+        hours={showHourPicker === "from" ? HOURS : HOURS}
         selectedTime={showHourPicker === "from" ? fromTime : toTime}
         onSelectTime={(hour: string) => {
           if (showHourPicker === "from") {
             setFromTime(hour);
-            setToTime("End Time");
+            const idx = HOURS.indexOf(hour);
+            if (idx !== -1 && idx + 1 < HOURS.length) {
+              setToTime(HOURS[idx + 1]);
+            } else {
+              setToTime("End Time");
+            }
           } else {
             setToTime(hour);
           }
         }}
+        isHourDisabled={(hour, index) => {
+          const hour24 =
+            hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
+          const isPast = isToday && hour24 <= currentHour;
+
+          if (showHourPicker === "from") {
+            const isBooked = bookedHours.includes(hour);
+            return isBooked || isPast;
+          } else {
+            const fromIndex = HOURS.indexOf(fromTime);
+            if (fromIndex === -1) return true;
+            if (index <= fromIndex) return true;
+
+            const intermediateHours = HOURS.slice(fromIndex, index);
+            const hasBookingInBetween = intermediateHours.some(h => bookedHours.includes(h));
+            return hasBookingInBetween || (isPast && !bookedHours.includes(hour));
+          }
+        }}
+        isFetching={isFetchingSlots}
       />
     </ScreenContainer>
   );
@@ -714,5 +839,17 @@ const styles = StyleSheet.create({
     color: "#E55959",
     fontSize: fs(14),
     marginLeft: hs(10),
+  },
+  slotPill: {
+    paddingVertical: vs(6),
+    paddingHorizontal: hs(12),
+    borderRadius: ms(15),
+    borderWidth: 1,
+    borderColor: "#CBDFFE",
+    backgroundColor: "#FFF",
+  },
+  slotPillSelected: {
+    backgroundColor: "#63A1FD",
+    borderColor: "#63A1FD",
   },
 });

@@ -70,129 +70,137 @@ export const useBookingDetails = (bookingId: string) => {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const fetchDetails = useCallback(async () => {
-    setLoading(true);
-    try {
-      // 1. Fetch the original booking first
-      const { data: baseBooking, error: baseError } = await supabase
-        .from("sports_bookings")
-        .select("*, sports_slots!inner(*), profiles(*), venues(*)")
-        .eq("id", bookingId)
-        .single();
+  const fetchDetails = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!options?.silent) {
+        setLoading(true);
+      }
+      try {
+        // 1. Fetch the original booking first
+        const { data: baseBooking, error: baseError } = await supabase
+          .from("sports_bookings")
+          .select("*, sports_slots!inner(*), profiles(*), venues(*)")
+          .eq("id", bookingId)
+          .single();
 
-      if (baseError) throw baseError;
+        if (baseError) throw baseError;
 
-      // 2. Fetch ALL potentially related bookings for this user/slot/date
-      let linkedQuery = supabase
-        .from("sports_bookings")
-        .select("*, sports_slots!inner(*)")
-        .eq("sports_slots.slot_date", baseBooking.sports_slots.slot_date)
-        .eq("sports_slots.ground_id", baseBooking.sports_slots.ground_id)
-        .neq("booking_status", "cancelled")
-        .neq("booking_status", "refunded")
-        .order("created_at", { ascending: true });
+        // 2. Fetch ALL potentially related bookings for this user/slot/date
+        let linkedQuery = supabase
+          .from("sports_bookings")
+          .select("*, sports_slots!inner(*)")
+          .eq("sports_slots.slot_date", baseBooking.sports_slots.slot_date)
+          .eq("sports_slots.ground_id", baseBooking.sports_slots.ground_id)
+          .neq("booking_status", "cancelled")
+          .neq("booking_status", "refunded")
+          .order("created_at", { ascending: true });
 
-      // Only search for linked if it's part of a group or has a parent/child
-      if (baseBooking.booking_group_id) {
-        linkedQuery = linkedQuery.eq("booking_group_id", baseBooking.booking_group_id);
-      } else if (baseBooking.parent_booking_id) {
-        linkedQuery = linkedQuery.or(
-          `id.eq.${baseBooking.parent_booking_id},parent_booking_id.eq.${baseBooking.parent_booking_id}`,
+        // Only search for linked if it's part of a group or has a parent/child
+        if (baseBooking.booking_group_id) {
+          linkedQuery = linkedQuery.eq("booking_group_id", baseBooking.booking_group_id);
+        } else if (baseBooking.parent_booking_id) {
+          linkedQuery = linkedQuery.or(
+            `id.eq.${baseBooking.parent_booking_id},parent_booking_id.eq.${baseBooking.parent_booking_id}`,
+          );
+        } else {
+          // It's a base booking, look for its extensions
+          linkedQuery = linkedQuery.or(
+            `id.eq.${baseBooking.id},parent_booking_id.eq.${baseBooking.id}`,
+          );
+        }
+
+        const { data: linkedData, error: linkedError } = await linkedQuery;
+
+        if (linkedError) throw linkedError;
+
+        const finalChain = (linkedData || []).sort((a, b) =>
+          a.sports_slots.start_time.localeCompare(b.sports_slots.start_time),
         );
-      } else {
-        // It's a base booking, look for its extensions
-        linkedQuery = linkedQuery.or(
-          `id.eq.${baseBooking.id},parent_booking_id.eq.${baseBooking.id}`,
+
+        // 4. Aggregate data
+        const totalAmount = finalChain.reduce((sum, b) => sum + Number(b.total_amount), 0);
+        const paidAmount = finalChain.reduce((sum, b) => sum + Number(b.paid_amount), 0);
+        const subtotalAmount = finalChain.reduce((sum, b) => sum + Number(b.subtotal || 0), 0);
+        const discountAmount = finalChain.reduce(
+          (sum, b) => sum + Number(b.discount_amount || 0),
+          0,
         );
-      }
+        const platformFee = finalChain.reduce((sum, b) => sum + Number(b.platform_fee || 0), 0);
+        const gatewayFee = finalChain.reduce((sum, b) => sum + Number(b.gateway_fee || 0), 0);
 
-      const { data: linkedData, error: linkedError } = await linkedQuery;
+        const firstBooking = finalChain[0];
+        const lastBooking = finalChain[finalChain.length - 1];
 
-      if (linkedError) throw linkedError;
+        if (!firstBooking || !lastBooking) {
+          throw new Error("No booking data found in chain.");
+        }
 
-      const finalChain = (linkedData || []).sort((a, b) =>
-        a.sports_slots.start_time.localeCompare(b.sports_slots.start_time),
-      );
-
-      // 4. Aggregate data
-      const totalAmount = finalChain.reduce((sum, b) => sum + Number(b.total_amount), 0);
-      const paidAmount = finalChain.reduce((sum, b) => sum + Number(b.paid_amount), 0);
-      const subtotalAmount = finalChain.reduce((sum, b) => sum + Number(b.subtotal || 0), 0);
-      const discountAmount = finalChain.reduce((sum, b) => sum + Number(b.discount_amount || 0), 0);
-      const platformFee = finalChain.reduce((sum, b) => sum + Number(b.platform_fee || 0), 0);
-      const gatewayFee = finalChain.reduce((sum, b) => sum + Number(b.gateway_fee || 0), 0);
-
-      const firstBooking = finalChain[0];
-      const lastBooking = finalChain[finalChain.length - 1];
-
-      if (!firstBooking || !lastBooking) {
-        throw new Error("No booking data found in chain.");
-      }
-
-      const aggregatedBooking: BookingDetailData = {
-        ...baseBooking,
-        total_amount: totalAmount,
-        paid_amount: paidAmount,
-        subtotal_amount: subtotalAmount,
-        discount_amount: discountAmount,
-        platform_fee: platformFee,
-        gateway_fee: gatewayFee,
-        booking_source: firstBooking.booking_source,
-        sports_slots: {
-          ...baseBooking.sports_slots,
-          id: lastBooking.sports_slots.id, // Use the last slot ID for extension logic
-          start_time: firstBooking.sports_slots.start_time,
-          end_time: lastBooking.sports_slots.end_time,
-        },
-        combined_time: `${formatHour(firstBooking.sports_slots.start_time)} - ${formatHour(
-          lastBooking.sports_slots.end_time,
-        )}`,
-        idChain: finalChain.map(b => b.id),
-        slotIdChain: finalChain.map(b => b.slot_id),
-        lastBookingId: lastBooking.id,
-      };
-
-      setBooking(aggregatedBooking);
-
-      // 5. Fetch Payment Logs Ledger for ALL bookings in the chain
-      const { data: logsData, error: logsError } = await supabase
-        .from("offline_payment_logs")
-        .select("id, amount, payment_mode, note, created_at")
-        .in("booking_id", aggregatedBooking.idChain)
-        .eq("booking_vertical", "sports")
-        .order("created_at", { ascending: true });
-
-      let fetchedLogs = (logsData as PaymentLog[]) || [];
-
-      if (logsError && logsError.code !== "PGRST116") {
-        console.warn("Could not fetch payment logs:", logsError);
-      }
-
-      // 6. Reconstruct Initial Advance Payment
-      const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
-      const totalPaidInChain = aggregatedBooking.paid_amount;
-
-      if (totalPaidInChain > totalLoggedAmount) {
-        const initialAmount = totalPaidInChain - totalLoggedAmount;
-        const initialLog: PaymentLog = {
-          id: `initial-chain-${bookingId}`,
-          amount: initialAmount,
-          payment_mode: baseBooking.user_id ? "online" : "cash",
-          note: "Initial Advance Payment",
-          created_at: baseBooking.created_at,
-          isInitial: true,
+        const aggregatedBooking: BookingDetailData = {
+          ...baseBooking,
+          total_amount: totalAmount,
+          paid_amount: paidAmount,
+          subtotal_amount: subtotalAmount,
+          discount_amount: discountAmount,
+          platform_fee: platformFee,
+          gateway_fee: gatewayFee,
+          booking_source: firstBooking.booking_source,
+          sports_slots: {
+            ...baseBooking.sports_slots,
+            id: lastBooking.sports_slots.id, // Use the last slot ID for extension logic
+            start_time: firstBooking.sports_slots.start_time,
+            end_time: lastBooking.sports_slots.end_time,
+          },
+          combined_time: `${formatHour(firstBooking.sports_slots.start_time)} - ${formatHour(
+            lastBooking.sports_slots.end_time,
+          )}`,
+          idChain: finalChain.map(b => b.id),
+          slotIdChain: finalChain.map(b => b.slot_id),
+          lastBookingId: lastBooking.id,
         };
-        fetchedLogs.unshift(initialLog);
-      }
 
-      setPaymentLogs(fetchedLogs);
-    } catch (error: any) {
-      Alert.alert("Error", "Could not fetch booking details.");
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  }, [bookingId]);
+        setBooking(aggregatedBooking);
+
+        // 5. Fetch Payment Logs Ledger for ALL bookings in the chain
+        const { data: logsData, error: logsError } = await supabase
+          .from("offline_payment_logs")
+          .select("id, amount, payment_mode, note, created_at")
+          .in("booking_id", aggregatedBooking.idChain)
+          .eq("booking_vertical", "sports")
+          .order("created_at", { ascending: true });
+
+        let fetchedLogs = (logsData as PaymentLog[]) || [];
+
+        if (logsError && logsError.code !== "PGRST116") {
+          console.warn("Could not fetch payment logs:", logsError);
+        }
+
+        // 6. Reconstruct Initial Advance Payment
+        const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
+        const totalPaidInChain = aggregatedBooking.paid_amount;
+
+        if (totalPaidInChain > totalLoggedAmount) {
+          const initialAmount = totalPaidInChain - totalLoggedAmount;
+          const initialLog: PaymentLog = {
+            id: `initial-chain-${bookingId}`,
+            amount: initialAmount,
+            payment_mode: baseBooking.user_id ? "online" : "cash",
+            note: "Initial Advance Payment",
+            created_at: baseBooking.created_at,
+            isInitial: true,
+          };
+          fetchedLogs.unshift(initialLog);
+        }
+
+        setPaymentLogs(fetchedLogs);
+      } catch (error: any) {
+        Alert.alert("Error", "Could not fetch booking details.");
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [bookingId],
+  );
 
   const logPayment = async (
     amount: number,
@@ -252,7 +260,7 @@ export const useBookingDetails = (bookingId: string) => {
       // Alert.alert("Success", "Payment logged successfully.");
 
       // Re-fetch to ensure sync (runs silently in background without blocking UI)
-      fetchDetails();
+      fetchDetails({ silent: true });
       return true;
     } catch (error: any) {
       Alert.alert("Payment Failed", error.message);
@@ -291,11 +299,11 @@ export const useBookingDetails = (bookingId: string) => {
 
       if (error) {
         // Rollback
-        await fetchDetails();
+        await fetchDetails({ silent: true });
         throw error;
       }
 
-      fetchDetails();
+      fetchDetails({ silent: true });
       return true;
     } catch (error: any) {
       Alert.alert("Remove Payment Failed", error.message);

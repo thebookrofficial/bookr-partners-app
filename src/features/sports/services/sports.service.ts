@@ -84,7 +84,12 @@ export const SportsService = {
         const slot = Array.isArray(b.sports_slots) ? b.sports_slots[0] : b.sports_slots;
         const slotStatus = (slot?.status || "").toLowerCase().trim();
 
-        if (bookingStatus === "cancelled" || bookingStatus === "refunded") return false;
+        if (
+          bookingStatus === "cancelled" ||
+          bookingStatus === "refunded" ||
+          bookingStatus === "rescheduled"
+        )
+          return false;
         if (slotStatus === "available") return false;
 
         return true;

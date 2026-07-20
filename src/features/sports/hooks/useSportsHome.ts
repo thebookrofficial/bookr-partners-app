@@ -253,11 +253,11 @@ export const useSportsHome = (
           const oldStat = b.status?.toLowerCase().trim();
           const sltStat = b.slot_status?.toLowerCase().trim();
 
-          const isCancelledOrRefunded = [bookingStat, oldStat].some(
-            val => val === "cancelled" || val === "refunded",
+          const isCancelledOrRefundedOrRescheduled = [bookingStat, oldStat].some(
+            val => val === "cancelled" || val === "refunded" || val === "rescheduled",
           );
 
-          if (isCancelledOrRefunded) {
+          if (isCancelledOrRefundedOrRescheduled) {
             return false;
           }
 
