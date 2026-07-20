@@ -86,8 +86,9 @@ import { COLORS } from "@/constants/theme";
 
 import { useAuthStore, useServiceStore } from "@/store";
 import { SplashScreen } from "@/screens/SplashScreen";
-import { vs, ms, fs, hs } from "@/utils/responsive.utils";
+import { vs, ms, fs } from "@/utils/responsive.utils";
 
+import { renderCustomTabBar } from "./CustomTabBar";
 // --- AUTHENTICATION IMPORTS ---
 import { supabase } from "@/lib/supabase";
 
@@ -107,64 +108,19 @@ const DineTab = createBottomTabNavigator<DineTabParamList>();
 const StaycationTab = createBottomTabNavigator<StaycationTabParamList>();
 const EventTab = createBottomTabNavigator<EventTabParamList>();
 
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 const TabIcon =
   (IconComponent: any) =>
   ({ color }: { color: string }) =>
     <IconComponent color={color} size={ms(24)} />;
 
-const useTabScreenOptions = () => {
-  const insets = useSafeAreaInsets();
-  const bottomInset = insets.bottom;
-  const paddingBottom = bottomInset > 0 ? bottomInset + vs(20) : vs(30);
-  const height = vs(52) + paddingBottom;
-
-  return React.useMemo(
-    () => ({
-      headerShown: false,
-      tabBarActiveTintColor: COLORS.primary,
-      tabBarInactiveTintColor: COLORS.text.muted,
-      tabBarStyle: {
-        position: "absolute" as const,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: COLORS.surface.primary,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border.navBar,
-        borderTopLeftRadius: ms(20),
-        borderTopRightRadius: ms(20),
-        height: height,
-        paddingTop: vs(10),
-        paddingBottom: paddingBottom,
-        paddingHorizontal: hs(10),
-        elevation: 0,
-        shadowOpacity: 0,
-      },
-      tabBarItemStyle: {
-        marginHorizontal: 0,
-      },
-      tabBarLabelStyle: {
-        fontFamily: "Gilroy-Bold",
-        fontSize: fs(12),
-        lineHeight: fs(12),
-        marginTop: vs(2),
-      },
-    }),
-    [height, paddingBottom],
-  );
-};
-
 const SportsTabNavigator = () => {
-  const tabScreenOptions = useTabScreenOptions();
   const { clientProfile } = useAuthStore();
   const isOwner = clientProfile?.client_role === "owner" || !clientProfile; // fallback
   const perms = clientProfile?.permissions || [];
   const canAccess = (perm: string) => isOwner || perms.includes(perm);
 
   return (
-    <SportsTab.Navigator screenOptions={tabScreenOptions}>
+    <SportsTab.Navigator tabBar={renderCustomTabBar} screenOptions={{ headerShown: false }}>
       {canAccess("sports:View Sports Home") && (
         <SportsTab.Screen
           name="SportsHome"
@@ -207,9 +163,8 @@ const SportsTabNavigator = () => {
 };
 
 const DineTabNavigator = () => {
-  const tabScreenOptions = useTabScreenOptions();
   return (
-    <DineTab.Navigator screenOptions={tabScreenOptions}>
+    <DineTab.Navigator tabBar={renderCustomTabBar} screenOptions={{ headerShown: false }}>
       <DineTab.Screen
         name="DineHome"
         component={DineHomeScreen}
@@ -240,14 +195,13 @@ const DineTabNavigator = () => {
 };
 
 const StaycationTabNavigator = () => {
-  const tabScreenOptions = useTabScreenOptions();
   const { clientProfile } = useAuthStore();
   const isOwner = clientProfile?.client_role === "owner" || !clientProfile; // fallback
   const perms = clientProfile?.permissions || [];
   const canAccess = (perm: string) => isOwner || perms.includes(perm);
 
   return (
-    <StaycationTab.Navigator screenOptions={tabScreenOptions}>
+    <StaycationTab.Navigator tabBar={renderCustomTabBar} screenOptions={{ headerShown: false }}>
       {canAccess("staycation:View Staycation Home") && (
         <StaycationTab.Screen
           name="StaycationHome"
@@ -303,22 +257,14 @@ const ScanTabIcon = () => (
 );
 
 const EventTabNavigator = () => {
-  const tabScreenOptions = useTabScreenOptions();
   return (
-    <EventTab.Navigator
-      screenOptions={{
-        ...tabScreenOptions,
-        tabBarStyle: {
-          ...tabScreenOptions.tabBarStyle,
-          paddingTop: vs(4), // Slightly less padding to accommodate elevated scan button
-        },
-      }}>
+    <EventTab.Navigator tabBar={renderCustomTabBar} screenOptions={{ headerShown: false }}>
       <EventTab.Screen
         name="EventHome"
         component={EventHomeScreen}
         options={{
           title: "Bookings",
-          tabBarIcon: TabIcon(FileText), // Better match for Figma list icon
+          tabBarIcon: TabIcon(FileText),
         }}
       />
       <EventTab.Screen
@@ -332,11 +278,6 @@ const EventTabNavigator = () => {
         options={{
           title: "Scan",
           tabBarIcon: ScanTabIcon,
-          tabBarLabelStyle: {
-            color: COLORS.text.primary,
-            fontSize: fs(12),
-            fontFamily: "Gilroy-Bold",
-          },
         }}
       />
       <EventTab.Screen
