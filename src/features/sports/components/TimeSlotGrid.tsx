@@ -4,7 +4,7 @@
 import React, { useState, useMemo, memo } from "react";
 import { View, StyleSheet, TouchableOpacity, LayoutChangeEvent } from "react-native";
 import { Text } from "@/components/ui";
-import { ChevronRight, ChevronDown } from "lucide-react-native";
+import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
@@ -23,7 +23,6 @@ interface TimeSlotGridProps {
   slots: TimeSlotData[];
   selectedDate: Date;
   onSlotPress?: (slot: TimeSlotData) => void;
-  isNested?: boolean; // Determines if it renders as a flat grid or categorized accordions
 }
 
 const NUM_COLUMNS = 6;
@@ -72,7 +71,7 @@ const SlotPill = memo(
 // HELPER COMPONENT: Accordion Section
 // ----------------------------------------------------
 const SlotAccordion = memo(({ title, data, selectedDate, onSlotPress, slotWidth }: any) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
 
   const now = new Date();
   const isToday =
@@ -87,15 +86,18 @@ const SlotAccordion = memo(({ title, data, selectedDate, onSlotPress, slotWidth 
   return (
     <View style={styles.accordionContainer}>
       <TouchableOpacity
-        style={styles.accordionHeader}
+        style={[styles.accordionHeader, isOpen && { marginBottom: vs(12) }]}
         onPress={() => setIsOpen(!isOpen)}
         activeOpacity={0.7}>
         <Text style={styles.accordionTitle}>{title}</Text>
-        {isOpen ? (
-          <ChevronDown size={ms(20)} color="#000" />
-        ) : (
-          <ChevronRight size={ms(20)} color="#000" />
-        )}
+        <View style={styles.accordionActionWrapper}>
+          <Text style={styles.accordionActionText}>{isOpen ? "Hide" : "Show"}</Text>
+          {isOpen ? (
+            <ChevronUp size={ms(18)} color="#000" />
+          ) : (
+            <ChevronDown size={ms(18)} color="#000" />
+          )}
+        </View>
       </TouchableOpacity>
 
       {isOpen && (
@@ -136,7 +138,7 @@ const SlotAccordion = memo(({ title, data, selectedDate, onSlotPress, slotWidth 
 });
 
 export const TimeSlotGrid = memo(
-  ({ slots: rawSlots, selectedDate, onSlotPress, isNested = false }: TimeSlotGridProps) => {
+  ({ slots: rawSlots, selectedDate, onSlotPress }: TimeSlotGridProps) => {
     const [containerWidth, setContainerWidth] = useState(0);
 
     const slots = useMemo(() => {
@@ -201,95 +203,36 @@ export const TimeSlotGrid = memo(
       return (containerWidth - (NUM_COLUMNS - 1) * SLOT_GAP) / NUM_COLUMNS;
     }, [containerWidth]);
 
-    const now = new Date();
-    const isToday =
-      selectedDate.getDate() === now.getDate() &&
-      selectedDate.getMonth() === now.getMonth() &&
-      selectedDate.getFullYear() === now.getFullYear();
-
-    const currentHour = now.getHours();
-    const currentMinutes = now.getMinutes();
-
-    // If Nested (Pickleball/Cricket), Group the Data!
-    const { morningSlots, afternoonSlots, eveningSlots } = useMemo(() => {
-      if (!isNested) return { morningSlots: [], afternoonSlots: [], eveningSlots: [] };
-
+    // Group Data into Day and Evening Slots
+    const { daySlots, eveningSlots } = useMemo(() => {
       return {
-        morningSlots: slots.filter(s => {
+        daySlots: slots.filter(s => {
           const h = parseInt(s.raw_start_time?.split(":")[0] || "0", 10);
-          return h < 12;
-        }),
-        afternoonSlots: slots.filter(s => {
-          const h = parseInt(s.raw_start_time?.split(":")[0] || "0", 10);
-          return h >= 12 && h < 17;
+          return h < 18;
         }),
         eveningSlots: slots.filter(s => {
           const h = parseInt(s.raw_start_time?.split(":")[0] || "0", 10);
-          return h >= 17;
+          return h >= 18;
         }),
       };
-    }, [slots, isNested]);
+    }, [slots]);
 
-    if (isNested) {
-      return (
-        <View style={styles.nestedContainer} onLayout={onLayout}>
-          <SlotAccordion
-            title="Morning Slots"
-            data={morningSlots}
-            selectedDate={selectedDate}
-            onSlotPress={onSlotPress}
-            slotWidth={slotWidth}
-          />
-          <SlotAccordion
-            title="Afternoon Slots"
-            data={afternoonSlots}
-            selectedDate={selectedDate}
-            onSlotPress={onSlotPress}
-            slotWidth={slotWidth}
-          />
-          <SlotAccordion
-            title="Evening Slots"
-            data={eveningSlots}
-            selectedDate={selectedDate}
-            onSlotPress={onSlotPress}
-            slotWidth={slotWidth}
-          />
-        </View>
-      );
-    }
-
-    // Fallback to traditional flat grid for Football
     return (
-      <View style={styles.grid} onLayout={onLayout}>
-        {slots.map(slot => {
-          let isPast = false;
-          if (isToday && slot.raw_start_time) {
-            const [hours, minutes] = slot.raw_start_time.split(":").map(Number);
-            if (hours < currentHour || (hours === currentHour && minutes < currentMinutes)) {
-              isPast = true;
-            }
-          }
-
-          const isUnavailable = isPast || slot.status === "maintenance";
-          const isAvailable = !isUnavailable && slot.status === "available";
-          const isBlocked = !isUnavailable && slot.status === "blocked";
-          const isOnline = !isUnavailable && slot.status === "booked" && !slot.isManualBooking;
-          const isManual = !isUnavailable && slot.status === "booked" && slot.isManualBooking;
-
-          return (
-            <SlotPill
-              key={slot.id}
-              slot={slot}
-              isUnavailable={isUnavailable}
-              isAvailable={isAvailable}
-              isBlocked={isBlocked}
-              isOnline={isOnline}
-              isManual={isManual}
-              onSlotPress={onSlotPress}
-              slotWidth={slotWidth}
-            />
-          );
-        })}
+      <View style={styles.nestedContainer} onLayout={onLayout}>
+        <SlotAccordion
+          title="Day Slots"
+          data={daySlots}
+          selectedDate={selectedDate}
+          onSlotPress={onSlotPress}
+          slotWidth={slotWidth}
+        />
+        <SlotAccordion
+          title="Evening Slots"
+          data={eveningSlots}
+          selectedDate={selectedDate}
+          onSlotPress={onSlotPress}
+          slotWidth={slotWidth}
+        />
       </View>
     );
   },
@@ -301,12 +244,12 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: SLOT_GAP,
     width: "100%",
-    marginBottom: vs(15),
+    marginBottom: 0,
   },
   tabText: { textTransform: "capitalize", fontSize: fs(16) },
 
   slot: {
-    height: vs(34),
+    height: vs(30),
     borderRadius: ms(25),
     justifyContent: "center",
     alignItems: "center",
@@ -324,7 +267,19 @@ const styles = StyleSheet.create({
 
   // Nested Accordion Styles
   nestedContainer: { width: "100%" },
-  accordionContainer: { marginBottom: vs(6) },
-  accordionHeader: { flexDirection: "row", alignItems: "center", gap: hs(4), marginBottom: vs(10) },
-  accordionTitle: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#000" },
+  accordionContainer: {
+    marginBottom: vs(12),
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(12),
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(10),
+  },
+  accordionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  accordionTitle: { fontFamily: "Gilroy-Bold", fontSize: fs(16), color: "#000" },
+  accordionActionWrapper: { flexDirection: "row", alignItems: "center", gap: hs(4) },
+  accordionActionText: { fontSize: fs(14), color: "#000", fontFamily: "Gilroy-Medium" },
 });

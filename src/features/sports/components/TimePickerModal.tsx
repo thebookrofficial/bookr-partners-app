@@ -71,8 +71,8 @@ export const TimePickerModal = ({
                           key={hour}
                           style={[
                             styles.timePickerItem,
-                            isSelected && styles.timePickerItemActive,
                             isDisabled && styles.timePickerItemDisabled,
+                            isSelected && styles.timePickerItemActive,
                           ]}
                           disabled={isDisabled}
                           onPress={() => {
@@ -82,8 +82,8 @@ export const TimePickerModal = ({
                           <Text
                             style={[
                               styles.timePickerItemText,
-                              isSelected && styles.timePickerItemTextActive,
                               isDisabled && { color: COLORS.text.secondary },
+                              isSelected && styles.timePickerItemTextActive,
                             ]}>
                             {formatDisplayHour(hour)}
                           </Text>
@@ -136,6 +136,7 @@ const styles = StyleSheet.create({
   },
   timePickerItemActive: {
     backgroundColor: COLORS.primary,
+    opacity: 1,
   },
   timePickerItemDisabled: {
     backgroundColor: "#F5F5F5",

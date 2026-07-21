@@ -20,7 +20,7 @@ import { ServiceHeader } from "../components/ServiceHeader";
 import { LegendIndicator } from "../components/LegendIndicator";
 import { TimeSlotGrid } from "../components/TimeSlotGrid";
 import { BookingCard } from "../components/BookingCard";
-import { Calendar as CalendarIcon, Plus, ChevronDown, ChevronUp } from "lucide-react-native";
+import { Calendar as CalendarIcon, Plus, ChevronDown, ChevronUp, X } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { RouteProp, useNavigation, useRoute, useIsFocused } from "@react-navigation/native";
@@ -209,109 +209,85 @@ export const SportsHomeScreen = () => {
           </View>
         ) : (
           <>
-            {isDropdownOpen ? (
-              <View style={styles.expandedDateRowContainer}>
-                <View style={styles.expandedDateHeaderRow}>
-                  <TouchableOpacity
-                    style={styles.expandedDateTitle}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                      setIsDropdownOpen(false);
-                    }}>
-                    <Text
-                      variant="body1"
-                      weight="bold"
-                      color={COLORS.text.primary}
-                      style={{ fontSize: fs(20) }}>
-                      Bookings
-                    </Text>
-                    <ChevronUp size={ms(20)} color={COLORS.text.primary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.expandedDateSelector}
-                    activeOpacity={0.7}
-                    onPress={() => setIsDatePickerOpen(true)}>
-                    <Text
-                      variant="body1"
-                      weight="semiBold"
-                      color={COLORS.text.primary}
-                      style={{ fontSize: fs(16) }}>
-                      {getFormattedDate(selectedDate)}
-                    </Text>
-                    <CalendarIcon size={ms(20)} color="#00327B" />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.expandedDivider} />
-                <TouchableOpacity
-                  style={styles.expandedDropdownItem}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    setSelectedDate(new Date());
-                    setSelectedView("Upcoming Bookings");
-                    setIsDropdownOpen(false);
-                  }}>
-                  <Text
-                    variant="body1"
-                    weight="bold"
-                    color={COLORS.text.primary}
-                    style={{ fontSize: fs(16) }}>
-                    Upcoming Bookings
-                  </Text>
-                  <Text style={styles.expandedPlusIcon}>+</Text>
-                </TouchableOpacity>
-                <View style={styles.expandedDivider} />
-                <TouchableOpacity
-                  style={styles.expandedDropdownItem}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    setSelectedDate(new Date());
-                    setSelectedView("Today Bookings");
-                    setIsDropdownOpen(false);
-                  }}>
-                  <Text
-                    variant="body1"
-                    weight="bold"
-                    color={COLORS.text.primary}
-                    style={{ fontSize: fs(16) }}>
-                    Today Bookings
-                  </Text>
-                  <Text style={styles.expandedPlusIcon}>+</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.dateRow}>
-                <TouchableOpacity
-                  style={styles.dateRowLeft}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    setIsDropdownOpen(true);
-                  }}>
-                  <Text
-                    variant="body1"
-                    weight="bold"
-                    color={COLORS.text.primary}
-                    style={{ fontSize: fs(18) }}>
-                    {selectedView}
-                  </Text>
-                  <ChevronDown size={ms(20)} color={COLORS.text.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.dateSelector}
-                  onPress={() => setIsDatePickerOpen(true)}
-                  activeOpacity={0.7}>
-                  <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
-                    {getFormattedDate(selectedDate)}
-                  </Text>
-                  <CalendarIcon size={ms(20)} color="#00327B" />
-                </TouchableOpacity>
-              </View>
-            )}
+            <View style={[styles.dateRow, styles.dateRowZIndex]}>
+              <TouchableOpacity
+                style={styles.dateSelectorLeft}
+                onPress={() => setIsDatePickerOpen(true)}
+                activeOpacity={0.7}>
+                <CalendarIcon size={ms(24)} color={COLORS.text.primary} strokeWidth={2} />
+                <Text
+                  variant="body1"
+                  weight="bold"
+                  color={COLORS.text.primary}
+                  style={{ fontSize: fs(18) }}>
+                  {getFormattedDate(selectedDate)}
+                </Text>
+              </TouchableOpacity>
 
-            {grounds.length > 0 && (
+              <View style={styles.dropdownToggleWrapper}>
+                <TouchableOpacity
+                  style={styles.dropdownToggle}
+                  activeOpacity={0.7}
+                  onPress={() => setIsDropdownOpen(!isDropdownOpen)}>
+                  <Text
+                    variant="body1"
+                    weight="semiBold"
+                    color={COLORS.text.inverse}
+                    style={{ fontSize: fs(16) }}>
+                    {selectedView === "Today Bookings" ? "Today" : "Upcoming"}
+                  </Text>
+                  {isDropdownOpen ? (
+                    <ChevronUp size={ms(20)} color={COLORS.text.inverse} strokeWidth={2.5} />
+                  ) : (
+                    <ChevronDown size={ms(20)} color={COLORS.text.inverse} strokeWidth={2.5} />
+                  )}
+                </TouchableOpacity>
+
+                {isDropdownOpen && (
+                  <View style={styles.dropdownPopover}>
+                    <View style={styles.popoverHeader}>
+                      <Text variant="body1" weight="bold" style={styles.popoverTitle}>
+                        Type
+                      </Text>
+                      <TouchableOpacity onPress={() => setIsDropdownOpen(false)}>
+                        <X size={ms(20)} color="#000" />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.popoverDivider} />
+                    <TouchableOpacity
+                      style={[
+                        styles.popoverItem,
+                        selectedView === "Today Bookings" && styles.popoverItemActive,
+                      ]}
+                      onPress={() => {
+                        setSelectedDate(new Date());
+                        setSelectedView("Today Bookings");
+                        setIsDropdownOpen(false);
+                      }}>
+                      <Text variant="body1" weight="medium" style={styles.popoverItemText}>
+                        Today
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.popoverItem,
+                        (selectedView === "Upcoming Bookings" || selectedView === "Bookings") &&
+                          styles.popoverItemActive,
+                      ]}
+                      onPress={() => {
+                        setSelectedView("Upcoming Bookings");
+                        setIsDropdownOpen(false);
+                      }}>
+                      <Text variant="body1" weight="medium" style={styles.popoverItemText}>
+                        Upcoming
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {grounds.length > 1 && (
               <View style={styles.groundTabs}>
                 <PillTabs
                   tabs={grounds.map((g: any) => g.name)}
@@ -333,14 +309,7 @@ export const SportsHomeScreen = () => {
                 <LegendIndicator />
 
                 {slotsLoading && slots.length === 0 ? (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      flexWrap: "wrap",
-                      justifyContent: "space-between",
-                      gap: vs(8),
-                      marginTop: vs(16),
-                    }}>
+                  <View style={styles.skeletonContainer}>
                     {Array.from({ length: 12 }).map((_, i) => (
                       <Skeleton key={i} width="23%" height={vs(40)} borderRadius={ms(8)} />
                     ))}
@@ -353,10 +322,6 @@ export const SportsHomeScreen = () => {
                   <TimeSlotGrid
                     slots={slots as any}
                     selectedDate={selectedDate}
-                    isNested={
-                      selectedCategory === "Pickleball" &&
-                      slots.some((s: any) => s.duration_minutes === 30)
-                    }
                     onSlotPress={slot => {
                       if (slot.status === "booked" || slot.status === "blocked") {
                         if (!slot.raw_start_time) return; // Prevent TS undefined error
@@ -478,66 +443,73 @@ const styles = StyleSheet.create({
   },
   dateRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: vs(8),
+    marginBottom: vs(15),
+  },
+  dateSelectorLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(8),
+  },
+  dropdownToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+    backgroundColor: "#424242",
+    paddingHorizontal: hs(14),
     paddingVertical: vs(10),
-    paddingHorizontal: hs(10),
-    marginBottom: vs(10),
-    borderRadius: ms(10),
-    backgroundColor: "#F4F7FC",
+    borderRadius: ms(14),
   },
-  dateRowLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(8),
+  dropdownPopover: {
+    position: "absolute",
+    top: "100%",
+    right: 0,
+    marginTop: vs(8),
+    backgroundColor: "#FFFFFF",
+    borderRadius: ms(12),
+    padding: ms(12),
+    minWidth: ms(140),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
   },
-  dateSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(6),
-  },
-  groundTabs: {
-    marginBottom: vs(15),
-  },
-  expandedDateRowContainer: {
-    backgroundColor: "#F4F7FC",
-    borderRadius: ms(9),
-    paddingHorizontal: hs(12),
-    paddingVertical: vs(14),
-    marginBottom: vs(15),
-    width: "100%",
-  },
-  expandedDateHeaderRow: {
+  popoverHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: vs(10),
+    marginBottom: vs(8),
   },
-  expandedDateTitle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(8),
+  popoverTitle: {
+    fontSize: fs(16),
+    color: "#000",
   },
-  expandedDateSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(6),
-  },
-  expandedDivider: {
+  popoverDivider: {
     height: 1,
     backgroundColor: "#E5E5E5",
     width: "100%",
+    marginBottom: vs(8),
   },
-  expandedDropdownItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: vs(12),
+  popoverItem: {
+    paddingVertical: vs(10),
+    paddingHorizontal: hs(12),
+    borderRadius: ms(8),
+    marginBottom: vs(4),
   },
-  expandedPlusIcon: {
-    fontSize: fs(24),
-    fontWeight: "600",
-    color: COLORS.text.primary,
+  popoverItemActive: {
+    backgroundColor: "#F0F0F0",
+  },
+  popoverItemText: {
+    fontSize: fs(15),
+    color: "#333",
+  },
+  groundTabs: {
+    marginBottom: vs(15),
   },
   dateGroupHeader: {
     marginTop: vs(5),
@@ -547,6 +519,20 @@ const styles = StyleSheet.create({
   emptySlotsText: { textAlign: "center", marginVertical: vs(20) },
   loaderStyle: { marginVertical: vs(20) },
   sectionTitle: { textTransform: "uppercase", marginBottom: vs(6) },
+  dateRowZIndex: {
+    zIndex: 100,
+  },
+  dropdownToggleWrapper: {
+    position: "relative",
+    zIndex: 100,
+  },
+  skeletonContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: vs(8),
+    marginTop: vs(16),
+  },
   bookingsContainer: { marginTop: vs(8), width: "100%" },
   fab: {
     position: "absolute",

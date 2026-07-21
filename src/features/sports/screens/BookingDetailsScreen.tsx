@@ -17,15 +17,7 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, DetailsSkeleton } from "@/components/ui";
-import {
-  Calendar,
-  Clock,
-  ChevronDown,
-  ChevronUp,
-  Trash2,
-  X,
-  ChevronLeft,
-} from "lucide-react-native";
+import { Clock, Trash2, X, ChevronLeft, ChevronRight, Phone } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
@@ -39,7 +31,12 @@ const icPhonepe = require("@/assets/icons/icons8-phone-pe-48.png");
 const icPaytm = require("@/assets/icons/paytm.png");
 const icCash = require("@/assets/icons/pay-50.png");
 const icWhatsapp = require("@/assets/icons/social.png");
-const icCall = require("@/assets/icons/phone-call.png");
+
+import ClockSvg from "@/assets/icons/ic-tabler-clock.svg";
+import DownloadSvg from "@/assets/icons/ic-material-symbols-download-rounded.svg";
+import MoneySvg from "@/assets/icons/ic-tdesign-money.svg";
+import PersonSvg from "@/assets/icons/ic-round-person.svg";
+import CalendarSvg from "@/assets/icons/ic-solar-calendar-outline.svg";
 
 export const BookingDetailsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -57,8 +54,13 @@ export const BookingDetailsScreen = () => {
 
   const [showCancelModal, setShowCancelModal] = useState(false);
 
-  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [paymentInput, setPaymentInput] = useState("");
+  const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
+    "cash",
+  );
+
+  const [showPaymentHistory, setShowPaymentHistory] = useState(true);
 
   const getIconForMode = (mode: string, note?: string) => {
     const noteUpper = note?.toUpperCase() || "";
@@ -83,10 +85,6 @@ export const BookingDetailsScreen = () => {
     }
     return mode === "upi" ? "Online" : mode.toUpperCase();
   };
-  const [paymentInput, setPaymentInput] = useState("");
-  const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
-    "cash",
-  );
 
   if (loading || !booking) {
     return (
@@ -279,58 +277,66 @@ export const BookingDetailsScreen = () => {
             )}
         </View>
       }>
-      {/* 1. Header Card */}
-      <View style={styles.headerCard}>
-        <View style={styles.headerTopRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <ChevronLeft size={ms(28)} color={COLORS.text.primary} />
-          </TouchableOpacity>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.iconBtnGreen} onPress={handleShareWhatsApp}>
-              <Image source={icWhatsapp} style={styles.headerIcon} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconBtnBlue} onPress={handleCall}>
-              <Image source={icCall} style={styles.headerIcon} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.avatarContainer}
-          activeOpacity={0.7}
-          onPress={() => {
-            navigation.navigate("GuestHistory", {
-              bookingId,
-              vertical: "sports",
-              venueId: booking.venue_id,
-            });
-          }}>
-          <Image
-            source={
-              profileData?.avatar_url
-                ? { uri: profileData.avatar_url }
-                : require("@/assets/images/avatar_man.png")
-            }
-            style={styles.avatarImage}
-          />
+      {/* 0. Screen Header */}
+      <View style={styles.screenHeader}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <ChevronLeft size={ms(28)} color={COLORS.text.primary} />
         </TouchableOpacity>
-
-        <Text variant="h2" weight="bold" style={styles.headerName}>
-          {guestName}
+        <Text variant="h2" weight="bold" style={styles.screenTitle}>
+          Booking Details
         </Text>
       </View>
+
+      {/* 1. Profile Card */}
+      <TouchableOpacity
+        style={styles.profileCard}
+        activeOpacity={0.7}
+        onPress={() => {
+          navigation.navigate("GuestHistory", {
+            bookingId,
+            vertical: "sports",
+            venueId: booking.venue_id,
+          });
+        }}>
+        {profileData?.avatar_url ? (
+          <Image source={{ uri: profileData.avatar_url }} style={styles.avatarImage} />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <PersonSvg width={ms(32)} height={ms(32)} color="#63a1fd" />
+          </View>
+        )}
+        <View style={styles.profileInfo}>
+          <Text variant="h3" weight="bold" style={styles.profileName}>
+            {guestName}
+          </Text>
+          <Text variant="body2" style={styles.profilePhone}>
+            {guestPhone}
+          </Text>
+          <View style={styles.onlineBadge}>
+            <Text style={styles.onlineBadgeText}>Online</Text>
+          </View>
+        </View>
+        <View style={styles.profileActions}>
+          <TouchableOpacity onPress={handleShareWhatsApp}>
+            <Image source={icWhatsapp} style={styles.socialIcon} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtnBlue} onPress={handleCall}>
+            <Phone size={ms(20)} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
 
       {/* 2. Date & Time Slots */}
       <View style={styles.dateTimeRow}>
         <View style={styles.dateCard}>
-          <View style={styles.iconBoxBlue}>
-            <Calendar size={ms(24)} color="#63a1fd" />
+          <View style={styles.iconBoxLightBlue}>
+            <CalendarSvg width={ms(20)} height={ms(20)} color="#63a1fd" />
           </View>
           <View style={styles.dateCardTextCol}>
             <Text variant="body2" weight="bold" style={styles.labelTitle}>
               Date
             </Text>
-            <Text variant="body2" weight="semiBold" style={styles.labelValue}>
+            <Text variant="body2" style={styles.labelValue}>
               {new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB", {
                 day: "2-digit",
                 month: "short",
@@ -341,15 +347,15 @@ export const BookingDetailsScreen = () => {
         </View>
 
         <View style={styles.dateCard}>
-          <View style={styles.iconBoxBlue}>
-            <Clock size={ms(24)} color="#63a1fd" />
+          <View style={styles.iconBoxLightBlue}>
+            <Clock size={ms(20)} color="#63a1fd" />
           </View>
           <View style={styles.dateCardTextCol}>
-            <Text variant="body2" weight="bold" style={styles.labelTitle}>
+            <Text variant="body1" weight="bold" style={styles.labelTitle}>
               Time Slots
             </Text>
-            <Text variant="body2" weight="semiBold" style={styles.labelValue}>
-              {formatHour(booking.sports_slots.start_time)} -{" "}
+            <Text variant="body1" style={styles.labelValue}>
+              {formatHour(booking.sports_slots.start_time)} to{" "}
               {formatHour(booking.sports_slots.end_time)}
             </Text>
           </View>
@@ -359,26 +365,37 @@ export const BookingDetailsScreen = () => {
       {/* 3. Payment Container */}
       <View style={styles.paymentCard}>
         <View style={styles.amountsRow}>
-          <View style={styles.amountBoxLight}>
-            <Text variant="body2" weight="bold" style={styles.amountLabel}>
-              Pending Amount
-            </Text>
-            <Text variant="h3" weight="bold" style={styles.amountValueRed}>
-              ₹{remainingAmount}
-            </Text>
+          <View style={styles.amountBoxLightRed}>
+            <View style={styles.amountIconRed}>
+              <ClockSvg width={ms(20)} height={ms(20)} color="#E55959" />
+            </View>
+            <View style={styles.amountTextCol}>
+              <Text variant="body1" weight="bold" style={styles.amountLabel}>
+                Pending Amount
+              </Text>
+              <Text variant="body1" weight="semiBold" style={styles.amountValueRed}>
+                ₹{remainingAmount}
+              </Text>
+            </View>
           </View>
-          <View style={styles.amountBoxBordered}>
-            <Text variant="body2" weight="bold" style={styles.amountLabel}>
-              Received Amount
-            </Text>
-            <Text variant="h3" weight="bold" style={styles.amountValueGreen}>
-              ₹{displayAmountPaid}
-            </Text>
+
+          <View style={styles.amountBoxLightGreen}>
+            <View style={styles.amountIconGreen}>
+              <DownloadSvg width={ms(20)} height={ms(20)} color="#00B562" />
+            </View>
+            <View style={styles.amountTextCol}>
+              <Text variant="body1" weight="bold" style={styles.amountLabel}>
+                Received Amount
+              </Text>
+              <Text variant="body1" weight="semiBold" style={styles.amountValueGreen}>
+                ₹{displayAmountPaid}
+              </Text>
+            </View>
           </View>
         </View>
 
         {remainingAmount <= 0 ? (
-          <View style={[styles.addMoneyBtn, { backgroundColor: "#9F9F9F" }]}>
+          <View style={[styles.addMoneyBtn, styles.addMoneyBtnCompleted]}>
             <Text variant="body1" weight="bold" style={styles.addMoneyBtnText}>
               Payment Completed
             </Text>
@@ -410,10 +427,7 @@ export const BookingDetailsScreen = () => {
                     }}
                   />
                   <TouchableOpacity onPress={() => setIsAddingPayment(false)}>
-                    <Text
-                      variant="body2"
-                      weight="bold"
-                      style={{ color: "#E55959", fontSize: fs(14) }}>
+                    <Text variant="body2" weight="bold" style={styles.cancelText}>
                       - Cancel
                     </Text>
                   </TouchableOpacity>
@@ -438,7 +452,7 @@ export const BookingDetailsScreen = () => {
                       ]}
                     />
                     <Text
-                      variant="body2"
+                      variant="body1"
                       weight="bold"
                       style={[
                         styles.methodText,
@@ -462,7 +476,7 @@ export const BookingDetailsScreen = () => {
                       ]}
                     />
                     <Text
-                      variant="body2"
+                      variant="body1"
                       weight="bold"
                       style={[
                         styles.methodText,
@@ -486,7 +500,7 @@ export const BookingDetailsScreen = () => {
                       ]}
                     />
                     <Text
-                      variant="body2"
+                      variant="body1"
                       weight="bold"
                       style={[
                         styles.methodText,
@@ -510,7 +524,7 @@ export const BookingDetailsScreen = () => {
                       ]}
                     />
                     <Text
-                      variant="body2"
+                      variant="body1"
                       weight="bold"
                       style={[
                         styles.methodText,
@@ -541,63 +555,57 @@ export const BookingDetailsScreen = () => {
 
       {/* Payment History Accordion */}
       {paymentLogs.length > 0 && (
-        <View style={styles.paymentAccordionContainer}>
+        <View style={styles.paymentHistoryContainer}>
           <TouchableOpacity
-            style={[
-              styles.paymentAccordionHeader,
-              { marginBottom: showPaymentHistory ? vs(10) : 0 },
-            ]}
+            style={styles.paymentHistoryBtn}
             activeOpacity={0.7}
             onPress={() => setShowPaymentHistory(!showPaymentHistory)}>
-            <View style={styles.paymentAccordionTitleRow}>
-              <Image
-                source={require("@/assets/icons/pay-50.png")}
-                style={styles.paymentAccordionTitleIcon}
-              />
-              <Text variant="body1" weight="semiBold" style={styles.paymentAccordionTitleText}>
+            <View style={styles.paymentHistoryLeft}>
+              <MoneySvg width={ms(24)} height={ms(24)} color="#000" />
+              <Text variant="body1" weight="semiBold" style={styles.paymentHistoryText}>
                 Payment History
               </Text>
             </View>
             {showPaymentHistory ? (
-              <ChevronUp size={ms(24)} color={COLORS.text.primary} />
+              <ChevronRight size={ms(24)} color={COLORS.text.primary} />
             ) : (
-              <ChevronDown size={ms(24)} color={COLORS.text.primary} />
+              <ChevronRight size={ms(24)} color={COLORS.text.primary} />
             )}
           </TouchableOpacity>
-
-          {showPaymentHistory &&
-            paymentLogs.map(log => {
-              const icon = getIconForMode(log.payment_mode, log.note);
-              const name = getNameForMode(log.payment_mode, log.note);
-              return (
-                <TouchableOpacity
-                  key={log.id}
-                  style={[styles.ledgerRow, styles.paymentAccordionRow]}
-                  onPress={() => navigation.navigate("PaymentHistory", { bookingId: booking.id })}
-                  activeOpacity={0.7}>
-                  <View style={styles.paymentLogLeft}>
-                    <Image source={icon} style={styles.paymentLogIcon} />
-                    <Text variant="body2" weight="semiBold" style={styles.paymentLogName}>
-                      {name}
-                    </Text>
-                  </View>
-                  <View style={styles.paymentAccordionDateCol}>
-                    <Text variant="body2" weight="semiBold" style={styles.paymentLogName}>
+          {showPaymentHistory && (
+            <View style={styles.paymentLogsWrapper}>
+              {paymentLogs.map(log => {
+                const icon = getIconForMode(log.payment_mode, log.note);
+                const name = getNameForMode(log.payment_mode, log.note);
+                return (
+                  <TouchableOpacity
+                    key={log.id}
+                    style={styles.logCard}
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      navigation.navigate("PaymentHistory", { bookingId: booking.id })
+                    }>
+                    <View style={styles.logLeftCol}>
+                      <Image source={icon} style={styles.logIcon} />
+                      <Text variant="body2" weight="semiBold" style={styles.logName}>
+                        {name}
+                      </Text>
+                    </View>
+                    <Text variant="body2" weight="semiBold" style={styles.logDate}>
                       {new Date(log.created_at).toLocaleDateString("en-GB", {
                         day: "2-digit",
                         month: "short",
                         year: "numeric",
                       })}
                     </Text>
-                  </View>
-                  <View style={styles.ledgerRight}>
-                    <Text variant="body1" weight="bold" color="#00B562">
+                    <Text variant="body1" weight="semiBold" style={styles.logAmount}>
                       ₹{log.amount}
                     </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </View>
       )}
       <Modal visible={showCancelModal} transparent animationType="fade">
@@ -680,66 +688,86 @@ const styles = StyleSheet.create({
   flex1: {
     flex: 1,
   },
-  headerCard: {
-    backgroundColor: "#F4F7FC",
-    borderRadius: ms(10),
-    padding: ms(12),
-    marginTop: vs(12),
-    marginBottom: vs(16),
-    alignItems: "center",
-  },
-  headerTopRow: {
+  screenHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
     alignItems: "center",
-    marginBottom: vs(8),
+    marginBottom: vs(16),
   },
-  backBtn: {
-    padding: ms(4),
+  screenTitle: {
+    fontSize: fs(20),
+    color: "#000",
+    marginLeft: hs(12),
   },
-  headerActions: {
+  profileCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F7F9FC",
+    borderRadius: ms(16),
+    padding: ms(12),
+    marginBottom: vs(16),
+  },
+  avatarImage: {
+    width: ms(60),
+    height: ms(60),
+    borderRadius: ms(30),
+    marginRight: hs(12),
+  },
+  avatarPlaceholder: {
+    width: ms(60),
+    height: ms(60),
+    borderRadius: ms(30),
+    marginRight: hs(12),
+    backgroundColor: "#E6F0FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profileInfo: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  profileName: {
+    fontSize: fs(18),
+    color: "#000",
+    marginBottom: vs(2),
+  },
+  profilePhone: {
+    fontSize: fs(16),
+    color: "#000",
+    marginBottom: vs(4),
+  },
+  onlineBadge: {
+    backgroundColor: "#E6F0FF",
+    paddingHorizontal: hs(8),
+    paddingVertical: vs(2),
+    borderRadius: ms(12),
+    alignSelf: "flex-start",
+  },
+  onlineBadgeText: {
+    color: "#4A80F0",
+    fontSize: fs(16),
+    fontFamily: "Gilroy-SemiBold",
+  },
+  profileActions: {
     flexDirection: "row",
     gap: hs(8),
   },
-  iconBtnGreen: {
-    width: ms(42),
-    height: ms(42),
-    borderRadius: ms(21),
-    backgroundColor: "transparent",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  iconBtnBlue: {
-    width: ms(42),
-    height: ms(42),
-    borderRadius: ms(21),
-    backgroundColor: "transparent",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerIcon: {
+  socialIcon: {
     width: ms(40),
     height: ms(40),
     resizeMode: "contain",
   },
-  avatarContainer: {
-    width: ms(60),
-    height: ms(60),
-    borderRadius: ms(30),
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "#fff",
-    marginBottom: vs(8),
+  iconBtnBlue: {
+    width: ms(40),
+    height: ms(40),
+    borderRadius: ms(20),
+    backgroundColor: "#4A80F0",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  avatarImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  headerName: {
-    fontSize: fs(20),
-    color: "#000",
+
+  backBtn: {
+    padding: ms(4),
+    marginLeft: -ms(8),
   },
   dateTimeRow: {
     flexDirection: "row",
@@ -755,11 +783,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: hs(8),
   },
-  iconBoxBlue: {
-    width: ms(36),
-    height: ms(36),
+  iconBoxLightBlue: {
+    width: ms(32),
+    height: ms(32),
     borderRadius: ms(8),
-    backgroundColor: "#dbeafe", // lighter blue for the icon background
+    backgroundColor: "#E6F0FF",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -767,20 +795,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   labelTitle: {
-    fontSize: fs(12),
+    fontSize: fs(16),
     color: "#000",
     marginBottom: vs(2),
   },
   labelValue: {
-    fontSize: fs(14),
+    fontSize: fs(16),
     color: "#000",
   },
   paymentCard: {
-    borderWidth: 1,
-    borderColor: "#cbdffe",
-    borderRadius: ms(10),
+    borderRadius: ms(16),
     padding: ms(16),
-    backgroundColor: "#F4F7FC",
+    backgroundColor: "#F7F9FC",
     marginBottom: vs(16),
   },
   amountsRow: {
@@ -788,38 +814,58 @@ const styles = StyleSheet.create({
     gap: hs(12),
     marginBottom: vs(16),
   },
-  amountBoxLight: {
+  amountBoxLightRed: {
     flex: 1,
     backgroundColor: "#F4F7FC",
-    borderColor: "#63A1FD",
-    borderWidth: 1,
-    borderRadius: ms(8),
-    paddingVertical: vs(12),
+    borderRadius: ms(12),
+    paddingVertical: vs(10),
     paddingHorizontal: hs(8),
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: hs(8),
   },
-  amountBoxBordered: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#63a1fd",
+  amountIconRed: {
+    width: ms(32),
+    height: ms(32),
     borderRadius: ms(8),
+    backgroundColor: "#FFE5E5",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  amountBoxLightGreen: {
+    flex: 1,
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(12),
     paddingVertical: vs(12),
     paddingHorizontal: hs(8),
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: hs(8),
+  },
+  amountIconGreen: {
+    width: ms(32),
+    height: ms(32),
+    borderRadius: ms(8),
+    backgroundColor: "#D6FFE9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  amountTextCol: {
+    flex: 1,
   },
   amountLabel: {
-    fontSize: fs(14),
+    fontSize: fs(16),
     color: "#444",
-    marginBottom: vs(4),
+    marginBottom: vs(2),
   },
   amountValueRed: {
-    fontSize: fs(20),
+    fontSize: fs(24),
     color: "#E55959",
   },
   amountValueGreen: {
-    fontSize: fs(20),
+    fontSize: fs(24),
     color: "#00B562",
   },
   inputLabel: {
@@ -835,7 +881,7 @@ const styles = StyleSheet.create({
     borderRadius: ms(8),
     paddingHorizontal: hs(12),
     marginBottom: vs(16),
-    height: vs(46),
+    height: vs(50),
   },
   currencySymbol: {
     fontSize: fs(18),
@@ -843,8 +889,8 @@ const styles = StyleSheet.create({
     marginRight: hs(8),
   },
   amountInput: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(24),
+    fontFamily: "Gilroy-SemiBold",
+    fontSize: fs(22),
     color: COLORS.text.primary,
     flex: 1,
   },
@@ -869,16 +915,16 @@ const styles = StyleSheet.create({
     borderColor: "#63a1fd",
   },
   methodText: {
-    fontSize: fs(12),
-    marginTop: vs(6),
+    fontSize: fs(14),
+    marginTop: vs(2),
     color: "#000",
   },
   methodTextSelected: {
     color: "#fff",
   },
   methodIcon: {
-    width: ms(44),
-    height: ms(44),
+    width: ms(48),
+    height: ms(48),
     resizeMode: "contain",
   },
   methodIconSelected: {
@@ -895,6 +941,13 @@ const styles = StyleSheet.create({
     fontSize: fs(16),
     color: "#fff",
   },
+  addMoneyBtnCompleted: {
+    backgroundColor: "#9F9F9F",
+  },
+  cancelText: {
+    color: "#E55959",
+    fontSize: fs(14),
+  },
   actionRowBottom: {
     flexDirection: "row",
     gap: hs(12),
@@ -902,16 +955,16 @@ const styles = StyleSheet.create({
   },
   repeatBtn: {
     flex: 1,
-    backgroundColor: "#F4F7FC",
+    backgroundColor: "#F7F9FC",
     borderWidth: 1,
-    borderColor: "#cbdffe",
+    borderColor: "#E2E8F0",
     borderRadius: ms(10),
     paddingVertical: vs(14),
     alignItems: "center",
     justifyContent: "center",
   },
   repeatBtnText: {
-    fontSize: fs(18),
+    fontSize: fs(20),
     color: "#000",
   },
   rescheduleBtn: {
@@ -925,7 +978,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rescheduleBtnText: {
-    fontSize: fs(18),
+    fontSize: fs(20),
     color: "#63a1fd",
   },
   cancelBtnBottom: {
@@ -938,7 +991,7 @@ const styles = StyleSheet.create({
     gap: hs(8),
   },
   cancelBtnBottomText: {
-    fontSize: fs(18),
+    fontSize: fs(20),
     color: "#fff",
   },
   actionCard: {
@@ -1074,43 +1127,110 @@ const styles = StyleSheet.create({
     gap: hs(8),
   },
   paymentLogIcon: {
-    width: ms(32),
-    height: ms(32),
+    width: ms(48),
+    height: ms(48),
     resizeMode: "contain",
   },
   paymentLogName: {
     color: "#000",
   },
-  paymentAccordionContainer: {
-    borderWidth: 1,
-    borderColor: "#cbdffe",
-    borderRadius: ms(10),
-    padding: ms(10),
-    marginBottom: vs(16),
-  },
-  paymentAccordionHeader: {
+  paymentHistoryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    backgroundColor: "transparent",
+    borderRadius: 0,
+    padding: 0,
+    marginBottom: 0,
   },
-  paymentAccordionTitleRow: {
+  paymentHistoryLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: hs(8),
   },
-  paymentAccordionTitleIcon: {
-    width: ms(24),
-    height: ms(24),
+  paymentHistoryContainer: {
+    marginBottom: vs(16),
+    borderWidth: 1,
+    borderColor: "#cbdffe",
+    borderRadius: ms(12),
+    backgroundColor: "#fff",
+    padding: ms(16),
   },
-  paymentAccordionTitleText: {
+  paymentHistoryText: {
+    fontSize: fs(16),
     color: "#000",
   },
-  paymentAccordionRow: {
-    paddingVertical: vs(4),
+  paymentLogsWrapper: {
+    marginTop: vs(10),
+    marginBottom: vs(-16),
+  },
+  logCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    paddingVertical: vs(8),
     marginBottom: vs(8),
   },
-  paymentAccordionDateCol: {
-    flex: 1,
+  logLeftCol: {
+    flexDirection: "row",
     alignItems: "center",
+    width: "35%",
+    gap: hs(12),
+  },
+  logIcon: {
+    width: ms(48),
+    height: ms(48),
+    resizeMode: "contain",
+  },
+  logName: {
+    fontSize: fs(16),
+    color: "#000",
+  },
+  logDate: {
+    fontSize: fs(16),
+    color: "#000",
+    textAlign: "center",
+    flex: 1,
+  },
+  logAmount: {
+    fontSize: fs(16),
+    color: "#00B562",
+    width: "25%",
+    textAlign: "right",
+  },
+  deletePaymentModalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: ms(20),
+    borderTopRightRadius: ms(20),
+    padding: ms(20),
+    position: "absolute",
+    bottom: 0,
+    width: "100%",
+  },
+  deletePaymentModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  deletePaymentModalTextCol: {
+    flex: 1,
+    paddingRight: hs(16),
+  },
+  deletePaymentModalQuestion: {
+    fontSize: fs(16),
+    marginTop: vs(4),
+  },
+  deletePaymentConfirmBtn: {
+    backgroundColor: "#E55959",
+    paddingHorizontal: hs(24),
+    paddingVertical: vs(12),
+    borderRadius: ms(8),
+    minWidth: hs(80),
+    alignItems: "center",
+  },
+  deletePaymentConfirmBtnText: {
+    color: "#fff",
+    fontSize: fs(16),
   },
 });

@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { FormSkeleton, Text } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { ArrowLeft, Calendar, Clock } from "lucide-react-native";
+import { ArrowLeft, Clock } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -28,6 +28,10 @@ import { SportsService } from "../services/sports.service";
 import { useBookingDetails } from "../hooks/useBookingDetails";
 import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
 import perf from "@react-native-firebase/perf";
+
+import CalendarSvg from "@/assets/icons/ic-solar-calendar-outline.svg";
+import MoneySvg from "@/assets/icons/ic-tdesign-money.svg";
+import WalletSvg from "@/assets/icons/ic-streamline-plump-wallet.svg";
 
 export const RepeatBookingScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -348,16 +352,16 @@ export const RepeatBookingScreen = () => {
           {/* Date Selector */}
           <View style={styles.inputBoxReadOnly}>
             <View style={styles.iconBoxBlue}>
-              <Calendar size={ms(20)} color="#63A1FD" />
+              <CalendarSvg width={ms(20)} height={ms(20)} color="#63A1FD" />
             </View>
             <TouchableOpacity
               onPress={() => setIsDatePickerOpen(true)}
               activeOpacity={0.7}
               style={styles.flex1}>
-              <Text variant="body2" weight="bold" color="#000">
+              <Text variant="body1" weight="bold" color="#000" style={{ fontSize: 16 }}>
                 Date
               </Text>
-              <Text variant="body2" weight="semiBold" color="#000">
+              <Text variant="body1" weight="semiBold" color="#000" style={{ fontSize: 16 }}>
                 {getFormattedDate(repeatDate)}
               </Text>
             </TouchableOpacity>
@@ -401,10 +405,10 @@ export const RepeatBookingScreen = () => {
                   <Clock size={ms(20)} color="#63A1FD" />
                 </View>
                 <View>
-                  <Text variant="body2" weight="bold" color="#000">
+                  <Text variant="body1" weight="bold" color="#000" style={{ fontSize: 16 }}>
                     From
                   </Text>
-                  <Text variant="body2" weight="semiBold" color="#000">
+                  <Text variant="body1" weight="semiBold" color="#000" style={{ fontSize: 16 }}>
                     {fromTime === "Start Time" ? "--" : fromTime}
                   </Text>
                 </View>
@@ -417,10 +421,10 @@ export const RepeatBookingScreen = () => {
                   <Clock size={ms(20)} color="#63A1FD" />
                 </View>
                 <View>
-                  <Text variant="body2" weight="bold" color="#000">
+                  <Text variant="body1" weight="bold" color="#000" style={{ fontSize: 16 }}>
                     To
                   </Text>
-                  <Text variant="body2" weight="semiBold" color="#000">
+                  <Text variant="body1" weight="semiBold" color="#000" style={{ fontSize: 16 }}>
                     {toTime === "End Time" ? "--" : toTime}
                   </Text>
                 </View>
@@ -469,15 +473,19 @@ export const RepeatBookingScreen = () => {
 
             <View style={styles.row}>
               <View style={[styles.paymentBox, styles.flex1]}>
-                <View style={styles.iconBoxGreen}>
-                  <Image source={require("@/assets/icons/pay-50.png")} style={styles.greenIcon} />
+                <View style={styles.iconBoxBlue}>
+                  <WalletSvg width={ms(20)} height={ms(20)} color="#63A1FD" />
                 </View>
-                <View style={styles.flex1}>
-                  <Text variant="body2" weight="bold" color="#000">
+                <View style={styles.paymentTextContainer}>
+                  <Text variant="body1" weight="bold" color="#000">
                     Total Amount
                   </Text>
                   <View style={styles.priceInputRow}>
-                    <Text variant="body2" weight="semiBold" color="#000">
+                    <Text
+                      variant="body1"
+                      weight="semiBold"
+                      color="#000"
+                      style={{ fontSize: fs(20) }}>
                       ₹
                     </Text>
                     <RNTextInput
@@ -492,14 +500,18 @@ export const RepeatBookingScreen = () => {
               <View style={styles.gap} />
               <View style={[styles.paymentBox, styles.flex1]}>
                 <View style={styles.iconBoxGreen}>
-                  <Image source={require("@/assets/icons/pay-50.png")} style={styles.greenIcon} />
+                  <MoneySvg width={ms(20)} height={ms(20)} color="#00B562" />
                 </View>
-                <View style={styles.flex1}>
-                  <Text variant="body2" weight="bold" color="#000">
+                <View style={styles.paymentTextContainer}>
+                  <Text variant="body1" weight="bold" color="#000">
                     Advance
                   </Text>
                   <View style={styles.priceInputRow}>
-                    <Text variant="body2" weight="semiBold" color="#000">
+                    <Text
+                      variant="body1"
+                      weight="semiBold"
+                      color="#000"
+                      style={{ fontSize: fs(20) }}>
                       ₹
                     </Text>
                     <RNTextInput
@@ -689,7 +701,7 @@ const styles = StyleSheet.create({
     gap: hs(12),
   },
   iconBoxBlue: {
-    backgroundColor: "#D9E8FF",
+    backgroundColor: "#CBDFFE",
     width: ms(40),
     height: ms(40),
     borderRadius: ms(8),
@@ -744,21 +756,25 @@ const styles = StyleSheet.create({
   },
   paymentCard: {
     marginTop: vs(24),
-    borderWidth: 1,
-    borderColor: "#CBDFFE",
     borderRadius: ms(10),
-    padding: ms(12),
-    backgroundColor: "#F4F7FC",
+    paddingTop: vs(10),
+    paddingBottom: vs(16),
+    paddingHorizontal: hs(10),
+    backgroundColor: "#F7F9FD",
   },
   paymentBox: {
-    borderWidth: 1,
-    borderColor: "#63A1FD",
-    borderRadius: ms(10),
-    padding: ms(8),
+    borderRadius: ms(20),
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(12),
     flexDirection: "row",
     alignItems: "center",
     gap: hs(8),
     backgroundColor: "#F4F7FC",
+  },
+  paymentTextContainer: {
+    flex: 1,
+    justifyContent: "center",
+    gap: vs(6),
   },
   priceInputRow: {
     flexDirection: "row",
@@ -767,7 +783,7 @@ const styles = StyleSheet.create({
   priceInput: {
     padding: 0,
     margin: 0,
-    fontSize: fs(14),
+    fontSize: fs(20),
     fontFamily: "Gilroy-SemiBold",
     color: "#000",
     marginLeft: hs(2),

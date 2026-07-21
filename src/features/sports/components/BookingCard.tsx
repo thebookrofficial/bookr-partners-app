@@ -4,9 +4,11 @@
 import React, { useEffect, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, Image, Animated } from "react-native";
 import { Text } from "@/components/ui";
-import { Calendar, Clock, User as UserIcon } from "lucide-react-native";
+import { Clock } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
+import PersonSvg from "@/assets/icons/ic-round-person.svg";
+import CalendarSvg from "@/assets/icons/ic-solar-calendar-outline.svg";
 
 interface BookingCardProps {
   name: string;
@@ -115,7 +117,17 @@ export const BookingCard = ({
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
           ) : (
-            <UserIcon size={ms(20)} color="#63A1FD" />
+            <View
+              style={{
+                backgroundColor: "#E6F0FF",
+                width: "100%",
+                height: "100%",
+                borderRadius: ms(20),
+                justifyContent: "center",
+                alignItems: "center",
+              }}>
+              <PersonSvg width={ms(20)} height={ms(20)} color="#63A1FD" />
+            </View>
           )}
         </View>
 
@@ -164,7 +176,7 @@ export const BookingCard = ({
             {useClockIcon ? (
               <Clock size={ms(18)} color="#63A1FD" />
             ) : (
-              <Calendar size={ms(18)} color="#63A1FD" />
+              <CalendarSvg width={ms(18)} height={ms(18)} color="#63A1FD" />
             )}
           </View>
           {!hideDateText && (
@@ -226,8 +238,8 @@ const styles = StyleSheet.create({
     marginBottom: vs(2),
   },
   phoneText: {
-    fontSize: fs(14),
-    color: "#6B7280",
+    fontSize: fs(16),
+    color: "#000000",
   },
   paymentBadge: {
     backgroundColor: "#FEE2E2",
@@ -282,12 +294,12 @@ const styles = StyleSheet.create({
     marginRight: hs(8),
   },
   dateText: {
-    fontSize: fs(15),
+    fontSize: fs(16),
   },
   timeWrapper: {
     justifyContent: "center",
   },
   timeText: {
-    fontSize: fs(15),
+    fontSize: fs(16),
   },
 });
