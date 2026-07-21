@@ -130,8 +130,13 @@ export const StaycationBookingDetailsScreen = () => {
 
   const getGroupType = (requests: string) => {
     if (!requests) return null;
-    const parts = requests.split("|");
-    const groupPart = parts.find(p => p.trim().toLowerCase().startsWith("group type:"));
+    // Split by either | or ,
+    const parts = requests.split(/[|,]/);
+    const groupPart = parts.find(
+      p =>
+        p.trim().toLowerCase().startsWith("group type:") ||
+        p.trim().toLowerCase().startsWith("group:"),
+    );
     if (groupPart) {
       return groupPart.split(":")[1]?.trim();
     }

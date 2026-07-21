@@ -19,30 +19,31 @@ export interface DashboardRoom {
   name: string;
 }
 
-export interface DailyRevenue {
+export interface BookingGraphItem {
   date: string;
-  amount: string;
-  percentage: number;
+  day: string;
+  value: number;
 }
 
-export interface WeeklyRevenue {
-  id: string;
-  week: string;
-  dates: string;
-  amount: string;
-  percentage: number;
-  isPrimary?: boolean;
-  dailyBreakdown?: DailyRevenue[];
+export interface RevenueGraphItem {
+  date: string;
+  value: string;
+  fillPct: string;
+  isBlue: boolean;
+  rawAmount: number;
 }
 
 export interface DashboardStats {
   totalBookings: number;
   onlineBookings: number;
   offlineBookings: number;
-  totalRevenue: string;
-  onlineRevenue: string;
-  offlineRevenue: string;
-  weeklyRevenue: WeeklyRevenue[];
+  totalRevenue: number;
+  onlineRevenue: number;
+  offlineRevenue: number;
+  bookingGraphData: BookingGraphItem[];
+  revenueGraphData: RevenueGraphItem[];
+  maxBookingValue: number;
+  dateRangeLabel: string;
 }
 
 export const useStaycationDashboard = (
@@ -58,10 +59,13 @@ export const useStaycationDashboard = (
     totalBookings: 0,
     onlineBookings: 0,
     offlineBookings: 0,
-    totalRevenue: "0",
-    onlineRevenue: "0",
-    offlineRevenue: "0",
-    weeklyRevenue: [],
+    totalRevenue: 0,
+    onlineRevenue: 0,
+    offlineRevenue: 0,
+    bookingGraphData: [],
+    revenueGraphData: [],
+    maxBookingValue: 0,
+    dateRangeLabel: "",
   });
 
   const fetchRooms = useCallback(async () => {
@@ -199,10 +203,13 @@ export const useStaycationDashboard = (
           totalBookings: 0,
           onlineBookings: 0,
           offlineBookings: 0,
-          totalRevenue: "0",
-          onlineRevenue: "0",
-          offlineRevenue: "0",
-          weeklyRevenue: [],
+          totalRevenue: 0,
+          onlineRevenue: 0,
+          offlineRevenue: 0,
+          bookingGraphData: [],
+          revenueGraphData: [],
+          maxBookingValue: 0,
+          dateRangeLabel: "",
         });
         return;
       }
@@ -218,12 +225,16 @@ export const useStaycationDashboard = (
       let offlineRevenue = 0;
 
       // Grouping by date for the graph
-      const revenueByDate: Record<string, number> = {};
+      const dailyData: Record<string, { bookings: number; revenue: number; day: string }> = {};
 
-      // Initialize all dates in range with 0
       let loopDate = new Date(startDate);
       while (loopDate <= endDate) {
-        revenueByDate[formatDate(loopDate)] = 0;
+        const dateKey = formatDate(loopDate);
+        dailyData[dateKey] = {
+          bookings: 0,
+          revenue: 0,
+          day: loopDate.toLocaleDateString("en-US", { weekday: "short" }),
+        };
         loopDate.setDate(loopDate.getDate() + 1);
       }
 
@@ -236,22 +247,13 @@ export const useStaycationDashboard = (
         const bookingDate = b.check_in_date;
 
         if (isOnline) {
-          // --- ALIGNED PAYOUT FORMULA ---
           const sumPaid = Number(b.paid_amount || 0);
           const sumDiscount = Number(b.discount_amount || 0);
           const sumSubtotal = Number(b.subtotal || 0);
           const sumTotalAmt = Number(b.total_amount || 0);
-
-          // 1. Total Paid = paid_amount + discount
           const totalPaid = sumPaid + sumDiscount;
-
-          // 2. Bookr Commission = 5% of Total Price (Staycation specific)
           const commission = Number((sumTotalAmt * 0.05).toFixed(2));
-
-          // 3. Gateway Fee = 2% of Subtotal
           const gateway = Number((sumSubtotal * 0.02).toFixed(2));
-
-          // 4. Net Payout
           const netPayout = totalPaid - commission - gateway;
 
           // Only include in summary totals if the booking is from YESTERDAY or earlier
@@ -261,96 +263,81 @@ export const useStaycationDashboard = (
             totalRevenue += netPayout;
           }
 
-          // For revenue graph, attribute net payout to check_in_date (Always show in graph for range visibility)
-          if (revenueByDate[bookingDate] !== undefined) {
-            revenueByDate[bookingDate] += netPayout;
+          if (dailyData[bookingDate]) {
+            dailyData[bookingDate].bookings += 1;
+            dailyData[bookingDate].revenue += netPayout;
           }
         } else {
-          // OFFLINE: Use gross amount (no platform commission)
           offlineBookings++;
           offlineRevenue += amount;
           totalRevenue += amount;
 
-          // For revenue graph, attribute gross amount to check_in_date
-          if (revenueByDate[bookingDate] !== undefined) {
-            revenueByDate[bookingDate] += amount;
+          if (dailyData[bookingDate]) {
+            dailyData[bookingDate].bookings += 1;
+            dailyData[bookingDate].revenue += amount;
           }
         }
       });
 
       totalBookings = onlineBookings + offlineBookings;
 
-      // Calculate Weekly Revenue
-      const weeklyRevenue: WeeklyRevenue[] = [];
-      const dates = Object.keys(revenueByDate).sort();
+      const dates = Object.keys(dailyData).sort();
+      let maxBookingValue = 0;
+      let maxRevenueValue = 0;
 
-      if (dates.length > 0) {
-        let currentWeekIndex = 1;
-        for (let i = 0; i < dates.length; i += 7) {
-          const weekDates = dates.slice(i, i + 7);
-          const weekStart = weekDates[0];
-          const weekEnd = weekDates[weekDates.length - 1];
+      const bookingGraphData: BookingGraphItem[] = [];
 
-          let weekAmount = 0;
-          const dailyBreakdown: DailyRevenue[] = [];
+      dates.forEach(date => {
+        const data = dailyData[date];
+        if (data.bookings > maxBookingValue) maxBookingValue = data.bookings;
+        if (data.revenue > maxRevenueValue) maxRevenueValue = data.revenue;
 
-          weekDates.forEach(date => {
-            const amount = revenueByDate[date];
-            weekAmount += amount;
-            dailyBreakdown.push({
-              date: new Date(date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
-              amount: amount.toString(),
-              percentage: 0, // Will calculate later
-            });
-          });
+        const formattedDate = new Date(date).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+        });
 
-          // Formatting date range for display (e.g., "Apr 1- Apr 4")
-          const startMonth = new Date(weekStart).toLocaleDateString("en-GB", { month: "short" });
-          const startDay = new Date(weekStart).getDate();
-          const endMonth = new Date(weekEnd).toLocaleDateString("en-GB", { month: "short" });
-          const endDay = new Date(weekEnd).getDate();
-          const datesLabel = `${startMonth} ${startDay}- ${endMonth} ${endDay}`;
-
-          weeklyRevenue.push({
-            id: `w${currentWeekIndex}`,
-            week: `Week ${currentWeekIndex}`,
-            dates: datesLabel,
-            amount: weekAmount.toString(),
-            percentage: 0, // Will calculate later
-            dailyBreakdown,
-          });
-          currentWeekIndex++;
-        }
-      }
-
-      // Calculate Percentages
-      const maxWeekAmount = Math.max(...weeklyRevenue.map(w => parseFloat(w.amount)), 0);
-      weeklyRevenue.forEach(w => {
-        const weekAmount = parseFloat(w.amount);
-        w.percentage = maxWeekAmount > 0 ? (weekAmount / maxWeekAmount) * 100 : 0;
-        // Make the highest week primary
-        if (weekAmount === maxWeekAmount && maxWeekAmount > 0) {
-          w.isPrimary = true;
-        }
-
-        const maxDailyAmount = Math.max(
-          ...(w.dailyBreakdown?.map(d => parseFloat(d.amount)) || [0]),
-          0,
-        );
-        w.dailyBreakdown?.forEach(day => {
-          const dayAmount = parseFloat(day.amount);
-          day.percentage = maxDailyAmount > 0 ? (dayAmount / maxDailyAmount) * 100 : 0;
+        bookingGraphData.push({
+          date: formattedDate,
+          day: data.day,
+          value: data.bookings,
         });
       });
+
+      const revenueGraphData: RevenueGraphItem[] = dates.map((date, idx) => {
+        const data = dailyData[date];
+        const pct = maxRevenueValue > 0 ? (data.revenue / maxRevenueValue) * 100 : 0;
+        const formattedDate = new Date(date).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+        });
+        return {
+          date: formattedDate,
+          value: `₹${Math.round(data.revenue).toLocaleString("en-IN")}`,
+          fillPct: `${pct}%`,
+          isBlue: idx % 2 === 0,
+          rawAmount: data.revenue,
+        };
+      });
+
+      let dateRangeLabel = "";
+      if (dates.length > 0) {
+        const first = bookingGraphData[0].date;
+        const last = bookingGraphData[bookingGraphData.length - 1].date;
+        dateRangeLabel = `${first} - ${last}`;
+      }
 
       setStats({
         totalBookings,
         onlineBookings,
         offlineBookings,
-        totalRevenue: totalRevenue.toString(),
-        onlineRevenue: onlineRevenue.toString(),
-        offlineRevenue: offlineRevenue.toString(),
-        weeklyRevenue,
+        totalRevenue,
+        onlineRevenue,
+        offlineRevenue,
+        bookingGraphData,
+        revenueGraphData,
+        maxBookingValue,
+        dateRangeLabel,
       });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);

@@ -3,7 +3,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "../../../lib/supabase";
-import { Alert } from "react-native";
+import { Alert, InteractionManager } from "react-native";
 import { useAuthStore } from "../../../store";
 
 export interface PaymentLog {
@@ -106,7 +106,10 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
   }, [bookingId]);
 
   useEffect(() => {
-    fetchBookingDetails();
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetchBookingDetails();
+    });
+    return () => task.cancel();
   }, [fetchBookingDetails]);
 
   const updatePayment = async (additionalCashStr: string, additionalOnlineStr: string) => {

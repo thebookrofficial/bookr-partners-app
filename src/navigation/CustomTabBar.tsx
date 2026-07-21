@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     borderWidth: 1,
     borderColor: "#E8F0FE",
-    boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.16)",
+    boxShadow: "0px 0px 25px rgba(0, 0, 0, 0.16)",
   },
   capsuleTabItem: {
     alignItems: "center",
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "#E8F0FE",
-    boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.16)",
+    boxShadow: "0px 0px 25px rgba(0, 0, 0, 0.16)",
   },
   profileOuterContainerActive: {
     borderColor: "#E8F0FE",

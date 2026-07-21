@@ -5,6 +5,7 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import { supabase } from "../../../lib/supabase";
 import { useAuthStore } from "../../../store";
 import { StaycationVenue } from "../types/staycation.types";
+import { InteractionManager } from "react-native";
 
 interface UseStaycationVenuesOptions {
   propertyType?: string;
@@ -128,7 +129,10 @@ export const useStaycationVenues = (options: UseStaycationVenuesOptions = {}) =>
   );
 
   useEffect(() => {
-    fetchVenues();
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetchVenues();
+    });
+    return () => task.cancel();
   }, [fetchVenues]);
 
   const activeVenue = useMemo(
