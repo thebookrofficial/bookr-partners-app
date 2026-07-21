@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React, { useEffect, useState, useRef } from "react";
-import { View, StyleSheet, TouchableOpacity, Animated } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Animated, InteractionManager } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -40,73 +40,75 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const profileIndex = routes.indexOf(profileRoute);
 
   useEffect(() => {
-    const isProfileActive = state.index === profileIndex;
+    InteractionManager.runAfterInteractions(() => {
+      const isProfileActive = state.index === profileIndex;
 
-    if (isProfileActive) {
-      Animated.parallel([
-        Animated.timing(capsuleOpacity, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: false,
-        }),
-        Animated.timing(widthAnim, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: false,
-        }),
-      ]).start();
-
-      Animated.sequence([
-        Animated.timing(profileWidth, {
-          toValue: 90,
-          duration: 120,
-          useNativeDriver: false,
-        }),
-        Animated.spring(profileWidth, {
-          toValue: 73,
-          useNativeDriver: false,
-          friction: 6,
-          tension: 60,
-        }),
-      ]).start();
-    } else {
-      Animated.timing(capsuleOpacity, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: false,
-      }).start();
-
-      Animated.timing(profileWidth, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: false,
-      }).start();
-
-      const activeLayout = layouts[state.index];
-      if (activeLayout) {
+      if (isProfileActive) {
         Animated.parallel([
-          Animated.spring(translateX, {
-            toValue: activeLayout.x + (activeLayout.width - 73) / 2,
+          Animated.timing(capsuleOpacity, {
+            toValue: 0,
+            duration: 180,
             useNativeDriver: false,
-            friction: 8,
-            tension: 50,
           }),
-          Animated.sequence([
-            Animated.timing(widthAnim, {
-              toValue: 92,
-              duration: 120,
-              useNativeDriver: false,
-            }),
-            Animated.spring(widthAnim, {
-              toValue: 73,
-              useNativeDriver: false,
-              friction: 6,
-              tension: 60,
-            }),
-          ]),
+          Animated.timing(widthAnim, {
+            toValue: 0,
+            duration: 180,
+            useNativeDriver: false,
+          }),
         ]).start();
+
+        Animated.sequence([
+          Animated.timing(profileWidth, {
+            toValue: 65,
+            duration: 120,
+            useNativeDriver: false,
+          }),
+          Animated.spring(profileWidth, {
+            toValue: 50,
+            useNativeDriver: false,
+            friction: 6,
+            tension: 60,
+          }),
+        ]).start();
+      } else {
+        Animated.timing(capsuleOpacity, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: false,
+        }).start();
+
+        Animated.timing(profileWidth, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: false,
+        }).start();
+
+        const activeLayout = layouts[state.index];
+        if (activeLayout) {
+          Animated.parallel([
+            Animated.spring(translateX, {
+              toValue: activeLayout.x + (activeLayout.width - 73) / 2,
+              useNativeDriver: false,
+              friction: 8,
+              tension: 50,
+            }),
+            Animated.sequence([
+              Animated.timing(widthAnim, {
+                toValue: 92,
+                duration: 120,
+                useNativeDriver: false,
+              }),
+              Animated.spring(widthAnim, {
+                toValue: 73,
+                useNativeDriver: false,
+                friction: 6,
+                tension: 60,
+              }),
+            ]),
+          ]).start();
+        }
       }
-    }
+    });
   }, [state.index, layouts, profileIndex, capsuleOpacity, profileWidth, translateX, widthAnim]);
 
   const renderTab = (route: any, isProfile = false) => {
@@ -144,7 +146,7 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
               styles.profileIndicator,
               {
                 width: profileWidth,
-                left: Animated.subtract(hs(42.5), Animated.divide(profileWidth, 2)),
+                left: Animated.subtract(hs(32.5), Animated.divide(profileWidth, 2)),
               },
             ]}
           />
@@ -259,8 +261,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#E8F0FE",
   },
   profileOuterContainer: {
-    width: hs(85),
-    height: vs(62),
+    width: hs(65),
+    height: vs(65),
     borderRadius: ms(31),
     backgroundColor: "#FFFFFF",
     alignItems: "center",
@@ -270,7 +272,7 @@ const styles = StyleSheet.create({
     boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.16)",
   },
   profileOuterContainerActive: {
-    borderColor: "#63A1FD",
+    borderColor: "#E8F0FE",
   },
   profileIndicator: {
     position: "absolute",

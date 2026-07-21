@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import {
   RootStackParamList,
   AuthStackParamList,
@@ -103,10 +103,10 @@ const SignupScreen = () => <PlaceholderScreen title="Signup Screen" />;
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainStack = createNativeStackNavigator<MainStackParamList>();
-const SportsTab = createBottomTabNavigator<SportsTabParamList>();
-const DineTab = createBottomTabNavigator<DineTabParamList>();
-const StaycationTab = createBottomTabNavigator<StaycationTabParamList>();
-const EventTab = createBottomTabNavigator<EventTabParamList>();
+const SportsTab = createMaterialTopTabNavigator<SportsTabParamList>();
+const DineTab = createMaterialTopTabNavigator<DineTabParamList>();
+const StaycationTab = createMaterialTopTabNavigator<StaycationTabParamList>();
+const EventTab = createMaterialTopTabNavigator<EventTabParamList>();
 
 const TabIcon =
   (IconComponent: any) =>
@@ -120,7 +120,10 @@ const SportsTabNavigator = () => {
   const canAccess = (perm: string) => isOwner || perms.includes(perm);
 
   return (
-    <SportsTab.Navigator tabBar={renderCustomTabBar} screenOptions={{ headerShown: false }}>
+    <SportsTab.Navigator
+      tabBarPosition="bottom"
+      tabBar={renderCustomTabBar}
+      screenOptions={{ swipeEnabled: true }}>
       {canAccess("sports:View Sports Home") && (
         <SportsTab.Screen
           name="SportsHome"
@@ -164,7 +167,10 @@ const SportsTabNavigator = () => {
 
 const DineTabNavigator = () => {
   return (
-    <DineTab.Navigator tabBar={renderCustomTabBar} screenOptions={{ headerShown: false }}>
+    <DineTab.Navigator
+      tabBarPosition="bottom"
+      tabBar={renderCustomTabBar}
+      screenOptions={{ swipeEnabled: true }}>
       <DineTab.Screen
         name="DineHome"
         component={DineHomeScreen}
@@ -201,7 +207,10 @@ const StaycationTabNavigator = () => {
   const canAccess = (perm: string) => isOwner || perms.includes(perm);
 
   return (
-    <StaycationTab.Navigator tabBar={renderCustomTabBar} screenOptions={{ headerShown: false }}>
+    <StaycationTab.Navigator
+      tabBarPosition="bottom"
+      tabBar={renderCustomTabBar}
+      screenOptions={{ swipeEnabled: true }}>
       {canAccess("staycation:View Staycation Home") && (
         <StaycationTab.Screen
           name="StaycationHome"
@@ -240,7 +249,6 @@ const StaycationTabNavigator = () => {
         name="StaycationCloseDate"
         component={StaycationCloseDateScreen}
         options={{
-          tabBarButton: () => null,
           tabBarItemStyle: { display: "none" },
         }}
       />
@@ -258,7 +266,10 @@ const ScanTabIcon = () => (
 
 const EventTabNavigator = () => {
   return (
-    <EventTab.Navigator tabBar={renderCustomTabBar} screenOptions={{ headerShown: false }}>
+    <EventTab.Navigator
+      tabBarPosition="bottom"
+      tabBar={renderCustomTabBar}
+      screenOptions={{ swipeEnabled: true }}>
       <EventTab.Screen
         name="EventHome"
         component={EventHomeScreen}
