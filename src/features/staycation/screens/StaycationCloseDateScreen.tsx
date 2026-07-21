@@ -27,8 +27,8 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
 export const StaycationCloseDateScreen = () => {
   const navigation = useNavigation();
-  const route = useRoute<RouteProp<StaycationTabParamList, "StaycationCloseDate">>();
-  const { serviceId } = route.params;
+  const route = useRoute<any>();
+  const { serviceId } = route.params || {};
   const { activeVenue: venue } = useStaycationHome(serviceId);
   const { activeVenueName } = useServiceStore();
 

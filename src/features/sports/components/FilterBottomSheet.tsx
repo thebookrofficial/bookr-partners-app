@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: ms(24),
     borderTopRightRadius: ms(24),
     padding: ms(20),
-    paddingBottom: vs(40),
+    paddingBottom: vs(65),
   },
   header: {
     flexDirection: "row",

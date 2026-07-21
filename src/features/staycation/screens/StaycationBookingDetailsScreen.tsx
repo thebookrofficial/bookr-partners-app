@@ -6,55 +6,43 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
+  Image,
   Share,
   Alert,
   ActivityIndicator,
   Linking,
   Platform,
+  TextInput,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, Avatar, TextInput } from "@/components/ui";
-import {
-  ArrowLeft,
-  Phone,
-  Clock,
-  User,
-  ClipboardList,
-  Plus,
-  Share2,
-  Trash2,
-  ChevronDown,
-  Minus,
-  CheckCircle2,
-  ChevronRight,
-} from "lucide-react-native";
+import { Text } from "@/components/ui";
+import { ArrowLeft, Trash2, ChevronRight, Phone } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useStaycationBookingDetails } from "../hooks/useStaycationBookingDetails";
-// import { supabase } from "@/lib/supabase";
+import WalletSvg from "@/assets/icons/ic-streamline-plump-wallet.svg";
+import MoneySvg from "@/assets/icons/ic-tdesign-money.svg";
+import CalendarSvg from "@/assets/icons/ic-solar-calendar-outline.svg";
+import DownloadSvg from "@/assets/icons/ic-material-symbols-download-rounded.svg";
+import ClockSvg from "@/assets/icons/ic-tabler-clock.svg";
+import PersonSvg from "@/assets/icons/ic-round-person.svg";
+import { Users2 } from "lucide-react-native";
 
-const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
-
-const InfoBlock = ({ label, value, icon: Icon, isSelection, valueColor }: any) => (
-  <View style={styles.infoBlock}>
-    <View style={styles.labelRow}>
-      <Icon size={ms(18)} color={COLORS.text?.primary || "black"} />
-      <Text style={styles.labelText}>{label}</Text>
-    </View>
-    <View style={styles.valueBox}>
-      <Text style={[styles.valueText, valueColor ? { color: valueColor } : {}]}>{value}</Text>
-      {isSelection && <ChevronDown size={ms(18)} color="black" />}
-    </View>
-  </View>
-);
+const icWhatsapp = require("@/assets/icons/social.png");
+const icGpay = require("@/assets/icons/google-pay.png");
+const icPhonepe = require("@/assets/icons/icons8-phone-pe-48.png");
+const icPaytm = require("@/assets/icons/paytm.png");
+const icCash = require("@/assets/icons/pay-50.png");
 
 const formatDate = (dateStr: string | undefined) => {
   if (!dateStr) return "N/A";
   const date = new Date(dateStr);
-  return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
-    .toString()
-    .padStart(2, "0")}/${date.getFullYear()}`;
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 export const StaycationBookingDetailsScreen = () => {
@@ -66,9 +54,11 @@ export const StaycationBookingDetailsScreen = () => {
     useStaycationBookingDetails(initialBooking?.dbId || initialBooking?.id);
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
-  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
-  const [cashAmount, setCashAmount] = useState("");
-  const [onlineAmount, setOnlineAmount] = useState("");
+  const [showPaymentHistory, setShowPaymentHistory] = useState(true);
+  const [paymentInput, setPaymentInput] = useState("");
+  const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
+    "cash",
+  );
 
   const handleCall = () => {
     const phone = bookingDetails?.profiles?.phone || initialBooking?.phone;
@@ -81,11 +71,20 @@ export const StaycationBookingDetailsScreen = () => {
   };
 
   const handleSavePayment = async () => {
-    const success = await updatePayment(cashAmount, onlineAmount);
+    const amount = parseFloat(paymentInput) || 0;
+    if (amount <= 0) {
+      Alert.alert("Notice", "Please enter an amount to save.");
+      return;
+    }
+
+    // Map selected method to cash/online split
+    const cashAmt = selectedMethod === "cash" ? paymentInput : "0";
+    const onlineAmt = selectedMethod !== "cash" ? paymentInput : "0";
+
+    const success = await updatePayment(cashAmt, onlineAmt);
     if (success) {
       setIsAddingPayment(false);
-      setCashAmount("");
-      setOnlineAmount("");
+      setPaymentInput("");
     }
   };
 
@@ -113,7 +112,6 @@ export const StaycationBookingDetailsScreen = () => {
     );
   }
 
-  // 1. Calculate split units exactly like the previous screen
   const units = bookingDetails?.unit_count || 1;
 
   const totalPayment = bookingDetails?.total_amount
@@ -130,7 +128,6 @@ export const StaycationBookingDetailsScreen = () => {
 
   const remainingAmount = Math.max(0, totalPayment - amountPaid);
 
-  // Parse Group Type from special_requests
   const getGroupType = (requests: string) => {
     if (!requests) return null;
     const parts = requests.split("|");
@@ -142,106 +139,28 @@ export const StaycationBookingDetailsScreen = () => {
   };
 
   const groupType = getGroupType(bookingDetails?.special_requests);
-
-  // 2. The CORRECT way to check if a booking is online
   const isOnline = bookingDetails?.booking_source === "online" || !!bookingDetails?.user_id;
   const isCancelled = bookingDetails?.booking_status === "cancelled";
-  const bookingType = isOnline ? "Online" : "Offline";
 
-  // 3. Assemble the data, prioritizing the "unrolled" data passed from the card
+  const profileData = bookingDetails?.profiles;
+  const guestName =
+    bookingDetails?.guest_name || profileData?.full_name || initialBooking?.name || "Guest";
+  const guestPhone =
+    bookingDetails?.guest_phone || profileData?.phone || initialBooking?.phone || "N/A";
+
   const bookingData = {
-    name:
-      bookingDetails?.guest_name ||
-      bookingDetails?.profiles?.full_name ||
-      initialBooking?.name ||
-      "Guest",
-    phone:
-      bookingDetails?.guest_phone ||
-      bookingDetails?.profiles?.phone ||
-      initialBooking?.phone ||
-      "N/A",
-    avatarUrl: bookingDetails?.profiles?.avatar_url || initialBooking?.avatarUrl,
+    name: guestName,
+    phone: guestPhone,
+    avatarUrl: profileData?.avatar_url || initialBooking?.avatarUrl,
     checkIn: formatDate(bookingDetails?.check_in_date || initialBooking?.checkIn),
     checkOut: formatDate(bookingDetails?.check_out_date || initialBooking?.checkOut),
-
-    // Use initialBooking.guestCount to preserve the remainder math we did on the previous screen!
     guestCount:
       initialBooking?.guestCount || Math.floor((bookingDetails?.guest_count || 0) / units),
-
-    // Preserve the serial room name (e.g., DEL-101) passed from the card
-    roomName: initialBooking?.roomName || "Room Assigned",
-
-    bookingType: isCancelled ? "Cancelled" : bookingType,
-    realBookingType: bookingDetails?.booking_type, // "full_property" or "per_room"
-    totalPayment: totalPayment.toFixed(2), // Keep it clean
-    remainingAmount: remainingAmount.toFixed(2),
-    amountPaid: amountPaid.toFixed(2),
+    totalPayment: totalPayment.toFixed(0),
+    remainingAmount: remainingAmount.toFixed(0),
+    amountPaid: amountPaid.toFixed(0),
     groupType: groupType,
   };
-
-  // Direct WhatsApp Share Handler
-  // const handleWhatsAppShare = async () => {
-  //   let venueName = "our venue";
-
-  //   // 1. Dynamically fetch the venue name
-  //   if (bookingDetails?.id) {
-  //     try {
-  //       const { data } = await supabase
-  //         .from("staycation_bookings")
-  //         .select("venues(name)")
-  //         .eq("id", bookingDetails.id)
-  //         .single();
-  //       const vName = (data?.venues as any)?.name;
-  //       if (vName) venueName = vName;
-  //     } catch (e) {
-  //       console.warn("Could not fetch venue name for Sharing");
-  //     }
-  //   }
-
-  //   // 2. Build the message
-  //   const shareMessage = `Booking Confirmed! 🎉
-  //     Hi ${bookingData.name},
-  //     Your slot at ${venueName} is locked in via Bookr.
-  //     Date: ${bookingData.checkIn} to ${bookingData.checkOut}
-  //     Payment Summary:
-  //     Total: ₹${bookingData.totalPayment}
-  //     Paid: ₹${bookingData.amountPaid}
-  //     Due at Venue: ₹${bookingData.remainingAmount}
-  //     Thank you for booking with Bookr!`;
-
-  //   // 3. Try to open WhatsApp directly if we have a valid phone number
-  //   if (bookingData.phone && bookingData.phone !== "N/A") {
-  //     // Remove all non-numeric characters
-  //     let cleanPhone = bookingData.phone.replace(/\D/g, "");
-
-  //     // If it's a standard 10 digit Indian number, append the 91 country code
-  //     if (cleanPhone.length === 10) {
-  //       cleanPhone = `91${cleanPhone}`;
-  //     }
-
-  //     const encodedMessage = encodeURIComponent(shareMessage);
-  //     const whatsappUrl = `whatsapp://send?phone=${cleanPhone}&text=${encodedMessage}`;
-
-  //     try {
-  //       const canOpen = await Linking.canOpenURL(whatsappUrl);
-  //       if (canOpen) {
-  //         await Linking.openURL(whatsappUrl);
-  //         return; // Stop here if WhatsApp successfully opened
-  //       }
-  //     } catch (err) {
-  //       console.warn("Could not check/open WhatsApp URL", err);
-  //     }
-  //   }
-
-  //   // 4. Fallback to standard share if WhatsApp isn't installed or number is invalid
-  //   try {
-  //     await Share.share({
-  //       message: shareMessage,
-  //     });
-  //   } catch (error) {
-  //     Alert.alert("Error", "Could not open the share menu.");
-  //   }
-  // };
 
   const handleWhatsAppShare = async () => {
     const spicyLine =
@@ -251,9 +170,9 @@ export const StaycationBookingDetailsScreen = () => {
         ? "https://apps.apple.com/app/bookr/idYOUR_APP_ID"
         : "https://play.google.com/store/apps/details?id=com.bookr_mobile";
 
-    const shareMessage = `Booking Confirmed! 🎉\nHi ${bookingData.name},\nYour slot at ${
+    const shareMessage = `Booking Confirmed! 🎉\nHi ${bookingData.name},\nYour staycation at ${
       bookingDetails?.venues?.name || "the venue"
-    } is locked in via Bookr.\n\nDate: ${bookingData.checkIn} to ${
+    } is locked in via Bookr.\n\nCheck In: ${bookingData.checkIn}\nCheck Out: ${
       bookingData.checkOut
     }\n\nPayment Summary:\nTotal: ₹${bookingData.totalPayment}\nPaid: ₹${
       bookingData.amountPaid
@@ -276,379 +195,631 @@ export const StaycationBookingDetailsScreen = () => {
       .catch(() => Share.share({ message: shareMessage }));
   };
 
-  const getGroupInfo = (requests: string) => {
-    if (!requests) return null;
-    // This matches "Group: Family" or "Group Type: friends"
-    const match = requests.match(/(?:Group|Group Type):\s*([^|]+)/i);
-    return match ? match[1].trim() : null;
+  const getNameForMethod = (method: string) => {
+    if (method === "gpay") return "GPay";
+    if (method === "phonepe") return "PhonePe";
+    if (method === "paytm") return "Paytm";
+    return "Cash";
+  };
+
+  const getIconForLog = (mode: string) => {
+    if (mode === "upi") return icGpay;
+    return icCash;
   };
 
   return (
     <View style={styles.root}>
-      <ScreenContainer scrollable paddingHorizontal={hs(12)}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <ArrowLeft size={ms(24)} color="black" />
-          </TouchableOpacity>
-          <View style={styles.profileRow}>
-            <Avatar
-              source={bookingData.avatarUrl ? { uri: bookingData.avatarUrl } : USER_PROFILE}
-              size={50}
-            />
-            <Text style={styles.profileName}>{bookingData.name}</Text>
-          </View>
-        </View>
-
-        {/* Mobile No Section */}
-        <View style={styles.section}>
-          <View style={styles.labelRow}>
-            <Phone size={ms(18)} color={COLORS.text?.primary || "black"} />
-            <Text style={styles.labelText}>Mobile No</Text>
-          </View>
-          <View style={styles.phoneBox}>
-            <Text style={styles.valueText}>{bookingData.phone}</Text>
-            <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
-              <Text style={styles.callBtnText}>Call</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Group Type Section */}
-        {getGroupInfo(bookingDetails?.special_requests) && (
-          <View style={styles.section}>
-            <View style={styles.labelRow}>
-              <User size={ms(18)} color="black" />
-              <Text style={styles.labelText}>Group</Text>
-            </View>
-            <View style={styles.valueBox}>
-              <Text style={styles.valueText}>{getGroupInfo(bookingDetails?.special_requests)}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Check In / Out Section */}
-        <View style={styles.row}>
-          <InfoBlock label="Check In" value={bookingData.checkIn} icon={Clock} />
-          <View style={{ width: hs(20) }} />
-          <InfoBlock label="Check Out" value={bookingData.checkOut} icon={Clock} />
-        </View>
-
-        {/* Booking Type / Guest Section */}
-        <View style={styles.row}>
-          <InfoBlock
-            label="Booking Type"
-            value={bookingData.bookingType}
-            icon={ClipboardList}
-            valueColor={isCancelled ? COLORS.text.muted : "#63a1fd"}
-          />
-          <View style={{ width: hs(20) }} />
-          <InfoBlock label="No Of Guest" value={bookingData.guestCount} icon={User} />
-        </View>
-
-        {/* Payment Card */}
-        <View style={styles.paymentCard}>
-          <View style={styles.paymentItem}>
-            <Text style={styles.paymentLabel}>Total Payment</Text>
-            <View style={styles.paymentBox}>
-              <Text style={styles.paymentValue}>₹ {bookingData.totalPayment}</Text>
-            </View>
-          </View>
-
-          <View style={styles.paymentItem}>
-            <Text style={styles.paymentLabel}>Remaining Amount</Text>
-            <View style={styles.paymentBox}>
-              <Text style={[styles.paymentValue, styles.remainingAmountText]}>
-                ₹{bookingData.remainingAmount}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.paymentItem}>
-            <Text style={styles.paymentLabel}>Amount Paid</Text>
-            <View style={[styles.paymentBox, styles.amountPaidBox]}>
-              <Text style={[styles.paymentValue, styles.amountPaidText]}>
-                ₹ {bookingData.amountPaid}
-              </Text>
-
-              {(remainingAmount > 0 || bookingData.realBookingType === "full_property") &&
-                !isCancelled && (
-                  <TouchableOpacity
-                    style={styles.addBtnRow}
-                    onPress={() => setIsAddingPayment(!isAddingPayment)}>
-                    <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
-                    {isAddingPayment ? (
-                      <Minus size={ms(20)} color="#e55959" />
-                    ) : (
-                      <Plus size={ms(20)} color="#00b562" />
-                    )}
-                  </TouchableOpacity>
-                )}
-            </View>
-          </View>
-
-          {isAddingPayment && (
-            <View>
-              <View style={styles.splitBox}>
-                <View style={styles.splitInput}>
-                  <Text style={styles.paymentLabel}>Cash</Text>
-                  <TextInput
-                    placeholder="₹ 0"
-                    keyboardType="numeric"
-                    value={cashAmount}
-                    onChangeText={setCashAmount}
-                  />
-                </View>
-                <View style={styles.splitInput}>
-                  <Text style={styles.paymentLabel}>Online</Text>
-                  <TextInput
-                    placeholder="₹ 0"
-                    keyboardType="numeric"
-                    value={onlineAmount}
-                    onChangeText={setOnlineAmount}
-                  />
-                </View>
-              </View>
+      <ScreenContainer
+        scrollable
+        backgroundColor={COLORS.background}
+        paddingHorizontal={hs(12)}
+        footer={
+          !isFromHistory && !isCancelled ? (
+            <View style={styles.fixedBottomActions}>
               <TouchableOpacity
-                style={styles.savePaymentBtn}
-                onPress={handleSavePayment}
+                style={styles.cancelBtnBottom}
+                onPress={handleCancel}
                 disabled={isUpdating}>
                 {isUpdating ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <Text style={styles.savePaymentText}>Save Payment</Text>
+                  <>
+                    <Text variant="body1" family="bison" style={styles.cancelBtnBottomText}>
+                      CANCEL YOUR BOOKING
+                    </Text>
+                    <Trash2 size={ms(22)} color="#fff" />
+                  </>
                 )}
               </TouchableOpacity>
             </View>
+          ) : undefined
+        }>
+        {/* Header */}
+        <View style={styles.screenHeader}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <ArrowLeft size={ms(26)} color={COLORS.text.primary} />
+          </TouchableOpacity>
+          <Text variant="h2" weight="bold" style={styles.screenTitle}>
+            Booking Details
+          </Text>
+        </View>
+
+        {/* Profile Card */}
+        <View style={styles.profileCard}>
+          {bookingData.avatarUrl ? (
+            <Image source={{ uri: bookingData.avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <PersonSvg width={ms(32)} height={ms(32)} color="#63a1fd" />
+            </View>
+          )}
+          <View style={styles.profileInfo}>
+            <Text variant="h3" weight="bold" style={styles.profileName}>
+              {bookingData.name}
+            </Text>
+            <Text variant="body2" style={styles.profilePhone}>
+              {bookingData.phone}
+            </Text>
+            <View style={styles.onlineBadge}>
+              <Text style={styles.onlineBadgeText}>
+                {isCancelled ? "Cancelled" : isOnline ? "Online" : "Offline"}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.profileActions}>
+            <TouchableOpacity onPress={handleWhatsAppShare}>
+              <Image source={icWhatsapp} style={styles.socialIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtnBlue} onPress={handleCall}>
+              <Phone size={ms(20)} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Booking Details */}
+        <View style={styles.sectionHeaderRow}>
+          <CalendarSvg width={ms(20)} height={ms(20)} color="#000" />
+          <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+            BOOKING DETAILS
+          </Text>
+        </View>
+
+        <View style={styles.dateTimeRow}>
+          {/* Check In */}
+          <View style={styles.dateCard}>
+            <View style={styles.iconBoxLightBlue}>
+              <CalendarSvg width={ms(20)} height={ms(20)} color="#63a1fd" />
+            </View>
+            <View style={styles.dateCardTextCol}>
+              <Text variant="body2" weight="bold" style={styles.labelTitle}>
+                Check In
+              </Text>
+              <Text variant="body2" style={styles.labelValue}>
+                {bookingData.checkIn}
+              </Text>
+            </View>
+          </View>
+          {/* Check Out */}
+          <View style={styles.dateCard}>
+            <View style={styles.iconBoxLightBlue}>
+              <CalendarSvg width={ms(20)} height={ms(20)} color="#63a1fd" />
+            </View>
+            <View style={styles.dateCardTextCol}>
+              <Text variant="body2" weight="bold" style={styles.labelTitle}>
+                Check Out
+              </Text>
+              <Text variant="body2" style={styles.labelValue}>
+                {bookingData.checkOut}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.dateTimeRow}>
+          {/* No of Guest */}
+          <View style={styles.dateCard}>
+            <View style={styles.iconBoxLightBlue}>
+              <Users2 size={ms(20)} color="#63a1fd" />
+            </View>
+            <View style={styles.dateCardTextCol}>
+              <Text variant="body2" weight="bold" style={styles.labelTitle}>
+                No Of Guest
+              </Text>
+              <Text variant="body2" style={styles.labelValue}>
+                {bookingData.guestCount}
+              </Text>
+            </View>
+          </View>
+          {/* Group Type */}
+          <View style={styles.dateCard}>
+            <View style={styles.iconBoxLightBlue}>
+              <Users2 size={ms(20)} color="#63a1fd" />
+            </View>
+            <View style={styles.dateCardTextCol}>
+              <Text variant="body2" weight="bold" style={styles.labelTitle}>
+                Group Type
+              </Text>
+              <Text variant="body2" style={styles.labelValue}>
+                {bookingData.groupType || "N/A"}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Payment Details */}
+        <View style={styles.sectionHeaderRow}>
+          <WalletSvg width={ms(20)} height={ms(20)} color="#000" />
+          <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+            PAYMENT DETAILS
+          </Text>
+        </View>
+
+        <View style={styles.paymentCard}>
+          {/* Total Amount Row */}
+          <View style={styles.totalAmountRow}>
+            <View style={styles.totalIconBox}>
+              <WalletSvg width={ms(22)} height={ms(22)} color="#63a1fd" />
+            </View>
+            <View>
+              <Text variant="body1" weight="bold" style={styles.totalLabel}>
+                Total Amount
+              </Text>
+              <Text variant="h2" weight="bold" style={styles.totalValue}>
+                ₹{bookingData.totalPayment}
+              </Text>
+            </View>
+          </View>
+
+          {/* Pending + Received */}
+          <View style={styles.amountsRow}>
+            <View style={styles.amountBoxLightRed}>
+              <View style={styles.amountIconRed}>
+                <ClockSvg width={ms(20)} height={ms(20)} color="#E55959" />
+              </View>
+              <View style={styles.amountTextCol}>
+                <Text variant="body1" weight="bold" style={styles.amountLabel}>
+                  Pending Amount
+                </Text>
+                <Text variant="body1" weight="semiBold" style={styles.amountValueRed}>
+                  ₹{bookingData.remainingAmount}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.amountBoxLightGreen}>
+              <View style={styles.amountIconGreen}>
+                <DownloadSvg width={ms(20)} height={ms(20)} color="#00B562" />
+              </View>
+              <View style={styles.amountTextCol}>
+                <Text variant="body1" weight="bold" style={styles.amountLabel}>
+                  Received Amount
+                </Text>
+                <Text variant="body1" weight="semiBold" style={styles.amountValueGreen}>
+                  ₹{bookingData.amountPaid}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Add Money */}
+          {!isCancelled && (
+            <>
+              {remainingAmount <= 0 ? (
+                <View style={[styles.addMoneyBtn, styles.addMoneyBtnCompleted]}>
+                  <Text variant="body1" weight="bold" style={styles.addMoneyBtnText}>
+                    Payment Completed
+                  </Text>
+                </View>
+              ) : !isAddingPayment ? (
+                <TouchableOpacity
+                  style={styles.addMoneyBtn}
+                  onPress={() => setIsAddingPayment(true)}>
+                  <Text variant="body1" weight="bold" style={styles.addMoneyBtnText}>
+                    Add Money +
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <Text variant="body2" weight="bold" style={styles.inputLabel}>
+                    Amount
+                  </Text>
+                  <View style={styles.amountInputContainer}>
+                    <Text variant="h3" weight="bold" style={styles.currencySymbol}>
+                      ₹
+                    </Text>
+                    <TextInput
+                      style={styles.amountInput}
+                      keyboardType="numeric"
+                      value={paymentInput}
+                      onChangeText={text => setPaymentInput(text.replace(/[^0-9]/g, ""))}
+                    />
+                    <TouchableOpacity onPress={() => setIsAddingPayment(false)}>
+                      <Text variant="body2" weight="bold" style={styles.cancelInputText}>
+                        - Cancel
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text variant="body2" weight="bold" style={styles.inputLabel}>
+                    Method
+                  </Text>
+                  <View style={styles.methodsRow}>
+                    {(["cash", "gpay", "phonepe", "paytm"] as const).map(method => (
+                      <TouchableOpacity
+                        key={method}
+                        style={[
+                          styles.methodBox,
+                          selectedMethod === method && styles.methodBoxSelected,
+                        ]}
+                        onPress={() => setSelectedMethod(method)}>
+                        <Image
+                          source={
+                            method === "gpay"
+                              ? icGpay
+                              : method === "phonepe"
+                              ? icPhonepe
+                              : method === "paytm"
+                              ? icPaytm
+                              : icCash
+                          }
+                          style={styles.methodIcon}
+                        />
+                        <Text
+                          variant="body1"
+                          weight="bold"
+                          style={[
+                            styles.methodText,
+                            selectedMethod === method && styles.methodTextSelected,
+                          ]}>
+                          {getNameForMethod(method)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.addMoneyBtn}
+                    onPress={handleSavePayment}
+                    disabled={isUpdating}>
+                    {isUpdating ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text variant="body1" weight="bold" style={styles.addMoneyBtnText}>
+                        Save Payment
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+            </>
           )}
         </View>
 
-        {/* Payment History Ledger */}
-        {showPaymentHistory && paymentLogs.length > 0 && (
-          <View style={styles.ledgerContainer}>
-            <Text style={styles.paymentLabel}>Payment History</Text>
-            {paymentLogs.map(log => (
-              <View key={log.id} style={styles.ledgerRow}>
-                <View style={styles.ledgerLeft}>
-                  <CheckCircle2 size={ms(14)} color="#00B562" />
-                  <Text style={styles.ledgerDate}>
-                    {new Date(log.created_at).toLocaleDateString("en-GB")}
-                  </Text>
-                </View>
-                <View style={styles.ledgerRight}>
-                  <Text style={styles.ledgerAmount}>₹{log.amount}</Text>
-                  <Text style={styles.ledgerMode}>
-                    ({log.payment_mode === "upi" ? "ONLINE" : log.payment_mode.toUpperCase()})
-                  </Text>
-                </View>
+        {/* Payment History */}
+        {paymentLogs.length > 0 && (
+          <View style={styles.paymentHistoryContainer}>
+            <TouchableOpacity
+              style={styles.paymentHistoryBtn}
+              activeOpacity={0.7}
+              onPress={() => setShowPaymentHistory(!showPaymentHistory)}>
+              <View style={styles.paymentHistoryLeft}>
+                <MoneySvg width={ms(24)} height={ms(24)} color="#000" />
+                <Text variant="body1" weight="bold" style={styles.paymentHistoryText}>
+                  PAYMENT HISTORY
+                </Text>
               </View>
-            ))}
+              <ChevronRight size={ms(24)} color={COLORS.text.primary} />
+            </TouchableOpacity>
+            {showPaymentHistory && (
+              <View style={styles.paymentLogsWrapper}>
+                {paymentLogs.map(log => {
+                  const icon = getIconForLog(log.payment_mode);
+                  return (
+                    <View key={log.id} style={styles.logCard}>
+                      <View style={styles.logIconContainer}>
+                        <Image source={icon} style={styles.logIcon} />
+                      </View>
+                      <View style={styles.logDetailsCol}>
+                        <Text variant="body1" weight="bold" style={styles.logName}>
+                          {log.payment_mode === "upi" ? "Online" : "Cash"}
+                        </Text>
+                        <Text variant="body2" weight="medium" style={styles.logDate}>
+                          {new Date(log.created_at).toLocaleDateString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </Text>
+                      </View>
+                      <Text variant="body1" weight="bold" style={styles.logAmount}>
+                        ₹{log.amount}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         )}
-
-        {/* Action Toggle for Payment History */}
-        <TouchableOpacity
-          style={styles.actionCard}
-          activeOpacity={0.7}
-          onPress={() => setShowPaymentHistory(!showPaymentHistory)}>
-          <Clock size={ms(20)} color="#E55959" />
-          <Text style={styles.actionCardText}>Current Booking Payment History</Text>
-          <ChevronRight size={ms(20)} color="black" />
-        </TouchableOpacity>
-
-        {/* WhatsApp Share Button */}
-        <TouchableOpacity
-          style={styles.whatsappBtn}
-          onPress={handleWhatsAppShare}
-          activeOpacity={0.8}>
-          <View style={styles.whatsappContent}>
-            <Share2 size={ms(20)} color="white" />
-            <Text style={styles.whatsappText}>Share confirmation</Text>
-          </View>
-          <Share2 size={ms(18)} color="white" />
-        </TouchableOpacity>
-
-        {/* Removed the !isOnline check so vendors can cancel ANY active booking */}
-        {!isFromHistory && !isCancelled && !isOnline && (
-          <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} disabled={isUpdating}>
-            <View style={styles.cancelContent}>
-              {isUpdating ? (
-                <ActivityIndicator size="small" color="black" />
-              ) : (
-                <Text style={styles.cancelText}>Cancel Booking</Text>
-              )}
-            </View>
-            <Trash2 size={ms(20)} color="black" />
-          </TouchableOpacity>
-        )}
-
-        <View style={{ height: vs(40) }} />
       </ScreenContainer>
     </View>
   );
 };
 
-// ... keep existing styles below ...
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+
+  fixedBottomActions: {
+    paddingVertical: vs(16),
+    paddingHorizontal: hs(12),
     backgroundColor: COLORS.background,
   },
-  header: { flexDirection: "row", alignItems: "center", marginTop: vs(10), marginBottom: vs(20) },
-  backBtn: { marginRight: hs(12) },
-  profileRow: { flexDirection: "row", alignItems: "center", gap: hs(10) },
-  profileName: { fontFamily: "Gilroy-Bold", fontSize: fs(22), color: "black" },
-  section: { marginBottom: vs(20) },
-  labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6), marginBottom: vs(4) },
-  labelText: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: "black" },
-  phoneBox: {
+
+  // Header
+  screenHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#f4f7fc",
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(12),
+    marginBottom: vs(16),
   },
-  valueBox: {
+  backBtn: { padding: ms(4), marginLeft: -ms(4) },
+  screenTitle: { fontSize: fs(20), color: "#000", marginLeft: hs(10) },
+
+  // Profile Card
+  profileCard: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#f4f7fc",
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(12),
-    width: "100%",
+    backgroundColor: "#F7F9FC",
+    borderRadius: ms(16),
+    padding: ms(12),
+    marginBottom: vs(16),
   },
-  valueText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "black" },
-  callBtn: {
-    backgroundColor: "black",
-    paddingHorizontal: hs(14),
-    paddingVertical: vs(6),
-    borderRadius: ms(6),
+  avatarImage: {
+    width: ms(60),
+    height: ms(60),
+    borderRadius: ms(30),
+    marginRight: hs(12),
   },
-  callBtnText: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: "white" },
-  row: { flexDirection: "row", marginBottom: vs(20) },
-  infoBlock: { flex: 1 },
-  paymentCard: {
-    borderWidth: 1,
-    borderColor: "#cbdffe",
-    borderRadius: ms(10),
-    padding: hs(6),
-    gap: vs(10),
-    marginBottom: vs(20),
-  },
-  paymentItem: { width: "100%" },
-  paymentLabel: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(14),
-    color: "black",
-    marginBottom: vs(4),
-  },
-  paymentBox: {
-    backgroundColor: "#f4f7fc",
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(12),
-  },
-  amountPaidBox: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  paymentValue: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "black" },
-  splitBox: { flexDirection: "row", gap: hs(10), marginTop: vs(10) },
-  splitInput: { flex: 1 },
-  addBtnRow: { flexDirection: "row", alignItems: "center", gap: hs(4) },
-  addText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#00b562" },
-  amountPaidText: { color: "#00b562" },
-  remainingAmountText: { color: "#e55959" },
-  savePaymentBtn: {
-    backgroundColor: "#63a1fd",
-    paddingVertical: vs(12),
-    borderRadius: ms(8),
+  avatarPlaceholder: {
+    width: ms(60),
+    height: ms(60),
+    borderRadius: ms(30),
+    marginRight: hs(12),
+    backgroundColor: "#E6F0FF",
+    justifyContent: "center",
     alignItems: "center",
-    marginTop: vs(12),
   },
-  savePaymentText: { fontFamily: "Gilroy-Bold", fontSize: fs(16), color: "white" },
-  whatsappBtn: {
-    backgroundColor: "#25d366",
+  profileInfo: { flex: 1, justifyContent: "center" },
+  profileName: { fontSize: fs(22), color: "#000", marginBottom: vs(2) },
+  profilePhone: { fontSize: fs(16), color: "#000", marginBottom: vs(4) },
+  onlineBadge: {
+    backgroundColor: "#E6F0FF",
+    paddingHorizontal: hs(8),
+    paddingVertical: vs(2),
+    borderRadius: ms(12),
+    alignSelf: "flex-start",
+  },
+  onlineBadgeText: { color: "#4A80F0", fontSize: fs(16), fontFamily: "Gilroy-SemiBold" },
+  profileActions: { flexDirection: "row", gap: hs(8) },
+  socialIcon: { width: ms(40), height: ms(40), resizeMode: "contain" },
+  iconBtnBlue: {
+    width: ms(40),
+    height: ms(40),
+    borderRadius: ms(20),
+    backgroundColor: "#4A80F0",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Section Header
+  sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    padding: hs(10),
-    borderRadius: ms(10),
+    gap: hs(8),
     marginBottom: vs(10),
   },
-  whatsappContent: { flexDirection: "row", alignItems: "center", gap: hs(6) },
-  whatsappText: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: "white" },
-  cancelBtn: {
-    borderWidth: 1,
-    borderColor: "#cbdffe",
+  sectionTitle: { fontSize: fs(16), color: "#000" },
+
+  // Date/Info Cards
+  dateTimeRow: { flexDirection: "row", gap: hs(12), marginBottom: vs(12) },
+  dateCard: {
+    flex: 1,
+    flexDirection: "row",
+    backgroundColor: "#EEF3FC",
+    borderRadius: ms(12),
+    padding: ms(10),
+    alignItems: "center",
+    gap: hs(8),
+  },
+  iconBoxLightBlue: {
+    width: ms(36),
+    height: ms(36),
+    borderRadius: ms(8),
+    backgroundColor: "#CBDFFE",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dateCardTextCol: { flex: 1 },
+  labelTitle: { fontSize: fs(16), color: "#000", marginBottom: vs(2), fontFamily: "Gilroy-Bold" },
+  labelValue: { fontSize: fs(16), color: "#333", fontFamily: "Gilroy-Medium" },
+
+  // Payment Card
+  paymentCard: {
+    borderRadius: ms(16),
+    padding: ms(16),
+    backgroundColor: "#F7F9FC",
+    marginBottom: vs(16),
+  },
+  totalAmountRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    padding: hs(10),
-    borderRadius: ms(10),
+    gap: hs(12),
+    marginBottom: vs(16),
+    backgroundColor: "#EEF3FC",
+    borderRadius: ms(12),
+    padding: ms(12),
   },
-  cancelContent: { flexDirection: "row", alignItems: "center" },
-  cancelText: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: "black" },
-  ledgerContainer: {
-    marginTop: vs(4),
-    marginBottom: vs(14),
-    padding: hs(10),
-    backgroundColor: "#F4F7FC",
-    borderRadius: ms(10),
-    borderWidth: 1,
-    borderColor: "#cbdffe",
-  },
-  ledgerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  totalIconBox: {
+    width: ms(44),
+    height: ms(44),
+    borderRadius: ms(12),
+    backgroundColor: "#CBDFFE",
+    justifyContent: "center",
     alignItems: "center",
-    paddingVertical: vs(6),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E0E0E0",
   },
-  ledgerLeft: {
-    flexDirection: "row",
+  totalLabel: { fontSize: fs(16), color: "#000", marginBottom: vs(2), fontFamily: "Gilroy-Bold" },
+  totalValue: { fontSize: fs(24), color: "#4A80F0", fontFamily: "Gilroy-Medium" },
+
+  amountsRow: { flexDirection: "row", gap: hs(12), marginBottom: vs(16) },
+  amountBoxLightRed: {
+    flex: 1,
+    backgroundColor: "#EEF3FC",
+    borderRadius: ms(12),
+    paddingVertical: vs(12),
+    paddingHorizontal: hs(8),
     alignItems: "center",
-    gap: hs(6),
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: hs(8),
   },
-  ledgerDate: {
-    fontFamily: "Gilroy-Medium",
+  amountIconRed: {
+    width: ms(36),
+    height: ms(36),
+    borderRadius: ms(8),
+    backgroundColor: "#FFE5E5",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  amountBoxLightGreen: {
+    flex: 1,
+    backgroundColor: "#EEF3FC",
+    borderRadius: ms(12),
+    paddingVertical: vs(12),
+    paddingHorizontal: hs(8),
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: hs(8),
+  },
+  amountIconGreen: {
+    width: ms(36),
+    height: ms(36),
+    borderRadius: ms(8),
+    backgroundColor: "#D6FFE9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  amountTextCol: { flex: 1 },
+  amountLabel: {
     fontSize: fs(12),
-    color: "black",
-  },
-  ledgerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(4),
-  },
-  ledgerAmount: {
-    fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(14),
-    color: "black",
-  },
-  ledgerMode: {
+    color: "#000",
+    marginBottom: vs(2),
     fontFamily: "Gilroy-Medium",
-    fontSize: fs(10),
-    color: COLORS.text.muted,
   },
-  actionCard: {
+  amountValueRed: { fontSize: fs(20), color: "#E55959", fontFamily: "Gilroy-Medium" },
+  amountValueGreen: { fontSize: fs(20), color: "#00B562", fontFamily: "Gilroy-Medium" },
+
+  // Add Money
+  addMoneyBtn: {
+    backgroundColor: "#63a1fd",
+    borderRadius: ms(10),
+    paddingVertical: vs(14),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addMoneyBtnText: { fontSize: fs(16), color: "#fff" },
+  addMoneyBtnCompleted: { backgroundColor: "#9F9F9F" },
+
+  inputLabel: { fontSize: fs(14), color: "#000", marginBottom: vs(8) },
+  amountInputContainer: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#CBDFFE",
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    height: vs(44),
+    borderColor: "#cbdffe",
+    borderRadius: ms(8),
+    paddingHorizontal: hs(12),
+    marginBottom: vs(16),
+    minHeight: vs(50),
+    paddingVertical: vs(4),
+  },
+  currencySymbol: { fontSize: fs(18), color: "#000", marginRight: hs(8) },
+  amountInput: {
+    fontFamily: "Gilroy-SemiBold",
+    fontSize: fs(22),
+    color: COLORS.text.primary,
+    flex: 1,
+    paddingVertical: 0,
+    includeFontPadding: false,
+  },
+  cancelInputText: { color: "#E55959", fontSize: fs(14) },
+  methodsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: vs(16),
+  },
+  methodBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#cbdffe",
+    borderRadius: ms(8),
+    paddingVertical: vs(10),
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: hs(4),
+    backgroundColor: "#fff",
+  },
+  methodBoxSelected: { backgroundColor: "#63a1fd", borderColor: "#63a1fd" },
+  methodText: { fontSize: fs(14), marginTop: vs(2), color: "#000" },
+  methodTextSelected: { color: "#fff" },
+  methodIcon: { width: ms(36), height: ms(36), resizeMode: "contain" },
+
+  // Payment History
+  paymentHistoryContainer: {
+    marginBottom: vs(16),
+    borderRadius: ms(12),
+    backgroundColor: "#F7F9FC",
+    padding: ms(16),
+  },
+  paymentHistoryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  paymentHistoryLeft: { flexDirection: "row", alignItems: "center", gap: hs(8) },
+  paymentHistoryText: { fontSize: fs(14), color: "#000", fontFamily: "Gilroy-Bold" },
+  paymentLogsWrapper: { marginTop: vs(10), marginBottom: vs(-16) },
+  logCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF3FC",
+    borderRadius: ms(12),
+    padding: ms(12),
     marginBottom: vs(12),
   },
-  actionCardText: {
-    flex: 1,
-    marginLeft: hs(8),
-    fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(14),
-    color: "#E55959",
+  logIconContainer: {
+    width: ms(40),
+    height: ms(40),
+    borderRadius: ms(20),
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: hs(12),
   },
+  logIcon: { width: ms(24), height: ms(24), resizeMode: "contain" },
+  logDetailsCol: { flex: 1, justifyContent: "center" },
+  logName: { fontSize: fs(14), color: "#000", fontFamily: "Gilroy-Bold", marginBottom: vs(2) },
+  logDate: { fontSize: fs(12), color: "#8C8C8C", fontFamily: "Gilroy-Medium" },
+  logAmount: { fontSize: fs(16), color: "#00B562", fontFamily: "Gilroy-Bold" },
+
+  // Bottom Cancel
+  cancelBtnBottom: {
+    flexDirection: "row",
+    backgroundColor: "#E55959",
+    borderRadius: ms(10),
+    paddingVertical: vs(14),
+    alignItems: "center",
+    justifyContent: "center",
+    gap: hs(8),
+  },
+  cancelBtnBottomText: { fontSize: fs(20), color: "#fff" },
 });

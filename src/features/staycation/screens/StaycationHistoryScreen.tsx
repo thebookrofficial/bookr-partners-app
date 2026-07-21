@@ -2,11 +2,20 @@
 // Confidential and Proprietary.
 
 import React, { useState, useMemo } from "react";
-import { View, StyleSheet, SectionList, TouchableOpacity, RefreshControl } from "react-native";
+import {
+  View,
+  StyleSheet,
+  SectionList,
+  TouchableOpacity,
+  RefreshControl,
+  TextInput,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, ListSkeleton } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
-import { Phone, Calendar, User } from "lucide-react-native";
+import { Search, SlidersHorizontal, ChevronDown } from "lucide-react-native";
+import PersonSvg from "@/assets/icons/ic-round-person.svg";
+import CalendarSvg from "@/assets/icons/ic-solar-calendar-outline.svg";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -22,46 +31,41 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 // 1. NEW HISTORY CARD
 // ==========================================
 const HistoryCard = ({ name, phone, dateRange, guests, price, status, onPress }: any) => {
-  const getStatusColor = (s: string) => {
-    switch (s?.toLowerCase()) {
-      case "online":
-        return "#63A1FD";
-      case "offline":
-        return "#E55959";
-      case "cancelled":
-        return "#E55959";
-      default:
-        return COLORS.text.muted;
-    }
-  };
+  const isOnline = status?.toLowerCase() === "online";
 
   return (
     <TouchableOpacity style={styles.cardContainer} activeOpacity={0.7} onPress={onPress}>
-      <View style={styles.avatarCircle} />
-      <View style={styles.cardInfoCol}>
-        <View style={styles.cardHeaderRow}>
+      <View style={styles.cardHeaderRow}>
+        <View style={styles.cardHeaderLeft}>
+          <View style={styles.avatarSquircle}>
+            <PersonSvg width={ms(20)} height={ms(20)} color="#63A1FD" />
+          </View>
           <View style={styles.namePhoneCol}>
             <Text style={styles.cardName}>{name}</Text>
-            <View style={styles.phoneRow}>
-              <Phone size={ms(14)} color={COLORS.text.primary} fill={COLORS.text.primary} />
-              <Text style={styles.cardPhone}>{phone.replace("+91 ", "")}</Text>
-            </View>
-          </View>
-          <View style={styles.priceStatusCol}>
-            <Text style={styles.cardPrice}>₹{price}</Text>
-            <Text style={[styles.cardStatus, { color: getStatusColor(status) }]}>{status}</Text>
+            <Text style={styles.cardPhone}>{phone}</Text>
           </View>
         </View>
-        <View style={styles.detailsRow}>
-          <View style={styles.detailItem}>
-            <Calendar size={ms(14)} color={COLORS.text.primary} />
-            <Text style={styles.cardDetailText}>{dateRange}</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <User size={ms(14)} color={COLORS.text.primary} />
-            <Text style={styles.cardDetailText}>{guests} Guest</Text>
+
+        <View style={styles.priceStatusCol}>
+          <Text style={styles.cardPrice}>₹{price}</Text>
+          <View style={isOnline ? styles.statusBadgeOnline : styles.statusBadgeOffline}>
+            <Text style={isOnline ? styles.statusTextOnline : styles.statusTextOffline}>
+              {isOnline ? "Online" : "Offline"}
+            </Text>
           </View>
         </View>
+      </View>
+
+      <View style={styles.cardDivider} />
+
+      <View style={styles.cardFooterRow}>
+        <View style={styles.cardFooterLeft}>
+          <View style={styles.calendarSquircle}>
+            <CalendarSvg width={ms(18)} height={ms(18)} color="#63A1FD" />
+          </View>
+          <Text style={styles.cardDateRange}>{dateRange}</Text>
+        </View>
+        <Text style={styles.cardGuestCount}>{guests} Guest</Text>
       </View>
     </TouchableOpacity>
   );
@@ -70,20 +74,11 @@ const HistoryCard = ({ name, phone, dateRange, guests, price, status, onPress }:
 // ==========================================
 // 2. HEADERS
 // ==========================================
-const MonthSectionHeader = ({
-  month,
-  totalSettlement,
-}: {
-  month: string;
-  totalSettlement: number;
-}) => (
+const MonthSectionHeader = ({ month }: { month: string }) => (
   <View style={styles.monthHeaderRow}>
-    <Text style={styles.monthText}>{month}</Text>
-    <View style={styles.monthSettlementContainer}>
-      <Text style={styles.monthSettlementLabel}>Total:</Text>
-      <Text style={styles.monthSettlementAmount}>
-        ₹{Number(totalSettlement).toLocaleString("en-IN")}
-      </Text>
+    <View style={styles.monthHeaderLeft}>
+      <Text style={styles.monthText}>{month}</Text>
+      <ChevronDown size={ms(20)} color="#000" />
     </View>
   </View>
 );
@@ -115,6 +110,7 @@ export const StaycationHistoryScreen = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilterOption>("all");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const {
     isLoading,
@@ -137,8 +133,23 @@ export const StaycationHistoryScreen = () => {
   // }, [rooms]);
 
   const listData = useMemo(() => {
-    return getGroupedBookings("All Rooms");
-  }, [getGroupedBookings]);
+    const data = getGroupedBookings("All Rooms");
+    if (!searchQuery.trim()) return data;
+
+    const query = searchQuery.toLowerCase();
+    const filtered = data
+      .map(section => {
+        return {
+          ...section,
+          data: section.data.filter(
+            item => item.name.toLowerCase().includes(query) || item.phone.includes(query),
+          ),
+        };
+      })
+      .filter(section => section.data.length > 0);
+
+    return filtered;
+  }, [getGroupedBookings, searchQuery]);
 
   return (
     <ScreenContainer
@@ -161,45 +172,21 @@ export const StaycationHistoryScreen = () => {
           <>
             <StaycationHeader
               title={venue?.name || activeVenueName}
-              subtitle="History"
+              subtitle="Bookings"
               imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
             />
-            {/* 
-              <View style={styles.tabRow}>
-                <Text variant="body1" weight="bold" style={styles.bookingsLabel}>
-                  Bookings
-                </Text>
-                <View style={styles.staticPill}>
-                  <Text variant="body2" weight="semiBold" color={COLORS.text.inverse}>
-                    {displayLabel}
-                  </Text>
-                </View>
-              </View> */}
 
-            <View style={styles.filterRow}>
-              <Text variant="body2" weight="semiBold" style={styles.monthText}>
-                {dateFilter === "all"
-                  ? "Past History"
-                  : dateFilter === "3_months"
-                  ? "Last 3 Months"
-                  : dateFilter === "6_months"
-                  ? "Last 6 Months"
-                  : dateFilter === "9_months"
-                  ? "Last 9 Months"
-                  : customRange
-                  ? `${customRange.start.toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })} - ${customRange.end.toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}`
-                  : "Custom Range"}
-              </Text>
+            <View style={styles.searchBarContainer}>
+              <Search size={ms(20)} color="#000" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search"
+                placeholderTextColor="#8C8C8C"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
               <TouchableOpacity onPress={() => setIsFilterOpen(true)}>
-                <Calendar size={ms(16)} color={COLORS.text.primary} />
+                <SlidersHorizontal size={ms(20)} color="#000" />
               </TouchableOpacity>
             </View>
           </>
@@ -221,9 +208,7 @@ export const StaycationHistoryScreen = () => {
             }}
           />
         )}
-        renderSectionHeader={({ section }) => (
-          <MonthSectionHeader month={section.date} totalSettlement={(section as any).settlement} />
-        )}
+        renderSectionHeader={({ section }) => <MonthSectionHeader month={section.date} />}
         ListEmptyComponent={
           isLoading ? (
             <View style={{ paddingTop: vs(20) }}>
@@ -256,117 +241,178 @@ export const StaycationHistoryScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  tabRow: {
+  listContent: { paddingBottom: vs(100) },
+  searchBarContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: hs(10),
-    marginVertical: vs(10),
-    height: vs(40),
-  },
-  bookingsLabel: {
-    fontSize: fs(16),
-    color: "#000",
-  },
-  staticPill: {
-    paddingHorizontal: hs(16),
-    paddingVertical: vs(6),
-    backgroundColor: "#282828",
-    borderRadius: ms(20),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  filterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    backgroundColor: "#F4F7FB",
+    borderRadius: ms(8),
+    paddingHorizontal: hs(12),
     paddingVertical: vs(10),
-    paddingHorizontal: hs(6),
+    marginBottom: vs(16),
   },
-  // monthText: {
-  //   fontSize: fs(14),
-  //   color: "#000",
-  // },
+  searchIcon: {
+    marginRight: hs(8),
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fs(14),
+    fontFamily: "Gilroy-Medium",
+    color: "#000",
+    paddingVertical: 0,
+    includeFontPadding: false,
+  },
 
-  /* --- MONTH HEADER --- */
   monthHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: COLORS.surface.primary,
-    paddingVertical: vs(10),
-    paddingHorizontal: hs(12),
-    borderRadius: ms(8),
-    marginTop: vs(10),
+    marginTop: vs(16),
     marginBottom: vs(12),
   },
-  monthText: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: COLORS.text.primary },
-  monthSettlementContainer: { flexDirection: "row", alignItems: "center", gap: hs(4) },
-  monthSettlementLabel: { fontFamily: "Gilroy-Medium", fontSize: fs(12), color: COLORS.text.muted },
-  monthSettlementAmount: {
-    fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
-
-  /* --- HISTORY CARD --- */
-  cardContainer: {
+  monthHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surface.primary,
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(10),
-    marginBottom: vs(10),
-    width: "100%",
   },
-  avatarCircle: {
-    width: ms(50),
-    height: ms(50),
-    borderRadius: ms(25),
-    backgroundColor: COLORS.danger,
-    marginRight: hs(10),
+  monthText: {
+    fontSize: fs(16),
+    fontFamily: "Gilroy-SemiBold",
+    color: "#000",
+    marginRight: hs(4),
   },
-  cardInfoCol: { flex: 1, flexDirection: "column" },
+  monthSettlementContainer: {
+    alignItems: "flex-end",
+  },
+  monthSettlementAmount: {
+    fontSize: fs(14),
+    fontFamily: "Gilroy-Bold",
+    color: "#00B562",
+  },
+  monthSettlementLabel: {
+    fontSize: fs(10),
+    fontFamily: "Gilroy-Medium",
+    color: "#8C8C8C",
+  },
+
+  cardContainer: {
+    backgroundColor: "#F4F7FB",
+    borderRadius: ms(12),
+    padding: ms(16),
+    marginBottom: vs(16),
+  },
   cardHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.navBar,
-    paddingBottom: vs(4),
-    marginBottom: vs(6),
   },
-  namePhoneCol: { flexDirection: "column" },
-  cardName: { fontFamily: "Gilroy-Bold", fontSize: fs(16), color: COLORS.text.primary },
-  phoneRow: { flexDirection: "row", alignItems: "center", gap: hs(6), marginTop: vs(2) },
-  cardPhone: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: COLORS.text.primary },
-  priceStatusCol: { alignItems: "center" },
-  cardPrice: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#00B562" },
-  cardStatus: {
+  cardHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  avatarSquircle: {
+    width: ms(36),
+    height: ms(36),
+    borderRadius: ms(8),
+    backgroundColor: "#E4F0FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: hs(12),
+  },
+  namePhoneCol: {
+    justifyContent: "center",
+  },
+  cardName: {
+    fontSize: fs(20),
+    fontFamily: "Gilroy-Bold",
+    color: "#000",
+    marginBottom: vs(2),
+  },
+  cardPhone: {
+    fontSize: fs(18),
+    fontFamily: "Gilroy-Medium",
+    color: "#000",
+  },
+  priceStatusCol: {
+    alignItems: "flex-end",
+  },
+  cardPrice: {
+    fontSize: fs(20),
+    fontFamily: "Gilroy-Bold",
+    color: "#00B562",
+    marginBottom: vs(4),
+  },
+  statusBadgeOnline: {
+    backgroundColor: "#E4F0FF",
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(4),
+    borderRadius: ms(16),
+  },
+  statusBadgeOffline: {
+    backgroundColor: "#FFEBEB",
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(4),
+    borderRadius: ms(16),
+  },
+  statusTextOnline: {
+    color: "#63A1FD",
+    fontSize: fs(14),
     fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(10),
-    color: COLORS.text.muted,
-    marginTop: vs(2),
   },
-  detailsRow: { flexDirection: "row", alignItems: "center", gap: hs(12) },
-  detailItem: { flexDirection: "row", alignItems: "center", gap: hs(6) },
-  cardDetailText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: COLORS.text.primary },
+  statusTextOffline: {
+    color: "#E55959",
+    fontSize: fs(14),
+    fontFamily: "Gilroy-SemiBold",
+  },
 
-  listContent: {
-    paddingBottom: vs(20),
+  cardDivider: {
+    height: 1,
+    backgroundColor: "#D4E5F9",
+    marginVertical: vs(16),
+  },
+
+  cardFooterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  cardFooterLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  calendarSquircle: {
+    width: ms(32),
+    height: ms(32),
+    borderRadius: ms(8),
+    backgroundColor: "#E4F0FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: hs(12),
+  },
+  cardDateRange: {
+    fontSize: fs(18),
+    fontFamily: "Gilroy-SemiBold",
+    color: "#000",
+  },
+  cardGuestCount: {
+    fontSize: fs(18),
+    fontFamily: "Gilroy-SemiBold",
+    color: "#000",
+  },
+  emptyContainer: {
+    padding: ms(32),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyText: {
+    fontSize: fs(16),
+    fontFamily: "Gilroy-Medium",
+    color: COLORS.text.muted,
   },
   loaderOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255,255,255,0.5)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  emptyContainer: {
-    paddingTop: vs(40),
-    alignItems: "center",
-  },
-  emptyText: {
-    fontSize: fs(14),
-    color: COLORS.text.muted,
   },
 });
