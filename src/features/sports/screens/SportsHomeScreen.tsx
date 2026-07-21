@@ -78,6 +78,7 @@ export const SportsHomeScreen = () => {
     loading,
     availableCategories,
     refresh,
+    addOptimisticBooking,
   } = useSportsHome(serviceId, selectedCategory, selectedView);
 
   // Handle incoming targetDate for navigation redirects (e.g. from Reschedule/Repeat)
@@ -411,9 +412,11 @@ export const SportsHomeScreen = () => {
             shouldReOpenSheet.current = true;
             setIsBottomSheetOpen(false);
           }}
-          onSuccess={() => {
-            setIsBottomSheetOpen(false);
-            refresh();
+          onSuccess={async optimisticData => {
+            if (optimisticData) {
+              addOptimisticBooking(optimisticData);
+            }
+            // Supabase real-time will handle the actual refresh in the background
           }}
         />
       )}

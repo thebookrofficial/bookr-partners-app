@@ -52,7 +52,7 @@ interface OfflineBookingSheetProps {
   venueId: string;
   _groundId: string;
   selectedDate: Date;
-  onSuccess: () => void;
+  onSuccess: (optimisticData?: any) => Promise<void> | void;
   onCheckHistory?: () => void;
   _sportsType: string;
 }
@@ -464,13 +464,38 @@ export const OfflineBookingSheet = ({
         slotDurationMinutes: detectedSlotDuration,
       };
 
-      await SportsService.createOfflineBooking(bookingParams);
+      const optimisticBooking = {
+        id: `temp-${Date.now()}`,
+        name: name.trim(),
+        phone: cleanMobile,
+        date: formattedDate,
+        time: `${fromTime} - ${toTime}`,
+        price: numericTotal.toString(),
+        status: "Offline",
+        isOfflineRecord: true,
+        startTimeRaw: startTime24,
+        endTimeRaw: endTime24,
+        idChain: [],
+        sports_booking_type: "offline",
+        rawSubtotal: numericTotal,
+        rawPaidAmount: numericAdvance,
+        rawDiscountAmount: 0,
+      };
+
+      if (onSuccess) onSuccess(optimisticBooking);
       onClose();
       resetForm();
-      onSuccess();
+
+      SportsService.createOfflineBooking(bookingParams)
+        .catch((error: any) => {
+          Alert.alert("Booking Failed", error.message || "Something went wrong.");
+        })
+        .finally(async () => {
+          await trace.stop();
+          setIsSubmitting(false);
+        });
     } catch (error: any) {
       Alert.alert("Booking Failed", error.message || "Something went wrong.");
-    } finally {
       await trace.stop();
       setIsSubmitting(false);
     }

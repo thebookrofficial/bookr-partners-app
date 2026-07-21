@@ -480,6 +480,10 @@ export const useSportsHome = (
     await Promise.all([fetchSlots(), fetchBookings()]);
   }, [fetchSlots, fetchBookings]);
 
+  const addOptimisticBooking = useCallback((booking: BookingData) => {
+    setBookings(prev => [booking, ...prev]);
+  }, []);
+
   return {
     venue,
     grounds,
@@ -494,5 +498,6 @@ export const useSportsHome = (
     loading,
     availableCategories,
     refresh: handleRefresh,
+    addOptimisticBooking,
   };
 };
