@@ -73,7 +73,7 @@ export type MainStackParamList = {
   DineServiceTabs: NavigatorScreenParams<DineTabParamList>;
   StaycationServiceTabs: NavigatorScreenParams<StaycationTabParamList>;
   EventServiceTabs: NavigatorScreenParams<EventTabParamList>;
-  BookingDetails: { bookingId: string };
+  BookingDetails: { bookingId: string; idChain?: string[] };
   StaycationBookingDetails: { booking: any };
   StaycationInvoice: { bookingId: string };
   StaycationCloseDate: { serviceId: string };
@@ -102,8 +102,8 @@ export type MainStackParamList = {
     refreshKey?: string;
     type?: "multi" | "single";
   };
-  RescheduleBooking: { bookingId: string; venueId: string; groundId: string };
-  RepeatBooking: { bookingId: string; venueId: string; groundId: string };
+  RescheduleBooking: { bookingId: string; venueId: string; groundId: string; idChain?: string[] };
+  RepeatBooking: { bookingId: string; venueId: string; groundId: string; idChain?: string[] };
   Payouts: { venueId: string };
   PayoutDetails: {
     venueId: string;

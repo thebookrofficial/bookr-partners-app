@@ -379,7 +379,10 @@ export const SportsHomeScreen = () => {
                       isPaymentPending={booking.isPaymentPending}
                       isHighlighted={highlightedBookingId === booking.id}
                       onPress={() =>
-                        navigation.navigate("BookingDetails", { bookingId: booking.id })
+                        navigation.navigate("BookingDetails", {
+                          bookingId: booking.id,
+                          idChain: booking.idChain,
+                        })
                       }
                     />
                   ))}

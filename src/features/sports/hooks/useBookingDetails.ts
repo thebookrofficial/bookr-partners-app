@@ -64,7 +64,7 @@ const formatHour = (timeStr: string) => {
   return `${displayHour} ${ampm}`;
 };
 
-export const useBookingDetails = (bookingId: string) => {
+export const useBookingDetails = (bookingId: string, idChain?: string[]) => {
   const [booking, setBooking] = useState<BookingDetailData | null>(null);
   const [paymentLogs, setPaymentLogs] = useState<PaymentLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,46 +76,67 @@ export const useBookingDetails = (bookingId: string) => {
         setLoading(true);
       }
       try {
-        // 1. Fetch the original booking first
-        const { data: baseBooking, error: baseError } = await supabase
-          .from("sports_bookings")
-          .select("*, sports_slots!inner(*), profiles(*), venues(*)")
-          .eq("id", bookingId)
-          .single();
+        let finalChain: any[] = [];
+        let baseBooking: any = null;
 
-        if (baseError) throw baseError;
+        if (idChain && idChain.length > 0) {
+          // OPTIMIZATION: Fetch the full chain in ONE query if we have the idChain!
+          const { data, error } = await supabase
+            .from("sports_bookings")
+            .select("*, sports_slots!inner(*), profiles(*), venues(*)")
+            .in("id", idChain)
+            .order("created_at", { ascending: true });
 
-        // 2. Fetch ALL potentially related bookings for this user/slot/date
-        let linkedQuery = supabase
-          .from("sports_bookings")
-          .select("*, sports_slots!inner(*)")
-          .eq("sports_slots.slot_date", baseBooking.sports_slots.slot_date)
-          .eq("sports_slots.ground_id", baseBooking.sports_slots.ground_id)
-          .neq("booking_status", "cancelled")
-          .neq("booking_status", "refunded")
-          .order("created_at", { ascending: true });
+          if (error) throw error;
 
-        // Only search for linked if it's part of a group or has a parent/child
-        if (baseBooking.booking_group_id) {
-          linkedQuery = linkedQuery.eq("booking_group_id", baseBooking.booking_group_id);
-        } else if (baseBooking.parent_booking_id) {
-          linkedQuery = linkedQuery.or(
-            `id.eq.${baseBooking.parent_booking_id},parent_booking_id.eq.${baseBooking.parent_booking_id}`,
+          // Determine baseBooking (either the specific bookingId or first in chain)
+          baseBooking = data.find((b: any) => b.id === bookingId) || data[0];
+
+          finalChain = data.sort((a: any, b: any) =>
+            a.sports_slots.start_time.localeCompare(b.sports_slots.start_time),
           );
         } else {
-          // It's a base booking, look for its extensions
-          linkedQuery = linkedQuery.or(
-            `id.eq.${baseBooking.id},parent_booking_id.eq.${baseBooking.id}`,
+          // 1. Fallback: Fetch the original booking first
+          const { data: fallbackBaseBooking, error: baseError } = await supabase
+            .from("sports_bookings")
+            .select("*, sports_slots!inner(*), profiles(*), venues(*)")
+            .eq("id", bookingId)
+            .single();
+
+          if (baseError) throw baseError;
+          baseBooking = fallbackBaseBooking;
+
+          // 2. Fetch ALL potentially related bookings for this user/slot/date
+          let linkedQuery = supabase
+            .from("sports_bookings")
+            .select("*, sports_slots!inner(*)")
+            .eq("sports_slots.slot_date", baseBooking.sports_slots.slot_date)
+            .eq("sports_slots.ground_id", baseBooking.sports_slots.ground_id)
+            .neq("booking_status", "cancelled")
+            .neq("booking_status", "refunded")
+            .order("created_at", { ascending: true });
+
+          // Only search for linked if it's part of a group or has a parent/child
+          if (baseBooking.booking_group_id) {
+            linkedQuery = linkedQuery.eq("booking_group_id", baseBooking.booking_group_id);
+          } else if (baseBooking.parent_booking_id) {
+            linkedQuery = linkedQuery.or(
+              `id.eq.${baseBooking.parent_booking_id},parent_booking_id.eq.${baseBooking.parent_booking_id}`,
+            );
+          } else {
+            // It's a base booking, look for its extensions
+            linkedQuery = linkedQuery.or(
+              `id.eq.${baseBooking.id},parent_booking_id.eq.${baseBooking.id}`,
+            );
+          }
+
+          const { data: linkedData, error: linkedError } = await linkedQuery;
+          if (linkedError) throw linkedError;
+
+          finalChain = (linkedData || []).sort((a: any, b: any) =>
+            a.sports_slots.start_time.localeCompare(b.sports_slots.start_time),
           );
         }
-
-        const { data: linkedData, error: linkedError } = await linkedQuery;
-
-        if (linkedError) throw linkedError;
-
-        const finalChain = (linkedData || []).sort((a, b) =>
-          a.sports_slots.start_time.localeCompare(b.sports_slots.start_time),
-        );
 
         // 4. Aggregate data
         const totalAmount = finalChain.reduce((sum, b) => sum + Number(b.total_amount), 0);
@@ -199,7 +220,7 @@ export const useBookingDetails = (bookingId: string) => {
         setLoading(false);
       }
     },
-    [bookingId],
+    [bookingId, idChain],
   );
 
   const logPayment = async (

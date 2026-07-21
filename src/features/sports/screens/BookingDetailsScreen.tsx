@@ -41,10 +41,10 @@ import CalendarSvg from "@/assets/icons/ic-solar-calendar-outline.svg";
 export const BookingDetailsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<MainStackParamList, "BookingDetails">>();
-  const { bookingId } = route.params;
+  const { bookingId, idChain } = route.params;
 
   const { booking, paymentLogs, loading, isSaving, logPayment, cancelBooking, refresh } =
-    useBookingDetails(bookingId);
+    useBookingDetails(bookingId, idChain);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -233,6 +233,7 @@ export const BookingDetailsScreen = () => {
                   bookingId: booking.id,
                   venueId: booking.venue_id,
                   groundId: booking.sports_slots?.ground_id || "",
+                  idChain: booking.idChain,
                 })
               }>
               <Text variant="body1" family="bison" style={styles.repeatBtnText}>
@@ -249,6 +250,7 @@ export const BookingDetailsScreen = () => {
                     bookingId,
                     venueId: booking.venue_id,
                     groundId: booking.sports_slots?.ground_id || "",
+                    idChain: booking.idChain,
                   });
                 }
               }}>

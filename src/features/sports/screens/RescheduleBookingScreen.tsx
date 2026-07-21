@@ -37,9 +37,9 @@ import WalletSvg from "@/assets/icons/ic-streamline-plump-wallet.svg";
 export const RescheduleBookingScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<MainStackParamList, "RescheduleBooking">>();
-  const { bookingId, venueId, groundId } = route.params;
+  const { bookingId, venueId, groundId, idChain } = route.params;
 
-  const { booking, loading } = useBookingDetails(bookingId);
+  const { booking, loading } = useBookingDetails(bookingId, idChain);
 
   const [rescheduleDate, setRescheduleDate] = useState<Date>(new Date());
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -248,47 +248,43 @@ export const RescheduleBookingScreen = () => {
       return;
     }
 
-    setIsRescheduling(true);
-    const trace = await perf().startTrace("reschedule_booking");
-    try {
-      await SportsService.rescheduleBookingWithRange({
-        bookingId,
-        venueId,
-        groundId: selectedGroundId,
-        dateStr: getLocalISODate(rescheduleDate),
-        fromTime,
-        toTime,
-        totalPrice: Number(totalPrice),
-        addAmount: Number(advanceAmount),
-        slotDurationMinutes: pricing.slotDurationMinutes,
-      });
+    // 1. Instantly navigate back for an optimistic feel
+    navigation.navigate("SportsServiceTabs" as any, {
+      screen: "SportsHome",
+      params: { targetDate: rescheduleDate.toISOString() },
+    });
 
-      // Explicitly update old bookings in the chain to "rescheduled" status
-      const oldIds = booking?.idChain || [bookingId];
-      if (oldIds.length > 0) {
-        await supabase
-          .from("sports_bookings")
-          .update({ booking_status: "rescheduled" })
-          .in("id", oldIds);
+    // 2. Perform the actual mutation in the background
+    (async () => {
+      const trace = await perf().startTrace("reschedule_booking");
+      try {
+        await SportsService.rescheduleBookingWithRange({
+          bookingId,
+          venueId,
+          groundId: selectedGroundId,
+          dateStr: getLocalISODate(rescheduleDate),
+          fromTime,
+          toTime,
+          totalPrice: Number(totalPrice),
+          addAmount: Number(advanceAmount),
+          slotDurationMinutes: pricing.slotDurationMinutes,
+        });
+
+        // Explicitly update old bookings in the chain to "rescheduled" status
+        const oldIds = booking?.idChain || [bookingId];
+        if (oldIds.length > 0) {
+          await supabase
+            .from("sports_bookings")
+            .update({ booking_status: "rescheduled" })
+            .in("id", oldIds);
+        }
+      } catch (err: any) {
+        Alert.alert("Reschedule Failed", err.message || "Failed to reschedule booking");
+      } finally {
+        await trace.stop();
+        setIsRescheduling(false);
       }
-
-      Alert.alert("Success", "Booking rescheduled successfully!", [
-        {
-          text: "OK",
-          onPress: () => {
-            navigation.navigate("SportsServiceTabs" as any, {
-              screen: "SportsHome",
-              params: { targetDate: rescheduleDate.toISOString() },
-            });
-          },
-        },
-      ]);
-    } catch (err: any) {
-      Alert.alert("Reschedule Failed", err.message || "Failed to reschedule booking");
-    } finally {
-      await trace.stop();
-      setIsRescheduling(false);
-    }
+    })();
   };
 
   const getMethodIcon = (method: "cash" | "gpay" | "phonepe" | "paytm") => {

@@ -36,9 +36,9 @@ import WalletSvg from "@/assets/icons/ic-streamline-plump-wallet.svg";
 export const RepeatBookingScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<MainStackParamList, "RepeatBooking">>();
-  const { bookingId, venueId, groundId } = route.params;
+  const { bookingId, venueId, groundId, idChain } = route.params;
 
-  const { booking, loading } = useBookingDetails(bookingId);
+  const { booking, loading } = useBookingDetails(bookingId, idChain);
 
   const [repeatDate, setRepeatDate] = useState<Date>(new Date());
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -245,60 +245,55 @@ export const RepeatBookingScreen = () => {
       return;
     }
 
-    setIsRepeating(true);
-    const trace = await perf().startTrace("repeat_booking");
-    try {
-      const timeMatchFrom = fromTime.match(/^(\d+)(?::(\d+))?\s*(AM|PM)?/i);
-      const timeMatchTo = toTime.match(/^(\d+)(?::(\d+))?\s*(AM|PM)?/i);
+    // 1. Instantly navigate back for an optimistic feel
+    navigation.navigate("SportsServiceTabs" as any, {
+      screen: "SportsHome",
+      params: { targetDate: repeatDate.toISOString() },
+    });
 
-      let startH = parseInt(timeMatchFrom?.[1] || "0", 10);
-      let endH = parseInt(timeMatchTo?.[1] || "0", 10);
+    // 2. Perform the actual mutation in the background
+    (async () => {
+      const trace = await perf().startTrace("repeat_booking");
+      try {
+        const timeMatchFrom = fromTime.match(/^(\d+)(?::(\d+))?\s*(AM|PM)?/i);
+        const timeMatchTo = toTime.match(/^(\d+)(?::(\d+))?\s*(AM|PM)?/i);
 
-      if (timeMatchFrom?.[3]?.toUpperCase() === "PM" && startH !== 12) startH += 12;
-      if (timeMatchFrom?.[3]?.toUpperCase() === "AM" && startH === 12) startH = 0;
-      if (timeMatchTo?.[3]?.toUpperCase() === "PM" && endH !== 12) endH += 12;
-      if (timeMatchTo?.[3]?.toUpperCase() === "AM" && endH === 12) endH = 0;
+        let startH = parseInt(timeMatchFrom?.[1] || "0", 10);
+        let endH = parseInt(timeMatchTo?.[1] || "0", 10);
 
-      const startTime24 = `${startH.toString().padStart(2, "0")}:${(
-        timeMatchFrom?.[2] || "00"
-      ).padStart(2, "0")}:00`;
-      const endTime24 = `${endH.toString().padStart(2, "0")}:${(timeMatchTo?.[2] || "00").padStart(
-        2,
-        "0",
-      )}:00`;
+        if (timeMatchFrom?.[3]?.toUpperCase() === "PM" && startH !== 12) startH += 12;
+        if (timeMatchFrom?.[3]?.toUpperCase() === "AM" && startH === 12) startH = 0;
+        if (timeMatchTo?.[3]?.toUpperCase() === "PM" && endH !== 12) endH += 12;
+        if (timeMatchTo?.[3]?.toUpperCase() === "AM" && endH === 12) endH = 0;
 
-      await SportsService.createOfflineBooking({
-        venueId,
-        groundId: selectedGroundId,
-        dateStr: getLocalISODate(repeatDate),
-        startTime24,
-        endTime24,
-        numericTotal: Number(totalPrice),
-        advancePaid: Number(advanceAmount),
-        guestName: booking.guest_name || "Guest",
-        guestPhone: booking.guest_phone || "",
-        bookingSource: booking.booking_source || "vendor_app",
-        sportsBookingType: booking.sports_booking_type || "standard",
-        slotDurationMinutes: pricing.slotDurationMinutes,
-      });
+        const startTime24 = `${startH.toString().padStart(2, "0")}:${(
+          timeMatchFrom?.[2] || "00"
+        ).padStart(2, "0")}:00`;
+        const endTime24 = `${endH.toString().padStart(2, "0")}:${(
+          timeMatchTo?.[2] || "00"
+        ).padStart(2, "0")}:00`;
 
-      Alert.alert("Success", "Booking repeated successfully!", [
-        {
-          text: "OK",
-          onPress: () => {
-            navigation.navigate("SportsServiceTabs" as any, {
-              screen: "SportsHome",
-              params: { targetDate: repeatDate.toISOString() },
-            });
-          },
-        },
-      ]);
-    } catch (err: any) {
-      Alert.alert("Slot Unavailable", err.message || "Failed to repeat booking");
-    } finally {
-      await trace.stop();
-      setIsRepeating(false);
-    }
+        await SportsService.createOfflineBooking({
+          venueId,
+          groundId: selectedGroundId,
+          dateStr: getLocalISODate(repeatDate),
+          startTime24,
+          endTime24,
+          numericTotal: Number(totalPrice),
+          advancePaid: Number(advanceAmount),
+          guestName: booking.guest_name || "Guest",
+          guestPhone: booking.guest_phone || "",
+          bookingSource: booking.booking_source || "vendor_app",
+          sportsBookingType: booking.sports_booking_type || "standard",
+          slotDurationMinutes: pricing.slotDurationMinutes,
+        });
+      } catch (err: any) {
+        Alert.alert("Slot Unavailable", err.message || "Failed to repeat booking");
+      } finally {
+        await trace.stop();
+        setIsRepeating(false);
+      }
+    })();
   };
 
   const getMethodIcon = (method: "cash" | "gpay" | "phonepe" | "paytm") => {
