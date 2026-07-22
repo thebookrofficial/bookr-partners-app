@@ -64,6 +64,35 @@ export const ScreenContainer = ({
     }
   };
 
+  React.useEffect(() => {
+    return () => {
+      if (hideTabBarOnScroll) {
+        setTabBarVisible(true);
+      }
+    };
+  }, [hideTabBarOnScroll, setTabBarVisible]);
+
+  // Handle focus loss for horizontal swipe navigators safely (prevents crashes in tests)
+  const { NavigationContext } = require("@react-navigation/native");
+  const navigation: any = React.useContext(NavigationContext);
+
+  React.useEffect(() => {
+    if (!navigation) return;
+
+    const unsubscribeFocus = navigation.addListener("focus", () => {
+      if (hideTabBarOnScroll) setTabBarVisible(true);
+    });
+
+    const unsubscribeBlur = navigation.addListener("blur", () => {
+      if (hideTabBarOnScroll) setTabBarVisible(true);
+    });
+
+    return () => {
+      unsubscribeFocus();
+      unsubscribeBlur();
+    };
+  }, [navigation, hideTabBarOnScroll, setTabBarVisible]);
+
   const containerProps = scrollable
     ? {
         showsVerticalScrollIndicator: false,

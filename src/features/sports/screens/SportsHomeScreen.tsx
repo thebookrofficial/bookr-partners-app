@@ -93,6 +93,7 @@ export const SportsHomeScreen = () => {
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isTimeSlotExpanded, setIsTimeSlotExpanded] = useState(true);
   const [highlightedBookingId, setHighlightedBookingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const shouldReOpenSheet = React.useRef(false);
@@ -312,50 +313,67 @@ export const SportsHomeScreen = () => {
               )}
 
               {(selectedView === "Today Bookings" || selectedView === "Bookings") && (
-                <>
-                  <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-                    TIME SLOT
-                  </Text>
-                  <LegendIndicator />
-
-                  {slotsLoading && slots.length === 0 ? (
-                    <View style={styles.skeletonContainer}>
-                      {Array.from({ length: 12 }).map((_, i) => (
-                        <Skeleton key={i} width="23%" height={vs(40)} borderRadius={ms(8)} />
-                      ))}
-                    </View>
-                  ) : slots.length === 0 ? (
-                    <Text
-                      variant="body2"
-                      color={COLORS.text.secondary}
-                      style={styles.emptySlotsText}>
-                      No slots generated for this date/ground yet.
+                <View style={styles.timeSlotWrapper}>
+                  <TouchableOpacity
+                    style={styles.timeSlotHeader}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      setIsTimeSlotExpanded(!isTimeSlotExpanded);
+                    }}>
+                    <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+                      TIME SLOT
                     </Text>
-                  ) : (
-                    <TimeSlotGrid
-                      slots={slots as any}
-                      selectedDate={selectedDate}
-                      onSlotPress={slot => {
-                        if (slot.status === "booked" || slot.status === "blocked") {
-                          if (!slot.raw_start_time) return; // Prevent TS undefined error
-                          const foundBooking = bookings.find((b: any) => {
-                            if (!b.startTimeRaw || !b.endTimeRaw) return false;
-                            // Non-null assertion (!) is safe here since we just checked
-                            return (
-                              slot.raw_start_time! >= b.startTimeRaw &&
-                              slot.raw_start_time! < b.endTimeRaw
-                            );
-                          });
+                    {isTimeSlotExpanded ? (
+                      <ChevronUp size={ms(20)} color="#000" />
+                    ) : (
+                      <ChevronDown size={ms(20)} color="#000" />
+                    )}
+                  </TouchableOpacity>
 
-                          if (foundBooking) {
-                            setHighlightedBookingId(foundBooking.id);
-                            setTimeout(() => setHighlightedBookingId(null), 3000);
-                          }
-                        }
-                      }}
-                    />
+                  {isTimeSlotExpanded && (
+                    <View style={styles.timeSlotContentContainer}>
+                      <LegendIndicator />
+
+                      {slotsLoading && slots.length === 0 ? (
+                        <View style={styles.skeletonContainer}>
+                          {Array.from({ length: 12 }).map((_, i) => (
+                            <Skeleton key={i} width="23%" height={vs(40)} borderRadius={ms(8)} />
+                          ))}
+                        </View>
+                      ) : slots.length === 0 ? (
+                        <Text
+                          variant="body2"
+                          color={COLORS.text.secondary}
+                          style={styles.emptySlotsText}>
+                          No slots generated for this date/ground yet.
+                        </Text>
+                      ) : (
+                        <TimeSlotGrid
+                          slots={slots as any}
+                          selectedDate={selectedDate}
+                          onSlotPress={slot => {
+                            if (slot.status === "booked" || slot.status === "blocked") {
+                              if (!slot.raw_start_time) return;
+                              const foundBooking = bookings.find((b: any) => {
+                                if (!b.startTimeRaw || !b.endTimeRaw) return false;
+                                return (
+                                  slot.raw_start_time! >= b.startTimeRaw &&
+                                  slot.raw_start_time! < b.endTimeRaw
+                                );
+                              });
+
+                              if (foundBooking) {
+                                setHighlightedBookingId(foundBooking.id);
+                                setTimeout(() => setHighlightedBookingId(null), 3000);
+                              }
+                            }
+                          }}
+                        />
+                      )}
+                    </View>
                   )}
-                </>
+                </View>
               )}
 
               {/* Bookings Title Removed per Figma */}
@@ -542,7 +560,22 @@ const styles = StyleSheet.create({
   },
   emptySlotsText: { textAlign: "center", marginVertical: vs(20) },
   loaderStyle: { marginVertical: vs(20) },
-  sectionTitle: { textTransform: "uppercase", marginBottom: vs(6) },
+  timeSlotHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sectionTitle: { textTransform: "uppercase", fontSize: fs(18) },
+  timeSlotContentContainer: {
+    overflow: "hidden",
+    marginTop: vs(6),
+  },
+  timeSlotWrapper: {
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(12),
+    padding: ms(12),
+    marginBottom: vs(12),
+  },
   dateRowZIndex: {
     zIndex: 100,
   },
@@ -562,9 +595,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: hs(10),
     bottom: vs(140),
-    width: ms(58),
-    height: ms(58),
-    borderRadius: ms(29),
+    width: ms(60),
+    height: ms(60),
+    borderRadius: ms(30),
     backgroundColor: COLORS.primary,
     justifyContent: "center",
     alignItems: "center",

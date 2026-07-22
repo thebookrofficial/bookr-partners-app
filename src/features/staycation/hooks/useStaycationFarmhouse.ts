@@ -130,7 +130,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         const finalPhone = b.guest_phone || profile?.phone || "N/A";
 
         const isOnline = b.booking_source === "online";
-        const isPast = new Date(b.check_out_date) < new Date();
+        const isPast = b.check_out_date < todayStr;
         const rangeColor = isPast ? "#aaa" : isOnline ? COLORS.primary : COLORS.danger;
 
         // Calendar marking
@@ -164,7 +164,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
 
         if (isPast) {
           pastList.push(formatted);
-        } else if (b.check_in_date === todayStr) {
+        } else if (b.check_in_date === todayStr || b.check_out_date === todayStr) {
           todayList.push(formatted);
         } else {
           upcomingList.push(formatted);

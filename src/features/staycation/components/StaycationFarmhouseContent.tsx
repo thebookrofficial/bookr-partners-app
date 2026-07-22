@@ -53,6 +53,26 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
       lastScrollY.current = currentY;
     }
   };
+
+  React.useEffect(() => {
+    return () => setTabBarVisible(true);
+  }, [setTabBarVisible]);
+
+  // Safely use NavigationContext to prevent test crashes when not wrapped in NavigationContainer
+  const { NavigationContext } = require("@react-navigation/native");
+  const navigation: any = React.useContext(NavigationContext);
+
+  React.useEffect(() => {
+    if (!navigation) return;
+
+    const unsubscribeFocus = navigation.addListener("focus", () => setTabBarVisible(true));
+    const unsubscribeBlur = navigation.addListener("blur", () => setTabBarVisible(true));
+
+    return () => {
+      unsubscribeFocus();
+      unsubscribeBlur();
+    };
+  }, [navigation, setTabBarVisible]);
   const {
     isLoading,
     markedDates,
@@ -95,7 +115,7 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
 
     groupedBookings.forEach(section => {
       // Filter out sections or bookings that are in the past
-      const filteredSectionData = section.data.filter(b => b.checkOut > todayStr);
+      const filteredSectionData = section.data.filter(b => b.checkOut >= todayStr);
 
       if (filteredSectionData.length > 0) {
         data.push({ type: "header", title: section.title });
@@ -452,7 +472,7 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: hs(0),
-    bottom: vs(100),
+    bottom: vs(120),
     width: ms(60),
     height: ms(60),
     borderRadius: ms(30),

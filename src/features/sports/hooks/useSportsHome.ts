@@ -40,6 +40,7 @@ export interface BookingData {
   isPaymentPending?: boolean;
   startTimeRaw?: string;
   endTimeRaw?: string;
+  slotDateRaw?: string;
   notes?: string;
   idChain: string[];
   parent_booking_id?: string | null;
@@ -327,6 +328,7 @@ export const useSportsHome = (
             isPaymentPending: isDisabled && isUnpaid,
             startTimeRaw: b.start_time,
             endTimeRaw: b.end_time,
+            slotDateRaw: b.slot_date,
             notes: b.notes,
             idChain: [b.id],
             parent_booking_id: b.parent_booking_id,
@@ -341,8 +343,13 @@ export const useSportsHome = (
           };
         });
 
-      // Sort chronological by start time
+      // Sort chronological by start time and date
       const sortedBookings = [...formattedBookings].sort((a, b) => {
+        const dateA = a.slotDateRaw || "";
+        const dateB = b.slotDateRaw || "";
+        if (dateA !== dateB) {
+          return dateA.localeCompare(dateB);
+        }
         return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
       });
 
@@ -406,6 +413,11 @@ export const useSportsHome = (
       const finalSorted = [...merged].sort((a, b) => {
         if (a.isDisabled !== b.isDisabled) {
           return a.isDisabled ? 1 : -1;
+        }
+        const dateA = a.slotDateRaw || "";
+        const dateB = b.slotDateRaw || "";
+        if (dateA !== dateB) {
+          return dateA.localeCompare(dateB);
         }
         return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
       });

@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   cardDivider: {
     height: 1,
     backgroundColor: "#D4E5F9",
-    marginVertical: vs(16),
+    marginVertical: vs(8),
   },
 
   cardFooterRow: {

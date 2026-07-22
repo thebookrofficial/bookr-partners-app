@@ -37,6 +37,7 @@ export const CustomDatePickerModal: React.FC<CustomDatePickerModalProps> = ({
           <Calendar
             current={getLocalISODate(selectedDate)}
             minDate={getLocalISODate(minDate)}
+            hideExtraDays={true}
             onDayPress={(day: any) => {
               const dateStr = day.dateString;
               if (blockedDates.includes(dateStr)) return;

@@ -24,7 +24,7 @@ import { useSportsHistory } from "../hooks/useSportsHistory";
 import { FilterBottomSheet, DateFilterOption } from "../components/FilterBottomSheet";
 
 // Navigation Imports
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute, useIsFocused } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
 import { useAuthStore } from "@/store";
@@ -103,12 +103,14 @@ const DateSectionHeader = ({
 // 3. MAIN SCREEN
 // ==========================================
 export const SportsHistoryScreen = () => {
+  const isFocused = useIsFocused();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, any>>();
   const { clientProfile } = useAuthStore();
   const isOwner = clientProfile?.client_role === "owner" || !clientProfile;
 
-  const { selectedCategories, setServiceCategory, activeServiceId } = useServiceStore();
+  const { selectedCategories, setServiceCategory, activeServiceId, setTabBarVisible } =
+    useServiceStore();
 
   // 1. Get Service ID (Priority: Route -> Store)
   const serviceId = route.params?.serviceId || activeServiceId;
@@ -151,6 +153,12 @@ export const SportsHistoryScreen = () => {
   );
 
   const [refreshing, setRefreshing] = useState(false);
+
+  React.useEffect(() => {
+    if (isFocused) {
+      setTabBarVisible(true);
+    }
+  }, [isFocused, setTabBarVisible]);
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -136,11 +136,11 @@ export const BookingCard = ({
             {name}
           </Text>
           {phone ? (
-            <Text weight="medium" style={styles.phoneText}>
+            <Text weight="medium" style={[styles.phoneText, { color: textColor }]}>
               {phone}
             </Text>
           ) : subtitle ? (
-            <Text weight="medium" style={styles.phoneText}>
+            <Text weight="medium" style={[styles.phoneText, { color: textColor }]}>
               {subtitle}
             </Text>
           ) : null}
