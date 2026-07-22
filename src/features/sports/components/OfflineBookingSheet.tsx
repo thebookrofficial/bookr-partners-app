@@ -457,6 +457,7 @@ export const OfflineBookingSheet = ({
         endTime24,
         numericTotal,
         advancePaid: numericAdvance,
+        paymentMethod: numericAdvance > 0 ? selectedMethod : undefined,
         guestName: name.trim(),
         guestPhone: cleanMobile,
         bookingSource: "offline",

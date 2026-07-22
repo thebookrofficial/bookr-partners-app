@@ -49,7 +49,16 @@ export interface BookingDetailData {
 export interface PaymentLog {
   id: string;
   amount: number;
-  payment_mode: "cash" | "online" | "upi" | "card" | "bank_transfer" | "other";
+  payment_mode:
+    | "cash"
+    | "online"
+    | "upi"
+    | "card"
+    | "bank_transfer"
+    | "other"
+    | "gpay"
+    | "phonepe"
+    | "paytm";
   note: string;
   created_at: string;
   isInitial?: boolean; // Flag to identify our synthetic log
@@ -225,7 +234,16 @@ export const useBookingDetails = (bookingId: string, idChain?: string[]) => {
 
   const logPayment = async (
     amount: number,
-    mode: "cash" | "online" | "upi" | "card" | "bank_transfer" | "other",
+    mode:
+      | "cash"
+      | "online"
+      | "upi"
+      | "card"
+      | "bank_transfer"
+      | "other"
+      | "gpay"
+      | "phonepe"
+      | "paytm",
     note?: string,
   ) => {
     setIsSaving(true);
@@ -239,7 +257,20 @@ export const useBookingDetails = (bookingId: string, idChain?: string[]) => {
       }
 
       const vertical = booking?.venues?.vertical || "sports";
-      const dbPaymentMode = mode === "online" ? "upi" : mode;
+      // If mode is one of the specific types, use it directly. Otherwise, fallback online to upi
+      const dbPaymentMode = [
+        "gpay",
+        "phonepe",
+        "paytm",
+        "cash",
+        "card",
+        "bank_transfer",
+        "other",
+      ].includes(mode)
+        ? mode
+        : mode === "online"
+        ? "upi"
+        : mode;
 
       // 1. Optimistically update UI
       const optimisticLog: PaymentLog = {
@@ -275,6 +306,31 @@ export const useBookingDetails = (bookingId: string, idChain?: string[]) => {
           return { ...prev, paid_amount: Number(prev.paid_amount) - amount };
         });
         throw error;
+      }
+
+      // The edge function currently hardcodes the note to "Manual upi payment...".
+      // We manually override it here if a specific note was provided (e.g. GPAY, PHONEPE).
+      if (note && mode !== "cash") {
+        try {
+          // Find the latest payment log for this booking and update its note
+          const { data: latestLog } = await supabase
+            .from("offline_payment_logs")
+            .select("id")
+            .eq("booking_id", bookingId)
+            .eq("amount", amount)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (latestLog?.id) {
+            await supabase
+              .from("offline_payment_logs")
+              .update({ note: note })
+              .eq("id", latestLog.id);
+          }
+        } catch (updateErr) {
+          console.error("Failed to override hardcoded note:", updateErr);
+        }
       }
 
       // Do not block UI with an alert on success for a faster feel, or keep it if needed.

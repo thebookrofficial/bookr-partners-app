@@ -113,7 +113,10 @@ export const GuestHistoryScreen = () => {
         {/* Tabs */}
         <View style={styles.tabsContainer}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === "upcoming" ? styles.tabActive : styles.tabInactive]}
+            style={[
+              styles.tab,
+              activeTab === "upcoming" ? { backgroundColor: COLORS.primary } : styles.tabInactive,
+            ]}
             onPress={() => setActiveTab("upcoming")}>
             <Text
               variant="body2"
@@ -130,7 +133,10 @@ export const GuestHistoryScreen = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tab, activeTab === "past" ? styles.tabActive : styles.tabInactive]}
+            style={[
+              styles.tab,
+              activeTab === "past" ? { backgroundColor: "#000000" } : styles.tabInactive,
+            ]}
             onPress={() => setActiveTab("past")}>
             <Text
               variant="body2"
@@ -147,7 +153,10 @@ export const GuestHistoryScreen = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tab, activeTab === "cancelled" ? styles.tabActive : styles.tabInactive]}
+            style={[
+              styles.tab,
+              activeTab === "cancelled" ? { backgroundColor: COLORS.danger } : styles.tabInactive,
+            ]}
             onPress={() => setActiveTab("cancelled")}>
             <Text
               variant="body2"
@@ -295,9 +304,6 @@ const styles = StyleSheet.create({
   },
   tabInactive: {
     backgroundColor: "#F4F7FC",
-  },
-  tabActive: {
-    backgroundColor: "#E55959",
   },
   tabTextInactive: {
     color: "#8C8C8C",

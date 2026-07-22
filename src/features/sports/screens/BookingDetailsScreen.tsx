@@ -73,7 +73,19 @@ export const BookingDetailsScreen = () => {
   };
 
   const getNameForMode = (mode: string, note?: string) => {
+    const modeUpper = mode?.toUpperCase() || "";
     const noteUpper = note?.toUpperCase() || "";
+
+    if (["GPAY", "PHONEPE", "PAYTM", "CASH"].includes(modeUpper)) {
+      return modeUpper === "GPAY"
+        ? "GPay"
+        : modeUpper === "PHONEPE"
+        ? "PhonePe"
+        : modeUpper === "PAYTM"
+        ? "Paytm"
+        : "Cash";
+    }
+
     if (["GPAY", "PHONEPE", "PAYTM", "CASH"].includes(noteUpper)) {
       return noteUpper === "GPAY"
         ? "GPay"
@@ -83,6 +95,7 @@ export const BookingDetailsScreen = () => {
         ? "Paytm"
         : "Cash";
     }
+
     return mode === "upi" ? "Online" : mode.toUpperCase();
   };
 
@@ -135,7 +148,7 @@ export const BookingDetailsScreen = () => {
       return;
     }
 
-    const backendMethod = selectedMethod === "cash" ? "cash" : "upi";
+    const backendMethod = selectedMethod;
     let noteText = "CASH";
     if (selectedMethod === "gpay") noteText = "GPAY";
     if (selectedMethod === "phonepe") noteText = "PHONEPE";

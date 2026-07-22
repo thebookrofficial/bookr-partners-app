@@ -204,6 +204,8 @@ export const SportsService = {
     endTime24: string;
     numericTotal: number;
     advancePaid: number;
+    basePaidAmount?: number;
+    paymentMethod?: string;
     guestName: string;
     guestPhone: string;
     bookingSource: string;
@@ -227,7 +229,11 @@ export const SportsService = {
     const isMultiSlot = totalSlots > 1;
     const finalBookingType = isMultiSlot ? "multi_slot" : "standard";
     const hourlyPrice = params.numericTotal / totalSlots;
-    const hourlyAdvance = params.advancePaid / totalSlots;
+
+    const isLoggingPayment = params.advancePaid > 0 && params.paymentMethod;
+    const amountToDistribute =
+      (params.basePaidAmount || 0) + (isLoggingPayment ? 0 : params.advancePaid);
+    const hourlyPaid = amountToDistribute / totalSlots;
 
     const generateUUID = () => {
       return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -335,7 +341,7 @@ export const SportsService = {
       gateway_fee: 0,
       total_amount: hourlyPrice,
       vendor_payout: hourlyPrice,
-      paid_amount: hourlyAdvance,
+      paid_amount: hourlyPaid,
       booking_source: params.bookingSource,
       sports_booking_type: finalBookingType,
       booking_group_id:
@@ -366,6 +372,46 @@ export const SportsService = {
       }
     } catch (err) {
       console.error("Failed to update historical guest names:", err);
+    }
+
+    if (params.advancePaid > 0 && params.paymentMethod) {
+      try {
+        // Use the exact enum values: cash, gpay, phonepe, paytm, etc.
+        const backendMethod = [
+          "gpay",
+          "phonepe",
+          "paytm",
+          "cash",
+          "card",
+          "bank_transfer",
+          "other",
+        ].includes(params.paymentMethod)
+          ? params.paymentMethod
+          : "upi";
+
+        let noteText = "CASH";
+        if (params.paymentMethod === "gpay") noteText = "GPAY";
+        if (params.paymentMethod === "phonepe") noteText = "PHONEPE";
+        if (params.paymentMethod === "paytm") noteText = "PAYTM";
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData?.session?.user?.id;
+
+        const { error: insertError } = await supabase.from("offline_payment_logs").insert({
+          booking_id: firstBookingId,
+          booking_vertical: "sports",
+          amount: params.advancePaid,
+          payment_mode: backendMethod,
+          note: noteText,
+          logged_by: userId,
+        });
+
+        if (insertError) {
+          console.error("Direct insert error logging payment:", insertError);
+        }
+      } catch (err) {
+        console.error("Failed to log initial offline payment:", err);
+      }
     }
 
     return firstBookingId;
@@ -399,6 +445,7 @@ export const SportsService = {
     toTime: string;
     totalPrice: number;
     addAmount: number;
+    paymentMethod?: string;
     slotDurationMinutes?: number;
   }) {
     try {
@@ -488,8 +535,8 @@ export const SportsService = {
               return `${displayH}${displayM} ${ampm}`;
             };
             const cm =
-              parseInt(slot.start_time.split(":")[0]) * 60 +
-              parseInt(slot.start_time.split(":")[1]);
+              parseInt(slot.start_time.split(":")[0], 10) * 60 +
+              parseInt(slot.start_time.split(":")[1], 10);
             const em = cm + slotDuration;
             const endHStr = Math.floor(em / 60)
               .toString()
@@ -524,7 +571,9 @@ export const SportsService = {
         endTime24,
         numericTotal:
           params.totalPrice > 0 ? params.totalPrice : Number(oldBooking.total_amount || 0),
-        advancePaid: params.addAmount > 0 ? params.addAmount : totalPreviousPaid,
+        advancePaid: params.addAmount > 0 ? params.addAmount : 0,
+        basePaidAmount: totalPreviousPaid,
+        paymentMethod: params.addAmount > 0 ? params.paymentMethod : undefined,
         guestName: oldBooking.guest_name || "Guest",
         guestPhone: oldBooking.guest_phone || "",
         bookingSource: oldBooking.booking_source || "vendor_app",
