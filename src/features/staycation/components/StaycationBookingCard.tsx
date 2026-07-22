@@ -4,7 +4,8 @@
 import React, { useMemo } from "react";
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from "react-native";
 import { Text } from "@/components/ui";
-import { Calendar, User as UserIcon } from "lucide-react-native";
+import PersonSvg from "@/assets/icons/ic-round-person.svg";
+import CalendarSvg from "@/assets/icons/ic-solar-calendar-outline.svg";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { StaycationBooking } from "../types/staycation.types";
@@ -211,7 +212,7 @@ export const StaycationBookingCard = ({
           {displayData.avatarUrl ? (
             <Image source={{ uri: displayData.avatarUrl }} style={styles.avatarImage} />
           ) : (
-            <UserIcon size={ms(20)} color="#63A1FD" />
+            <PersonSvg width={ms(22)} height={ms(22)} color="#63A1FD" />
           )}
         </View>
 
@@ -234,7 +235,7 @@ export const StaycationBookingCard = ({
 
         <View style={styles.amountStatusWrapper}>
           <Text weight="bold" style={[styles.amountText, { color: getAmountColor() }]}>
-            ₹{displayData.totalAmount || displayData.amount || 0}
+            ₹{displayData.paidAmount || 0}
           </Text>
           <View style={[styles.statusLabelContainer, { backgroundColor: getStatusBgColor() }]}>
             <Text weight="semiBold" style={[styles.statusLabel, { color: getStatusColor() }]}>
@@ -251,7 +252,7 @@ export const StaycationBookingCard = ({
       <View style={styles.bottomSection}>
         <View style={styles.dateContainer}>
           <View style={styles.calendarIconWrapper}>
-            <Calendar size={ms(18)} color="#63A1FD" />
+            <CalendarSvg width={ms(18)} height={ms(18)} color="#63A1FD" />
           </View>
           <Text weight="semiBold" style={styles.dateText}>
             {dateRoomText}
@@ -314,7 +315,7 @@ const styles = StyleSheet.create({
   },
   phoneText: {
     fontSize: fs(18),
-    color: "#6B7280",
+    color: COLORS.text.secondary,
   },
   paymentBadge: {
     backgroundColor: "#FEE2E2",

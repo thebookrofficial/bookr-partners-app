@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
-import { ArrowLeft, Trash2, ChevronRight, Phone } from "lucide-react-native";
+import { ArrowLeft, Trash2, ChevronUp, ChevronDown, Phone } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -77,11 +77,7 @@ export const StaycationBookingDetailsScreen = () => {
       return;
     }
 
-    // Map selected method to cash/online split
-    const cashAmt = selectedMethod === "cash" ? paymentInput : "0";
-    const onlineAmt = selectedMethod !== "cash" ? paymentInput : "0";
-
-    const success = await updatePayment(cashAmt, onlineAmt);
+    const success = await updatePayment(paymentInput, selectedMethod);
     if (success) {
       setIsAddingPayment(false);
       setPaymentInput("");
@@ -208,7 +204,10 @@ export const StaycationBookingDetailsScreen = () => {
   };
 
   const getIconForLog = (mode: string) => {
-    if (mode === "upi") return icGpay;
+    if (mode === "gpay") return icGpay;
+    if (mode === "phonepe") return icPhonepe;
+    if (mode === "paytm") return icPaytm;
+    if (mode === "upi") return icGpay; // fallback
     return icCash;
   };
 
@@ -510,33 +509,38 @@ export const StaycationBookingDetailsScreen = () => {
               <View style={styles.paymentHistoryLeft}>
                 <MoneySvg width={ms(24)} height={ms(24)} color="#000" />
                 <Text variant="body1" weight="bold" style={styles.paymentHistoryText}>
-                  PAYMENT HISTORY
+                  Payment History
                 </Text>
               </View>
-              <ChevronRight size={ms(24)} color={COLORS.text.primary} />
+              {showPaymentHistory ? (
+                <ChevronUp size={ms(24)} color={COLORS.text.primary} />
+              ) : (
+                <ChevronDown size={ms(24)} color={COLORS.text.primary} />
+              )}
             </TouchableOpacity>
             {showPaymentHistory && (
               <View style={styles.paymentLogsWrapper}>
-                {paymentLogs.map(log => {
+                {paymentLogs.map((log, index) => {
                   const icon = getIconForLog(log.payment_mode);
                   return (
-                    <View key={log.id} style={styles.logCard}>
-                      <View style={styles.logIconContainer}>
-                        <Image source={icon} style={styles.logIcon} />
-                      </View>
-                      <View style={styles.logDetailsCol}>
-                        <Text variant="body1" weight="bold" style={styles.logName}>
-                          {log.payment_mode === "upi" ? "Online" : "Cash"}
-                        </Text>
-                        <Text variant="body2" weight="medium" style={styles.logDate}>
-                          {new Date(log.created_at).toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </Text>
-                      </View>
-                      <Text variant="body1" weight="bold" style={styles.logAmount}>
+                    <View
+                      key={log.id}
+                      style={[
+                        styles.logCard,
+                        index === paymentLogs.length - 1 && { marginBottom: 0 },
+                      ]}>
+                      <Image source={icon} style={styles.logIcon} />
+                      <Text variant="body1" weight="bold" style={styles.logName}>
+                        {getNameForMethod(log.payment_mode)}
+                      </Text>
+                      <Text variant="body1" weight="bold" style={styles.logDate}>
+                        {new Date(log.created_at).toLocaleDateString("en-GB", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </Text>
+                      <Text variant="h3" weight="bold" style={styles.logAmount}>
                         ₹{log.amount}
                       </Text>
                     </View>
@@ -782,7 +786,9 @@ const styles = StyleSheet.create({
   paymentHistoryContainer: {
     marginBottom: vs(16),
     borderRadius: ms(12),
-    backgroundColor: "#F7F9FC",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#cbdffe",
     padding: ms(16),
   },
   paymentHistoryBtn: {
@@ -791,30 +797,30 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   paymentHistoryLeft: { flexDirection: "row", alignItems: "center", gap: hs(8) },
-  paymentHistoryText: { fontSize: fs(14), color: "#000", fontFamily: "Gilroy-Bold" },
-  paymentLogsWrapper: { marginTop: vs(10), marginBottom: vs(-16) },
+  paymentHistoryText: { fontSize: fs(16), color: "#000", fontFamily: "Gilroy-Bold" },
+  paymentLogsWrapper: { marginTop: vs(24), marginBottom: vs(8) },
   logCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EEF3FC",
-    borderRadius: ms(12),
-    padding: ms(12),
-    marginBottom: vs(12),
-  },
-  logIconContainer: {
-    width: ms(40),
-    height: ms(40),
-    borderRadius: ms(20),
     backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: hs(12),
+    marginBottom: vs(20),
   },
-  logIcon: { width: ms(24), height: ms(24), resizeMode: "contain" },
-  logDetailsCol: { flex: 1, justifyContent: "center" },
-  logName: { fontSize: fs(14), color: "#000", fontFamily: "Gilroy-Bold", marginBottom: vs(2) },
-  logDate: { fontSize: fs(12), color: "#8C8C8C", fontFamily: "Gilroy-Medium" },
-  logAmount: { fontSize: fs(16), color: "#00B562", fontFamily: "Gilroy-Bold" },
+  logIcon: { width: ms(36), height: ms(36), resizeMode: "contain", marginRight: hs(12) },
+  logName: { flex: 1, fontSize: fs(14), color: "#000", fontFamily: "Gilroy-Bold" },
+  logDate: {
+    flex: 1.2,
+    fontSize: fs(14),
+    color: "#000",
+    fontFamily: "Gilroy-Bold",
+    textAlign: "center",
+  },
+  logAmount: {
+    flex: 1,
+    fontSize: fs(18),
+    color: "#00B562",
+    fontFamily: "Gilroy-Bold",
+    textAlign: "right",
+  },
 
   // Bottom Cancel
   cancelBtnBottom: {

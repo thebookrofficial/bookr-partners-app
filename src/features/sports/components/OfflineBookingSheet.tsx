@@ -536,7 +536,7 @@ export const OfflineBookingSheet = ({
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.sheetContent}>
+              contentContainerStyle={[styles.sheetContent, { paddingBottom: vs(120) }]}>
               <SectionHeader icon={UserIcon} text="CUSTOMER DETAILS" />
               <FieldBox
                 icon={Phone}
@@ -826,19 +826,21 @@ export const OfflineBookingSheet = ({
                 )}
               </View>
             </ScrollView>
-            <TouchableOpacity
-              style={styles.saveButton}
-              activeOpacity={0.8}
-              onPress={handleBookNow}
-              disabled={isSubmitting}>
-              {isSubmitting ? (
-                <ActivityIndicator color={COLORS.text.inverse} />
-              ) : (
-                <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
-                  BOOK NOW
-                </Text>
-              )}
-            </TouchableOpacity>
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
+              <TouchableOpacity
+                style={styles.saveButton}
+                activeOpacity={0.8}
+                onPress={handleBookNow}
+                disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <ActivityIndicator color={COLORS.text.inverse} />
+                ) : (
+                  <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
+                    BOOK NOW
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </KeyboardAvoidingView>
       </TouchableOpacity>
@@ -1172,5 +1174,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingTop: vs(60),
     paddingHorizontal: hs(10),
+  },
+  footer: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
+    paddingHorizontal: hs(10),
+    paddingTop: vs(12),
+    backgroundColor: COLORS.background,
   },
 });

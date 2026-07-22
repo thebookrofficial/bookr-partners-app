@@ -45,7 +45,7 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   useEffect(() => {
     Animated.timing(translateY, {
       toValue: isTabBarVisible ? 0 : vs(100),
-      duration: 300,
+      duration: 150,
       useNativeDriver: true,
     }).start();
   }, [isTabBarVisible, translateY]);

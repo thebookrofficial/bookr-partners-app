@@ -172,6 +172,17 @@ export const StaycationOfflineBookingSheet = ({
   const totalAllowedGuests = maxStandardGuests + maxExtraGuests;
   const extraGuestsCount = Math.max(0, currentGuestInt - maxStandardGuests);
 
+  const displayNights = Math.max(
+    1,
+    Math.round((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)),
+  );
+  let extraGuestAmount = 0;
+  if (isFarmhouse && farmhouseConfig) {
+    extraGuestAmount = extraGuestsCount * farmhouseConfig.extraCharge * displayNights;
+  } else if (!isFarmhouse && activeRoomConfig) {
+    extraGuestAmount = extraGuestsCount * activeRoomConfig.extraGuestCharge * displayNights;
+  }
+
   useEffect(() => {
     if (visible && isFarmhouse && venueId) {
       const fetchFarmhouseConfig = async () => {
@@ -214,6 +225,7 @@ export const StaycationOfflineBookingSheet = ({
     if (total > 0 && total.toString() !== totalPayment) {
       setTotalPayment(total.toString());
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isFarmhouse,
     farmhouseConfig,
@@ -223,7 +235,6 @@ export const StaycationOfflineBookingSheet = ({
     checkOutDate,
     extraGuestsCount,
     unitsInt,
-    totalPayment,
   ]);
 
   useEffect(() => {
@@ -801,6 +812,19 @@ export const StaycationOfflineBookingSheet = ({
                         <Text style={styles.gridCardValue}>{guestCount}</Text>
                       </View>
                     </TouchableOpacity>
+                    {extraGuestAmount > 0 && (
+                      <Text
+                        style={{
+                          fontSize: fs(13),
+                          color: COLORS.danger,
+                          marginTop: vs(-8),
+                          marginBottom: vs(8),
+                          fontFamily: "Gilroy-Medium",
+                          paddingHorizontal: hs(4),
+                        }}>
+                        + ₹{extraGuestAmount} for {extraGuestsCount} extra guest(s)
+                      </Text>
+                    )}
                   </View>
 
                   {/* Group Type / Room Type */}
@@ -1188,7 +1212,16 @@ export const StaycationOfflineBookingSheet = ({
             ? new Date()
             : new Date(new Date(checkInDate).setDate(checkInDate.getDate() + 1))
         }
-        blockedDates={blockedDates}
+        blockedDates={
+          showDatePicker === "out"
+            ? blockedDates.filter(d => {
+                const dateObj = new Date(d);
+                dateObj.setDate(dateObj.getDate() - 1);
+                const prevDateStr = formatYMD(dateObj);
+                return blockedDates.includes(prevDateStr);
+              })
+            : blockedDates
+        }
         bookingDots={bookingDots}
       />
     </>
@@ -1409,7 +1442,6 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: hs(16),
     paddingTop: vs(12),
-    paddingBottom: vs(32),
     backgroundColor: COLORS.background,
   },
   bookNowBtn: {
