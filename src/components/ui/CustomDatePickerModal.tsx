@@ -10,6 +10,8 @@ interface CustomDatePickerModalProps {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   minDate?: Date;
+  blockedDates?: string[];
+  bookingDots?: Record<string, { key: string; color: string }[]>;
 }
 
 export const CustomDatePickerModal: React.FC<CustomDatePickerModalProps> = ({
@@ -18,6 +20,8 @@ export const CustomDatePickerModal: React.FC<CustomDatePickerModalProps> = ({
   selectedDate,
   onSelectDate,
   minDate = new Date(),
+  blockedDates = [],
+  bookingDots = {},
 }) => {
   const getLocalISODate = (date: Date) => {
     const year = date.getFullYear();
@@ -34,13 +38,36 @@ export const CustomDatePickerModal: React.FC<CustomDatePickerModalProps> = ({
             current={getLocalISODate(selectedDate)}
             minDate={getLocalISODate(minDate)}
             onDayPress={(day: any) => {
+              const dateStr = day.dateString;
+              if (blockedDates.includes(dateStr)) return;
               onSelectDate(new Date(day.year, day.month - 1, day.day));
               onClose();
             }}
+            markingType={"multi-dot"}
             markedDates={{
+              ...Object.keys(bookingDots).reduce((acc, date) => {
+                acc[date] = { dots: bookingDots[date] };
+                return acc;
+              }, {} as any),
+              ...blockedDates.reduce((acc, date) => {
+                acc[date] = {
+                  ...(bookingDots[date] ? { dots: bookingDots[date] } : {}),
+                  disabled: true,
+                  disableTouchEvent: true,
+                  textColor: "#d9e1e8",
+                };
+                return acc;
+              }, {} as any),
               [getLocalISODate(selectedDate)]: {
+                ...(bookingDots[getLocalISODate(selectedDate)]
+                  ? { dots: bookingDots[getLocalISODate(selectedDate)] }
+                  : {}),
+                ...(blockedDates.includes(getLocalISODate(selectedDate))
+                  ? { disabled: true, disableTouchEvent: true }
+                  : {}),
                 selected: true,
-                selectedColor: COLORS.primary,
+                selectedColor: "#000000",
+                selectedTextColor: "#FFFFFF",
               },
             }}
             theme={{

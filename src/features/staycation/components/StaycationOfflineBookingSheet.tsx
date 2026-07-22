@@ -22,7 +22,7 @@ import { User, Phone, Wallet, ArrowLeft, Users, X, Calendar } from "lucide-react
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/theme";
-import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import { CustomDatePickerModal } from "@/components/ui/CustomDatePickerModal";
 import { supabase } from "@/lib/supabase";
 import { useCreateStaycationOfflineBooking } from "../hooks/useCreateStaycationOfflineBooking";
 
@@ -121,6 +121,7 @@ export const StaycationOfflineBookingSheet = ({
   const [phone, setPhone] = useState("");
   const [totalPayment, setTotalPayment] = useState("");
   const [advancePaid, setAdvancePaid] = useState("");
+  const [isAdvanceActive, setIsAdvanceActive] = useState(false);
 
   const [checkInDate, setCheckInDate] = useState(new Date());
   const [checkOutDate, setCheckOutDate] = useState(
@@ -144,6 +145,9 @@ export const StaycationOfflineBookingSheet = ({
 
   const [roomConfigs, setRoomConfigs] = useState<Record<string, RoomConfig>>({});
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [bookingDots, setBookingDots] = useState<Record<string, { key: string; color: string }[]>>(
+    {},
+  );
   const [availableUnitsForCurrentDates, setAvailableUnitsForCurrentDates] = useState<number>(1);
   const [farmhouseConfig, setFarmhouseConfig] = useState<{
     basePrice: number;
@@ -315,6 +319,8 @@ export const StaycationOfflineBookingSheet = ({
 
       if (isFarmhouse) {
         const dates = new Set<string>();
+        const newBookingDots: Record<string, { key: string; color: string }[]> = {};
+
         const { data: blocks } = await supabase
           .from("staycation_availability")
           .select("date")
@@ -325,7 +331,7 @@ export const StaycationOfflineBookingSheet = ({
 
         const { data: bookings } = await supabase
           .from("staycation_bookings")
-          .select("check_in_date, check_out_date")
+          .select("check_in_date, check_out_date, booking_source")
           .eq("venue_id", venueId)
           .eq("booking_type", "full_property")
           .neq("booking_status", "cancelled")
@@ -334,8 +340,14 @@ export const StaycationOfflineBookingSheet = ({
         bookings?.forEach(b => {
           let curr = new Date(b.check_in_date);
           const end = new Date(b.check_out_date);
+          const dotColor = b.booking_source === "offline" ? "red" : "blue";
+
           while (curr < end) {
-            dates.add(formatYMD(curr));
+            const dateStr = formatYMD(curr);
+            dates.add(dateStr);
+            if (!newBookingDots[dateStr]) newBookingDots[dateStr] = [];
+            // Adding a single dot per booking day to keep it clean for Farmhouse
+            newBookingDots[dateStr].push({ key: `booking_${Math.random()}`, color: dotColor });
             curr.setDate(curr.getDate() + 1);
           }
         });
@@ -355,6 +367,7 @@ export const StaycationOfflineBookingSheet = ({
         });
 
         setBlockedDates(Array.from(dates));
+        setBookingDots(newBookingDots);
       } else {
         if (!roomType) return;
 
@@ -374,9 +387,11 @@ export const StaycationOfflineBookingSheet = ({
         }
 
         const dateCounts: Record<string, number> = {};
+        const newBookingDots: Record<string, { key: string; color: string }[]> = {};
+
         const { data: bookings } = await supabase
           .from("staycation_bookings")
-          .select("check_in_date, check_out_date, unit_count")
+          .select("check_in_date, check_out_date, unit_count, booking_source")
           .eq("venue_id", venueId)
           .in("room_id", roomIds)
           .neq("booking_status", "cancelled")
@@ -385,9 +400,19 @@ export const StaycationOfflineBookingSheet = ({
         bookings?.forEach(b => {
           let curr = new Date(b.check_in_date);
           const end = new Date(b.check_out_date);
+          const dotColor = b.booking_source === "offline" ? "red" : "blue";
+          const units = b.unit_count || 1;
+
           while (curr < end) {
             const dStr = formatYMD(curr);
-            dateCounts[dStr] = (dateCounts[dStr] || 0) + (b.unit_count || 1);
+            dateCounts[dStr] = (dateCounts[dStr] || 0) + units;
+
+            if (!newBookingDots[dStr]) newBookingDots[dStr] = [];
+            // Add one dot per unit booked or just one per booking
+            for (let i = 0; i < Math.min(units, 3); i++) {
+              newBookingDots[dStr].push({ key: `booking_${Math.random()}`, color: dotColor });
+            }
+
             curr.setDate(curr.getDate() + 1);
           }
         });
@@ -399,6 +424,7 @@ export const StaycationOfflineBookingSheet = ({
           }
         }
         setBlockedDates(fullDates);
+        setBookingDots(newBookingDots);
       }
     };
 
@@ -447,30 +473,28 @@ export const StaycationOfflineBookingSheet = ({
       setName("");
       setPhone("");
       setAdvancePaid("");
+      setIsAdvanceActive(false);
     }
   }, [isFarmhouse, visible]);
 
   useEffect(() => {
-    if (!visible || isFarmhouse || !venueId || !roomType) return;
-    const findFirstAvailableDate = async () => {
+    if (!visible) return;
+
+    const currentCheckInStr = formatYMD(checkInDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkInTime = new Date(checkInDate);
+    checkInTime.setHours(0, 0, 0, 0);
+
+    if (blockedDates.includes(currentCheckInStr) || checkInTime < today) {
       let checkDate = new Date();
-      for (let i = 0; i < 30; i++) {
+      if (checkInTime > checkDate) {
+        checkDate = new Date(checkInDate);
+      }
+
+      for (let i = 0; i < 60; i++) {
         const dStr = formatYMD(checkDate);
-        const { data: bookings } = await supabase
-          .from("staycation_bookings")
-          .select("check_in_date, check_out_date, unit_count")
-          .eq("venue_id", venueId)
-          .neq("booking_status", "cancelled")
-          .lte("check_in_date", dStr)
-          .gt("check_out_date", dStr);
-
-        const totalOccupied = bookings?.reduce((acc, b) => acc + (b.unit_count || 1), 0) || 0;
-        const totalInventory = Object.values(roomConfigs).reduce(
-          (acc, c) => acc + c.totalInventory,
-          0,
-        );
-
-        if (totalOccupied < totalInventory) {
+        if (!blockedDates.includes(dStr)) {
           setCheckInDate(checkDate);
           const tomorrow = new Date(checkDate);
           tomorrow.setDate(tomorrow.getDate() + 1);
@@ -479,9 +503,8 @@ export const StaycationOfflineBookingSheet = ({
         }
         checkDate.setDate(checkDate.getDate() + 1);
       }
-    };
-    findFirstAvailableDate();
-  }, [visible, isFarmhouse, venueId, roomType, roomConfigs]);
+    }
+  }, [visible, blockedDates, checkInDate]);
 
   const handleDropdownSelect = (option: string) => {
     if (!activeDropdown) return;
@@ -619,65 +642,63 @@ export const StaycationOfflineBookingSheet = ({
     }
   };
 
-  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (event.type === "set" && selectedDate) {
-      const dateStr = formatYMD(selectedDate);
-      if (showDatePicker === "in") {
-        if (blockedDates.includes(dateStr)) {
-          Alert.alert("Date Unavailable", "Not enough rooms available for the selected dates.");
-          setShowDatePicker(null);
-          return;
+  const onDateChange = (selectedDate: Date) => {
+    const dateStr = formatYMD(selectedDate);
+    if (showDatePicker === "in") {
+      if (blockedDates.includes(dateStr)) {
+        Alert.alert("Date Unavailable", "Not enough rooms available for the selected dates.");
+        setShowDatePicker(null);
+        return;
+      }
+      const newCheckIn = selectedDate;
+      const nextDay = new Date(selectedDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      setCheckInDate(newCheckIn);
+      setCheckOutDate(nextDay);
+      const tomorrow = new Date(selectedDate);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      if (selectedDate >= checkOutDate) {
+        setCheckOutDate(tomorrow);
+      } else {
+        let hasBlock = false;
+        let curr = new Date(selectedDate);
+        while (curr < checkOutDate) {
+          if (blockedDates.includes(formatYMD(curr))) {
+            hasBlock = true;
+            break;
+          }
+          curr.setDate(curr.getDate() + 1);
         }
-        const newCheckIn = selectedDate;
-        const nextDay = new Date(selectedDate);
-        nextDay.setDate(nextDay.getDate() + 1);
-
-        setCheckInDate(newCheckIn);
-        setCheckOutDate(nextDay);
-        const tomorrow = new Date(selectedDate);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        if (selectedDate >= checkOutDate) {
+        if (hasBlock) {
+          Alert.alert(
+            "Range Adjusted",
+            "Your previous check-out date overlapped with booked dates. It has been automatically adjusted.",
+          );
           setCheckOutDate(tomorrow);
-        } else {
-          let hasBlock = false;
-          let curr = new Date(selectedDate);
-          while (curr < checkOutDate) {
-            if (blockedDates.includes(formatYMD(curr))) {
-              hasBlock = true;
-              break;
-            }
-            curr.setDate(curr.getDate() + 1);
-          }
-          if (hasBlock) {
-            Alert.alert(
-              "Range Adjusted",
-              "Your previous check-out date overlapped with booked dates. It has been automatically adjusted.",
-            );
-            setCheckOutDate(tomorrow);
-          }
         }
-      } else if (showDatePicker === "out") {
-        if (selectedDate <= checkInDate) {
-          Alert.alert("Invalid Date", "Check-out date must be after check-in date.");
+      }
+    } else if (showDatePicker === "out") {
+      if (selectedDate <= checkInDate) {
+        Alert.alert("Invalid Date", "Check-out date must be after check-in date.");
+      } else {
+        let hasBlock = false;
+        let curr = new Date(checkInDate);
+        while (curr < selectedDate) {
+          if (blockedDates.includes(formatYMD(curr))) {
+            hasBlock = true;
+            break;
+          }
+          curr.setDate(curr.getDate() + 1);
+        }
+        if (hasBlock) {
+          Alert.alert(
+            "Date Unavailable",
+            "The selected date range contains days without enough available rooms.",
+          );
         } else {
-          let hasBlock = false;
-          let curr = new Date(checkInDate);
-          while (curr < selectedDate) {
-            if (blockedDates.includes(formatYMD(curr))) {
-              hasBlock = true;
-              break;
-            }
-            curr.setDate(curr.getDate() + 1);
-          }
-          if (hasBlock) {
-            Alert.alert(
-              "Date Unavailable",
-              "The selected date range contains days without enough available rooms.",
-            );
-          } else {
-            setCheckOutDate(selectedDate);
-          }
+          setCheckOutDate(selectedDate);
         }
       }
     }
@@ -698,6 +719,7 @@ export const StaycationOfflineBookingSheet = ({
           <View style={styles.sheetContainer}>
             <ScrollView
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.scrollContent}>
               {/* Header */}
               <View style={styles.header}>
@@ -960,6 +982,7 @@ export const StaycationOfflineBookingSheet = ({
                           placeholderTextColor="#8C8C8C"
                           keyboardType="numeric"
                           value={advancePaid}
+                          onFocus={() => setIsAdvanceActive(true)}
                           onChangeText={text => {
                             const val = parseFloat(text) || 0;
                             const total = parseFloat(totalPayment) || 0;
@@ -972,7 +995,7 @@ export const StaycationOfflineBookingSheet = ({
                   </View>
                 </View>
 
-                {parseFloat(advancePaid) > 0 ? (
+                {isAdvanceActive || parseFloat(advancePaid) > 0 ? (
                   <View style={{ marginTop: vs(16) }}>
                     <Text weight="bold" style={styles.inputLabelText}>
                       Method
@@ -1155,19 +1178,19 @@ export const StaycationOfflineBookingSheet = ({
         </TouchableWithoutFeedback>
       </Modal>
 
-      {showDatePicker && (
-        <DateTimePicker
-          value={showDatePicker === "in" ? checkInDate : checkOutDate}
-          mode="date"
-          display="default"
-          onChange={onDateChange}
-          minimumDate={
-            showDatePicker === "in"
-              ? new Date()
-              : new Date(new Date(checkInDate).setDate(checkInDate.getDate() + 1))
-          }
-        />
-      )}
+      <CustomDatePickerModal
+        isVisible={!!showDatePicker}
+        onClose={() => setShowDatePicker(null)}
+        selectedDate={showDatePicker === "in" ? checkInDate : checkOutDate}
+        onSelectDate={onDateChange}
+        minDate={
+          showDatePicker === "in"
+            ? new Date()
+            : new Date(new Date(checkInDate).setDate(checkInDate.getDate() + 1))
+        }
+        blockedDates={blockedDates}
+        bookingDots={bookingDots}
+      />
     </>
   );
 };
@@ -1331,7 +1354,7 @@ const styles = StyleSheet.create({
     resizeMode: "contain",
   },
   methodIconSelected: {
-    tintColor: "#FFFFFF",
+    tintColor: "",
   },
   methodText: {
     fontFamily: "Gilroy-SemiBold",

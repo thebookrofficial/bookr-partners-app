@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     marginBottom: vs(2),
   },
   phoneText: {
-    fontSize: fs(16),
+    fontSize: fs(18),
     color: "#6B7280",
   },
   paymentBadge: {
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     width: ms(32),
     height: ms(32),
     borderRadius: ms(6),
-    backgroundColor: "#E8F0FE",
+    // backgroundColor: "#E8F0FE",
     alignItems: "center",
     justifyContent: "center",
     marginRight: hs(8),
