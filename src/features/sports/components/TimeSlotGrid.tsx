@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useMemo, memo } from "react";
+import React, { useState, useMemo, memo, useEffect, useCallback } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { View, StyleSheet, TouchableOpacity, LayoutChangeEvent } from "react-native";
 import { Text } from "@/components/ui";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
@@ -72,6 +73,33 @@ const SlotPill = memo(
 // ----------------------------------------------------
 const SlotAccordion = memo(({ title, data, selectedDate, onSlotPress, slotWidth }: any) => {
   const [isOpen, setIsOpen] = useState(true);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadState = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(`@TimeSlotGrid_isOpen_${title}`);
+        if (stored !== null) {
+          setIsOpen(stored === "true");
+        }
+      } catch (e) {
+        // ignore
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    loadState();
+  }, [title]);
+
+  const toggleOpen = useCallback(async () => {
+    const newValue = !isOpen;
+    setIsOpen(newValue);
+    try {
+      await AsyncStorage.setItem(`@TimeSlotGrid_isOpen_${title}`, newValue.toString());
+    } catch (e) {
+      // ignore
+    }
+  }, [isOpen, title]);
 
   const now = new Date();
   const isToday =
@@ -87,7 +115,7 @@ const SlotAccordion = memo(({ title, data, selectedDate, onSlotPress, slotWidth 
     <View style={styles.accordionContainer}>
       <TouchableOpacity
         style={[styles.accordionHeader, isOpen && { marginBottom: vs(12) }]}
-        onPress={() => setIsOpen(!isOpen)}
+        onPress={toggleOpen}
         activeOpacity={0.7}>
         <Text style={styles.accordionTitle}>{title}</Text>
         <View style={styles.accordionActionWrapper}>
@@ -100,7 +128,7 @@ const SlotAccordion = memo(({ title, data, selectedDate, onSlotPress, slotWidth 
         </View>
       </TouchableOpacity>
 
-      {isOpen && (
+      {isOpen && isLoaded && (
         <View style={styles.grid}>
           {data.map((slot: TimeSlotData) => {
             let isPast = false;

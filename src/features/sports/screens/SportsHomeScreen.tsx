@@ -560,8 +560,8 @@ const styles = StyleSheet.create({
   bookingsContainer: { marginTop: vs(8), width: "100%" },
   fab: {
     position: "absolute",
-    right: hs(16),
-    bottom: vs(160),
+    right: hs(10),
+    bottom: vs(140),
     width: ms(58),
     height: ms(58),
     borderRadius: ms(29),

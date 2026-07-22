@@ -233,6 +233,21 @@ export const RescheduleBookingScreen = () => {
 
     if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) return;
 
+    const origStartIdx = booking?.sports_slots?.start_time
+      ? HOURS.indexOf(formatHour(booking.sports_slots.start_time))
+      : -1;
+    const origEndIdx = booking?.sports_slots?.end_time
+      ? HOURS.indexOf(formatHour(booking.sports_slots.end_time))
+      : -1;
+    const origDurationSlots =
+      origStartIdx !== -1 && origEndIdx !== -1 ? origEndIdx - origStartIdx : -1;
+    const newDurationSlots = endIdx - startIdx;
+
+    if (newDurationSlots === origDurationSlots && booking?.total_amount) {
+      setTotalPrice(booking.total_amount.toString());
+      return;
+    }
+
     const selectedHours = HOURS.slice(startIdx, endIdx);
     let total = 0;
     const durationMultiplier = pricing.slotDurationMinutes ? pricing.slotDurationMinutes / 60 : 1;
@@ -250,7 +265,16 @@ export const RescheduleBookingScreen = () => {
     });
 
     setTotalPrice(total.toString());
-  }, [fromTime, toTime, pricing, HOURS]);
+  }, [
+    fromTime,
+    toTime,
+    pricing,
+    HOURS,
+    booking?.sports_slots?.start_time,
+    booking?.sports_slots?.end_time,
+    booking?.total_amount,
+    formatHour,
+  ]);
 
   const handleConfirmReschedule = async () => {
     if (fromTime === "Start Time" || toTime === "End Time") {
@@ -272,6 +296,10 @@ export const RescheduleBookingScreen = () => {
     (async () => {
       const trace = await perf().startTrace("reschedule_booking");
       try {
+        const parsedAdvance = Number(advanceAmount) || 0;
+        const prevPaid = booking?.paid_amount || 0;
+        const newAdvanceToAdd = Math.max(0, parsedAdvance - prevPaid);
+
         await SportsService.rescheduleBookingWithRange({
           bookingId,
           venueId,
@@ -280,7 +308,8 @@ export const RescheduleBookingScreen = () => {
           fromTime,
           toTime,
           totalPrice: Number(totalPrice),
-          addAmount: Number(advanceAmount),
+          addAmount: newAdvanceToAdd,
+          paymentMethod: newAdvanceToAdd > 0 ? paymentMethod : undefined,
           slotDurationMinutes: pricing.slotDurationMinutes,
         });
 
@@ -527,7 +556,7 @@ export const RescheduleBookingScreen = () => {
                       <TouchableOpacity
                         onPress={() => {
                           setIsAddingPayment(false);
-                          setAdvanceAmount("");
+                          setAdvanceAmount(booking?.paid_amount?.toString() || "");
                         }}>
                         <Text variant="body2" weight="bold" style={styles.cancelText}>
                           - Cancel

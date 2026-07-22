@@ -190,11 +190,24 @@ export const useBookingDetails = (bookingId: string, idChain?: string[]) => {
 
         setBooking(aggregatedBooking);
 
-        // 5. Fetch Payment Logs Ledger for ALL bookings in the chain
+        let allRelatedBookingIds = [...aggregatedBooking.idChain];
+
+        if (aggregatedBooking.booking_group_id) {
+          const { data: groupBookings } = await supabase
+            .from("sports_bookings")
+            .select("id")
+            .eq("booking_group_id", aggregatedBooking.booking_group_id);
+
+          if (groupBookings) {
+            allRelatedBookingIds = groupBookings.map(b => b.id);
+          }
+        }
+
+        // 5. Fetch Payment Logs Ledger for ALL bookings in the chain/group
         const { data: logsData, error: logsError } = await supabase
           .from("offline_payment_logs")
           .select("id, amount, payment_mode, note, created_at")
-          .in("booking_id", aggregatedBooking.idChain)
+          .in("booking_id", allRelatedBookingIds)
           .eq("booking_vertical", "sports")
           .order("created_at", { ascending: true });
 

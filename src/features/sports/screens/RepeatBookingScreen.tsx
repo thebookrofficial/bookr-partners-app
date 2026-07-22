@@ -289,6 +289,7 @@ export const RepeatBookingScreen = () => {
           endTime24,
           numericTotal: Number(totalPrice),
           advancePaid: Number(advanceAmount),
+          paymentMethod: Number(advanceAmount) > 0 ? paymentMethod : undefined,
           guestName: booking.guest_name || "Guest",
           guestPhone: booking.guest_phone || "",
           bookingSource: booking.booking_source || "vendor_app",

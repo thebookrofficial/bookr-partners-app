@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, DetailsSkeleton } from "@/components/ui";
-import { Clock, Trash2, X, ChevronLeft, ChevronRight, Phone } from "lucide-react-native";
+import { Clock, Trash2, X, ChevronLeft, Phone, ChevronUp, ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
@@ -134,6 +134,24 @@ export const BookingDetailsScreen = () => {
   };
 
   const isOnline = booking.booking_source === "online" || !!booking.user_id;
+
+  const getSourceDisplay = () => {
+    const source = booking.booking_source?.toLowerCase();
+    if (source === "offline") {
+      return { text: "Offline", bg: "#FDE8E8", color: "#E55959" };
+    }
+    if (source === "online" || !!booking.user_id) {
+      return { text: "Online", bg: "#E8F0FE", color: "#4A80F0" };
+    }
+    return {
+      text: booking.booking_source
+        ? booking.booking_source.charAt(0).toUpperCase() + booking.booking_source.slice(1)
+        : "Unknown",
+      bg: "#F3F4F6",
+      color: "#6B7280",
+    };
+  };
+  const statusStyle = getSourceDisplay();
 
   const handleSavePayment = async () => {
     const amountAdded = parseFloat(paymentInput) || 0;
@@ -327,8 +345,10 @@ export const BookingDetailsScreen = () => {
           <Text variant="body2" style={styles.profilePhone}>
             {guestPhone}
           </Text>
-          <View style={styles.onlineBadge}>
-            <Text style={styles.onlineBadgeText}>Online</Text>
+          <View style={[styles.onlineBadge, { backgroundColor: statusStyle.bg }]}>
+            <Text style={[styles.onlineBadgeText, { color: statusStyle.color }]}>
+              {statusStyle.text}
+            </Text>
           </View>
         </View>
         <View style={styles.profileActions}>
@@ -582,9 +602,9 @@ export const BookingDetailsScreen = () => {
               </Text>
             </View>
             {showPaymentHistory ? (
-              <ChevronRight size={ms(24)} color={COLORS.text.primary} />
+              <ChevronUp size={ms(24)} color={COLORS.text.primary} />
             ) : (
-              <ChevronRight size={ms(24)} color={COLORS.text.primary} />
+              <ChevronDown size={ms(24)} color={COLORS.text.primary} />
             )}
           </TouchableOpacity>
           {showPaymentHistory && (

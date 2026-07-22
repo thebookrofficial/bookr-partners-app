@@ -152,7 +152,7 @@ const SportsTabNavigator = () => {
         <SportsTab.Screen
           name="SportsEssentials"
           component={SportsEssentialsScreen}
-          options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
+          options={{ title: "More", tabBarIcon: TabIcon(MoreHorizontal) }}
         />
       )}
       {/* Profile can be accessed by everyone */}
