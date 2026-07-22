@@ -113,7 +113,15 @@ export const RescheduleBookingScreen = () => {
         });
 
         const formattedBooked = (data || [])
-          .filter((slot: any) => slot.status !== "available")
+          .filter((slot: any) => {
+            if (slot.status !== "available") {
+              if (booking?.slotIdChain?.includes(slot.id)) {
+                return false; // Treat as available for this specific booking
+              }
+              return true;
+            }
+            return false;
+          })
           .map((slot: any) => {
             const [h, m] = slot.start_time.split(":");
             const hourInt = parseInt(h, 10);
@@ -134,7 +142,13 @@ export const RescheduleBookingScreen = () => {
       }
     };
     fetchSlotsData();
-  }, [rescheduleDate, selectedGroundId, venueId, pricing.slotDurationMinutes]);
+  }, [
+    rescheduleDate,
+    selectedGroundId,
+    venueId,
+    pricing.slotDurationMinutes,
+    booking?.slotIdChain,
+  ]);
 
   const possibleBookableSlots = useMemo(() => {
     if (fromTime === "Start Time" || !fromTime) return [];

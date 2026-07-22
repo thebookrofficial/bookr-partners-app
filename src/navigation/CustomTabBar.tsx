@@ -6,10 +6,12 @@ import { View, StyleSheet, TouchableOpacity, Animated, InteractionManager } from
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
+import { useServiceStore } from "@/store/serviceStore";
 
 export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const insets = useSafeAreaInsets();
   const { routes } = state;
+  const { isTabBarVisible } = useServiceStore();
 
   // Filter out any hidden screens
   const visibleRoutes = routes.filter((route: any) => {
@@ -36,8 +38,17 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const widthAnim = useRef(new Animated.Value(73)).current;
   const capsuleOpacity = useRef(new Animated.Value(1)).current;
   const profileWidth = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
 
   const profileIndex = routes.indexOf(profileRoute);
+
+  useEffect(() => {
+    Animated.timing(translateY, {
+      toValue: isTabBarVisible ? 0 : vs(100),
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [isTabBarVisible, translateY]);
 
   useEffect(() => {
     InteractionManager.runAfterInteractions(() => {
@@ -184,7 +195,11 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   };
 
   return (
-    <View style={[styles.tabBarContainer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
+    <Animated.View
+      style={[
+        styles.tabBarContainer,
+        { paddingBottom: Math.max(insets.bottom, vs(16)), transform: [{ translateY }] },
+      ]}>
       <View style={styles.capsuleContainer}>
         <Animated.View
           style={[
@@ -215,7 +230,7 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
         })}
       </View>
       {profileRoute && renderTab(profileRoute, true)}
-    </View>
+    </Animated.View>
   );
 };
 

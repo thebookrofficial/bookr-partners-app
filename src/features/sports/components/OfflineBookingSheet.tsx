@@ -652,7 +652,7 @@ export const OfflineBookingSheet = ({
                       isInput={true}
                       keyboardType="numeric"
                       onChangeText={(text: string) => setTotalPayment(text.replace(/[^\d.]/g, ""))}
-                      hasBorder={true}
+                      hasBorder={false}
                     />
                   </View>
                   <View style={styles.flex1}>
@@ -684,7 +684,7 @@ export const OfflineBookingSheet = ({
                           setAdvancePaid(clean);
                         }
                       }}
-                      hasBorder={true}
+                      hasBorder={false}
                     />
                   </View>
                 </View>

@@ -1,8 +1,17 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useMemo, useState } from "react";
-import { View, StyleSheet, TouchableOpacity, FlatList, RefreshControl, Alert } from "react-native";
+import React, { useMemo, useState, useRef } from "react";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  RefreshControl,
+  Alert,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from "react-native";
 import { Text, StaycationBookingsListSkeleton } from "@/components/ui";
 import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
@@ -24,7 +33,26 @@ interface StaycationFarmhouseContentProps {
 type ListEntry = { type: "header"; title: string } | { type: "booking"; data: StaycationBooking };
 
 export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhouseContentProps) => {
-  const { activeVenueName } = useServiceStore();
+  const { activeVenueName, setTabBarVisible } = useServiceStore();
+
+  const lastScrollY = useRef(0);
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    if (currentY <= 0) {
+      setTabBarVisible(true);
+      lastScrollY.current = currentY;
+      return;
+    }
+
+    if (currentY > lastScrollY.current + 10) {
+      setTabBarVisible(false);
+      lastScrollY.current = currentY;
+    } else if (currentY < lastScrollY.current - 10) {
+      setTabBarVisible(true);
+      lastScrollY.current = currentY;
+    }
+  };
   const {
     isLoading,
     markedDates,
@@ -214,6 +242,8 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
         ListFooterComponent={<View style={{ height: vs(120) }} />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

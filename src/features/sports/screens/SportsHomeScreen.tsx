@@ -9,6 +9,7 @@ import {
   LayoutAnimation,
   UIManager,
   Platform,
+  Pressable,
 } from "react-native";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -188,210 +189,222 @@ export const SportsHomeScreen = () => {
         backgroundColor={COLORS.background}
         paddingHorizontal={hs(12)}
         refreshing={refreshing}
-        onRefresh={onRefresh}>
-        {/* Dropdown action removed, now it functions as a static label */}
-        <ServiceHeader
-          title={venue?.name || activeVenueName}
-          subtitle="Home"
-          category={selectedCategory}
-          imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
-          showBackBtn={false}
-        />
+        onRefresh={onRefresh}
+        hideTabBarOnScroll>
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={() => {
+            if (isDropdownOpen) setIsDropdownOpen(false);
+          }}
+          accessible={false}>
+          {/* Dropdown action removed, now it functions as a static label */}
+          <ServiceHeader
+            title={venue?.name || activeVenueName}
+            subtitle="Home"
+            category={selectedCategory}
+            imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
+            showBackBtn={false}
+          />
 
-        {!loading && !venue ? (
-          <View style={styles.centerContainer}>
-            <Text
-              variant="body1"
-              weight="semiBold"
-              color={COLORS.text.muted}
-              style={styles.emptyVenueText}>
-              No {selectedCategory} facility has been set up for this club yet.
-            </Text>
-          </View>
-        ) : (
-          <>
-            <View style={[styles.dateRow, styles.dateRowZIndex]}>
-              <TouchableOpacity
-                style={styles.dateSelectorLeft}
-                onPress={() => setIsDatePickerOpen(true)}
-                activeOpacity={0.7}>
-                <CalendarIcon size={ms(24)} color={COLORS.text.primary} strokeWidth={2} />
-                <Text
-                  variant="body1"
-                  weight="bold"
-                  color={COLORS.text.primary}
-                  style={{ fontSize: fs(18) }}>
-                  {getFormattedDate(selectedDate)}
-                </Text>
-              </TouchableOpacity>
-
-              <View style={styles.dropdownToggleWrapper}>
+          {!loading && !venue ? (
+            <View style={styles.centerContainer}>
+              <Text
+                variant="body1"
+                weight="semiBold"
+                color={COLORS.text.muted}
+                style={styles.emptyVenueText}>
+                No {selectedCategory} facility has been set up for this club yet.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={[styles.dateRow, styles.dateRowZIndex]}>
                 <TouchableOpacity
-                  style={styles.dropdownToggle}
-                  activeOpacity={0.7}
-                  onPress={() => setIsDropdownOpen(!isDropdownOpen)}>
+                  style={styles.dateSelectorLeft}
+                  onPress={() => setIsDatePickerOpen(true)}
+                  activeOpacity={0.7}>
+                  <CalendarIcon size={ms(24)} color={COLORS.text.primary} strokeWidth={2} />
                   <Text
                     variant="body1"
-                    weight="semiBold"
-                    color={COLORS.text.inverse}
-                    style={{ fontSize: fs(16) }}>
-                    {selectedView === "Today Bookings" ? "Today" : "Upcoming"}
+                    weight="bold"
+                    color={COLORS.text.primary}
+                    style={{ fontSize: fs(18) }}>
+                    {getFormattedDate(selectedDate)}
                   </Text>
-                  {isDropdownOpen ? (
-                    <ChevronUp size={ms(20)} color={COLORS.text.inverse} strokeWidth={2.5} />
-                  ) : (
-                    <ChevronDown size={ms(20)} color={COLORS.text.inverse} strokeWidth={2.5} />
-                  )}
                 </TouchableOpacity>
 
-                {isDropdownOpen && (
-                  <View style={styles.dropdownPopover}>
-                    <View style={styles.popoverHeader}>
-                      <Text variant="body1" weight="bold" style={styles.popoverTitle}>
-                        Type
-                      </Text>
-                      <TouchableOpacity onPress={() => setIsDropdownOpen(false)}>
-                        <X size={ms(20)} color="#000" />
+                <View style={styles.dropdownToggleWrapper}>
+                  <TouchableOpacity
+                    style={styles.dropdownToggle}
+                    activeOpacity={0.7}
+                    onPress={() => setIsDropdownOpen(!isDropdownOpen)}>
+                    <Text
+                      variant="body1"
+                      weight="semiBold"
+                      color={COLORS.text.inverse}
+                      style={{ fontSize: fs(16) }}>
+                      {selectedView === "Today Bookings" ? "Today" : "Upcoming"}
+                    </Text>
+                    {isDropdownOpen ? (
+                      <ChevronUp size={ms(20)} color={COLORS.text.inverse} strokeWidth={2.5} />
+                    ) : (
+                      <ChevronDown size={ms(20)} color={COLORS.text.inverse} strokeWidth={2.5} />
+                    )}
+                  </TouchableOpacity>
+
+                  {isDropdownOpen && (
+                    <View style={styles.dropdownPopover}>
+                      <View style={styles.popoverHeader}>
+                        <Text variant="body1" weight="bold" style={styles.popoverTitle}>
+                          Type
+                        </Text>
+                        <TouchableOpacity onPress={() => setIsDropdownOpen(false)}>
+                          <X size={ms(20)} color="#000" />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.popoverDivider} />
+                      <TouchableOpacity
+                        style={[
+                          styles.popoverItem,
+                          selectedView === "Today Bookings" && styles.popoverItemActive,
+                        ]}
+                        onPress={() => {
+                          setSelectedDate(new Date());
+                          setSelectedView("Today Bookings");
+                          setIsDropdownOpen(false);
+                        }}>
+                        <Text variant="body1" weight="medium" style={styles.popoverItemText}>
+                          Today
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.popoverItem,
+                          (selectedView === "Upcoming Bookings" || selectedView === "Bookings") &&
+                            styles.popoverItemActive,
+                        ]}
+                        onPress={() => {
+                          setSelectedView("Upcoming Bookings");
+                          setIsDropdownOpen(false);
+                        }}>
+                        <Text variant="body1" weight="medium" style={styles.popoverItemText}>
+                          Upcoming
+                        </Text>
                       </TouchableOpacity>
                     </View>
-                    <View style={styles.popoverDivider} />
-                    <TouchableOpacity
-                      style={[
-                        styles.popoverItem,
-                        selectedView === "Today Bookings" && styles.popoverItemActive,
-                      ]}
-                      onPress={() => {
-                        setSelectedDate(new Date());
-                        setSelectedView("Today Bookings");
-                        setIsDropdownOpen(false);
-                      }}>
-                      <Text variant="body1" weight="medium" style={styles.popoverItemText}>
-                        Today
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.popoverItem,
-                        (selectedView === "Upcoming Bookings" || selectedView === "Bookings") &&
-                          styles.popoverItemActive,
-                      ]}
-                      onPress={() => {
-                        setSelectedView("Upcoming Bookings");
-                        setIsDropdownOpen(false);
-                      }}>
-                      <Text variant="body1" weight="medium" style={styles.popoverItemText}>
-                        Upcoming
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {grounds.length > 1 && (
-              <View style={styles.groundTabs}>
-                <PillTabs
-                  tabs={grounds.map((g: any) => g.name)}
-                  activeTab={grounds.find((g: any) => g.id === activeGroundId)?.name || ""}
-                  onTabChange={selectedName => {
-                    const selectedGround = grounds.find((g: any) => g.name === selectedName);
-                    if (selectedGround) setActiveGroundId(selectedGround.id);
-                  }}
-                  variant="primary"
-                />
-              </View>
-            )}
-
-            {(selectedView === "Today Bookings" || selectedView === "Bookings") && (
-              <>
-                <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-                  TIME SLOT
-                </Text>
-                <LegendIndicator />
-
-                {slotsLoading && slots.length === 0 ? (
-                  <View style={styles.skeletonContainer}>
-                    {Array.from({ length: 12 }).map((_, i) => (
-                      <Skeleton key={i} width="23%" height={vs(40)} borderRadius={ms(8)} />
-                    ))}
-                  </View>
-                ) : slots.length === 0 ? (
-                  <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
-                    No slots generated for this date/ground yet.
-                  </Text>
-                ) : (
-                  <TimeSlotGrid
-                    slots={slots as any}
-                    selectedDate={selectedDate}
-                    onSlotPress={slot => {
-                      if (slot.status === "booked" || slot.status === "blocked") {
-                        if (!slot.raw_start_time) return; // Prevent TS undefined error
-                        const foundBooking = bookings.find((b: any) => {
-                          if (!b.startTimeRaw || !b.endTimeRaw) return false;
-                          // Non-null assertion (!) is safe here since we just checked
-                          return (
-                            slot.raw_start_time! >= b.startTimeRaw &&
-                            slot.raw_start_time! < b.endTimeRaw
-                          );
-                        });
-
-                        if (foundBooking) {
-                          setHighlightedBookingId(foundBooking.id);
-                          setTimeout(() => setHighlightedBookingId(null), 3000);
-                        }
-                      }
-                    }}
-                  />
-                )}
-              </>
-            )}
-
-            {/* Bookings Title Removed per Figma */}
-
-            <View style={styles.bookingsContainer}>
-              {bookingsLoading && bookings.length === 0 ? (
-                <View style={{ marginTop: vs(16) }}>
-                  <ListSkeleton count={3} />
-                </View>
-              ) : bookings.length === 0 ? (
-                <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
-                  No bookings found for this date.
-                </Text>
-              ) : (
-                <>
-                  {(selectedView === "Upcoming Bookings" || selectedView === "Bookings") && (
-                    <Text variant="body2" weight="bold" style={styles.dateGroupHeader}>
-                      {getFormattedDate(selectedDate)}
-                    </Text>
                   )}
-                  {bookings.map((booking: any) => (
-                    <BookingCard
-                      key={booking.id}
-                      name={booking.name}
-                      phone={booking.phone}
-                      date={booking.date}
-                      time={booking.time}
-                      price={booking.price}
-                      status={booking.status}
-                      avatarUrl={booking.avatarUrl}
-                      isOfflineRecord={booking.isOfflineRecord}
-                      isDisabled={booking.isDisabled}
-                      isPaymentPending={booking.isPaymentPending}
-                      isHighlighted={highlightedBookingId === booking.id}
-                      onPress={() =>
-                        navigation.navigate("BookingDetails", {
-                          bookingId: booking.id,
-                          idChain: booking.idChain,
-                        })
-                      }
+                </View>
+              </View>
+
+              {grounds.length > 1 && (
+                <View style={styles.groundTabs}>
+                  <PillTabs
+                    tabs={grounds.map((g: any) => g.name)}
+                    activeTab={grounds.find((g: any) => g.id === activeGroundId)?.name || ""}
+                    onTabChange={selectedName => {
+                      const selectedGround = grounds.find((g: any) => g.name === selectedName);
+                      if (selectedGround) setActiveGroundId(selectedGround.id);
+                    }}
+                    variant="primary"
+                    fillContainer={true}
+                  />
+                </View>
+              )}
+
+              {(selectedView === "Today Bookings" || selectedView === "Bookings") && (
+                <>
+                  <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+                    TIME SLOT
+                  </Text>
+                  <LegendIndicator />
+
+                  {slotsLoading && slots.length === 0 ? (
+                    <View style={styles.skeletonContainer}>
+                      {Array.from({ length: 12 }).map((_, i) => (
+                        <Skeleton key={i} width="23%" height={vs(40)} borderRadius={ms(8)} />
+                      ))}
+                    </View>
+                  ) : slots.length === 0 ? (
+                    <Text
+                      variant="body2"
+                      color={COLORS.text.secondary}
+                      style={styles.emptySlotsText}>
+                      No slots generated for this date/ground yet.
+                    </Text>
+                  ) : (
+                    <TimeSlotGrid
+                      slots={slots as any}
+                      selectedDate={selectedDate}
+                      onSlotPress={slot => {
+                        if (slot.status === "booked" || slot.status === "blocked") {
+                          if (!slot.raw_start_time) return; // Prevent TS undefined error
+                          const foundBooking = bookings.find((b: any) => {
+                            if (!b.startTimeRaw || !b.endTimeRaw) return false;
+                            // Non-null assertion (!) is safe here since we just checked
+                            return (
+                              slot.raw_start_time! >= b.startTimeRaw &&
+                              slot.raw_start_time! < b.endTimeRaw
+                            );
+                          });
+
+                          if (foundBooking) {
+                            setHighlightedBookingId(foundBooking.id);
+                            setTimeout(() => setHighlightedBookingId(null), 3000);
+                          }
+                        }
+                      }}
                     />
-                  ))}
+                  )}
                 </>
               )}
-            </View>
-          </>
-        )}
-        <View style={{ height: vs(120) }} />
+
+              {/* Bookings Title Removed per Figma */}
+
+              <View style={styles.bookingsContainer}>
+                {bookingsLoading && bookings.length === 0 ? (
+                  <View style={{ marginTop: vs(16) }}>
+                    <ListSkeleton count={3} />
+                  </View>
+                ) : bookings.length === 0 ? (
+                  <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
+                    No bookings found for this date.
+                  </Text>
+                ) : (
+                  <>
+                    {(selectedView === "Upcoming Bookings" || selectedView === "Bookings") && (
+                      <Text variant="body2" weight="bold" style={styles.dateGroupHeader}>
+                        {getFormattedDate(selectedDate)}
+                      </Text>
+                    )}
+                    {bookings.map((booking: any) => (
+                      <BookingCard
+                        key={booking.id}
+                        name={booking.name}
+                        phone={booking.phone}
+                        date={booking.date}
+                        time={booking.time}
+                        price={booking.price}
+                        status={booking.status}
+                        avatarUrl={booking.avatarUrl}
+                        isOfflineRecord={booking.isOfflineRecord}
+                        isDisabled={booking.isDisabled}
+                        isPaymentPending={booking.isPaymentPending}
+                        isHighlighted={highlightedBookingId === booking.id}
+                        onPress={() =>
+                          navigation.navigate("BookingDetails", {
+                            bookingId: booking.id,
+                            idChain: booking.idChain,
+                          })
+                        }
+                      />
+                    ))}
+                  </>
+                )}
+              </View>
+            </>
+          )}
+          <View style={{ height: vs(120) }} />
+        </Pressable>
       </ScreenContainer>
 
       {!loading && venue && (
@@ -431,7 +444,12 @@ export const SportsHomeScreen = () => {
         onSelectDate={date => {
           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setSelectedDate(date);
-          setSelectedView("Bookings");
+          const today = new Date();
+          const isToday =
+            date.getDate() === today.getDate() &&
+            date.getMonth() === today.getMonth() &&
+            date.getFullYear() === today.getFullYear();
+          setSelectedView(isToday ? "Today Bookings" : "Bookings");
         }}
       />
     </View>

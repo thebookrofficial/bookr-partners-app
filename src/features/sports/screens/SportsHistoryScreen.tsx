@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   cardContainer: {
     backgroundColor: "#F4F7FB",
     borderRadius: ms(12),
-    padding: ms(16),
+    padding: ms(10),
     marginBottom: vs(16),
   },
   cardHeaderRow: {
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   cardDivider: {
     height: 1,
     backgroundColor: "#D4E5F9",
-    marginVertical: vs(16),
+    marginVertical: vs(8),
   },
 
   cardFooterRow: {
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
     width: ms(32),
     height: ms(32),
     borderRadius: ms(8),
-    backgroundColor: "#E4F0FF",
+    // backgroundColor: "#E4F0FF",
     justifyContent: "center",
     alignItems: "center",
     marginRight: hs(12),

@@ -10,10 +10,13 @@ import {
   Platform,
   ViewStyle,
   RefreshControl,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
 import { hs } from "@/utils/responsive.utils";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/theme";
+import { useServiceStore } from "@/store/serviceStore";
 
 export interface ScreenContainerProps {
   children: React.ReactNode;
@@ -24,6 +27,7 @@ export interface ScreenContainerProps {
   refreshing?: boolean;
   onRefresh?: () => void;
   footer?: React.ReactNode;
+  hideTabBarOnScroll?: boolean;
 }
 
 export const ScreenContainer = ({
@@ -35,8 +39,30 @@ export const ScreenContainer = ({
   refreshing = false,
   onRefresh,
   footer,
+  hideTabBarOnScroll = false,
 }: ScreenContainerProps) => {
   const Container = scrollable ? ScrollView : View;
+
+  const { setTabBarVisible } = useServiceStore();
+  const lastScrollY = React.useRef(0);
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!hideTabBarOnScroll) return;
+    const currentY = event.nativeEvent.contentOffset.y;
+    if (currentY <= 0) {
+      setTabBarVisible(true);
+      lastScrollY.current = currentY;
+      return;
+    }
+
+    if (currentY > lastScrollY.current + 10) {
+      setTabBarVisible(false);
+      lastScrollY.current = currentY;
+    } else if (currentY < lastScrollY.current - 10) {
+      setTabBarVisible(true);
+      lastScrollY.current = currentY;
+    }
+  };
 
   const containerProps = scrollable
     ? {
@@ -50,6 +76,8 @@ export const ScreenContainer = ({
             colors={[COLORS.primary]}
           />
         ) : undefined,
+        onScroll: scrollable ? handleScroll : undefined,
+        scrollEventThrottle: scrollable ? 16 : undefined,
       }
     : { style: [styles.innerContent, { paddingHorizontal }] };
 

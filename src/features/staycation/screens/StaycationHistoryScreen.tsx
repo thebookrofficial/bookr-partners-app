@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   cardContainer: {
     backgroundColor: "#F4F7FB",
     borderRadius: ms(12),
-    padding: ms(16),
+    padding: ms(10),
     marginBottom: vs(16),
   },
   cardHeaderRow: {

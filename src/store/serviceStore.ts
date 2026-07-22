@@ -19,6 +19,8 @@ interface ServiceState {
   setActiveServiceId: (id: string) => void;
   setLastSelectedService: (service: LastSelectedService | null) => void;
   setHasNavigatedInitially: (status: boolean) => void;
+  isTabBarVisible: boolean;
+  setTabBarVisible: (visible: boolean) => void;
 }
 
 export const useServiceStore = create<ServiceState>()(
@@ -41,6 +43,8 @@ export const useServiceStore = create<ServiceState>()(
       setActiveServiceId: id => set({ activeServiceId: id }),
       setLastSelectedService: service => set({ lastSelectedService: service }),
       setHasNavigatedInitially: status => set({ hasNavigatedInitially: status }),
+      isTabBarVisible: true,
+      setTabBarVisible: visible => set({ isTabBarVisible: visible }),
     }),
     {
       name: "service-storage",
