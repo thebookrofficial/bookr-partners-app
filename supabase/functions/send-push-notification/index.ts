@@ -22,6 +22,8 @@ serve(async req => {
     let title = record?.title;
     let body = record?.body;
 
+    console.error(`[START] Processing ${type} for table ${table}. venue_id: ${record?.venue_id}`);
+
     // --- HANDLE DIRECT BOOKINGS ---
     if (table && table.includes("bookings")) {
       // 1. Find the vendor (owner_id) for this booking via the venue_id
@@ -52,7 +54,7 @@ serve(async req => {
       const { data: staffProfiles, error: staffError } = await supabase
         .from("client_profiles")
         .select("user_id")
-        .eq("venue_id", record.venue_id)
+        .contains("assigned_venue_ids", [record.venue_id])
         .eq("client_role", "staff");
 
       if (staffError) {
@@ -70,10 +72,14 @@ serve(async req => {
       title = "New Booking!";
       body = "You have received a new booking.";
     } else {
+      console.error(`[SKIP] Unsupported table: ${table}`);
       return new Response(JSON.stringify({ message: "Unsupported table" }), { status: 200 });
     }
 
+    console.error(`[INFO] Found userIds: ${JSON.stringify(userIds)}`);
+
     if (userIds.length === 0) {
+      console.error(`[SKIP] No users/staff found for notification.`);
       return new Response(JSON.stringify({ message: "No users/staff found for notification" }), {
         status: 200,
       });
@@ -95,6 +101,8 @@ serve(async req => {
     // Remove duplicates
     const uniqueTokens = [...new Set(tokensToSend)];
 
+    console.error(`[INFO] Found ${uniqueTokens.length} unique tokens to send push to.`);
+
     if (uniqueTokens.length === 0) {
       console.error(`[ERROR] No valid tokens found for users: ${JSON.stringify(userIds)}`);
       return new Response(JSON.stringify({ error: "No valid tokens" }), { status: 200 });
@@ -115,16 +123,20 @@ serve(async req => {
           token,
           notification: { title, body },
           android: {
-            priority: "high",
+            priority: "HIGH", // Must be capitalized in FCM v1 API to wake device from Doze mode
             notification: {
-              channelId: "booking_alerts_v2", // Plays the custom sound!
+              channel_id: "booking_alerts_v2", // Plays the custom sound!
               sound: "notification_audio", // Don't use .wav extension in FCM payload
             },
           },
           apns: {
+            headers: {
+              "apns-priority": "10", // 10 is required for immediate delivery
+              "apns-push-type": "alert",
+            },
             payload: {
               aps: {
-                contentAvailable: true,
+                "content-available": 1,
                 sound: "default",
               },
             },
@@ -147,12 +159,16 @@ serve(async req => {
       const responseData = await res.json();
       if (!res.ok) {
         console.error(`[FCM ERROR for token ${token}]`, responseData);
+      } else {
+        console.error(`[FCM SUCCESS for token ${token}]`, responseData);
       }
       return { token, ok: res.ok, data: responseData };
     });
 
     const sendResults = await Promise.all(sendPromises);
     const successCount = sendResults.filter(r => r.ok).length;
+
+    // console.log(`[DONE] Successfully sent ${successCount}/${uniqueTokens.length} notifications.`);
 
     return new Response(
       JSON.stringify({
