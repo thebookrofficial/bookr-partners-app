@@ -118,8 +118,8 @@ export const ScreenContainer = ({
         <Container {...containerProps} style={!scrollable ? containerProps.style : undefined}>
           <View style={[styles.wrapper, style]}>{children}</View>
         </Container>
-        {footer && <View style={styles.footerContainer}>{footer}</View>}
       </KeyboardAvoidingView>
+      {footer && <View style={styles.footerContainer}>{footer}</View>}
     </SafeAreaView>
   );
 };

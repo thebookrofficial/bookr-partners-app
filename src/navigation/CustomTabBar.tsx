@@ -2,14 +2,7 @@
 // Confidential and Proprietary.
 
 import React, { useEffect, useState, useRef } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  InteractionManager,
-  Easing,
-} from "react-native";
+import { View, StyleSheet, TouchableOpacity, Animated } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -20,9 +13,15 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const { routes } = state;
   const { isTabBarVisible, setTabBarVisible } = useServiceStore();
 
+  const [activeTabIndex, setActiveTabIndex] = useState<number>(state.index);
+
   useEffect(() => {
     setTabBarVisible(true);
   }, [state.index, setTabBarVisible]);
+
+  useEffect(() => {
+    setActiveTabIndex(state.index);
+  }, [state.index]);
 
   // Filter out any hidden screens
   const visibleRoutes = routes.filter((route: any) => {
@@ -46,9 +45,8 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const [layouts, setLayouts] = useState<{ [key: number]: { x: number; width: number } }>({});
 
   const translateX = useRef(new Animated.Value(0)).current;
-  const widthAnim = useRef(new Animated.Value(hs(73))).current;
   const capsuleOpacity = useRef(new Animated.Value(1)).current;
-  const profileWidth = useRef(new Animated.Value(0)).current;
+  const profileOpacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
 
   const profileIndex = routes.indexOf(profileRoute);
@@ -62,82 +60,50 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   }, [isTabBarVisible, translateY]);
 
   useEffect(() => {
-    InteractionManager.runAfterInteractions(() => {
-      const isProfileActive = state.index === profileIndex;
+    const isProfileActive = activeTabIndex === profileIndex;
 
-      if (isProfileActive) {
-        Animated.parallel([
-          Animated.timing(capsuleOpacity, {
-            toValue: 0,
-            duration: 180,
-            useNativeDriver: false,
-          }),
-          Animated.timing(widthAnim, {
-            toValue: 0,
-            duration: 180,
-            useNativeDriver: false,
-          }),
-        ]).start();
-
-        Animated.sequence([
-          Animated.timing(profileWidth, {
-            toValue: 75, // Fluid stretch out (50 + 25)
-            duration: 150,
-            useNativeDriver: false,
-            easing: Easing.out(Easing.ease),
-          }),
-          Animated.timing(profileWidth, {
-            toValue: 50, // Settle to final size
-            duration: 150,
-            useNativeDriver: false,
-            easing: Easing.in(Easing.ease),
-          }),
-        ]).start();
-      } else {
+    if (isProfileActive) {
+      Animated.parallel([
         Animated.timing(capsuleOpacity, {
-          toValue: 1,
-          duration: 180,
-          useNativeDriver: false,
-        }).start();
-
-        Animated.timing(profileWidth, {
           toValue: 0,
           duration: 150,
-          useNativeDriver: false,
-          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.spring(profileOpacity, {
+          toValue: 1,
+          tension: 140,
+          friction: 12,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(profileOpacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(capsuleOpacity, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      const activeLayout = layouts[activeTabIndex];
+      if (activeLayout) {
+        const CAPSULE_WIDTH = hs(73);
+        const targetX = activeLayout.x + (activeLayout.width - CAPSULE_WIDTH) / 2;
+
+        Animated.spring(translateX, {
+          toValue: targetX,
+          tension: 160,
+          friction: 15,
+          useNativeDriver: true,
         }).start();
-
-        const activeLayout = layouts[state.index];
-        if (activeLayout) {
-          const CAPSULE_WIDTH = hs(73);
-          const targetX = activeLayout.x + (activeLayout.width - CAPSULE_WIDTH) / 2;
-
-          Animated.parallel([
-            Animated.timing(translateX, {
-              toValue: targetX,
-              useNativeDriver: false,
-              duration: 300,
-              easing: Easing.inOut(Easing.ease),
-            }),
-            Animated.sequence([
-              Animated.timing(widthAnim, {
-                toValue: CAPSULE_WIDTH + 25, // Safely stretch mid-flight
-                duration: 150,
-                useNativeDriver: false,
-                easing: Easing.out(Easing.ease),
-              }),
-              Animated.timing(widthAnim, {
-                toValue: CAPSULE_WIDTH, // Shrink exactly back to perfect capsule
-                duration: 150,
-                useNativeDriver: false,
-                easing: Easing.in(Easing.ease),
-              }),
-            ]),
-          ]).start();
-        }
       }
-    });
-  }, [state.index, layouts, profileIndex, capsuleOpacity, profileWidth, translateX, widthAnim]);
+    }
+  }, [activeTabIndex, layouts, profileIndex, capsuleOpacity, profileOpacity, translateX]);
 
   const renderTab = (route: any, isProfile = false) => {
     const { options } = descriptors[route.key];
@@ -148,16 +114,22 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
         ? options.title
         : route.name;
 
-    const isFocused = state.index === routes.indexOf(route);
+    const routeIndex = routes.indexOf(route);
+    const isFocused = activeTabIndex === routeIndex;
 
     const onPress = () => {
+      // 1. Instantly update local state for 0ms visual feedback
+      setActiveTabIndex(routeIndex);
+
+      // 2. Emit navigation tabPress event
       const event = navigation.emit({
         type: "tabPress",
         target: route.key,
         canPreventDefault: true,
       });
 
-      if (!isFocused && !event.defaultPrevented) {
+      // 3. Navigate if allowed
+      if (state.index !== routeIndex && !event.defaultPrevented) {
         navigation.navigate({ name: route.name, merge: true });
       }
     };
@@ -173,12 +145,12 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
             style={[
               styles.profileIndicator,
               {
-                width: profileWidth,
-                left: Animated.subtract(hs(32.5), Animated.divide(profileWidth, 2)),
+                opacity: profileOpacity,
+                transform: [{ scale: profileOpacity }],
               },
             ]}
           />
-          <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.profileTabItem}>
+          <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.profileTabItem}>
             {Icon &&
               Icon({ color: isFocused ? "#63A1FD" : "#8E8E93", focused: isFocused, size: ms(24) })}
             <Text
@@ -198,7 +170,7 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
       <TouchableOpacity
         key={route.key}
         onPress={onPress}
-        activeOpacity={0.8}
+        activeOpacity={0.7}
         style={styles.capsuleTabItem}>
         {Icon &&
           Icon({ color: isFocused ? "#63A1FD" : "#8E8E93", focused: isFocused, size: ms(24) })}
@@ -222,9 +194,8 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
           style={[
             styles.capsuleIndicator,
             {
-              left: translateX,
-              width: widthAnim,
               opacity: capsuleOpacity,
+              transform: [{ translateX }],
             },
           ]}
         />
@@ -288,6 +259,8 @@ const styles = StyleSheet.create({
   },
   capsuleIndicator: {
     position: "absolute",
+    left: 0,
+    width: hs(73),
     height: vs(50),
     borderRadius: ms(25),
     backgroundColor: "#E8F0FE",
@@ -308,6 +281,7 @@ const styles = StyleSheet.create({
   },
   profileIndicator: {
     position: "absolute",
+    width: hs(50),
     height: vs(50),
     borderRadius: ms(25),
     backgroundColor: "#E8F0FE",

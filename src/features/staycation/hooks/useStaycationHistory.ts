@@ -2,10 +2,9 @@
 // Confidential and Proprietary.
 
 import { useState, useEffect, useCallback } from "react";
-import { InteractionManager } from "react-native";
 import { supabase } from "../../../lib/supabase";
-import { useAuthStore } from "../../../store";
 import { StaycationBooking } from "../types/staycation.types";
+import { useStaycationVenues } from "./useStaycationVenues";
 
 // Helper to format Date to YYYY-MM-DD
 const formatDate = (date: Date) => date.toISOString().split("T")[0];
@@ -22,7 +21,10 @@ export const useStaycationHistory = (
   dateFilter: DateFilterOption = "all",
   customRange?: { start: Date; end: Date },
 ) => {
-  const { clientProfile } = useAuthStore();
+  const { activeVenue } = useStaycationVenues({
+    initialVenueId: serviceId,
+  });
+
   const [isLoading, setIsLoading] = useState(true);
 
   // Raw bookings to filter later
@@ -38,45 +40,22 @@ export const useStaycationHistory = (
   } | null>(null);
 
   const fetchHistoryData = useCallback(async () => {
-    if (!clientProfile?.id) return;
+    if (!activeVenue?.venueId) return;
 
     try {
       setIsLoading(true);
 
-      let venueQuery = supabase
-        .from("venues")
-        .select("id, name, cover_image_url")
-        .eq("owner_id", clientProfile.id)
-        .eq("vertical", "staycation");
-
-      if (serviceId) {
-        venueQuery = venueQuery.eq("id", serviceId);
-      }
-
-      const { data: venueData, error: venueError } = await venueQuery.limit(1).maybeSingle();
-
-      if (venueError) {
-        console.error("Supabase error fetching venue:", venueError);
-        setIsLoading(false);
-        return;
-      }
-
-      if (!venueData) {
-        setIsLoading(false);
-        return;
-      }
-
       setVenue({
-        id: venueData.id,
-        name: venueData.name,
-        cover_image_url: venueData.cover_image_url,
+        id: activeVenue.venueId,
+        name: activeVenue.name,
+        cover_image_url: activeVenue.cover_image_url,
       });
 
       // Fetch Rooms for the tabs
       const { data: roomsData } = await supabase
         .from("staycation_rooms")
         .select("id, room_name")
-        .eq("venue_id", venueData.id)
+        .eq("venue_id", activeVenue.venueId)
         .eq("is_active", true);
 
       if (roomsData) {
@@ -86,11 +65,7 @@ export const useStaycationHistory = (
         ]);
       }
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      const yesterdayStr = formatDate(yesterday);
+      const todayStr = formatDate(new Date());
 
       let query = supabase
         .from("staycation_bookings")
@@ -115,20 +90,20 @@ export const useStaycationHistory = (
           profiles:user_id ( full_name, phone, avatar_url )
         `,
         )
-        .eq("venue_id", venueData.id)
-        .lte("check_in_date", yesterdayStr);
-
-      // Base History Filter: Show all bookings except cancelled ones
-      const historyFilterStr = `booking_status.neq.cancelled`;
+        .eq("venue_id", activeVenue.venueId)
+        .neq("booking_status", "cancelled")
+        .lte("check_out_date", todayStr);
 
       // Apply Date Range Filters
       if (dateFilter !== "all") {
         let fromDate = new Date();
-        let toDate = new Date(yesterday); // Default end range to yesterday for history
+        let toDate = new Date();
 
         if (dateFilter === "yesterday") {
-          fromDate = new Date(yesterday);
-          toDate = new Date(yesterday);
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          fromDate = yesterday;
+          toDate = yesterday;
         } else if (dateFilter === "3_months") {
           fromDate.setMonth(fromDate.getMonth() - 3);
         } else if (dateFilter === "6_months") {
@@ -138,24 +113,12 @@ export const useStaycationHistory = (
         } else if (dateFilter === "custom" && customRange) {
           fromDate = customRange.start;
           toDate = customRange.end;
-
-          // CAP to yesterday to prevent future bookings showing in history
-          if (toDate > yesterday) {
-            toDate = new Date(yesterday);
-          }
         }
 
         const fromStr = formatDate(fromDate);
         const toStr = formatDate(toDate);
 
-        // Apply AND condition using method chaining correctly
-        query = query
-          .or(historyFilterStr)
-          .gte("check_in_date", fromStr)
-          .lte("check_in_date", toStr);
-      } else {
-        // No date range applied, but base LTE condition on check_in_date already restricts to yesterday
-        query = query.or(historyFilterStr);
+        query = query.gte("check_out_date", fromStr).lte("check_out_date", toStr);
       }
 
       const { data: bookingsData, error: bookingsError } = await query.order("check_in_date", {
@@ -208,13 +171,10 @@ export const useStaycationHistory = (
     } finally {
       setIsLoading(false);
     }
-  }, [clientProfile, serviceId, dateFilter, customRange]);
+  }, [activeVenue, dateFilter, customRange]);
 
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      fetchHistoryData();
-    });
-    return () => task.cancel();
+    fetchHistoryData();
   }, [fetchHistoryData]);
 
   // Helper to group by month for History View

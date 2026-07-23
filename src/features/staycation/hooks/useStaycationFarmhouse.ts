@@ -162,9 +162,9 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           guestCount: b.guest_count,
         };
 
-        if (isPast) {
+        if (isPast || b.check_in_date < todayStr) {
           pastList.push(formatted);
-        } else if (b.check_in_date === todayStr || b.check_out_date === todayStr) {
+        } else if (b.check_in_date === todayStr) {
           todayList.push(formatted);
         } else {
           upcomingList.push(formatted);
