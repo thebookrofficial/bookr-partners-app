@@ -1,18 +1,19 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
   Alert,
   ScrollView,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
-import { Text } from "@/components/ui";
+import { Text, StaycationBookingsListSkeleton } from "@/components/ui";
 import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
@@ -35,7 +36,26 @@ type ListEntry =
   | { type: "booking"; data: StaycationBooking; sectionTitle: string };
 
 export const StaycationResortContent = ({ initialVenueId }: StaycationResortContentProps) => {
-  const { activeVenueName } = useServiceStore();
+  const { activeVenueName, setTabBarVisible } = useServiceStore();
+  const lastScrollY = useRef(0);
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    if (currentY <= 0) {
+      setTabBarVisible(true);
+      lastScrollY.current = currentY;
+      return;
+    }
+
+    if (currentY > lastScrollY.current + 10) {
+      setTabBarVisible(false);
+      lastScrollY.current = currentY;
+    } else if (currentY < lastScrollY.current - 10) {
+      setTabBarVisible(true);
+      lastScrollY.current = currentY;
+    }
+  };
+
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [activeRoomType, setActiveRoomType] = useState("All");
@@ -64,16 +84,8 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
   }, [activeRoomStatus, selectedDate]);
 
   // CRITICAL FIX: Passed activeRoomType to the hook so occupancy updates dynamically!
-  const {
-    isLoading,
-    closedDates,
-    groupedBookings,
-    refetch,
-    venues,
-    activeVenue,
-    rooms,
-    cancelBooking,
-  } = useStaycationResort(initialVenueId, effectiveDate, activeRoomType);
+  const { isLoading, closedDates, groupedBookings, refetch, activeVenue, rooms, cancelBooking } =
+    useStaycationResort(initialVenueId, effectiveDate, activeRoomType);
 
   const isDateClosed = useMemo(() => {
     const dStr = selectedDate.toISOString().split("T")[0];
@@ -81,6 +93,13 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
   }, [selectedDate, closedDates]);
 
   const [isOfflineSheetVisible, setIsOfflineSheetVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const onDateChange = (event: DateTimePickerEvent, date?: Date) => {
     setShowDatePicker(false);
@@ -345,31 +364,33 @@ export const StaycationResortContent = ({ initialVenueId }: StaycationResortCont
 
   return (
     <View style={styles.root}>
-      {isLoading && venues.length === 0 ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={flatListData}
-          keyExtractor={(item, index) =>
-            item.type === "header" ? item.title + index : item.data.id
-          }
-          renderItem={renderItem}
-          ListHeaderComponent={listHeader}
-          ListFooterComponent={<View style={{ height: vs(120) }} />}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={COLORS.primary} />
-          }
-          ListEmptyComponent={
+      <FlatList
+        data={flatListData}
+        keyExtractor={(item, index) => (item.type === "header" ? item.title + index : item.data.id)}
+        renderItem={renderItem}
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={<View style={{ height: vs(120) }} />}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+          />
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <StaycationBookingsListSkeleton />
+          ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No bookings found.</Text>
             </View>
-          }
-        />
-      )}
+          )
+        }
+      />
 
       <TouchableOpacity
         style={styles.fab}

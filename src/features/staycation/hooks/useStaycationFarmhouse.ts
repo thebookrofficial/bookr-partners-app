@@ -6,7 +6,7 @@ import { supabase } from "../../../lib/supabase";
 import { StaycationBooking } from "../types/staycation.types";
 import { COLORS } from "@/constants/theme";
 import { useFocusEffect } from "@react-navigation/native";
-import { Alert } from "react-native";
+import { Alert, InteractionManager } from "react-native";
 import { useStaycationVenues } from "./useStaycationVenues";
 
 const formatDate = (date: Date) => {
@@ -130,7 +130,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         const finalPhone = b.guest_phone || profile?.phone || "N/A";
 
         const isOnline = b.booking_source === "online";
-        const isPast = new Date(b.check_out_date) < new Date();
+        const isPast = b.check_out_date < todayStr;
         const rangeColor = isPast ? "#aaa" : isOnline ? COLORS.primary : COLORS.danger;
 
         // Calendar marking
@@ -164,7 +164,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
 
         if (isPast) {
           pastList.push(formatted);
-        } else if (b.check_in_date === todayStr) {
+        } else if (b.check_in_date === todayStr || b.check_out_date === todayStr) {
           todayList.push(formatted);
         } else {
           upcomingList.push(formatted);
@@ -286,7 +286,10 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
 
   // 1. Automatically fetch bookings whenever the activeVenue changes
   useEffect(() => {
-    fetchBookings();
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetchBookings();
+    });
+    return () => task.cancel();
   }, [fetchBookings]);
 
   // 2. Only trigger a background refresh when the screen comes into focus

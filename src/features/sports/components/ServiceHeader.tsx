@@ -16,6 +16,7 @@ interface ServiceHeaderProps {
   imageSource?: ImageSourcePropType;
   onCategoryPress?: () => void;
   rightComponent?: React.ReactNode;
+  showBackBtn?: boolean;
 }
 
 export const ServiceHeader = ({
@@ -25,14 +26,17 @@ export const ServiceHeader = ({
   imageSource,
   onCategoryPress,
   rightComponent,
+  showBackBtn = true,
 }: ServiceHeaderProps) => {
   const navigation = useNavigation();
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-        <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
-      </TouchableOpacity>
+      {showBackBtn && (
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
+        </TouchableOpacity>
+      )}
 
       <View style={styles.content}>
         <Avatar source={imageSource} size={50} />

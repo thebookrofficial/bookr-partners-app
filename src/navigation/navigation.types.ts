@@ -10,6 +10,7 @@ export type AuthStackParamList = {
   Login: undefined;
   Otp: { email: string };
   Signup: undefined;
+  AcceptInvite: undefined;
   LegalView: { title: string; content: string };
 };
 
@@ -60,6 +61,8 @@ export type MainStackParamList = {
   Dashboard: undefined;
   VendorProfile: undefined;
   AddStaff: undefined;
+  EditStaff: { staffId: string; staffData?: any };
+  StaffManagement: { venueId?: string; serviceCategory?: string } | undefined;
   EditProfile: undefined;
   AddService: undefined;
   Settings: undefined;
@@ -70,7 +73,7 @@ export type MainStackParamList = {
   DineServiceTabs: NavigatorScreenParams<DineTabParamList>;
   StaycationServiceTabs: NavigatorScreenParams<StaycationTabParamList>;
   EventServiceTabs: NavigatorScreenParams<EventTabParamList>;
-  BookingDetails: { bookingId: string };
+  BookingDetails: { bookingId: string; idChain?: string[] };
   StaycationBookingDetails: { booking: any };
   StaycationInvoice: { bookingId: string };
   StaycationCloseDate: { serviceId: string };
@@ -91,13 +94,16 @@ export type MainStackParamList = {
     venueId?: string;
   };
   BlockUnblock: { venueId: string; groundId: string };
-  BulkBooking: { venueId: string; groundId?: string };
+  BulkBooking: { venueId: string; groundId?: string; type?: "multi" | "single" };
   BulkBookingDetails: {
     bookingId: string;
-    type: "multi" | "single";
     venueId: string;
     groundId: string;
+    refreshKey?: string;
+    type?: "multi" | "single";
   };
+  RescheduleBooking: { bookingId: string; venueId: string; groundId: string; idChain?: string[] };
+  RepeatBooking: { bookingId: string; venueId: string; groundId: string; idChain?: string[] };
   Payouts: { venueId: string };
   PayoutDetails: {
     venueId: string;
@@ -108,6 +114,8 @@ export type MainStackParamList = {
   };
   SportsInvoice: { bookingId: string };
   FAQ: { vertical: "sports" | "staycation" };
+  AcceptInvite: undefined;
+  PaymentHistory: { bookingId: string };
   // Future screens: Bookings, Earnings, Profile, etc.
 };
 

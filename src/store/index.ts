@@ -34,6 +34,8 @@ interface ClientProfile {
   bank_account_number: string | null;
   bank_ifsc: string | null;
   bank_account_name?: string | null; // UI helper for bank holder name
+  permissions?: string[];
+  assigned_venue_ids?: string[];
   version: number; // Required for Optimistic Locking
 }
 

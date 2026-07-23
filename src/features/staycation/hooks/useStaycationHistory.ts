@@ -2,6 +2,7 @@
 // Confidential and Proprietary.
 
 import { useState, useEffect, useCallback } from "react";
+import { InteractionManager } from "react-native";
 import { supabase } from "../../../lib/supabase";
 import { useAuthStore } from "../../../store";
 import { StaycationBooking } from "../types/staycation.types";
@@ -210,7 +211,10 @@ export const useStaycationHistory = (
   }, [clientProfile, serviceId, dateFilter, customRange]);
 
   useEffect(() => {
-    fetchHistoryData();
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetchHistoryData();
+    });
+    return () => task.cancel();
   }, [fetchHistoryData]);
 
   // Helper to group by month for History View

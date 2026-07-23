@@ -2,9 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, BulkBookingSkeleton } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { BookingCard } from "../components/BookingCard";
 import { Plus } from "lucide-react-native";
@@ -163,11 +163,12 @@ export const BulkBookingScreen = () => {
             : `${formatDate(minDate)} - ${formatDate(maxDate)}`;
 
         const formatTime = (t: string) => {
-          const [h] = t.split(":");
+          const [h, m] = t.split(":");
           const hour = parseInt(h, 10);
           const ampm = hour >= 12 ? "PM" : "AM";
           const displayHour = hour % 12 || 12;
-          return `${displayHour} ${ampm}`;
+          const displayMins = m === "00" ? "" : `:${m}`;
+          return `${displayHour}${displayMins} ${ampm}`;
         };
 
         const times = slots.map((s: any) => s.start_time).sort();
@@ -205,7 +206,7 @@ export const BulkBookingScreen = () => {
 
   const renderContent = () => {
     if (loading) {
-      return <ActivityIndicator color={COLORS.primary} style={{ marginTop: vs(20) }} />;
+      return <BulkBookingSkeleton />;
     }
 
     if (bookings.length === 0) {
@@ -229,7 +230,6 @@ export const BulkBookingScreen = () => {
             time={item.timeRange}
             price=""
             status={item.status}
-            hideCallButton={false}
             onPress={() =>
               navigation.navigate("BulkBookingDetails", {
                 bookingId: item.ids[0],

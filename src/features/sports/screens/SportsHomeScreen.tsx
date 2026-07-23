@@ -2,29 +2,35 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Modal } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  LayoutAnimation,
+  UIManager,
+  Platform,
+  Pressable,
+} from "react-native";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, PillTabs } from "@/components/ui";
+import { Text, PillTabs, CustomDatePickerModal, Skeleton, ListSkeleton } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { LegendIndicator } from "../components/LegendIndicator";
 import { TimeSlotGrid } from "../components/TimeSlotGrid";
 import { BookingCard } from "../components/BookingCard";
-import { Calendar as CalendarIcon, Plus } from "lucide-react-native";
-import { hs, vs, ms } from "@/utils/responsive.utils";
+import { Calendar as CalendarIcon, Plus, ChevronDown, ChevronUp, X } from "lucide-react-native";
+import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import {
-  RouteProp,
-  useNavigation,
-  useRoute,
-  useFocusEffect,
-  useIsFocused,
-} from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute, useIsFocused } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { OfflineBookingSheet } from "../components/OfflineBookingSheet";
 import { useSportsHome } from "../hooks/useSportsHome";
 import { useServiceStore } from "@/store/serviceStore";
-import { Calendar } from "react-native-calendars";
+import perf from "@react-native-firebase/perf";
 
 export const SportsHomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -53,7 +59,11 @@ export const SportsHomeScreen = () => {
     if (routeCategory && routeCategory !== storedCategory) {
       setServiceCategory(serviceId, routeCategory);
     }
-  }, [routeCategory, serviceId, storedCategory, setServiceCategory]);
+  }, [routeCategory, storedCategory, serviceId, setServiceCategory]);
+
+  const [selectedView, setSelectedView] = useState<
+    "Today Bookings" | "Upcoming Bookings" | "Bookings"
+  >("Today Bookings");
 
   const {
     venue,
@@ -69,21 +79,58 @@ export const SportsHomeScreen = () => {
     loading,
     availableCategories,
     refresh,
-  } = useSportsHome(serviceId, selectedCategory);
+    addOptimisticBooking,
+  } = useSportsHome(serviceId, selectedCategory, selectedView);
+
+  // Handle incoming targetDate for navigation redirects (e.g. from Reschedule/Repeat)
+  useEffect(() => {
+    if (route.params?.targetDate) {
+      setSelectedDate(new Date(route.params.targetDate));
+      navigation.setParams({ targetDate: undefined } as any);
+    }
+  }, [route.params?.targetDate, setSelectedDate, navigation]);
 
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isTimeSlotExpanded, setIsTimeSlotExpanded] = useState(true);
+  const [highlightedBookingId, setHighlightedBookingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const shouldReOpenSheet = React.useRef(false);
 
   const { activeVenueName, setActiveVenueName } = useServiceStore();
   const isFocused = useIsFocused();
 
-  useFocusEffect(
-    React.useCallback(() => {
-      refresh();
-    }, [refresh]),
-  );
+  // --- PERFORMANCE TRACKING ---
+  const mountTime = React.useRef(Date.now());
+  useEffect(() => {
+    if (!loading && !slotsLoading && !bookingsLoading) {
+      const loadTime = ((Date.now() - mountTime.current) / 1000).toFixed(2);
+      console.warn(`[PERFORMANCE] SportsHomeScreen fully loaded in ${loadTime} seconds`);
+
+      if ((globalThis as any).otpSubmitTime) {
+        const totalLoginTime = ((Date.now() - (globalThis as any).otpSubmitTime) / 1000).toFixed(2);
+        console.warn(
+          `[PERFORMANCE] Loaded from OTP Submit to SportsHomeScreen in ${totalLoginTime} seconds`,
+        );
+        delete (globalThis as any).otpSubmitTime;
+      }
+    }
+  }, [loading, slotsLoading, bookingsLoading]);
+  // ----------------------------
+
+  const hasRefreshedOnFocus = React.useRef(false);
+
+  useEffect(() => {
+    if (isFocused) {
+      if (!hasRefreshedOnFocus.current) {
+        refresh();
+        hasRefreshedOnFocus.current = true;
+      }
+    } else {
+      hasRefreshedOnFocus.current = false;
+    }
+  }, [isFocused, refresh]);
 
   useEffect(() => {
     if (isFocused && shouldReOpenSheet.current) {
@@ -104,8 +151,13 @@ export const SportsHomeScreen = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refresh();
-    setRefreshing(false);
+    const trace = await perf().startTrace("home_data_refresh");
+    try {
+      await refresh();
+    } finally {
+      await trace.stop();
+      setRefreshing(false);
+    }
   };
 
   // Auto-select the first available category if the current one isn't valid for this vendor
@@ -131,13 +183,6 @@ export const SportsHomeScreen = () => {
     return isToday ? `Today, ${dateString}` : dateString;
   };
 
-  const getLocalISODate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   return (
     <View style={styles.root}>
       <ScreenContainer
@@ -145,112 +190,239 @@ export const SportsHomeScreen = () => {
         backgroundColor={COLORS.background}
         paddingHorizontal={hs(12)}
         refreshing={refreshing}
-        onRefresh={onRefresh}>
-        {/* Dropdown action removed, now it functions as a static label */}
-        <ServiceHeader
-          title={venue?.name || activeVenueName}
-          imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
-        />
+        onRefresh={onRefresh}
+        hideTabBarOnScroll>
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={() => {
+            if (isDropdownOpen) setIsDropdownOpen(false);
+          }}
+          accessible={false}>
+          {/* Dropdown action removed, now it functions as a static label */}
+          <ServiceHeader
+            title={venue?.name || activeVenueName}
+            subtitle="Home"
+            category={selectedCategory}
+            imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
+            showBackBtn={false}
+          />
 
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          </View>
-        ) : !venue ? (
-          <View style={styles.centerContainer}>
-            <Text
-              variant="body1"
-              weight="semiBold"
-              color={COLORS.text.muted}
-              style={styles.emptyVenueText}>
-              No {selectedCategory} facility has been set up for this club yet.
-            </Text>
-          </View>
-        ) : (
-          <>
-            <TouchableOpacity
-              style={styles.dateRow}
-              onPress={() => setIsDatePickerOpen(true)}
-              activeOpacity={0.7}>
-              <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
-                {getFormattedDate(selectedDate)}
+          {!loading && !venue ? (
+            <View style={styles.centerContainer}>
+              <Text
+                variant="body1"
+                weight="semiBold"
+                color={COLORS.text.muted}
+                style={styles.emptyVenueText}>
+                No {selectedCategory} facility has been set up for this club yet.
               </Text>
-              <CalendarIcon size={ms(18)} color="#00327B" />
-            </TouchableOpacity>
-
-            {grounds.length > 0 && (
-              <View style={styles.groundTabs}>
-                <PillTabs
-                  tabs={grounds.map(g => g.name)}
-                  activeTab={grounds.find(g => g.id === activeGroundId)?.name || ""}
-                  onTabChange={selectedName => {
-                    const selectedGround = grounds.find(g => g.name === selectedName);
-                    if (selectedGround) setActiveGroundId(selectedGround.id);
-                  }}
-                  variant="primary"
-                />
-              </View>
-            )}
-
-            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              TIME SLOT
-            </Text>
-            <LegendIndicator />
-
-            {slotsLoading ? (
-              <ActivityIndicator size="small" color={COLORS.primary} style={styles.loaderStyle} />
-            ) : slots.length === 0 ? (
-              <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
-                No slots generated for this date/ground yet.
-              </Text>
-            ) : (
-              <TimeSlotGrid
-                slots={slots as any}
-                selectedDate={selectedDate}
-                isNested={
-                  selectedCategory === "Pickleball" &&
-                  slots.some((s: any) => s.duration_minutes === 30)
-                }
-                onSlotPress={_slot => {}}
-              />
-            )}
-
-            <Text
-              variant="body1"
-              weight="bold"
-              style={[styles.sectionTitle, { marginTop: vs(24) }]}>
-              BOOKINGS
-            </Text>
-
-            <View style={styles.bookingsContainer}>
-              {bookingsLoading ? (
-                <ActivityIndicator size="small" color={COLORS.primary} style={styles.loaderStyle} />
-              ) : bookings.length === 0 ? (
-                <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
-                  No bookings found for this date.
-                </Text>
-              ) : (
-                bookings.map(booking => (
-                  <BookingCard
-                    key={booking.id}
-                    name={booking.name}
-                    phone={booking.phone}
-                    date={booking.date}
-                    time={booking.time}
-                    price={booking.price}
-                    status={booking.status}
-                    avatarUrl={booking.avatarUrl}
-                    isOfflineRecord={booking.isOfflineRecord}
-                    isDisabled={booking.isDisabled}
-                    isPaymentPending={booking.isPaymentPending}
-                    onPress={() => navigation.navigate("BookingDetails", { bookingId: booking.id })}
-                  />
-                ))
-              )}
             </View>
-          </>
-        )}
-        <View style={{ height: vs(120) }} />
+          ) : (
+            <>
+              <View style={[styles.dateRow, styles.dateRowZIndex]}>
+                <TouchableOpacity
+                  style={styles.dateSelectorLeft}
+                  onPress={() => setIsDatePickerOpen(true)}
+                  activeOpacity={0.7}>
+                  <CalendarIcon size={ms(24)} color={COLORS.text.primary} strokeWidth={2} />
+                  <Text
+                    variant="body1"
+                    weight="bold"
+                    color={COLORS.text.primary}
+                    style={{ fontSize: fs(18) }}>
+                    {getFormattedDate(selectedDate)}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.dropdownToggleWrapper}>
+                  <TouchableOpacity
+                    style={styles.dropdownToggle}
+                    activeOpacity={0.7}
+                    onPress={() => setIsDropdownOpen(!isDropdownOpen)}>
+                    <Text
+                      variant="body1"
+                      weight="semiBold"
+                      color={COLORS.text.inverse}
+                      style={{ fontSize: fs(16) }}>
+                      {selectedView === "Today Bookings" ? "Today" : "Upcoming"}
+                    </Text>
+                    {isDropdownOpen ? (
+                      <ChevronUp size={ms(20)} color={COLORS.text.inverse} strokeWidth={2.5} />
+                    ) : (
+                      <ChevronDown size={ms(20)} color={COLORS.text.inverse} strokeWidth={2.5} />
+                    )}
+                  </TouchableOpacity>
+
+                  {isDropdownOpen && (
+                    <View style={styles.dropdownPopover}>
+                      <View style={styles.popoverHeader}>
+                        <Text variant="body1" weight="bold" style={styles.popoverTitle}>
+                          Type
+                        </Text>
+                        <TouchableOpacity onPress={() => setIsDropdownOpen(false)}>
+                          <X size={ms(20)} color="#000" />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.popoverDivider} />
+                      <TouchableOpacity
+                        style={[
+                          styles.popoverItem,
+                          selectedView === "Today Bookings" && styles.popoverItemActive,
+                        ]}
+                        onPress={() => {
+                          setSelectedDate(new Date());
+                          setSelectedView("Today Bookings");
+                          setIsDropdownOpen(false);
+                        }}>
+                        <Text variant="body1" weight="medium" style={styles.popoverItemText}>
+                          Today
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.popoverItem,
+                          (selectedView === "Upcoming Bookings" || selectedView === "Bookings") &&
+                            styles.popoverItemActive,
+                        ]}
+                        onPress={() => {
+                          setSelectedView("Upcoming Bookings");
+                          setIsDropdownOpen(false);
+                        }}>
+                        <Text variant="body1" weight="medium" style={styles.popoverItemText}>
+                          Upcoming
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {grounds.length > 1 && (
+                <View style={styles.groundTabs}>
+                  <PillTabs
+                    tabs={grounds.map((g: any) => g.name)}
+                    activeTab={grounds.find((g: any) => g.id === activeGroundId)?.name || ""}
+                    onTabChange={selectedName => {
+                      const selectedGround = grounds.find((g: any) => g.name === selectedName);
+                      if (selectedGround) setActiveGroundId(selectedGround.id);
+                    }}
+                    variant="primary"
+                    fillContainer={true}
+                  />
+                </View>
+              )}
+
+              {(selectedView === "Today Bookings" || selectedView === "Bookings") && (
+                <View style={styles.timeSlotWrapper}>
+                  <TouchableOpacity
+                    style={styles.timeSlotHeader}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      setIsTimeSlotExpanded(!isTimeSlotExpanded);
+                    }}>
+                    <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+                      TIME SLOT
+                    </Text>
+                    {isTimeSlotExpanded ? (
+                      <ChevronUp size={ms(20)} color="#000" />
+                    ) : (
+                      <ChevronDown size={ms(20)} color="#000" />
+                    )}
+                  </TouchableOpacity>
+
+                  {isTimeSlotExpanded && (
+                    <View style={styles.timeSlotContentContainer}>
+                      <LegendIndicator />
+
+                      {slotsLoading && slots.length === 0 ? (
+                        <View style={styles.skeletonContainer}>
+                          {Array.from({ length: 12 }).map((_, i) => (
+                            <Skeleton key={i} width="23%" height={vs(40)} borderRadius={ms(8)} />
+                          ))}
+                        </View>
+                      ) : slots.length === 0 ? (
+                        <Text
+                          variant="body2"
+                          color={COLORS.text.secondary}
+                          style={styles.emptySlotsText}>
+                          No slots generated for this date/ground yet.
+                        </Text>
+                      ) : (
+                        <TimeSlotGrid
+                          slots={slots as any}
+                          selectedDate={selectedDate}
+                          onSlotPress={slot => {
+                            if (slot.status === "booked" || slot.status === "blocked") {
+                              if (!slot.raw_start_time) return;
+                              const foundBooking = bookings.find((b: any) => {
+                                if (!b.startTimeRaw || !b.endTimeRaw) return false;
+                                return (
+                                  slot.raw_start_time! >= b.startTimeRaw &&
+                                  slot.raw_start_time! < b.endTimeRaw
+                                );
+                              });
+
+                              if (foundBooking) {
+                                setHighlightedBookingId(foundBooking.id);
+                                setTimeout(() => setHighlightedBookingId(null), 3000);
+                              }
+                            }
+                          }}
+                        />
+                      )}
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Bookings Title Removed per Figma */}
+
+              <View style={styles.bookingsContainer}>
+                {bookingsLoading && bookings.length === 0 ? (
+                  <View style={{ marginTop: vs(16) }}>
+                    <ListSkeleton count={3} />
+                  </View>
+                ) : bookings.length === 0 ? (
+                  <Text variant="body2" color={COLORS.text.secondary} style={styles.emptySlotsText}>
+                    No bookings found for this date.
+                  </Text>
+                ) : (
+                  <>
+                    {(selectedView === "Upcoming Bookings" || selectedView === "Bookings") && (
+                      <Text variant="body2" weight="bold" style={styles.dateGroupHeader}>
+                        {getFormattedDate(selectedDate)}
+                      </Text>
+                    )}
+                    {bookings.map((booking: any) => (
+                      <BookingCard
+                        key={booking.id}
+                        name={booking.name}
+                        phone={booking.phone}
+                        date={booking.date}
+                        time={booking.time}
+                        price={booking.price}
+                        status={booking.status}
+                        avatarUrl={booking.avatarUrl}
+                        isOfflineRecord={booking.isOfflineRecord}
+                        isDisabled={booking.isDisabled}
+                        isPaymentPending={booking.isPaymentPending}
+                        isHighlighted={highlightedBookingId === booking.id}
+                        onPress={() =>
+                          navigation.navigate("BookingDetails", {
+                            bookingId: booking.id,
+                            idChain: booking.idChain,
+                          })
+                        }
+                      />
+                    ))}
+                  </>
+                )}
+              </View>
+            </>
+          )}
+          <View style={{ height: vs(120) }} />
+        </Pressable>
       </ScreenContainer>
 
       {!loading && venue && (
@@ -274,47 +446,30 @@ export const SportsHomeScreen = () => {
             shouldReOpenSheet.current = true;
             setIsBottomSheetOpen(false);
           }}
-          onSuccess={() => {
-            setIsBottomSheetOpen(false);
-            refresh();
+          onSuccess={async optimisticData => {
+            if (optimisticData) {
+              addOptimisticBooking(optimisticData);
+            }
+            // Supabase real-time will handle the actual refresh in the background
           }}
         />
       )}
 
-      <Modal
-        visible={isDatePickerOpen}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsDatePickerOpen(false)}>
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsDatePickerOpen(false)}>
-          <View style={styles.calendarContainer}>
-            <Calendar
-              current={getLocalISODate(selectedDate)}
-              minDate={getLocalISODate(new Date())}
-              onDayPress={(day: any) => {
-                setSelectedDate(new Date(day.year, day.month - 1, day.day));
-                setIsDatePickerOpen(false);
-              }}
-              markedDates={{
-                [getLocalISODate(selectedDate)]: {
-                  selected: true,
-                  selectedColor: COLORS.primary,
-                },
-              }}
-              theme={{
-                todayTextColor: COLORS.primary,
-                arrowColor: COLORS.primary,
-                textDayFontFamily: "Gilroy-SemiBold",
-                textMonthFontFamily: "Gilroy-ExtraBold",
-                textDayHeaderFontFamily: "Gilroy-SemiBold",
-              }}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      <CustomDatePickerModal
+        isVisible={isDatePickerOpen}
+        onClose={() => setIsDatePickerOpen(false)}
+        selectedDate={selectedDate}
+        onSelectDate={date => {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setSelectedDate(date);
+          const today = new Date();
+          const isToday =
+            date.getDate() === today.getDate() &&
+            date.getMonth() === today.getMonth() &&
+            date.getFullYear() === today.getFullYear();
+          setSelectedView(isToday ? "Today Bookings" : "Bookings");
+        }}
+      />
     </View>
   );
 };
@@ -330,26 +485,119 @@ const styles = StyleSheet.create({
   },
   dateRow: {
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: vs(8),
+    marginBottom: vs(15),
+  },
+  dateSelectorLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(8),
+  },
+  dropdownToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(6),
+    backgroundColor: "#424242",
+    paddingHorizontal: hs(14),
+    paddingVertical: vs(10),
+    borderRadius: ms(14),
+  },
+  dropdownPopover: {
+    position: "absolute",
+    top: "100%",
+    right: 0,
+    marginTop: vs(8),
+    backgroundColor: "#FFFFFF",
+    borderRadius: ms(12),
+    padding: ms(12),
+    minWidth: ms(140),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  popoverHeader: {
+    flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: vs(12),
-    paddingHorizontal: hs(12),
-    marginBottom: vs(10),
-    borderRadius: ms(12),
-    backgroundColor: "rgba(99, 161, 253, 0.08)",
+    marginBottom: vs(8),
   },
-  groundTabs: { marginTop: -vs(10), marginBottom: vs(10) },
+  popoverTitle: {
+    fontSize: fs(16),
+    color: "#000",
+  },
+  popoverDivider: {
+    height: 1,
+    backgroundColor: "#E5E5E5",
+    width: "100%",
+    marginBottom: vs(8),
+  },
+  popoverItem: {
+    paddingVertical: vs(10),
+    paddingHorizontal: hs(12),
+    borderRadius: ms(8),
+    marginBottom: vs(4),
+  },
+  popoverItemActive: {
+    backgroundColor: "#F0F0F0",
+  },
+  popoverItemText: {
+    fontSize: fs(15),
+    color: "#333",
+  },
+  groundTabs: {
+    marginBottom: vs(15),
+  },
+  dateGroupHeader: {
+    marginTop: vs(5),
+    marginBottom: vs(10),
+    fontSize: fs(14),
+  },
   emptySlotsText: { textAlign: "center", marginVertical: vs(20) },
   loaderStyle: { marginVertical: vs(20) },
-  sectionTitle: { textTransform: "uppercase", marginBottom: vs(6) },
+  timeSlotHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sectionTitle: { textTransform: "uppercase", fontSize: fs(18) },
+  timeSlotContentContainer: {
+    overflow: "hidden",
+    marginTop: vs(6),
+  },
+  timeSlotWrapper: {
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(12),
+    padding: ms(12),
+    marginBottom: vs(12),
+  },
+  dateRowZIndex: {
+    zIndex: 100,
+  },
+  dropdownToggleWrapper: {
+    position: "relative",
+    zIndex: 100,
+  },
+  skeletonContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: vs(8),
+    marginTop: vs(16),
+  },
   bookingsContainer: { marginTop: vs(8), width: "100%" },
   fab: {
     position: "absolute",
-    right: hs(16),
-    bottom: vs(110),
-    width: ms(58),
-    height: ms(58),
-    borderRadius: ms(29),
+    right: hs(10),
+    bottom: vs(140),
+    width: ms(60),
+    height: ms(60),
+    borderRadius: ms(30),
     backgroundColor: COLORS.primary,
     justifyContent: "center",
     alignItems: "center",
@@ -359,24 +607,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     zIndex: 10,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  calendarContainer: {
-    width: "95%",
-    maxWidth: ms(420),
-    backgroundColor: COLORS.background,
-    borderRadius: ms(16),
-    padding: ms(16),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   emptyVenueText: {
     textAlign: "center",

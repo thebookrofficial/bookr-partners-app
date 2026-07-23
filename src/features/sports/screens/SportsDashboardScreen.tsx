@@ -7,17 +7,17 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   RefreshControl,
   Modal,
 } from "react-native";
+import { DashboardSkeleton, Text } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
-import { Calendar, X } from "lucide-react-native";
+import { Calendar, X, ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import DatePicker from "react-native-date-picker";
+import Svg, { Path } from "react-native-svg";
 
 // Navigation & DB Imports
 import { RouteProp, useRoute } from "@react-navigation/native";
@@ -27,21 +27,19 @@ import { supabase } from "@/lib/supabase";
 import { useServiceStore } from "@/store/serviceStore";
 import { useSportsDashboard } from "../hooks/useSportsDashboard";
 
-const FilterTab = ({ label, isActive, onPress, icon }: any) => (
-  <TouchableOpacity
-    style={[styles.filterTab, isActive ? styles.filterTabActive : styles.filterTabInactive]}
-    onPress={onPress}
-    activeOpacity={0.7}>
-    {icon}
-    <Text
-      variant="caption"
-      weight="semiBold"
-      color={isActive ? COLORS.text.inverse : COLORS.text.muted}
-      style={styles.filterTabText}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
+const polarToCartesian = (cx: number, cy: number, r: number, angleInDegrees: number) => {
+  const angleInRadians = (Math.PI * (180 - angleInDegrees)) / 180.0;
+  return {
+    x: cx + r * Math.cos(angleInRadians),
+    y: cy - r * Math.sin(angleInRadians),
+  };
+};
+
+const describeArc = (cx: number, cy: number, r: number, startAngle: number, endAngle: number) => {
+  const start = polarToCartesian(cx, cy, r, startAngle);
+  const end = polarToCartesian(cx, cy, r, endAngle);
+  return ["M", start.x, start.y, "A", r, r, 0, 0, 1, end.x, end.y].join(" ");
+};
 
 export const SportsDashboardScreen = () => {
   const route = useRoute<RouteProp<SportsTabParamList, any>>();
@@ -56,8 +54,9 @@ export const SportsDashboardScreen = () => {
   const storedCategory = selectedCategories[serviceId];
   const selectedCategory = routeCategory || storedCategory || "Football";
 
-  const [timeFilter, setTimeFilter] = useState("Yesterday");
+  const [timeFilter, setTimeFilter] = useState("Last week");
   const [groundFilter, setGroundFilter] = useState("Overall");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Custom Date Range State
   const [customRange, setCustomRange] = useState({ start: new Date(), end: new Date() });
@@ -93,8 +92,12 @@ export const SportsDashboardScreen = () => {
 
   const { activeVenueName } = useServiceStore();
 
-  const onRefresh = React.useCallback(() => {
-    refetch();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
   }, [refetch]);
 
   useEffect(() => {
@@ -143,158 +146,224 @@ export const SportsDashboardScreen = () => {
     if (serviceId) resolveVenue();
   }, [serviceId, selectedCategory]);
 
+  // 6. Revenue Gauge Math
+  const gaugeSize = ms(140);
+  const strokeWidth = ms(24);
+  const gaugeRadius = (gaugeSize - strokeWidth) / 2;
+  const capAngle = (strokeWidth / 2 / gaugeRadius) * (180 / Math.PI);
+  const gapAngle = (ms(6) / gaugeRadius) * (180 / Math.PI);
+  const availableAngle = Math.max(0, 180 - 4 * capAngle - gapAngle);
+
+  const totalRev = metrics.onlineRevenue + metrics.offlineRevenue;
+  const onlinePct = totalRev === 0 ? 0.5 : metrics.onlineRevenue / totalRev;
+
+  const blueAngle = availableAngle * onlinePct;
+  const redAngle = availableAngle * (1 - onlinePct);
+
+  const blueStart = capAngle;
+  const blueEnd = blueStart + blueAngle;
+
+  const redStart = blueEnd + 2 * capAngle + gapAngle;
+  const redEnd = redStart + redAngle;
+
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={loading || dataLoading} onRefresh={onRefresh} />
-        }>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* 1. Header */}
         <ServiceHeader title={activeVenueName} subtitle="Dashboard" />
 
         {/* 2. Conditional Rendering for Dashboard Content */}
         {loading || dataLoading ? (
-          <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+          <DashboardSkeleton />
         ) : !currentVenueId ? (
           <Text style={styles.emptyStateText}>
             No {selectedCategory} facility setup for this club.
           </Text>
         ) : (
           <>
-            {/* Selection Filters */}
-            <View style={styles.filterSection}>
-              <Text variant="h3" weight="bold" style={styles.filterLabel}>
+            {/* Selection Row */}
+            <View style={styles.selectionRow}>
+              <Text variant="h2" weight="bold" color="#000">
                 Selection
               </Text>
-              <View style={styles.filterTabsRow}>
-                <FilterTab
-                  label="Yesterday"
-                  isActive={timeFilter === "Yesterday"}
-                  onPress={() => setTimeFilter("Yesterday")}
-                />
-                <FilterTab
-                  label={"Last\nweek"}
-                  isActive={timeFilter === "Last week"}
-                  onPress={() => setTimeFilter("Last week")}
-                />
-                <FilterTab
-                  label={"Last\nMonth"}
-                  isActive={timeFilter === "Last Month"}
-                  onPress={() => setTimeFilter("Last Month")}
-                />
-                <FilterTab
-                  label="Custom"
-                  isActive={timeFilter === "Custom"}
-                  onPress={() => {
-                    setTempStart(customRange.start);
-                    setTempEnd(customRange.end);
-                    setIsCustomModalVisible(true);
-                  }}
-                  icon={
-                    <Calendar
-                      size={ms(16)}
-                      color={timeFilter === "Custom" ? COLORS.text.inverse : COLORS.text.muted}
-                    />
-                  }
-                />
-              </View>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                activeOpacity={0.7}
+                onPress={() => setIsDropdownOpen(true)}>
+                <Text variant="body1" weight="medium" color="#FFF">
+                  {timeFilter}
+                </Text>
+                <ChevronDown size={ms(18)} color="#FFF" style={{ marginLeft: hs(8) }} />
+              </TouchableOpacity>
             </View>
 
-            <Text variant="body1" weight="bold" style={styles.dateRangeText}>
+            {/* Dropdown Modal */}
+            <Modal visible={isDropdownOpen} transparent animationType="fade">
+              <TouchableOpacity
+                style={styles.modalOverlay}
+                activeOpacity={1}
+                onPress={() => setIsDropdownOpen(false)}>
+                <View style={styles.dropdownContent}>
+                  {["Yesterday", "Last week", "Last Month", "Custom"].map(opt => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={styles.dropdownOption}
+                      onPress={() => {
+                        setIsDropdownOpen(false);
+                        if (opt === "Custom") {
+                          setTempStart(customRange.start);
+                          setTempEnd(customRange.end);
+                          setIsCustomModalVisible(true);
+                        } else {
+                          setTimeFilter(opt);
+                        }
+                      }}>
+                      <Text
+                        variant="body1"
+                        weight="semiBold"
+                        color={timeFilter === opt ? COLORS.primary : "#000"}>
+                        {opt}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </TouchableOpacity>
+            </Modal>
+
+            {/* Ground Row (Conditional) */}
+            {grounds.length > 1 && (
+              <View style={styles.groundSection}>
+                <Text variant="h2" weight="bold" color="#000" style={{ marginBottom: vs(12) }}>
+                  Ground
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.groundFilterScroll}>
+                  <TouchableOpacity
+                    style={[
+                      styles.groundPill,
+                      groundFilter === "Overall" && styles.groundPillActive,
+                    ]}
+                    onPress={() => setGroundFilter("Overall")}>
+                    <Text
+                      variant="body2"
+                      weight="semiBold"
+                      color={groundFilter === "Overall" ? "#FFF" : COLORS.text.secondary}>
+                      Overall
+                    </Text>
+                  </TouchableOpacity>
+                  {grounds.map(ground => {
+                    const isActive = groundFilter === ground.name;
+                    return (
+                      <TouchableOpacity
+                        key={ground.id}
+                        style={[styles.groundPill, isActive && styles.groundPillActive]}
+                        onPress={() => setGroundFilter(ground.name)}>
+                        <Text
+                          variant="body2"
+                          weight="semiBold"
+                          color={isActive ? "#FFF" : COLORS.text.secondary}>
+                          {ground.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            <Text variant="h2" weight="medium" style={styles.dateRangeText}>
               {metrics.dateRangeLabel}
             </Text>
 
-            <View style={styles.filterSection}>
-              <Text variant="body1" weight="bold" style={styles.filterLabel}>
-                Ground
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.groundFilterScroll}>
-                <FilterTab
-                  label="Overall"
-                  isActive={groundFilter === "Overall"}
-                  onPress={() => setGroundFilter("Overall")}
-                />
-                {grounds.map(ground => (
-                  <FilterTab
-                    key={ground.id}
-                    label={ground.name}
-                    isActive={groundFilter === ground.name}
-                    onPress={() => setGroundFilter(ground.name)}
-                  />
-                ))}
-              </ScrollView>
-            </View>
-
             {/* Booking Details Summary */}
-            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              BOOKING DETAILS
+            <Text variant="h2" weight="bold" style={styles.sectionTitle}>
+              Bookings
             </Text>
-            <View style={styles.summaryCard}>
-              <View style={styles.totalBlock}>
-                <Text variant="body1" weight="medium">
-                  Total bookings
-                </Text>
-                <Text variant="body1" weight="medium" style={styles.totalNumber}>
+            <View style={styles.bookingsContainer}>
+              <View style={styles.bookingsLeftCard}>
+                <Text variant="h1" weight="bold" color="#000" style={{ fontSize: fs(36) }}>
                   {metrics.totalBookings}
                 </Text>
+                <Text variant="caption" weight="medium" color={COLORS.text.secondary}>
+                  Total bookings
+                </Text>
               </View>
-              <View style={styles.splitBlock}>
-                <View style={styles.splitRow}>
-                  <Text variant="body2" weight="medium" color={COLORS.text.primary}>
-                    Online bookings
-                  </Text>
-                  <Text variant="body1" weight="medium" color={COLORS.primary}>
+              <View style={styles.bookingsRightColumn}>
+                <View style={styles.bookingMiniCard}>
+                  <Text variant="h3" weight="bold" color={COLORS.primary}>
                     {metrics.onlineBookings}
                   </Text>
-                </View>
-                <View style={styles.splitRow}>
-                  <Text variant="body2" weight="medium" color={COLORS.text.primary}>
-                    Offline bookings
+                  <Text variant="caption" weight="medium" color={COLORS.text.secondary}>
+                    Online
                   </Text>
-                  <Text variant="body1" weight="medium" color={COLORS.danger}>
+                </View>
+                <View style={styles.bookingMiniCard}>
+                  <Text variant="h3" weight="bold" color={COLORS.danger}>
                     {metrics.offlineBookings}
+                  </Text>
+                  <Text variant="caption" weight="medium" color={COLORS.text.secondary}>
+                    Offline
                   </Text>
                 </View>
               </View>
             </View>
 
             {/* Revenue Details Summary */}
-            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              GROSS PROFIT DETAILS
+            <Text variant="h2" weight="bold" style={styles.sectionTitle}>
+              Revenue
             </Text>
-            <View style={styles.onlineRevenueCard}>
-              <View style={styles.revenueDonutWrapper}>
-                <View style={[styles.donutRing, styles.donutRingBase]} />
-                <View style={[styles.donutRing, styles.donutRingOver, styles.donutRingOnline]} />
-                <View style={styles.donutInner}>
-                  <Text variant="body2" weight="semiBold" color="#00B562">
-                    +₹{(metrics.onlineRevenue + metrics.offlineRevenue).toLocaleString("en-IN")}
-                  </Text>
-                  <Text variant="caption" weight="semiBold">
-                    Total
-                  </Text>
+            <View style={styles.bookingsContainer}>
+              <View style={styles.revenueDonutCard}>
+                <View style={styles.revenueDonutContainer}>
+                  <Svg width={gaugeSize} height={gaugeSize / 2 + ms(5)}>
+                    <Path
+                      d={describeArc(gaugeSize / 2, gaugeSize / 2, gaugeRadius, blueStart, blueEnd)}
+                      stroke={COLORS.primary}
+                      strokeWidth={strokeWidth}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d={describeArc(gaugeSize / 2, gaugeSize / 2, gaugeRadius, redStart, redEnd)}
+                      stroke={COLORS.danger}
+                      strokeWidth={strokeWidth}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  </Svg>
+                  <View style={styles.revenueDonutTextContainer}>
+                    <Text variant="body1" weight="bold" color="#000">
+                      +₹{totalRev.toLocaleString("en-IN")}
+                    </Text>
+                  </View>
                 </View>
               </View>
 
-              <View style={styles.revenueSplitBlock}>
-                <View style={styles.revenueRow}>
-                  <Text variant="body2" weight="bold" color={COLORS.text.primary}>
-                    Online Collections
+              <View style={styles.revenueRightColumn}>
+                <View style={styles.revenueMiniCard}>
+                  <Text variant="caption" weight="medium" color={COLORS.text.secondary}>
+                    Online{" "}
+                    <Text variant="caption" weight="semiBold" color={COLORS.text.secondary}>
+                      Revenue
+                    </Text>
                   </Text>
-                  <Text variant="body1" weight="bold" color={COLORS.primary}>
+                  <Text variant="h3" weight="bold" color={COLORS.primary}>
                     ₹{metrics.onlineRevenue.toLocaleString("en-IN")}
                   </Text>
                 </View>
-                <View style={styles.revenueRow}>
-                  <Text variant="body2" weight="bold" color={COLORS.text.primary}>
-                    Offline Collections
+                <View style={styles.revenueMiniCard}>
+                  <Text variant="caption" weight="medium" color={COLORS.text.secondary}>
+                    Offline{" "}
+                    <Text variant="caption" weight="semiBold" color={COLORS.text.secondary}>
+                      Revenue
+                    </Text>
                   </Text>
-                  <Text variant="body1" weight="bold" color={COLORS.danger}>
+                  <Text variant="h3" weight="bold" color={COLORS.danger}>
                     ₹{metrics.offlineRevenue.toLocaleString("en-IN")}
                   </Text>
                 </View>
@@ -302,13 +371,17 @@ export const SportsDashboardScreen = () => {
             </View>
 
             {/* Booking Graph */}
-            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              BOOKING GRAPH
+            <Text variant="h2" weight="bold" style={styles.sectionTitle}>
+              Booking graph
             </Text>
             <View style={styles.graphContainer}>
               <View style={styles.yAxis}>
-                {Array.from({ length: 5 }, (_, i) =>
-                  Math.round((metrics.maxBookingValue / 4) * (4 - i)),
+                {Array.from(
+                  new Set(
+                    Array.from({ length: 9 }, (_, i) =>
+                      Math.round((metrics.maxBookingValue / 8) * (8 - i)),
+                    ),
+                  ),
                 ).map((val, idx) => (
                   <Text key={idx} variant="caption" weight="medium" style={styles.yAxisText}>
                     {val}
@@ -321,13 +394,20 @@ export const SportsDashboardScreen = () => {
                 contentContainerStyle={styles.chartArea}>
                 {metrics.bookingGraphData.map((item, index) => {
                   const heightPct = (item.value / (metrics.maxBookingValue || 1)) * 100;
+                  const isMax = item.value === metrics.maxBookingValue && item.value > 0;
                   return (
                     <View key={index} style={styles.barColumn}>
                       <View style={styles.barTrack}>
-                        <View style={[styles.barFill, { height: `${Math.max(heightPct, 2)}%` }]} />
+                        <View
+                          style={[
+                            styles.barFill,
+                            { height: `${item.value === 0 ? 0 : Math.max(heightPct, 4)}%` },
+                            !isMax && styles.barFillLight,
+                          ]}
+                        />
                       </View>
-                      <Text variant="caption" weight="medium" style={styles.xLabelDate}>
-                        {item.date}
+                      <Text variant="caption" weight="bold" color="#000" style={styles.xLabelDate}>
+                        {item.date.split(" ")[0]}
                       </Text>
                       <Text
                         variant="caption"
@@ -343,28 +423,40 @@ export const SportsDashboardScreen = () => {
             </View>
 
             {/* Revenue Graph */}
-            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              REVENUE GRAPH
+            <Text variant="h2" weight="bold" style={styles.sectionTitle}>
+              Revenue graph
             </Text>
             <View style={styles.revenueGraphContainer}>
               {metrics.revenueGraphData.length > 0 ? (
-                metrics.revenueGraphData.map((item, index) => (
-                  <View key={index} style={styles.revenueGraphRow}>
-                    <Text variant="caption" weight="semiBold" style={styles.revenueDateLabel}>
-                      {item.date}
-                    </Text>
-                    <View style={styles.revenueBarContainer}>
-                      <View style={[styles.revenueBarTrack, { width: item.fillPct as any }]}>
-                        <Text
-                          variant="caption"
-                          weight="semiBold"
-                          color={item.isBlue ? COLORS.primary : "#00B562"}>
-                          ₹{item.rawAmount}
-                        </Text>
+                metrics.revenueGraphData.map((item, index) => {
+                  const isMax = item.fillPct === "100%";
+                  return (
+                    <View key={index} style={styles.revenueGraphRow}>
+                      <Text
+                        variant="caption"
+                        weight="bold"
+                        color="#000"
+                        style={styles.revenueDateLabel}>
+                        {item.date}
+                      </Text>
+                      <View style={styles.revenueBarContainer}>
+                        <View
+                          style={[
+                            styles.revenueBarTrack,
+                            { width: item.fillPct as any },
+                            isMax && styles.revenueBarTrackMax,
+                          ]}>
+                          <Text
+                            variant="caption"
+                            weight="bold"
+                            color={isMax ? COLORS.primary : "#000"}>
+                            {item.value}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))
+                  );
+                })
               ) : (
                 <Text style={styles.emptyStateText}>No revenue data available for this range.</Text>
               )}
@@ -446,134 +538,146 @@ export const SportsDashboardScreen = () => {
 
 const styles = StyleSheet.create({
   scrollContent: { paddingTop: vs(10) },
-  filterSection: { flexDirection: "row", alignItems: "center", marginBottom: vs(16) },
-  filterLabel: { width: hs(120), fontSize: fs(20) },
-  filterTabsRow: { flex: 1, flexDirection: "row", gap: hs(10) },
-  groundFilterScroll: { gap: hs(10), paddingRight: hs(20) },
-  filterTab: {
-    minWidth: hs(60),
-    height: vs(40),
-    borderRadius: ms(10),
-    justifyContent: "center",
-    alignItems: "center",
-    flexDirection: "column",
-  },
-  filterTabText: { textAlign: "center" },
-  filterTabActive: { backgroundColor: "#282828", borderWidth: 1, borderColor: "#CBDFFE" },
-  filterTabInactive: {
-    backgroundColor: COLORS.surface.primary,
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  dateRangeText: { textAlign: "center", marginVertical: vs(12) },
-  sectionTitle: { textTransform: "uppercase", marginTop: vs(10), marginBottom: vs(12) },
-  summaryCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surface.primary,
-    borderRadius: ms(10),
-    padding: hs(12),
-    marginBottom: vs(20),
-  },
-  onlineRevenueCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surface.primary,
-    borderRadius: ms(10),
-    padding: hs(12),
-    marginBottom: vs(20),
-  },
-  revenueSummaryCard: { backgroundColor: "transparent", justifyContent: "center" },
-  totalBlock: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: hs(6),
-  },
-  totalNumber: { fontSize: fs(18) },
-  splitBlock: { flex: 1, gap: vs(6) },
-  splitRow: {
+
+  // Selection
+  selectionRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "rgba(203, 223, 254, 0.5)",
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(6),
-    borderRadius: ms(10),
+    marginBottom: vs(24),
   },
-  revenueDonutWrapper: {
-    width: ms(100),
-    height: ms(100),
-    justifyContent: "center",
+  dropdownButton: {
+    flexDirection: "row",
+    backgroundColor: "#222",
+    paddingHorizontal: hs(16),
+    paddingVertical: vs(8),
+    borderRadius: ms(8),
     alignItems: "center",
+  },
+  dropdownContent: {
+    backgroundColor: "#FFF",
+    borderRadius: ms(12),
+    padding: ms(8),
+    width: hs(160),
+    alignSelf: "flex-end",
+    marginTop: vs(120),
     marginRight: hs(20),
-    marginLeft: hs(10),
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
-  donutRing: {
-    position: "absolute",
-    width: ms(100),
-    height: ms(100),
-    borderRadius: ms(50),
-    borderWidth: ms(4),
+  dropdownOption: { paddingVertical: vs(12), paddingHorizontal: hs(12) },
+
+  // Ground
+  groundSection: { marginBottom: vs(24) },
+  groundFilterScroll: { gap: hs(10), paddingRight: hs(20) },
+  groundPill: {
+    paddingHorizontal: hs(24),
+    paddingVertical: vs(8),
+    borderRadius: ms(20),
+    backgroundColor: "#F4F7FC",
   },
-  donutRingBase: { borderColor: COLORS.danger },
-  donutRingOver: {
-    position: "absolute",
-    width: ms(100),
-    height: ms(100),
-    borderRadius: ms(50),
-    borderWidth: ms(4),
-    borderTopColor: "transparent",
-    borderLeftColor: "transparent",
+  groundPillActive: { backgroundColor: "#63A1FD" },
+
+  dateRangeText: { textAlign: "center", marginBottom: vs(24), color: "#555" },
+  sectionTitle: { marginBottom: vs(16), color: "#000" },
+
+  // Bookings
+  bookingsContainer: {
+    flexDirection: "row",
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(16),
+    padding: ms(16),
+    marginBottom: vs(24),
+    gap: hs(12),
   },
-  donutRingOnline: { borderColor: COLORS.primary, transform: [{ rotate: "45deg" }] },
-  donutInner: {
-    width: ms(92),
-    height: ms(92),
-    borderRadius: ms(46),
-    backgroundColor: COLORS.background,
+  bookingsLeftCard: {
+    flex: 1,
     justifyContent: "center",
+    alignItems: "flex-start",
+    paddingLeft: hs(8),
+  },
+  bookingsRightColumn: { flex: 1, flexDirection: "row", gap: hs(8) },
+  bookingMiniCard: {
+    flex: 1,
+    backgroundColor: "#FFF",
+    borderRadius: ms(12),
+    paddingVertical: vs(16),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Revenue
+  revenueDonutCard: { flex: 1, justifyContent: "center", alignItems: "center" },
+  revenueRightColumn: { flex: 1, gap: vs(8) },
+  revenueMiniCard: {
+    backgroundColor: "#FFF",
+    borderRadius: ms(12),
+    paddingVertical: vs(12),
+    paddingHorizontal: hs(12),
+    justifyContent: "center",
+  },
+
+  revenueDonutContainer: {
+    width: ms(140),
+    height: ms(75),
+    position: "relative",
     alignItems: "center",
   },
-  revenueSplitBlock: { justifyContent: "center", gap: vs(12) },
-  revenueRow: { gap: vs(2) },
-  graphContainer: { flexDirection: "row", height: vs(250), marginBottom: vs(30) },
+  revenueDonutTextContainer: {
+    position: "absolute",
+    bottom: vs(0),
+    width: "100%",
+    alignItems: "center",
+  },
+
+  // Booking Graph
+  graphContainer: { flexDirection: "row", height: vs(280), marginBottom: vs(32) },
   yAxis: {
     justifyContent: "space-between",
     paddingRight: hs(10),
     borderRightWidth: 1,
-    borderRightColor: COLORS.border.navBar,
-    height: vs(200),
-    paddingBottom: vs(40), // Offset for x-axis labels
+    borderRightColor: "#E0E0E0",
+    height: vs(280),
+    paddingBottom: vs(10),
   },
-  yAxisText: { textAlign: "right", fontSize: fs(10), minWidth: hs(20) },
+  yAxisText: { textAlign: "right", fontSize: fs(10), minWidth: hs(24), color: "#888" },
   chartArea: {
     paddingLeft: hs(14),
     paddingRight: hs(20),
     flexDirection: "row",
-    gap: hs(12),
+    gap: hs(16),
+    alignItems: "flex-end",
+    height: vs(280),
   },
-  barColumn: { alignItems: "center", width: hs(35) },
-  barTrack: { width: "100%", height: vs(200), justifyContent: "flex-end" },
-  barFill: { width: "100%", backgroundColor: COLORS.primary, borderRadius: ms(4) },
+  barColumn: { alignItems: "center", width: hs(36) },
+  barTrack: { width: "100%", height: vs(280), justifyContent: "flex-end" },
+  barFill: { width: "100%", backgroundColor: COLORS.primary, borderRadius: ms(10) },
+  barFillLight: { backgroundColor: "#CBDFFE" },
   xLabelDate: { marginTop: vs(8), fontSize: fs(10) },
   xLabelDay: { fontSize: fs(10) },
-  revenueGraphContainer: { gap: vs(12), marginBottom: vs(20) },
+
+  // Revenue Graph
+  revenueGraphContainer: { gap: vs(16), marginBottom: vs(20) },
   revenueGraphRow: { flexDirection: "row", alignItems: "center" },
-  revenueDateLabel: { width: hs(50), fontSize: fs(12) },
+  revenueDateLabel: { width: hs(45), fontSize: fs(10) },
   revenueBarContainer: { flex: 1 },
   revenueBarTrack: {
-    height: vs(30),
-    backgroundColor: COLORS.surface.primary,
-    borderRadius: ms(10),
+    height: vs(36),
+    backgroundColor: "#EEF4FF",
+    borderRadius: ms(18),
     justifyContent: "center",
     alignItems: "flex-end",
-    paddingRight: hs(10),
-    minWidth: hs(40),
+    paddingRight: hs(16),
+    minWidth: hs(60),
+  },
+  revenueBarTrackMax: {
+    backgroundColor: "#E6F0FF",
   },
 
-  // Modal Styles
+  // Modals
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -595,12 +699,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: vs(20),
   },
-  modalContent: {
-    gap: vs(12),
-  },
-  inputLabel: {
-    color: COLORS.text.muted,
-  },
+  modalContent: { gap: vs(12) },
+  inputLabel: { color: COLORS.text.muted },
   dateInput: {
     flexDirection: "row",
     justifyContent: "space-between",

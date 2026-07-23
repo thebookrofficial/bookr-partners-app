@@ -7,6 +7,15 @@ export const handleStaycationBooking = async (
   old_record: any,
   supabase: SupabaseClient,
 ) => {
+  // If the booking has a user_id, it is an ONLINE booking.
+  // We only want to send these templates for OFFLINE (manual) bookings.
+  if (record.user_id !== null) {
+    return {
+      success: true,
+      message: "Online booking detected. Skipping offline WhatsApp notification.",
+    };
+  }
+
   let action = "";
   let templateName = "";
 

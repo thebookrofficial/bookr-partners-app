@@ -149,7 +149,7 @@ export const useBlockUnblock = (venueId: string, groundId: string) => {
         .in("slot_date", dates); // Handles all selected dates at once
 
       if (!isAllDay && fromTime && toTime) {
-        query = query.gte("start_time", fromTime).lt("start_time", toTime);
+        query = query.lt("start_time", toTime).gt("end_time", fromTime);
       }
 
       const { error } = await query;

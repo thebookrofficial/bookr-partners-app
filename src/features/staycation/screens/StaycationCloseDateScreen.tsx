@@ -7,11 +7,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, Skeleton } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import { Calendar, DateData } from "react-native-calendars";
 import { Calendar as CalendarIcon, X, ChevronLeft, ChevronRight } from "lucide-react-native";
@@ -27,8 +27,8 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
 export const StaycationCloseDateScreen = () => {
   const navigation = useNavigation();
-  const route = useRoute<RouteProp<StaycationTabParamList, "StaycationCloseDate">>();
-  const { serviceId } = route.params;
+  const route = useRoute<any>();
+  const { serviceId } = route.params || {};
   const { activeVenue: venue } = useStaycationHome(serviceId);
   const { activeVenueName } = useServiceStore();
 
@@ -208,11 +208,15 @@ export const StaycationCloseDateScreen = () => {
             CLOSED DATES
           </Text>
           {dbLoading ? (
-            <ActivityIndicator
-              size="small"
-              color={COLORS.primary}
-              style={{ marginVertical: vs(10) }}
-            />
+            <View style={{ marginVertical: vs(10) }}>
+              <Skeleton
+                width="100%"
+                height={vs(30)}
+                borderRadius={ms(8)}
+                style={{ marginBottom: vs(10) }}
+              />
+              <Skeleton width="100%" height={vs(30)} borderRadius={ms(8)} />
+            </View>
           ) : upcomingClosedDates.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.greenDot} />

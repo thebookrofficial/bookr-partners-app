@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { SportsService } from "../services/sports.service";
 
@@ -40,6 +40,7 @@ export interface BookingData {
   isPaymentPending?: boolean;
   startTimeRaw?: string;
   endTimeRaw?: string;
+  slotDateRaw?: string;
   notes?: string;
   idChain: string[];
   parent_booking_id?: string | null;
@@ -76,7 +77,11 @@ const formatCategoryName = (dbName: string) => {
     .join(" ");
 };
 
-export const useSportsHome = (initialVenueId: string, category: string) => {
+export const useSportsHome = (
+  initialVenueId: string,
+  category: string,
+  selectedView: string = "Today Bookings",
+) => {
   const [currentVenueId, setCurrentVenueId] = useState<string>(initialVenueId);
   const [venue, setVenue] = useState<VenueData | null>(null);
   const [grounds, setGrounds] = useState<GroundData[]>([]);
@@ -86,9 +91,9 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [slots, setSlots] = useState<SlotData[]>([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsLoading, setSlotsLoading] = useState(true);
   const [bookings, setBookings] = useState<BookingData[]>([]);
-  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
 
   // Reset state when venue or category changes to avoid stale data leakage
   useEffect(() => {
@@ -98,6 +103,8 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     setActiveGroundId("");
     setSlots([]);
     setBookings([]);
+    setSlotsLoading(true);
+    setBookingsLoading(true);
   }, [initialVenueId, category]);
 
   // Auto-select the first available category if the current one isn't valid for this vendor
@@ -170,7 +177,8 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         localDateString,
       );
 
-      const formattedSlots: SlotData[] = (slotsData || []).map((slot: any) => {
+      const rawSlots = slotsData || [];
+      const formattedSlots: SlotData[] = rawSlots.map((slot: any) => {
         const [startHStr, startMStr] = slot.start_time.split(":");
         const hourInt = parseInt(startHStr, 10);
         const ampm = hourInt >= 12 ? "PM" : "AM";
@@ -214,13 +222,31 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     if (!activeGroundId || !currentVenueId) return;
     setBookingsLoading(true);
     try {
-      const localDateString = getLocalDateString(selectedDate);
+      let mode: "exact" | "gt" = "exact";
+      let targetDate = selectedDate;
+
+      if (selectedView === "Upcoming Bookings") {
+        mode = "gt";
+        targetDate = new Date(); // fetch > today
+      }
+
+      const localDateString = getLocalDateString(targetDate);
       const bookingsData = await SportsService.getBookings(
         currentVenueId,
         activeGroundId,
         localDateString,
+        mode,
       );
       const now = new Date();
+
+      const isHalfHourVenue = (bookingsData || []).some((bk: any) => {
+        if (!bk.start_time || !bk.end_time) return false;
+        const [sH, sM] = bk.start_time.split(":").map(Number);
+        const [eH, eM] = bk.end_time.split(":").map(Number);
+        let diff = eH * 60 + eM - (sH * 60 + sM);
+        if (diff < 0) diff += 24 * 60;
+        return diff === 30;
+      });
 
       const formattedBookings: BookingData[] = (bookingsData || [])
         .filter((b: any) => {
@@ -228,11 +254,11 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           const oldStat = b.status?.toLowerCase().trim();
           const sltStat = b.slot_status?.toLowerCase().trim();
 
-          const isCancelledOrRefunded = [bookingStat, oldStat].some(
-            val => val === "cancelled" || val === "refunded",
+          const isCancelledOrRefundedOrRescheduled = [bookingStat, oldStat].some(
+            val => val === "cancelled" || val === "refunded" || val === "rescheduled",
           );
 
-          if (isCancelledOrRefunded) {
+          if (isCancelledOrRefundedOrRescheduled) {
             return false;
           }
 
@@ -249,7 +275,8 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             const hourInt = parseInt(h, 10);
             const ampm = hourInt >= 12 ? "PM" : "AM";
             const displayHour = hourInt % 12 || 12;
-            const displayMins = m === "00" ? "" : `:${m}`;
+
+            const displayMins = isHalfHourVenue || m !== "00" ? `:${m}` : m === "00" ? "" : `:${m}`;
             return `${displayHour}${displayMins} ${ampm}`;
           };
 
@@ -257,7 +284,6 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             weekday: "short",
             day: "numeric",
             month: "short",
-            year: "numeric",
           });
 
           // DETERMINING OFFLINE VS ONLINE
@@ -302,6 +328,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
             isPaymentPending: isDisabled && isUnpaid,
             startTimeRaw: b.start_time,
             endTimeRaw: b.end_time,
+            slotDateRaw: b.slot_date,
             notes: b.notes,
             idChain: [b.id],
             parent_booking_id: b.parent_booking_id,
@@ -316,8 +343,13 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           };
         });
 
-      // Sort chronological by start time
+      // Sort chronological by start time and date
       const sortedBookings = [...formattedBookings].sort((a, b) => {
+        const dateA = a.slotDateRaw || "";
+        const dateB = b.slotDateRaw || "";
+        if (dateA !== dateB) {
+          return dateA.localeCompare(dateB);
+        }
         return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
       });
 
@@ -382,6 +414,11 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
         if (a.isDisabled !== b.isDisabled) {
           return a.isDisabled ? 1 : -1;
         }
+        const dateA = a.slotDateRaw || "";
+        const dateB = b.slotDateRaw || "";
+        if (dateA !== dateB) {
+          return dateA.localeCompare(dateB);
+        }
         return (a.startTimeRaw || "").localeCompare(b.startTimeRaw || "");
       });
 
@@ -391,7 +428,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     } finally {
       setBookingsLoading(false);
     }
-  }, [currentVenueId, activeGroundId, selectedDate, category]);
+  }, [currentVenueId, activeGroundId, selectedDate, category, selectedView]);
 
   useEffect(() => {
     if (initialVenueId) fetchVenueDetails();
@@ -402,12 +439,24 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     fetchBookings();
   }, [fetchSlots, fetchBookings]);
 
+  // Refs to hold the latest fetch callbacks so the Supabase subscription doesn't re-trigger on date/ground changes
+  const fetchBookingsRef = useRef(fetchBookings);
+  const fetchSlotsRef = useRef(fetchSlots);
+
+  useEffect(() => {
+    fetchBookingsRef.current = fetchBookings;
+    fetchSlotsRef.current = fetchSlots;
+  }, [fetchBookings, fetchSlots]);
+
   // Real-time listener for BOTH bookings AND slots
   useEffect(() => {
     if (!currentVenueId) return;
 
+    const channelId = `sports_sync_${currentVenueId}_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(7)}`;
     const channel = supabase
-      .channel(`sports_sync_${currentVenueId}`)
+      .channel(channelId)
       .on(
         "postgres_changes",
         {
@@ -417,7 +466,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           filter: `venue_id=eq.${currentVenueId}`,
         },
         () => {
-          fetchBookings();
+          fetchBookingsRef.current();
         },
       )
       .on(
@@ -429,7 +478,7 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
           filter: `venue_id=eq.${currentVenueId}`,
         },
         () => {
-          fetchSlots();
+          fetchSlotsRef.current();
         },
       )
       .subscribe();
@@ -437,11 +486,15 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentVenueId, fetchSlots, fetchBookings]);
+  }, [currentVenueId]);
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([fetchSlots(), fetchBookings()]);
   }, [fetchSlots, fetchBookings]);
+
+  const addOptimisticBooking = useCallback((booking: BookingData) => {
+    setBookings(prev => [booking, ...prev]);
+  }, []);
 
   return {
     venue,
@@ -457,5 +510,6 @@ export const useSportsHome = (initialVenueId: string, category: string) => {
     loading,
     availableCategories,
     refresh: handleRefresh,
+    addOptimisticBooking,
   };
 };

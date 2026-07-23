@@ -20,10 +20,11 @@ interface CreateOfflineBookingPayload {
   groupType?: string;
   unitCount?: number;
   bookingSource?: "offline" | "online";
+  paymentMode?: string;
 }
 
 export const useCreateStaycationOfflineBooking = () => {
-  const { clientProfile } = useAuthStore();
+  const { clientProfile, profile } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -136,35 +137,60 @@ export const useCreateStaycationOfflineBooking = () => {
       const safeTotalPayment = Math.max(0, payload.totalPayment || 0);
       const safeAdvancePaid = Math.max(0, payload.advancePaid || 0);
 
-      const { error: insertError } = await supabase.from("staycation_bookings").insert({
-        user_id: userId,
-        venue_id: payload.venueId,
-        room_id: assignedRoomId,
-        unit_count: requiredUnits,
-        booking_type: bookingTypeValue,
-        check_in_date: checkInStr,
-        check_out_date: checkOutStr,
-        nights_count: nightsCount,
-        guest_count: safeGuestCount,
-        subtotal: safeTotalPayment,
-        discount_amount: 0,
-        platform_fee: 0,
-        gateway_fee: 0,
-        total_amount: safeTotalPayment,
-        vendor_payout: safeTotalPayment,
-        booking_status: safeTotalPayment > 0 ? "confirmed" : "pending",
-        paid_amount: safeAdvancePaid,
-        guest_name: payload.guestName || "Guest",
-        guest_phone: payload.guestPhone || "N/A",
-        special_requests: `Booking For: ${payload.bookingType}, Type: ${assignedRoomStr}, Group: ${
-          payload.groupType || "-"
-        }`,
-        booking_source: "offline",
-      });
+      const { data: insertedBooking, error: insertError } = await supabase
+        .from("staycation_bookings")
+        .insert({
+          user_id: userId,
+          venue_id: payload.venueId,
+          room_id: assignedRoomId,
+          unit_count: requiredUnits,
+          booking_type: bookingTypeValue,
+          check_in_date: checkInStr,
+          check_out_date: checkOutStr,
+          nights_count: nightsCount,
+          guest_count: safeGuestCount,
+          subtotal: safeTotalPayment,
+          discount_amount: 0,
+          platform_fee: 0,
+          gateway_fee: 0,
+          total_amount: safeTotalPayment,
+          vendor_payout: safeTotalPayment,
+          booking_status: safeTotalPayment > 0 ? "confirmed" : "pending",
+          paid_amount: 0,
+          guest_name: payload.guestName || "Guest",
+          guest_phone: payload.guestPhone || "N/A",
+          special_requests: `Booking For: ${
+            payload.bookingType
+          }, Type: ${assignedRoomStr}, Group: ${payload.groupType || "-"}`,
+          booking_source: "offline",
+        })
+        .select("id")
+        .single();
 
       if (insertError) {
         console.error("Supabase Insertion Error:", JSON.stringify(insertError, null, 2));
         throw new Error("Could not save your booking at this time.");
+      }
+
+      // If the user entered an advance payment, insert the payment log to record the specific payment mode
+      if (insertedBooking?.id && safeAdvancePaid > 0 && payload.paymentMode) {
+        let note = "Initial staycation payment";
+        if (payload.paymentMode === "gpay") note = "Initial staycation payment (GPay)";
+        if (payload.paymentMode === "phonepe") note = "Initial staycation payment (PhonePe)";
+        if (payload.paymentMode === "paytm") note = "Initial staycation payment (Paytm)";
+
+        const { error: logError } = await supabase.from("offline_payment_logs").insert({
+          booking_id: insertedBooking.id,
+          booking_vertical: "staycation",
+          amount: safeAdvancePaid,
+          payment_mode: payload.paymentMode,
+          logged_by: profile?.id,
+          note: note,
+        });
+
+        if (logError) {
+          console.error("Failed to insert initial payment log:", logError);
+        }
       }
 
       // =========================================================
@@ -187,10 +213,10 @@ export const useCreateStaycationOfflineBooking = () => {
             targetRoomIds = assignedRoomsToBlock;
           }
 
-          const upsertData = [];
+          const insertData = [];
           for (const roomId of targetRoomIds) {
             for (const date of targetDates) {
-              upsertData.push({
+              insertData.push({
                 venue_id: payload.venueId,
                 room_id: roomId,
                 date: date,
@@ -200,14 +226,33 @@ export const useCreateStaycationOfflineBooking = () => {
             }
           }
 
-          if (upsertData.length > 0) {
-            const { error: upsertErr } = await supabase
-              .from("staycation_availability")
-              .upsert(upsertData, {
-                onConflict: "venue_id, room_id, date",
-              });
+          if (insertData.length > 0) {
+            // First, delete any existing availability rows for these specific dates/rooms
+            // to avoid unique constraint conflicts on NULL room_ids
+            for (const roomId of targetRoomIds) {
+              if (roomId === null) {
+                await supabase
+                  .from("staycation_availability")
+                  .delete()
+                  .eq("venue_id", payload.venueId)
+                  .in("date", targetDates)
+                  .is("room_id", null);
+              } else {
+                await supabase
+                  .from("staycation_availability")
+                  .delete()
+                  .eq("venue_id", payload.venueId)
+                  .in("date", targetDates)
+                  .eq("room_id", roomId);
+              }
+            }
 
-            if (upsertErr) console.error("Upsert Availability Error:", upsertErr);
+            // Now insert the fresh blocked dates safely
+            const { error: insertErr } = await supabase
+              .from("staycation_availability")
+              .insert(insertData);
+
+            if (insertErr) console.error("Insert Availability Error:", insertErr);
           }
         }
       } catch (avErr) {

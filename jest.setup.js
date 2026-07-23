@@ -140,3 +140,16 @@ jest.mock(
   },
   { virtual: true },
 ); // <-- This tells Jest to skip verifying if the module exists
+
+// Mock Firebase Perf
+jest.mock("@react-native-firebase/perf", () => {
+  return () => ({
+    startTrace: jest.fn(() =>
+      Promise.resolve({
+        stop: jest.fn(() => Promise.resolve()),
+        putAttribute: jest.fn(),
+        incrementMetric: jest.fn(),
+      }),
+    ),
+  });
+});

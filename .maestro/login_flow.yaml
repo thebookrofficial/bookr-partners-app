@@ -1,0 +1,10 @@
+appId: com.bookrpartners
+---
+- clearState
+- launchApp
+- assertVisible: "Welcome Back!"
+- inputText: "test.client@gmail.com"
+- tapOn: "Continue with email address"
+- assertVisible: "Didn’t received the OTP?" # Verifies we reached the OTP screen
+- inputText: "123456"
+- tapOn: "Login"

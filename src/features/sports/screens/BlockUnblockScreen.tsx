@@ -2,7 +2,15 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { FormSkeleton } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -12,44 +20,16 @@ import { COLORS } from "@/constants/theme";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { SportsTabParamList } from "@/navigation/navigation.types";
 import { useServiceStore } from "@/store/serviceStore";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { CustomDatePickerModal } from "@/components/ui";
+import { supabase } from "@/lib/supabase";
+import perf from "@react-native-firebase/perf";
 
 // Sub-components & Hooks
 import { ClosedDatesAlert } from "../components/block-unblock/ClosedDatesAlert";
 import { TimePickerModal } from "../components/TimePickerModal";
 import { useBlockUnblock, BlockedEntry } from "../hooks/useBlockUnblock";
 import { SportsService } from "../services/sports.service";
-
-const HOURS = [
-  "6 AM",
-  "7 AM",
-  "8 AM",
-  "9 AM",
-  "10 AM",
-  "11 AM",
-  "12 PM",
-  "1 PM",
-  "2 PM",
-  "3 PM",
-  "4 PM",
-  "5 PM",
-  "6 PM",
-  "7 PM",
-  "8 PM",
-  "9 PM",
-  "10 PM",
-  "11 PM",
-  "12 AM",
-];
-
-const parseTimeTo24Hour = (time12h: string) => {
-  if (time12h === "12 AM") return "00:00:00";
-  const [time, modifier] = time12h.split(" ");
-  let hours = parseInt(time, 10);
-  if (hours === 12 && modifier === "AM") hours = 0;
-  if (hours < 12 && modifier === "PM") hours += 12;
-  return `${hours.toString().padStart(2, "0")}:00:00`;
-};
+import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
 
 const formatDisplayDate = (dateStr: string) => {
   const d = new Date(dateStr);
@@ -57,21 +37,26 @@ const formatDisplayDate = (dateStr: string) => {
 };
 
 const formatDisplayTime = (time24: string) => {
-  const [h] = time24.split(":");
+  if (!time24) return "";
+  const [h, m] = time24.split(":");
   const hourInt = parseInt(h, 10);
   const ampm = hourInt >= 12 ? "PM" : "AM";
   const displayHour = hourInt % 12 || 12;
-  return `${displayHour} ${ampm}`;
+  const minutes = m && m !== "00" ? `:${m}` : "";
+  return `${displayHour}${minutes} ${ampm}`;
 };
 
 export const BlockUnblockScreen = () => {
   const route = useRoute<RouteProp<SportsTabParamList, "BlockUnblock">>();
   const { venueId, groundId } = route.params || { venueId: "", groundId: "" };
 
+  const { activeVenueName, selectedCategories } = useServiceStore();
+  const selectedCategory = selectedCategories[venueId] || "Football";
+
   const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
   const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId || "");
 
-  const { activeBlocks, pastBlocks, loading, blockSlots, unblockSlots } = useBlockUnblock(
+  const { activeBlocks, pastBlocks, loading, blockSlots, unblockSlots, refresh } = useBlockUnblock(
     venueId,
     selectedGroundId,
   );
@@ -84,7 +69,9 @@ export const BlockUnblockScreen = () => {
         const data = await SportsService.getGrounds(venueId);
         if (data && data.length > 0) {
           setGrounds(data);
-          if (!selectedGroundId) {
+          if (groundId) {
+            setSelectedGroundId(groundId);
+          } else {
             setSelectedGroundId(data[0].id);
           }
         }
@@ -93,11 +80,64 @@ export const BlockUnblockScreen = () => {
       }
     };
     fetchGrounds();
-  }, [venueId, selectedGroundId]);
+  }, [venueId, groundId]);
 
   const [isSelectingRange, setIsSelectingRange] = useState(false);
   const [slotType, setSlotType] = useState<"Custom" | "All">("All");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [slotDurationMinutes, setSlotDurationMinutes] = useState(60);
+
+  useEffect(() => {
+    const detectSlotDuration = async () => {
+      if (!selectedGroundId) return;
+      try {
+        const { data: slotData } = await supabase
+          .from("sports_slots")
+          .select("start_time, end_time")
+          .eq("ground_id", selectedGroundId)
+          .limit(1)
+          .maybeSingle();
+
+        if (slotData && slotData.start_time && slotData.end_time) {
+          const [sh, sm] = slotData.start_time.split(":").map(Number);
+          const [eh, em] = slotData.end_time.split(":").map(Number);
+          let diff = eh * 60 + em - (sh * 60 + sm);
+          if (diff < 0) diff += 24 * 60;
+          if (diff > 0) {
+            setSlotDurationMinutes(diff);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to detect slot duration from slot:", err);
+      }
+
+      // Fallback: use venue config filtered by the active sport type
+      try {
+        const dbSportType = selectedCategory.toLowerCase().replace(" ", "_");
+        const { data, error } = await supabase
+          .from("sports_venues")
+          .select("price_per_slot, weekend_price_per_slot, slot_duration_minutes")
+          .eq("venue_id", venueId)
+          .eq("sports_type", dbSportType)
+          .single();
+
+        if (error) throw error;
+
+        if (data && data.slot_duration_minutes) {
+          setSlotDurationMinutes(data.slot_duration_minutes);
+        }
+      } catch (err) {
+        console.error("Failed to fetch venue config:", err);
+      }
+    };
+    detectSlotDuration();
+  }, [selectedGroundId, venueId, selectedCategory]);
+
+  const HOURS = React.useMemo(
+    () => generateTimeSlots(6, 24, slotDurationMinutes),
+    [slotDurationMinutes],
+  );
 
   // --- NATIVE DATE PICKER STATES ---
   const [fromDate, setFromDate] = useState<Date>(new Date());
@@ -109,13 +149,11 @@ export const BlockUnblockScreen = () => {
   const [toTime, setToTime] = useState("4 PM");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
 
-  const { activeVenueName } = useServiceStore();
-
-  const handleDateChange = (event: any, selectedDate?: Date) => {
+  const handleDateChange = (selectedDate: Date) => {
     const activePicker = showDatePicker;
-    setShowDatePicker(null); // Hide picker (Android behavior)
+    setShowDatePicker(null); // Hide picker
 
-    if (selectedDate && event.type !== "dismissed") {
+    if (selectedDate) {
       if (activePicker === "from") {
         setFromDate(selectedDate);
         // Automatically push 'toDate' forward if it's earlier than the new 'fromDate'
@@ -130,6 +168,7 @@ export const BlockUnblockScreen = () => {
 
   const handleBlockSubmit = async () => {
     setIsSubmitting(true);
+    const trace = await perf().startTrace("block_time_slot");
     try {
       const selectedDates: string[] = [];
 
@@ -156,20 +195,41 @@ export const BlockUnblockScreen = () => {
       // Only reset the UI if it actually succeeded
       if (success) {
         setIsSelectingRange(false);
+        refresh();
       }
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to close slot");
     } finally {
+      await trace.stop();
       setIsSubmitting(false);
     }
   };
 
   const handleUnblock = (block: BlockedEntry) => {
-    unblockSlots(block.slotIds);
+    Alert.alert("Unblock Slot", `Are you sure you want to unblock this?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Unblock",
+        style: "destructive",
+        onPress: async () => {
+          const trace = await perf().startTrace("unblock_time_slot");
+          try {
+            await unblockSlots(block.slotIds);
+            refresh();
+          } catch (err: any) {
+            Alert.alert("Error", err.message || "Failed to unblock");
+          } finally {
+            await trace.stop();
+          }
+        },
+      },
+    ]);
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <FormSkeleton />
       </View>
     );
   }
@@ -416,16 +476,14 @@ export const BlockUnblockScreen = () => {
         </View>
       </ScrollView>
 
-      {/* --- NATIVE DATE PICKER --- */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={showDatePicker === "from" ? fromDate : toDate}
-          mode="date"
-          display="default"
-          minimumDate={showDatePicker === "to" ? fromDate : new Date()}
-          onChange={handleDateChange}
-        />
-      )}
+      {/* --- CUSTOM DATE PICKER --- */}
+      <CustomDatePickerModal
+        isVisible={!!showDatePicker}
+        onClose={() => setShowDatePicker(null)}
+        selectedDate={showDatePicker === "from" ? fromDate : toDate}
+        minDate={showDatePicker === "to" ? fromDate : new Date()}
+        onSelectDate={handleDateChange}
+      />
 
       <TimePickerModal
         visible={!!showHourPicker}

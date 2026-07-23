@@ -28,35 +28,16 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { useBulkBooking } from "../hooks/useBulkBooking";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { CustomDatePickerModal } from "@/components/ui";
 import { useServiceStore } from "@/store/serviceStore";
 import { supabase } from "@/lib/supabase";
+import perf from "@react-native-firebase/perf";
 
 // IMPORT THE NEW VIEW COMPONENT
 import { ViewBulkBooking } from "../components/ViewBulkBooking";
 import { TimePickerModal } from "../components/TimePickerModal";
-
-const HOURS = [
-  "6 AM",
-  "7 AM",
-  "8 AM",
-  "9 AM",
-  "10 AM",
-  "11 AM",
-  "12 PM",
-  "1 PM",
-  "2 PM",
-  "3 PM",
-  "4 PM",
-  "5 PM",
-  "6 PM",
-  "7 PM",
-  "8 PM",
-  "9 PM",
-  "10 PM",
-  "11 PM",
-  "12 AM",
-];
+import { generateTimeSlots } from "../utils/time.utils";
+import { SportsService } from "../services/sports.service";
 
 // ==========================================
 // CREATE MODE (Internal Component)
@@ -118,6 +99,26 @@ const CreateBulkBooking = ({
   const [showDatePicker, setShowDatePicker] = useState<"from" | "to" | null>(null);
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [slotDurationMinutes, setSlotDurationMinutes] = useState(60);
+
+  useEffect(() => {
+    const fetchPricing = async () => {
+      try {
+        const data = await SportsService.getVenuePricing(venueId);
+        if (data && data.slot_duration_minutes) {
+          setSlotDurationMinutes(data.slot_duration_minutes);
+        }
+      } catch (err) {
+        console.error("Failed to fetch venue config:", err);
+      }
+    };
+    fetchPricing();
+  }, [venueId]);
+
+  const HOURS = React.useMemo(
+    () => generateTimeSlots(6, 24, slotDurationMinutes),
+    [slotDurationMinutes],
+  );
 
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
 
@@ -159,7 +160,8 @@ const CreateBulkBooking = ({
       ? 1
       : Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1) *
     (HOURS.indexOf(toTime) - HOURS.indexOf(fromTime));
-  const totalPayment = totalSlots * pricePerHour;
+  const slotMultiplier = slotDurationMinutes / 60;
+  const totalPayment = totalSlots * pricePerHour * slotMultiplier;
   const amountPaid = stagedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remainingAmount = totalPayment - amountPaid;
 
@@ -212,21 +214,27 @@ const CreateBulkBooking = ({
       Alert.alert("Missing Info", "Please ensure dates, times, ground, and guest info are valid.");
       return;
     }
-    const success = await confirmBulkBooking({
-      ownerId,
-      venueId,
-      groundId: selectedGroundId, // Pass the selected ground to the hook
-      category: selectedCategory,
-      mobile,
-      name,
-      fromDate,
-      toDate: bookingType === "single" ? fromDate : toDate,
-      fromTime,
-      toTime,
-      totalAmountPerSlot: pricePerHour,
-      initialPayments: stagedPayments,
-    });
-    if (success) navigation.goBack();
+    const trace = await perf().startTrace("bulk_booking_confirm");
+    try {
+      const success = await confirmBulkBooking({
+        ownerId,
+        venueId,
+        groundId: selectedGroundId,
+        category: selectedCategory,
+        mobile,
+        name,
+        fromDate,
+        toDate: bookingType === "single" ? fromDate : toDate,
+        fromTime,
+        toTime,
+        totalAmountPerSlot: pricePerHour * slotMultiplier,
+        initialPayments: stagedPayments,
+        slotDurationMinutes,
+      });
+      if (success) navigation.goBack();
+    } finally {
+      await trace.stop();
+    }
   };
 
   // Helper to display current ground name
@@ -389,17 +397,17 @@ const CreateBulkBooking = ({
           <Text style={styles.labelBold}>Total Payment</Text>
           <TextInput
             variant="filled"
-            value={String(totalPayment)} // Display totalPayment
+            value={totalPayment.toString()}
             onChangeText={text => {
               const newTotalPayment = parseFloat(text || "0");
-              if (!isNaN(newTotalPayment) && totalSlots > 0) {
-                setPricePerHour(newTotalPayment / totalSlots); // Calculate pricePerHour
+              if (!isNaN(newTotalPayment) && totalSlots > 0 && slotMultiplier > 0) {
+                setPricePerHour(newTotalPayment / (totalSlots * slotMultiplier)); // Calculate pricePerHour
               } else if (isNaN(newTotalPayment) && text === "") {
                 setPricePerHour(0);
               }
             }}
             keyboardType="numeric"
-            placeholder="₹ 0"
+            placeholder="₹0"
             style={styles.inputFill}
           />
         </View>
@@ -463,19 +471,16 @@ const CreateBulkBooking = ({
         <View style={{ height: vs(40) }} />
       </ScrollView>
 
-      {showDatePicker && (
-        <DateTimePicker
-          value={showDatePicker === "from" ? fromDate : toDate}
-          mode="date"
-          onChange={(e, date) => {
-            setShowDatePicker(null);
-            if (date) {
-              if (showDatePicker === "from") setFromDate(date);
-              else setToDate(date);
-            }
-          }}
-        />
-      )}
+      {/* --- CUSTOM DATE PICKER --- */}
+      <CustomDatePickerModal
+        isVisible={!!showDatePicker}
+        onClose={() => setShowDatePicker(null)}
+        selectedDate={showDatePicker === "from" ? fromDate : toDate}
+        onSelectDate={date => {
+          if (showDatePicker === "from") setFromDate(date);
+          else setToDate(date);
+        }}
+      />
 
       <TimePickerModal
         visible={!!showHourPicker}
@@ -580,9 +585,9 @@ export const BulkBookingDetailsScreen = () => {
   return (
     <ScreenContainer backgroundColor="#FFFFFF" paddingHorizontal={hs(12)}>
       {bookingId === "new" ? (
-        <CreateBulkBooking type={type} venueId={venueId} groundId={groundId} />
+        <CreateBulkBooking type={type || "multi"} venueId={venueId} groundId={groundId} />
       ) : (
-        <ViewBulkBooking bookingId={bookingId} type={type} />
+        <ViewBulkBooking bookingId={bookingId} type={type || "multi"} />
       )}
     </ScreenContainer>
   );

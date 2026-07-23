@@ -4,7 +4,7 @@
 import React from "react";
 import { ScrollView, TouchableOpacity, StyleSheet, View, ViewStyle, StyleProp } from "react-native";
 import { Text } from "./Text";
-import { hs, vs, ms } from "@/utils/responsive.utils";
+import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
 export interface PillTabsProps {
@@ -12,7 +12,8 @@ export interface PillTabsProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   variant?: "default" | "primary" | "dark";
-  style?: StyleProp<ViewStyle>; // Added to allow external style overrides
+  style?: StyleProp<ViewStyle>;
+  fillContainer?: boolean;
 }
 
 export const PillTabs = ({
@@ -20,76 +21,86 @@ export const PillTabs = ({
   activeTab,
   onTabChange,
   variant = "default",
+  fillContainer = false,
   style,
 }: PillTabsProps) => {
   const isPrimary = variant === "primary";
   const isDark = variant === "dark";
 
+  const renderTab = (tabItem: any, index: number) => {
+    const tabLabel = typeof tabItem === "string" ? tabItem : tabItem.label;
+    const tabCount = typeof tabItem === "string" ? undefined : tabItem.count;
+    const isActive = tabLabel === activeTab;
+
+    let activeStyle, inactiveStyle, baseStyle;
+
+    if (isDark) {
+      activeStyle = styles.darkActive;
+      inactiveStyle = styles.darkInactive;
+      baseStyle = styles.darkPill;
+    } else if (isPrimary) {
+      activeStyle = styles.primaryActive;
+      inactiveStyle = styles.primaryInactive;
+      baseStyle = styles.primaryPill;
+    } else {
+      activeStyle = styles.defaultActive;
+      inactiveStyle = styles.defaultInactive;
+      baseStyle = styles.defaultPill;
+    }
+
+    let textColor;
+    if (isActive) {
+      if (isDark) textColor = COLORS.text.inverse;
+      else if (isPrimary) textColor = COLORS.text.inverse;
+      else textColor = COLORS.text.primary;
+    } else {
+      if (isDark) textColor = COLORS.text.muted;
+      else if (isPrimary) textColor = COLORS.text.primary;
+      else textColor = COLORS.text.muted;
+    }
+
+    return (
+      <TouchableOpacity
+        key={`${tabLabel}-${index}`}
+        activeOpacity={0.7}
+        onPress={() => onTabChange(tabLabel)}
+        style={[
+          baseStyle,
+          isActive ? activeStyle : inactiveStyle,
+          fillContainer && { flex: 1, paddingHorizontal: 0 },
+        ]}>
+        <View style={styles.tabContent}>
+          <Text
+            variant="body2"
+            weight="semiBold"
+            color={textColor}
+            style={[styles.tabText, isPrimary && { fontSize: fs(16) }]}>
+            {tabLabel}
+          </Text>
+          {tabCount !== undefined && (
+            <Text variant="caption" weight="semiBold" color={textColor} style={styles.tabCountText}>
+              ({tabCount})
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    // Applied the external style array to the main wrapper
     <View style={[styles.wrapper, style]}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContainer}>
-        {tabs.map((tabItem, index) => {
-          const tabLabel = typeof tabItem === "string" ? tabItem : tabItem.label;
-          const tabCount = typeof tabItem === "string" ? undefined : tabItem.count;
-          const isActive = tabLabel === activeTab;
-
-          // Determine styles based on variant
-          let activeStyle, inactiveStyle, baseStyle;
-
-          if (isDark) {
-            activeStyle = styles.darkActive;
-            inactiveStyle = styles.darkInactive;
-            baseStyle = styles.darkPill;
-          } else if (isPrimary) {
-            activeStyle = styles.primaryActive;
-            inactiveStyle = styles.primaryInactive;
-            baseStyle = styles.primaryPill;
-          } else {
-            activeStyle = styles.defaultActive;
-            inactiveStyle = styles.defaultInactive;
-            baseStyle = styles.defaultPill;
-          }
-
-          // Determine exact text color
-          let textColor;
-          if (isActive) {
-            if (isDark) textColor = COLORS.text.inverse;
-            else if (isPrimary) textColor = COLORS.text.inverse;
-            else textColor = COLORS.text.primary;
-          } else {
-            if (isDark) textColor = COLORS.text.muted;
-            else if (isPrimary) textColor = COLORS.text.primary;
-            else textColor = COLORS.text.muted;
-          }
-
-          return (
-            <TouchableOpacity
-              key={`${tabLabel}-${index}`}
-              activeOpacity={0.7}
-              onPress={() => onTabChange(tabLabel)}
-              style={[baseStyle, isActive ? activeStyle : inactiveStyle]}>
-              <View style={styles.tabContent}>
-                <Text variant="body2" weight="semiBold" color={textColor} style={styles.tabText}>
-                  {tabLabel}
-                </Text>
-                {tabCount !== undefined && (
-                  <Text
-                    variant="caption"
-                    weight="semiBold"
-                    color={textColor}
-                    style={styles.tabCountText}>
-                    ({tabCount})
-                  </Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {fillContainer ? (
+        <View style={[styles.scrollContainer, { flexDirection: "row", width: "100%" }]}>
+          {tabs.map((tabItem, index) => renderTab(tabItem, index))}
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContainer}>
+          {tabs.map((tabItem, index) => renderTab(tabItem, index))}
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -122,8 +133,8 @@ const styles = StyleSheet.create({
 
   // --- PRIMARY VARIANT (SportsHomeScreen Ground Selector) ---
   primaryPill: {
-    paddingHorizontal: hs(18),
-    height: vs(33),
+    paddingHorizontal: hs(30),
+    height: vs(40),
     borderRadius: ms(25),
     justifyContent: "center",
     alignItems: "center",

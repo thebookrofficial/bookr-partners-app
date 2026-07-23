@@ -13,6 +13,7 @@ import {
   HelpCircle,
   //  RefreshCw,
   ChevronRight,
+  User,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -66,6 +67,8 @@ export const StaycationEssentialsScreen = () => {
       navigation.navigate("Payouts", { venueId: serviceId });
     } else if (label === "FAQ's") {
       navigation.navigate("FAQ", { vertical: "staycation" });
+    } else if (label === "Staff Management") {
+      navigation.navigate("StaffManagement", { venueId: serviceId, serviceCategory: "staycation" });
     } else {
       // Handle other presses
     }
@@ -84,6 +87,11 @@ export const StaycationEssentialsScreen = () => {
         {/* <EssentialsItem label="Offers" Icon={Ticket} onPress={() => handlePress("Offers")} /> */}
         <EssentialsItem label="Payouts" Icon={Banknote} onPress={() => handlePress("Payouts")} />
         <EssentialsItem label="FAQ's" Icon={HelpCircle} onPress={() => handlePress("FAQ's")} />
+        <EssentialsItem
+          label="Staff Management"
+          Icon={User}
+          onPress={() => handlePress("Staff Management")}
+        />
         {/* <EssentialsItem
           label="Update Venue Info"
           Icon={RefreshCw}

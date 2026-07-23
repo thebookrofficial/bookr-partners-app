@@ -3,7 +3,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "../../../lib/supabase";
-import { Alert } from "react-native";
+import { Alert, InteractionManager } from "react-native";
 import { useAuthStore } from "../../../store";
 
 export interface PaymentLog {
@@ -106,15 +106,16 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
   }, [bookingId]);
 
   useEffect(() => {
-    fetchBookingDetails();
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetchBookingDetails();
+    });
+    return () => task.cancel();
   }, [fetchBookingDetails]);
 
-  const updatePayment = async (additionalCashStr: string, additionalOnlineStr: string) => {
+  const updatePayment = async (amountStr: string, paymentMethod: string) => {
     if (!bookingDetails?.id || !profile?.id) return false;
 
-    const addedCash = parseFloat(additionalCashStr) || 0;
-    const addedOnline = parseFloat(additionalOnlineStr) || 0;
-    const totalAdded = addedCash + addedOnline;
+    const totalAdded = parseFloat(amountStr) || 0;
 
     if (totalAdded <= 0) {
       Alert.alert("Invalid Amount", "Please enter a valid payment amount.");
@@ -133,31 +134,21 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
         return false;
       }
 
-      // Log specific cash vs online split in offline_payment_logs
-      // The database likely has a trigger to update paid_amount in staycation_bookings automatically
-      if (addedCash > 0) {
-        const { error: cashLogError } = await supabase.from("offline_payment_logs").insert({
-          booking_id: bookingDetails.id,
-          booking_vertical: "staycation",
-          amount: addedCash,
-          payment_mode: "cash",
-          logged_by: profile.id,
-          note: "Additional staycation payment (Cash)",
-        });
-        if (cashLogError) throw cashLogError;
-      }
+      // Log specific payment method in offline_payment_logs
+      let note = "Additional staycation payment (Cash)";
+      if (paymentMethod === "gpay") note = "Additional staycation payment (GPay)";
+      if (paymentMethod === "phonepe") note = "Additional staycation payment (PhonePe)";
+      if (paymentMethod === "paytm") note = "Additional staycation payment (Paytm)";
 
-      if (addedOnline > 0) {
-        const { error: onlineLogError } = await supabase.from("offline_payment_logs").insert({
-          booking_id: bookingDetails.id,
-          booking_vertical: "staycation",
-          amount: addedOnline,
-          payment_mode: "upi",
-          logged_by: profile.id,
-          note: "Additional staycation payment (Online/UPI)",
-        });
-        if (onlineLogError) throw onlineLogError;
-      }
+      const { error: logError } = await supabase.from("offline_payment_logs").insert({
+        booking_id: bookingDetails.id,
+        booking_vertical: "staycation",
+        amount: totalAdded,
+        payment_mode: paymentMethod,
+        logged_by: profile.id,
+        note: note,
+      });
+      if (logError) throw logError;
 
       // Re-fetch to update UI (trigger should have finished by now)
       await fetchBookingDetails();

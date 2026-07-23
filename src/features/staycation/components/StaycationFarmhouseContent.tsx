@@ -1,17 +1,18 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
   Alert,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
-import { Text } from "@/components/ui";
+import { Text, StaycationBookingsListSkeleton } from "@/components/ui";
 import { StaycationHeader } from "./StaycationHeader";
 import { StaycationBookingCard } from "./StaycationBookingCard";
 import { StaycationOfflineBookingSheet } from "./StaycationOfflineBookingSheet";
@@ -32,14 +33,52 @@ interface StaycationFarmhouseContentProps {
 type ListEntry = { type: "header"; title: string } | { type: "booking"; data: StaycationBooking };
 
 export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhouseContentProps) => {
-  const { activeVenueName } = useServiceStore();
+  const { activeVenueName, setTabBarVisible } = useServiceStore();
+
+  const lastScrollY = useRef(0);
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    if (currentY <= 0) {
+      setTabBarVisible(true);
+      lastScrollY.current = currentY;
+      return;
+    }
+
+    if (currentY > lastScrollY.current + 10) {
+      setTabBarVisible(false);
+      lastScrollY.current = currentY;
+    } else if (currentY < lastScrollY.current - 10) {
+      setTabBarVisible(true);
+      lastScrollY.current = currentY;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => setTabBarVisible(true);
+  }, [setTabBarVisible]);
+
+  // Safely use NavigationContext to prevent test crashes when not wrapped in NavigationContainer
+  const { NavigationContext } = require("@react-navigation/native");
+  const navigation: any = React.useContext(NavigationContext);
+
+  React.useEffect(() => {
+    if (!navigation) return;
+
+    const unsubscribeFocus = navigation.addListener("focus", () => setTabBarVisible(true));
+    const unsubscribeBlur = navigation.addListener("blur", () => setTabBarVisible(true));
+
+    return () => {
+      unsubscribeFocus();
+      unsubscribeBlur();
+    };
+  }, [navigation, setTabBarVisible]);
   const {
     isLoading,
     markedDates,
     closedDates,
     groupedBookings,
     refetch,
-    venues,
     activeVenue,
     cancelBooking,
     selectedDate,
@@ -51,6 +90,13 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
   }, [selectedDate, closedDates]);
 
   const [isOfflineSheetVisible, setIsOfflineSheetVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const handleCancel = (id: string) => {
     Alert.alert("Cancel Booking", "Are you sure you want to cancel this booking?", [
@@ -69,7 +115,7 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
 
     groupedBookings.forEach(section => {
       // Filter out sections or bookings that are in the past
-      const filteredSectionData = section.data.filter(b => b.checkOut > todayStr);
+      const filteredSectionData = section.data.filter(b => b.checkOut >= todayStr);
 
       if (filteredSectionData.length > 0) {
         data.push({ type: "header", title: section.title });
@@ -208,31 +254,33 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
 
   return (
     <View style={styles.root}>
-      {isLoading && venues.length === 0 ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={flatListData}
-          keyExtractor={(item, index) =>
-            item.type === "header" ? item.title + index : item.data.id
-          }
-          renderItem={renderItem}
-          ListHeaderComponent={listHeader}
-          ListFooterComponent={<View style={{ height: vs(120) }} />}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={COLORS.primary} />
-          }
-          ListEmptyComponent={
+      <FlatList
+        data={flatListData}
+        keyExtractor={(item, index) => (item.type === "header" ? item.title + index : item.data.id)}
+        renderItem={renderItem}
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={<View style={{ height: vs(120) }} />}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+          />
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <StaycationBookingsListSkeleton />
+          ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No bookings found.</Text>
             </View>
-          }
-        />
-      )}
+          )
+        }
+      />
 
       <TouchableOpacity
         style={styles.fab}
@@ -411,12 +459,8 @@ const styles = StyleSheet.create({
   },
   loaderContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: vs(100),
   },
   emptyContainer: {
-    padding: ms(32),
     alignItems: "center",
     marginTop: vs(20),
   },
@@ -427,8 +471,8 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    right: hs(16),
-    bottom: vs(110),
+    right: hs(0),
+    bottom: vs(120),
     width: ms(60),
     height: ms(60),
     borderRadius: ms(30),

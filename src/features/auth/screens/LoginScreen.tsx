@@ -10,8 +10,6 @@ import { vs, hs, ms, fs } from "@/utils/responsive.utils";
 import { useAuthLogic } from "../hooks/useAuthLogic";
 import { AuthTextInput } from "../components/AuthTextInput";
 import { LEGAL_TEXT } from "@/constants/legal";
-import { Alert } from "react-native";
-import { supabase } from "@/lib/supabase";
 
 // Assets
 import LoginIllustration from "@/assets/images/login-screen-client-side.svg";
@@ -21,43 +19,10 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
   const [email, setEmail] = useState("");
-  const [isCheckingUser, setIsCheckingUser] = useState(false);
-  const { isLoading: isAuthLoading, loginWithEmail, loginWithGoogle } = useAuthLogic();
+  const { isLoading, loginWithEmail, loginWithGoogle } = useAuthLogic();
 
-  const isScreenLoading = isAuthLoading || isCheckingUser;
-
-  const handleEmailContinue = async () => {
-    setIsCheckingUser(true);
-
-    // 1. Query the database to see if this email exists as a client
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("id, client_profiles(client_role)")
-      .eq("email", email.trim().toLowerCase())
-      .maybeSingle();
-
-    if (error) {
-      console.error("Supabase Error:", error);
-    }
-
-    // Type definition fixes the implicitly 'any' error for 'cp'
-    // No need for .some() since it's a single object
-    const cp = profile?.client_profiles as any;
-    const isClient = cp?.client_role === "owner" || cp?.client_role === "staff";
-
-    // 2. If they are not a client, block them immediately
-    if (!isClient) {
-      setIsCheckingUser(false);
-      Alert.alert(
-        "Access Denied",
-        "No vendor profile found for this email. Please create a partner account.",
-      );
-      return;
-    }
-
-    // 3. If they are a client, proceed with the normal OTP flow
+  const handleEmailContinue = () => {
     loginWithEmail(email, isBypass => {
-      setIsCheckingUser(false);
       if (!isBypass) {
         navigation.navigate("Otp", { email: email.trim() });
       }
@@ -113,7 +78,7 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
-                editable={!isScreenLoading}
+                editable={!isLoading}
                 style={styles.emailInput}
               />
             </View>
@@ -123,8 +88,8 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
             title="Continue with email address"
             variant="primary"
             onPress={handleEmailContinue}
-            isLoading={isScreenLoading}
-            disabled={!email.trim() || isScreenLoading}
+            isLoading={isLoading}
+            disabled={!email.trim() || isLoading}
             style={styles.continueButton}
             textStyle={styles.continueButtonText}
           />
@@ -149,14 +114,6 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
               style={styles.socialIcon}
             />
             <Text style={styles.socialButtonText}>Sign in with Google</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.socialButton}>
-            <Image
-              source={{ uri: "https://img.icons8.com/ios-filled/50/000000/mac-os.png" }}
-              style={styles.socialIcon}
-            />
-            <Text style={styles.socialButtonText}>Sign in with Apple</Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>
@@ -331,6 +288,14 @@ const styles = StyleSheet.create({
   footerLinks: {
     flexDirection: "row",
     marginTop: vs(4),
+  },
+  registerLink: {
+    marginTop: vs(10),
+    fontSize: fs(12),
+  },
+  acceptInviteButton: {
+    marginTop: vs(15),
+    alignItems: "center",
   },
   linkText: {
     textDecorationLine: "underline",

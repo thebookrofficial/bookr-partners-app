@@ -7,6 +7,24 @@ export const handleSportsBooking = async (
   old_record: any,
   supabase: SupabaseClient,
 ) => {
+  // If the booking has a user_id, it is an ONLINE booking.
+  // We only want to send these templates for OFFLINE (manual) bookings.
+  if (record.user_id !== null) {
+    return {
+      success: true,
+      message: "Online booking detected. Skipping offline WhatsApp notification.",
+    };
+  }
+
+  // If multi-slot, skip sending for non-parent bookings (to prevent duplicate WhatsApp messages)
+  if (record.booking_group_id !== null && record.parent_booking_id !== null) {
+    return {
+      success: true,
+      message:
+        "Multi-slot booking detected. Skipping child slot to prevent duplicate WhatsApp notification.",
+    };
+  }
+
   let action = "";
   let templateName = "";
 
@@ -57,9 +75,38 @@ export const handleSportsBooking = async (
 
   const venueName = bookingDetails.venues.name;
   const slotDate = bookingDetails.sports_slots.slot_date;
-  const formattedTimeRange = `${formatTo12Hour(
-    bookingDetails.sports_slots.start_time,
-  )} - ${formatTo12Hour(bookingDetails.sports_slots.end_time)}`;
+
+  // Consolidate time range if this is a multi-slot booking group
+  let formattedTimeRange = "";
+  if (record.booking_group_id) {
+    const { data: groupBookings } = await supabase
+      .from("sports_bookings")
+      .select(
+        `
+        sports_slots ( start_time, end_time )
+      `,
+      )
+      .eq("booking_group_id", record.booking_group_id);
+
+    if (groupBookings && groupBookings.length > 0) {
+      const sortedSlots = groupBookings
+        .map((b: any) => b.sports_slots)
+        .filter(Boolean)
+        .sort((a: any, b: any) => a.start_time.localeCompare(b.start_time));
+
+      if (sortedSlots.length > 0) {
+        const firstStart = sortedSlots[0].start_time;
+        const lastEnd = sortedSlots[sortedSlots.length - 1].end_time;
+        formattedTimeRange = `${formatTo12Hour(firstStart)} - ${formatTo12Hour(lastEnd)}`;
+      }
+    }
+  }
+
+  if (!formattedTimeRange) {
+    formattedTimeRange = `${formatTo12Hour(
+      bookingDetails.sports_slots.start_time,
+    )} - ${formatTo12Hour(bookingDetails.sports_slots.end_time)}`;
+  }
 
   let cleanPhone = rawPhone.replace(/\D/g, "");
   if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;

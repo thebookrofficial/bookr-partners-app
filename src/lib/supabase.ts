@@ -1,3 +1,30 @@
+/**
+ * @file supabase.ts
+ * @description Supabase client initialisation for the Bookr Partner App.
+ *
+ * ╔══════════════════════════════════════════════════════════════════════════╗
+ * ║                       ⚠️  DO NOT TOUCH THIS FILE ⚠️                      ║
+ * ║                                                                          ║
+ * ║  This file is intentionally kept SIMPLE and MINIMAL.                    ║
+ * ║  Do NOT add a custom `fetch`, `AbortController`, timeout wrappers,      ║
+ * ║  failover logic, or any other interception layer here.                  ║
+ * ║                                                                          ║
+ * ║  History (why this must stay simple):                                   ║
+ * ║  ─────────────────────────────────────────────────────────────────────  ║
+ * ║  • Versions 1.1.1 → 1.1.3 used this exact simple client and were       ║
+ * ║    stable, fast (< 1 s startup), and never had session issues.          ║
+ * ║  • A custom failoverFetch + AbortController was added post-1.1.3.       ║
+ * ║    It caused ALL of the following production regressions:               ║
+ * ║      – signInWithPassword aborted mid-flight → "Aborted" error         ║
+ * ║      – Session tokens never saved to AsyncStorage → auto-logout         ║
+ * ║        every 2-3 app opens                                              ║
+ * ║      – OTP screen freezing after a failed login attempt                 ║
+ * ║      – Slow startup due to extra async layers blocking init             ║
+ * ║  • The file was reverted on 2026-07-16 and must remain as-is.           ║
+ * ║                                                                          ║
+ * ║  If you believe you need to change this file, speak to Prasad first.     ║
+ * ╚══════════════════════════════════════════════════════════════════════════╝
+ */
 import "react-native-url-polyfill/auto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
@@ -20,11 +47,4 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey || "MISSING_KE
     persistSession: true,
     detectSessionInUrl: false,
   },
-  // 3. Explicitly force headers to ensure they pass through Cloudflare
-  // global: {
-  //   headers: {
-  //     apikey: supabaseAnonKey || "",
-  //     Authorization: `Bearer ${supabaseAnonKey || ""}`,
-  //   },
-  // },
 });

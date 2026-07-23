@@ -20,7 +20,6 @@ import { LEGAL_TEXT } from "@/constants/legal";
 
 // Assets
 import LoginIllustration from "@/assets/images/login-screen-client-side.svg";
-import WhiteBookrLogo from "@/assets/images/white_bookr_logo.png";
 import DividerLine from "@/assets/icons/ic_divider_line.svg";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -48,6 +47,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
   useEffect(() => {
     if (code.length === OTP_LENGTH && !hasSubmitted.current) {
       hasSubmitted.current = true;
+      (globalThis as any).otpSubmitTime = Date.now(); // PERFORMANCE TRACKING
       verifyOtpCode(email, code);
     } else if (code.length < OTP_LENGTH) {
       hasSubmitted.current = false;
@@ -65,6 +65,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
 
   const handleLoginPress = () => {
     if (code.length === OTP_LENGTH) {
+      (globalThis as any).otpSubmitTime = Date.now(); // PERFORMANCE TRACKING
       verifyOtpCode(email, code);
     }
   };
@@ -86,11 +87,6 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <Image source={WhiteBookrLogo} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.partnerText}>Partner</Text>
-        </View>
-
         <View style={styles.illustrationContainer}>
           <LoginIllustration width={hs(380)} height={vs(345)} />
         </View>
@@ -103,6 +99,10 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
           bounces={false}>
           <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>
             Login
+          </Text>
+          <Text style={styles.subtitle}>
+            Enter the 6-digit code sent to{"\n"}
+            <Text style={styles.emailText}>{email}</Text>
           </Text>
 
           <View style={styles.otpContainer}>
@@ -181,14 +181,6 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
               style={styles.socialIcon}
             />
             <Text style={styles.socialButtonText}>Sign in with Google</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.socialButton}>
-            <Image
-              source={{ uri: "https://img.icons8.com/ios-filled/50/000000/mac-os.png" }}
-              style={styles.socialIcon}
-            />
-            <Text style={styles.socialButtonText}>Sign in with Apple</Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>
@@ -279,11 +271,23 @@ const styles = StyleSheet.create({
     fontFamily: "Gilroy-Bold",
     fontSize: fs(34),
     color: COLORS.danger,
-    marginBottom: vs(28),
+    marginBottom: vs(12),
     textAlign: "center",
     width: "100%",
     lineHeight: fs(42), // Added explicit line height
     paddingTop: vs(4), // Added padding to prevent clipping
+  },
+  subtitle: {
+    fontFamily: "Gilroy-Medium",
+    fontSize: fs(14),
+    color: COLORS.text.muted,
+    textAlign: "center",
+    marginBottom: vs(28),
+    lineHeight: fs(20),
+  },
+  emailText: {
+    fontFamily: "Gilroy-Bold",
+    color: COLORS.text.primary,
   },
   otpContainer: {
     flexDirection: "row",

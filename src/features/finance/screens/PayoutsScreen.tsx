@@ -2,16 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-} from "react-native";
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, PillTabs } from "@/components/ui";
+import { Text, PillTabs, PendingPayoutSkeleton, PayoutListItemSkeleton } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -179,7 +172,10 @@ export const PayoutsScreen = () => {
         </Text>
 
         {loading && pendingPayouts.length === 0 ? (
-          <ActivityIndicator color={COLORS.primary} style={{ marginVertical: vs(20) }} />
+          <>
+            <PendingPayoutSkeleton />
+            <PendingPayoutSkeleton />
+          </>
         ) : (
           pendingPayouts.map((item, index) => (
             <PendingPayoutCard
@@ -256,7 +252,11 @@ export const PayoutsScreen = () => {
         )}
 
         {loading && historicalPayouts.length === 0 ? (
-          <ActivityIndicator color={COLORS.primary} style={{ marginVertical: vs(20) }} />
+          <>
+            <PayoutListItemSkeleton />
+            <PayoutListItemSkeleton />
+            <PayoutListItemSkeleton />
+          </>
         ) : (
           historicalPayouts.map((item, index) => (
             <PayoutListItem

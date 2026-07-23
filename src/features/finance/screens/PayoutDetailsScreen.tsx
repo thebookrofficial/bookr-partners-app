@@ -2,15 +2,8 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  Platform,
-} from "react-native";
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from "react-native";
+import { PayoutDetailsSkeleton } from "@/components/ui";
 import ReactNativeBlobUtil from "react-native-blob-util";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, Button } from "@/components/ui";
@@ -149,23 +142,8 @@ export const PayoutDetailsScreen = () => {
 
   if (loading && !breakdown) {
     return (
-      <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => _navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
-          </TouchableOpacity>
-          <View>
-            <Text variant="h3" weight="bold">
-              {activeVenueName}
-            </Text>
-            <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
-              Payouts
-            </Text>
-          </View>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={COLORS.primary} size="large" />
-        </View>
+      <ScreenContainer scrollable={false} backgroundColor={COLORS.background} paddingHorizontal={0}>
+        <PayoutDetailsSkeleton />
       </ScreenContainer>
     );
   }

@@ -10,43 +10,83 @@ import { COLORS } from "@/constants/theme";
 
 interface StaffCardProps {
   name: string;
-  role: string;
-  type: "Manager" | "Employee";
+  permissions?: {
+    sports?: string[];
+    staycation?: string[];
+  };
+  isInvite?: boolean;
+  onPress?: () => void;
+  onDelete?: () => void;
+  onBlock?: () => void;
 }
 
-export const StaffCard = ({ name, role, type }: StaffCardProps) => (
-  <View style={styles.container}>
-    {/* Column 1: Avatar (50x50) */}
-    <Avatar size={50} fallbackInitials={name.charAt(0)} />
+export const StaffCard = ({
+  name,
+  permissions,
+  isInvite,
+  onPress,
+  onDelete,
+  onBlock,
+}: StaffCardProps) => {
+  const hasSports = permissions?.sports && permissions.sports.length > 0;
+  const hasStaycation = permissions?.staycation && permissions.staycation.length > 0;
 
-    {/* Column 2: Info (Flex Grow) */}
-    <View style={styles.info}>
-      <Text variant="h3" weight="bold">
-        {name}
-      </Text>
-      <Text variant="body2" weight="semiBold" color={COLORS.text.primary} style={styles.roleText}>
-        {role}
-      </Text>
-    </View>
+  return (
+    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
+      {/* Column 1: Avatar (50x50) */}
+      <Avatar size={50} fallbackInitials={name.charAt(0)} />
 
-    {/* Column 3: Type (Centered vertically) */}
-    <View style={styles.typeContainer}>
-      <Text variant="body1" weight="semiBold" color={COLORS.text.primary}>
-        {type}
-      </Text>
-    </View>
+      {/* Column 2: Info (Flex Grow) */}
+      <View style={styles.info}>
+        <View style={styles.nameRow}>
+          <Text variant="h3" weight="bold">
+            {name}
+          </Text>
+          <View style={[styles.statusBadge, isInvite ? styles.statusPending : styles.statusActive]}>
+            <Text
+              variant="caption"
+              weight="bold"
+              color={isInvite ? COLORS.warning : COLORS.success}
+              style={{ fontSize: 10 }}>
+              {isInvite ? "Pending" : "Active"}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.badgesContainer}>
+          {hasSports && (
+            <View style={styles.badge}>
+              <Text variant="caption" weight="bold" color={COLORS.primary}>
+                Sports
+              </Text>
+            </View>
+          )}
+          {hasStaycation && (
+            <View style={styles.badge}>
+              <Text variant="caption" weight="bold" color={COLORS.success}>
+                Staycation
+              </Text>
+            </View>
+          )}
+          {!hasSports && !hasStaycation && (
+            <Text variant="caption" color={COLORS.text.muted}>
+              No Access
+            </Text>
+          )}
+        </View>
+      </View>
 
-    {/* Column 4: Actions (Stacked vertically) */}
-    <View style={styles.actionsContainer}>
-      <TouchableOpacity style={styles.iconBtn}>
-        <Trash2 size={ms(20)} color={COLORS.danger} />
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.iconBtn}>
-        <Ban size={ms(20)} color={COLORS.warning} />
-      </TouchableOpacity>
-    </View>
-  </View>
-);
+      {/* Column 4: Actions (Stacked vertically) */}
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity style={styles.iconBtn} onPress={onDelete}>
+          <Trash2 size={ms(20)} color={COLORS.danger} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.iconBtn} onPress={onBlock}>
+          <Ban size={ms(20)} color={COLORS.warning} />
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -64,17 +104,34 @@ const styles = StyleSheet.create({
     flex: 1, // This allows the name/role to take up the middle space
     flexDirection: "column",
     alignItems: "flex-start",
-    gap: vs(2), // Slight gap between name and role
+    gap: vs(6), // Slight gap between name and badges
   },
-  roleText: {
-    marginTop: vs(2),
-  },
-  typeContainer: {
-    height: vs(50),
-    justifyContent: "center",
+  nameRow: {
+    flexDirection: "row",
     alignItems: "center",
-    // We don't strictly enforce width: 68px to allow for translation,
-    // but the flex layout will mimic it perfectly.
+    gap: hs(8),
+  },
+  statusBadge: {
+    paddingHorizontal: hs(6),
+    paddingVertical: vs(2),
+    borderRadius: ms(4),
+  },
+  statusPending: {
+    backgroundColor: COLORS.warning + "20", // light warning background
+  },
+  statusActive: {
+    backgroundColor: COLORS.success + "20", // light success background
+  },
+  badgesContainer: {
+    flexDirection: "row",
+    gap: hs(6),
+    flexWrap: "wrap",
+  },
+  badge: {
+    backgroundColor: COLORS.surface.pillActive,
+    paddingHorizontal: hs(8),
+    paddingVertical: vs(2),
+    borderRadius: ms(4),
   },
   actionsContainer: {
     height: vs(50),

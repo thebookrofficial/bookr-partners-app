@@ -7,13 +7,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   RefreshControl,
+  TextInput,
 } from "react-native";
+import { HistorySkeleton } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, TextInput } from "@/components/ui";
+import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
-import { Search, ChevronDown, SlidersHorizontal, Phone, Clock } from "lucide-react-native";
+import { Search, ChevronDown, SlidersHorizontal } from "lucide-react-native";
+import PersonSvg from "@/assets/icons/ic-round-person.svg";
+import CalendarSvg from "@/assets/icons/ic-solar-calendar-outline.svg";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useServiceStore } from "@/store/serviceStore";
@@ -21,38 +24,50 @@ import { useSportsHistory } from "../hooks/useSportsHistory";
 import { FilterBottomSheet, DateFilterOption } from "../components/FilterBottomSheet";
 
 // Navigation Imports
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute, useIsFocused } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList, SportsTabParamList } from "@/navigation/navigation.types";
+import { useAuthStore } from "@/store";
 
 // ==========================================
 // 1. NEW HISTORY CARD
 // ==========================================
-const HistoryCard = ({ name, phone, time, price, status, onPress }: any) => {
-  const isOnline = status === "Online";
-  const statusColor = isOnline ? COLORS.primary : COLORS.danger;
+const HistoryCard = ({ name, phone, date, time, price, status, onPress }: any) => {
+  const isOnline = status?.toLowerCase() === "online";
 
   return (
     <TouchableOpacity style={styles.cardContainer} activeOpacity={0.7} onPress={onPress}>
-      <View style={styles.avatarCircle} />
-      <View style={styles.cardInfoCol}>
-        <View style={styles.cardHeaderRow}>
+      <View style={styles.cardHeaderRow}>
+        <View style={styles.cardHeaderLeft}>
+          <View style={styles.avatarSquircle}>
+            <PersonSvg width={ms(20)} height={ms(20)} color="#63A1FD" />
+          </View>
           <View style={styles.namePhoneCol}>
             <Text style={styles.cardName}>{name}</Text>
-            <View style={styles.phoneRow}>
-              <Phone size={ms(14)} color={COLORS.text.primary} fill={COLORS.text.primary} />
-              <Text style={styles.cardPhone}>{phone.replace("+91 ", "")}</Text>
-            </View>
-          </View>
-          <View style={styles.priceStatusCol}>
-            <Text style={styles.cardPrice}>{price}</Text>
-            <Text style={[styles.cardStatus, { color: statusColor }]}>{status}</Text>
+            <Text style={styles.cardPhone}>{phone}</Text>
           </View>
         </View>
-        <View style={styles.timeRow}>
-          <Clock size={ms(14)} color={COLORS.text.primary} />
-          <Text style={styles.cardTime}>{time}</Text>
+
+        <View style={styles.priceStatusCol}>
+          <Text style={styles.cardPrice}>{price}</Text>
+          <View style={isOnline ? styles.statusBadgeOnline : styles.statusBadgeOffline}>
+            <Text style={isOnline ? styles.statusTextOnline : styles.statusTextOffline}>
+              {isOnline ? "Online" : "Offline"}
+            </Text>
+          </View>
         </View>
+      </View>
+
+      <View style={styles.cardDivider} />
+
+      <View style={styles.cardFooterRow}>
+        <View style={styles.cardFooterLeft}>
+          <View style={styles.calendarSquircle}>
+            <CalendarSvg width={ms(20)} height={ms(20)} color="#63A1FD" />
+          </View>
+          <Text style={styles.cardDateRange}>{date}</Text>
+        </View>
+        <Text style={styles.cardGuestCount}>{time}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -61,29 +76,23 @@ const HistoryCard = ({ name, phone, time, price, status, onPress }: any) => {
 // ==========================================
 // 2. HEADERS
 // ==========================================
-const MonthSectionHeader = ({ month }: { month: string }) => (
-  <View style={styles.monthHeaderRow}>
-    <Text style={styles.monthText}>{month}</Text>
-  </View>
-);
-
 const DateSectionHeader = ({
   date,
+
   isExpanded,
   onToggle,
 }: {
   date: string;
+
   isExpanded: boolean;
   onToggle: () => void;
 }) => (
   <View style={styles.dateHeaderRow}>
     <TouchableOpacity style={styles.dateLeft} activeOpacity={0.7} onPress={onToggle}>
-      <Text variant="body2" weight="bold" style={styles.dateText}>
-        {date}
-      </Text>
+      <Text style={styles.dateText}>{date}</Text>
       <ChevronDown
-        size={ms(16)}
-        color={COLORS.text.primary}
+        size={ms(20)}
+        color="#000"
         style={{ transform: [{ rotate: isExpanded ? "180deg" : "0deg" }] }}
       />
     </TouchableOpacity>
@@ -94,10 +103,14 @@ const DateSectionHeader = ({
 // 3. MAIN SCREEN
 // ==========================================
 export const SportsHistoryScreen = () => {
+  const isFocused = useIsFocused();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<SportsTabParamList, any>>();
+  const { clientProfile } = useAuthStore();
+  const isOwner = clientProfile?.client_role === "owner" || !clientProfile;
 
-  const { selectedCategories, setServiceCategory, activeServiceId } = useServiceStore();
+  const { selectedCategories, setServiceCategory, activeServiceId, setTabBarVisible } =
+    useServiceStore();
 
   // 1. Get Service ID (Priority: Route -> Store)
   const serviceId = route.params?.serviceId || activeServiceId;
@@ -138,9 +151,14 @@ export const SportsHistoryScreen = () => {
     dateFilter,
     customRange,
   );
-  const { activeVenueName } = useServiceStore();
 
   const [refreshing, setRefreshing] = useState(false);
+
+  React.useEffect(() => {
+    if (isFocused) {
+      setTabBarVisible(true);
+    }
+  }, [isFocused, setTabBarVisible]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -163,30 +181,30 @@ export const SportsHistoryScreen = () => {
         }>
         {/* Header */}
         <View style={styles.headerZIndex}>
-          <ServiceHeader title={activeVenueName} subtitle="History" />
+          <ServiceHeader title="History" subtitle="" />
         </View>
 
         {/* Sticky Search */}
         <View style={styles.stickySearchWrapper}>
-          <TextInput
-            variant="filled"
-            placeholder="Search for mobile number , Date , Name"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            leftIcon={<Search size={ms(20)} color={COLORS.text.primary} />}
-            rightIcon={
-              <TouchableOpacity activeOpacity={0.7} onPress={() => setIsFilterOpen(true)}>
-                <SlidersHorizontal size={ms(20)} color={COLORS.text.primary} />
-              </TouchableOpacity>
-            }
-            style={styles.searchBarOverride}
-          />
+          <View style={styles.searchBarContainer}>
+            <Search size={ms(20)} color="#000" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search"
+              placeholderTextColor="#8C8C8C"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            <TouchableOpacity onPress={() => setIsFilterOpen(true)}>
+              <SlidersHorizontal size={ms(20)} color="#000" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* List Section */}
         <View style={styles.listSection}>
           {loading ? (
-            <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+            <HistorySkeleton />
           ) : !currentVenueId ? (
             <Text style={styles.emptyStateText}>
               No {selectedCategory} facility setup for this club.
@@ -196,8 +214,6 @@ export const SportsHistoryScreen = () => {
           ) : (
             historyGroups.map((monthGroup, mIndex) => (
               <View key={`month-${mIndex}`} style={styles.monthGroupContainer}>
-                <MonthSectionHeader month={monthGroup.month} />
-
                 {monthGroup.days.map((dayGroup, dIndex) => {
                   const isCollapsed = !!collapsedDates[dayGroup.date];
                   return (
@@ -214,12 +230,15 @@ export const SportsHistoryScreen = () => {
                             key={booking.id}
                             name={booking.name}
                             phone={booking.phone}
+                            date={dayGroup.date}
                             time={booking.timeRanges}
                             price={`₹${booking.price}`}
                             status={booking.status}
-                            onPress={() =>
-                              navigation.navigate("SportsInvoice", { bookingId: booking.id })
-                            }
+                            onPress={() => {
+                              if (isOwner) {
+                                navigation.navigate("SportsInvoice", { bookingId: booking.id });
+                              }
+                            }}
                           />
                         ))}
                     </View>
@@ -258,21 +277,28 @@ const styles = StyleSheet.create({
   stickySearchWrapper: {
     backgroundColor: COLORS.background,
     paddingHorizontal: hs(12),
-    paddingTop: vs(6),
-    paddingBottom: vs(2),
+    paddingTop: vs(12),
+    paddingBottom: vs(4),
     zIndex: 9,
   },
-  searchBarOverride: {
-    backgroundColor: "#F4F7FC",
-    borderWidth: 1,
-    borderColor: "#FFFFFF",
-    borderRadius: ms(10),
-    shadowColor: "rgba(229, 229, 229, 0.7)",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 4,
-    height: vs(40),
+  searchBarContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F4F7FB",
+    borderRadius: ms(8),
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(10),
+  },
+  searchIcon: {
+    marginRight: hs(8),
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fs(14),
+    fontFamily: "Gilroy-Medium",
+    color: "#000",
+    paddingVertical: 0,
+    includeFontPadding: false,
   },
 
   listSection: { width: "100%", paddingHorizontal: hs(12) },
@@ -281,84 +307,146 @@ const styles = StyleSheet.create({
   /* --- HEADERS --- */
   monthHeaderRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: COLORS.surface.primary,
-    paddingVertical: vs(10),
-    paddingHorizontal: hs(12),
-    borderRadius: ms(8),
     marginTop: vs(10),
     marginBottom: vs(5),
   },
-  monthText: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: COLORS.text.primary },
-  monthSettlementContainer: { flexDirection: "row", alignItems: "center", gap: hs(4) },
-  monthSettlementLabel: { fontFamily: "Gilroy-Medium", fontSize: fs(12), color: COLORS.text.muted },
-  monthSettlementAmount: {
-    fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
+  monthText: { fontFamily: "Gilroy-Bold", fontSize: fs(16), color: "#000" },
 
   dateHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: vs(8),
-    marginTop: vs(12),
-    paddingVertical: vs(4),
+    marginBottom: vs(12),
+    marginTop: vs(8),
   },
-  dateLeft: { flexDirection: "row", alignItems: "center", gap: hs(6), paddingRight: hs(10) },
-  dateText: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: COLORS.text.primary },
-  settlementRight: { alignItems: "center", justifyContent: "center" },
-  datePriceText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#00B562" },
-  dateSettlementLabel: {
-    fontFamily: "Gilroy-SemiBold",
+  dateLeft: { flexDirection: "row", alignItems: "center" },
+  dateText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(16), color: "#000", marginRight: hs(4) },
+  monthSettlementContainer: {
+    alignItems: "flex-end",
+  },
+  monthSettlementAmount: {
+    fontSize: fs(14),
+    fontFamily: "Gilroy-Bold",
+    color: "#00B562",
+  },
+  monthSettlementLabel: {
     fontSize: fs(10),
-    color: COLORS.text.muted,
+    fontFamily: "Gilroy-Medium",
+    color: "#8C8C8C",
   },
 
   /* --- HISTORY CARD --- */
   cardContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surface.primary,
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(10),
-    marginBottom: vs(10),
-    width: "100%",
+    backgroundColor: "#F4F7FB",
+    borderRadius: ms(12),
+    padding: ms(10),
+    marginBottom: vs(16),
   },
-  avatarCircle: {
-    width: ms(50),
-    height: ms(50),
-    borderRadius: ms(25),
-    backgroundColor: COLORS.danger,
-    marginRight: hs(10),
-  },
-  cardInfoCol: { flex: 1, flexDirection: "column" },
   cardHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.navBar,
-    paddingBottom: vs(4),
-    marginBottom: vs(6),
   },
-  namePhoneCol: { flexDirection: "column" },
-  cardName: { fontFamily: "Gilroy-Bold", fontSize: fs(16), color: COLORS.text.primary },
-  phoneRow: { flexDirection: "row", alignItems: "center", gap: hs(6), marginTop: vs(2) },
-  cardPhone: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: COLORS.text.primary },
-  priceStatusCol: { alignItems: "center" },
-  cardPrice: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#00B562" },
-  cardStatus: {
+  cardHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  avatarSquircle: {
+    width: ms(36),
+    height: ms(36),
+    borderRadius: ms(8),
+    backgroundColor: "#E4F0FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: hs(12),
+  },
+  namePhoneCol: {
+    justifyContent: "center",
+  },
+  cardName: {
+    fontSize: fs(20),
+    fontFamily: "Gilroy-Bold",
+    color: "#000",
+    marginBottom: vs(2),
+  },
+  cardPhone: {
+    fontSize: fs(18),
+    fontFamily: "Gilroy-Medium",
+    color: "#000",
+  },
+  priceStatusCol: {
+    alignItems: "flex-end",
+  },
+  cardPrice: {
+    fontSize: fs(20),
+    fontFamily: "Gilroy-Bold",
+    color: "#00B562",
+    marginBottom: vs(4),
+  },
+  statusBadgeOnline: {
+    backgroundColor: "#E4F0FF",
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(4),
+    borderRadius: ms(16),
+  },
+  statusBadgeOffline: {
+    backgroundColor: "#FFEBEB",
+    paddingHorizontal: hs(12),
+    paddingVertical: vs(4),
+    borderRadius: ms(16),
+  },
+  statusTextOnline: {
+    color: "#63A1FD",
+    fontSize: fs(14),
     fontFamily: "Gilroy-SemiBold",
-    fontSize: fs(10),
-    color: COLORS.text.muted,
-    marginTop: vs(2),
   },
-  timeRow: { flexDirection: "row", alignItems: "center", gap: hs(8) },
-  cardTime: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: COLORS.text.primary },
+  statusTextOffline: {
+    color: "#E55959",
+    fontSize: fs(14),
+    fontFamily: "Gilroy-SemiBold",
+  },
+
+  cardDivider: {
+    height: 1,
+    backgroundColor: "#D4E5F9",
+    marginVertical: vs(8),
+  },
+
+  cardFooterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  cardFooterLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  calendarSquircle: {
+    width: ms(32),
+    height: ms(32),
+    borderRadius: ms(8),
+    // backgroundColor: "#E4F0FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: hs(12),
+  },
+  cardDateRange: {
+    fontSize: fs(16),
+    fontFamily: "Gilroy-SemiBold",
+    color: "#000",
+  },
+  cardGuestCount: {
+    fontSize: fs(16),
+    fontFamily: "Gilroy-SemiBold",
+    color: "#000",
+  },
   loader: { marginTop: vs(40) },
-  emptyStateText: { textAlign: "center", marginTop: vs(40), color: COLORS.text.muted },
+  emptyStateText: {
+    textAlign: "center",
+    marginTop: vs(40),
+    color: COLORS.text.muted,
+    fontFamily: "Gilroy-Medium",
+  },
 });

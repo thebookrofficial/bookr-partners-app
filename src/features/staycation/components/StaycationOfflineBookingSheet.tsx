@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -9,19 +9,29 @@ import {
   Modal,
   TextInput,
   ScrollView,
-  TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
   Platform,
+  KeyboardAvoidingView,
   Linking,
+  TouchableWithoutFeedback,
+  Image,
 } from "react-native";
 import { Text } from "@/components/ui";
-import { User, Phone, Calendar, ChevronDown, Wallet, Hash } from "lucide-react-native";
+import { User, Phone, Wallet, ArrowLeft, Users, X, Calendar } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/theme";
-import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import { CustomDatePickerModal } from "@/components/ui/CustomDatePickerModal";
 import { supabase } from "@/lib/supabase";
 import { useCreateStaycationOfflineBooking } from "../hooks/useCreateStaycationOfflineBooking";
+
+import MoneySvg from "@/assets/icons/ic-tdesign-money.svg";
+
+const icGpay = require("@/assets/icons/google-pay.png");
+const icPhonepe = require("@/assets/icons/icons8-phone-pe-48.png");
+const icPaytm = require("@/assets/icons/paytm.png");
+const icCash = require("@/assets/icons/pay-50.png");
 
 interface StaycationOfflineBookingSheetProps {
   visible: boolean;
@@ -38,7 +48,6 @@ interface RoomConfig {
   pricePerNight: number;
 }
 
-// 1. Move this OUTSIDE the component (e.g., above the component definition)
 const formatYMD = (d: Date): string => {
   const year = d.getFullYear();
   const month = (d.getMonth() + 1).toString().padStart(2, "0");
@@ -55,6 +64,52 @@ export const StaycationOfflineBookingSheet = ({
 }: StaycationOfflineBookingSheetProps) => {
   const isFarmhouse = activeCategory === "Farmhouse";
   const { createBooking, isLoading } = useCreateStaycationOfflineBooking();
+  const insets = useSafeAreaInsets();
+  const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
+    "cash",
+  );
+
+  const [searchResults, setSearchResults] = useState<{ name: string; phone: string }[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isSelectingFromResults, setIsSelectingFromResults] = useState(false);
+
+  const lookupGuestsByName = async (vId: string, q: string) => {
+    try {
+      const { data } = await supabase
+        .from("staycation_bookings")
+        .select("guest_name, guest_phone")
+        .eq("venue_id", vId)
+        .ilike("guest_name", `%${q}%`)
+        .limit(10);
+      if (!data) return [];
+      const unique = new Map();
+      data.forEach(d => {
+        if (d.guest_name && d.guest_phone && !unique.has(d.guest_phone)) {
+          unique.set(d.guest_phone, { name: d.guest_name, phone: d.guest_phone });
+        }
+      });
+      return Array.from(unique.values());
+    } catch (e) {
+      return [];
+    }
+  };
+
+  const handleNameChange = async (text: string) => {
+    setName(text);
+    if (isSelectingFromResults) {
+      setIsSelectingFromResults(false);
+      return;
+    }
+
+    if (text.trim().length >= 1) {
+      const results = await lookupGuestsByName(venueId, text);
+      setSearchResults(results);
+      setShowSearchResults(results.length > 0);
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  };
 
   const [bookingFor, setBookingFor] = useState(isFarmhouse ? "Farmhouse" : "Cottages");
   const [roomType, setRoomType] = useState("");
@@ -66,6 +121,7 @@ export const StaycationOfflineBookingSheet = ({
   const [phone, setPhone] = useState("");
   const [totalPayment, setTotalPayment] = useState("");
   const [advancePaid, setAdvancePaid] = useState("");
+  const [isAdvanceActive, setIsAdvanceActive] = useState(false);
 
   const [checkInDate, setCheckInDate] = useState(new Date());
   const [checkOutDate, setCheckOutDate] = useState(
@@ -79,8 +135,19 @@ export const StaycationOfflineBookingSheet = ({
     title: string;
   } | null>(null);
 
+  const guestCountRef = useRef<View>(null);
+  const groupTypeRef = useRef<View>(null);
+  const [dropdownLayout, setDropdownLayout] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+
   const [roomConfigs, setRoomConfigs] = useState<Record<string, RoomConfig>>({});
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [bookingDots, setBookingDots] = useState<Record<string, { key: string; color: string }[]>>(
+    {},
+  );
   const [availableUnitsForCurrentDates, setAvailableUnitsForCurrentDates] = useState<number>(1);
   const [farmhouseConfig, setFarmhouseConfig] = useState<{
     basePrice: number;
@@ -89,10 +156,9 @@ export const StaycationOfflineBookingSheet = ({
   } | null>(null);
 
   const formatDateLabel = (date: Date) => {
-    return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+    return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   };
 
-  // --- Derived Values for Dynamic Guest Logic ---
   const activeRoomConfig = roomConfigs[roomType];
   const unitsInt = parseInt(unitCount, 10) || 1;
   const currentGuestInt = parseInt(guestCount, 10) || 1;
@@ -105,14 +171,18 @@ export const StaycationOfflineBookingSheet = ({
   const maxExtraGuests = isFarmhouse ? 10 : activeRoomConfig ? unitsInt : 0;
   const totalAllowedGuests = maxStandardGuests + maxExtraGuests;
   const extraGuestsCount = Math.max(0, currentGuestInt - maxStandardGuests);
-  const totalExtraCharge = isFarmhouse
-    ? extraGuestsCount * (farmhouseConfig?.extraCharge || 0)
-    : activeRoomConfig
-    ? extraGuestsCount * activeRoomConfig.extraGuestCharge
-    : 0;
-  const currentInventoryCount = activeRoomConfig ? activeRoomConfig.totalInventory : 1;
 
-  // Fetch Farmhouse Config
+  const displayNights = Math.max(
+    1,
+    Math.round((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)),
+  );
+  let extraGuestAmount = 0;
+  if (isFarmhouse && farmhouseConfig) {
+    extraGuestAmount = extraGuestsCount * farmhouseConfig.extraCharge * displayNights;
+  } else if (!isFarmhouse && activeRoomConfig) {
+    extraGuestAmount = extraGuestsCount * activeRoomConfig.extraGuestCharge * displayNights;
+  }
+
   useEffect(() => {
     if (visible && isFarmhouse && venueId) {
       const fetchFarmhouseConfig = async () => {
@@ -134,8 +204,6 @@ export const StaycationOfflineBookingSheet = ({
     }
   }, [visible, isFarmhouse, venueId]);
 
-  // Auto-calculation for Total Payment
-  // Unified Auto-calculation
   useEffect(() => {
     const nights = Math.max(
       1,
@@ -149,13 +217,11 @@ export const StaycationOfflineBookingSheet = ({
       const extraCost = extraGuestsCount * farmhouseConfig.extraCharge * nights;
       total = baseCost + extraCost;
     } else if (!isFarmhouse && activeRoomConfig) {
-      // Rooms calculation: (Price * Units * Nights) + Extra Guest Charges
       const baseCost = activeRoomConfig.pricePerNight * unitsInt * nights;
       const extraCost = extraGuestsCount * activeRoomConfig.extraGuestCharge * nights;
       total = baseCost + extraCost;
     }
 
-    // Only update if the value actually changed to prevent unnecessary re-renders
     if (total > 0 && total.toString() !== totalPayment) {
       setTotalPayment(total.toString());
     }
@@ -163,12 +229,12 @@ export const StaycationOfflineBookingSheet = ({
   }, [
     isFarmhouse,
     farmhouseConfig,
-    activeRoomConfig, // Tracks room price changes
+    activeRoomConfig,
     guestCount,
     checkInDate,
     checkOutDate,
     extraGuestsCount,
-    unitsInt, // Tracks unit count changes
+    unitsInt,
   ]);
 
   useEffect(() => {
@@ -204,8 +270,6 @@ export const StaycationOfflineBookingSheet = ({
     }
   }, [visible, isFarmhouse, venueId, roomType]);
 
-  // Track exactly how many units are available for the currently selected Check In/Out dates
-  // Track exactly how many units are available for the currently selected Check In/Out dates
   useEffect(() => {
     if (isFarmhouse || !venueId || !roomType || !visible) return;
 
@@ -226,7 +290,6 @@ export const StaycationOfflineBookingSheet = ({
       const dInStr = formatYMD(checkInDate);
       const dOutStr = formatYMD(checkOutDate);
 
-      // FIX: Check the actual availability calendar, NOT the bookings table
       const { data: blocks } = await supabase
         .from("staycation_availability")
         .select("room_id, date")
@@ -234,9 +297,8 @@ export const StaycationOfflineBookingSheet = ({
         .in("room_id", roomIds)
         .eq("is_blocked", true)
         .gte("date", dInStr)
-        .lt("date", dOutStr); // Less than checkout date
+        .lt("date", dOutStr);
 
-      // Count max blocked rooms per date
       const blockCountsPerDate: Record<string, Set<string>> = {};
       blocks?.forEach(b => {
         if (!blockCountsPerDate[b.date]) blockCountsPerDate[b.date] = new Set();
@@ -248,14 +310,12 @@ export const StaycationOfflineBookingSheet = ({
         if (dateSet.size > maxBlocked) maxBlocked = dateSet.size;
       }
 
-      // Final availability is total physical rooms minus the max blocked on any given day
       setAvailableUnitsForCurrentDates(Math.max(0, roomIds.length - maxBlocked));
     };
 
     fetchAvailabilityForDates();
   }, [venueId, roomType, checkInDate, checkOutDate, isFarmhouse, visible]);
 
-  // Ensure guestCount resets if units change and current guest count exceeds new max
   useEffect(() => {
     if (!isFarmhouse && activeRoomConfig && currentGuestInt > totalAllowedGuests) {
       setGuestCount(Math.max(1, totalAllowedGuests).toString());
@@ -270,6 +330,8 @@ export const StaycationOfflineBookingSheet = ({
 
       if (isFarmhouse) {
         const dates = new Set<string>();
+        const newBookingDots: Record<string, { key: string; color: string }[]> = {};
+
         const { data: blocks } = await supabase
           .from("staycation_availability")
           .select("date")
@@ -280,7 +342,7 @@ export const StaycationOfflineBookingSheet = ({
 
         const { data: bookings } = await supabase
           .from("staycation_bookings")
-          .select("check_in_date, check_out_date")
+          .select("check_in_date, check_out_date, booking_source")
           .eq("venue_id", venueId)
           .eq("booking_type", "full_property")
           .neq("booking_status", "cancelled")
@@ -289,13 +351,18 @@ export const StaycationOfflineBookingSheet = ({
         bookings?.forEach(b => {
           let curr = new Date(b.check_in_date);
           const end = new Date(b.check_out_date);
+          const dotColor = b.booking_source === "offline" ? "red" : "blue";
+
           while (curr < end) {
-            dates.add(formatYMD(curr));
+            const dateStr = formatYMD(curr);
+            dates.add(dateStr);
+            if (!newBookingDots[dateStr]) newBookingDots[dateStr] = [];
+            // Adding a single dot per booking day to keep it clean for Farmhouse
+            newBookingDots[dateStr].push({ key: `booking_${Math.random()}`, color: dotColor });
             curr.setDate(curr.getDate() + 1);
           }
         });
 
-        // 3. Fetch Closed Dates
         const { data: closedDates } = await supabase
           .from("venue_closed_dates")
           .select("start_date, end_date")
@@ -311,6 +378,7 @@ export const StaycationOfflineBookingSheet = ({
         });
 
         setBlockedDates(Array.from(dates));
+        setBookingDots(newBookingDots);
       } else {
         if (!roomType) return;
 
@@ -330,11 +398,11 @@ export const StaycationOfflineBookingSheet = ({
         }
 
         const dateCounts: Record<string, number> = {};
+        const newBookingDots: Record<string, { key: string; color: string }[]> = {};
 
-        // Fixed TypeScript Error: Added unit_count to the select statement
         const { data: bookings } = await supabase
           .from("staycation_bookings")
-          .select("check_in_date, check_out_date, unit_count")
+          .select("check_in_date, check_out_date, unit_count, booking_source")
           .eq("venue_id", venueId)
           .in("room_id", roomIds)
           .neq("booking_status", "cancelled")
@@ -343,22 +411,31 @@ export const StaycationOfflineBookingSheet = ({
         bookings?.forEach(b => {
           let curr = new Date(b.check_in_date);
           const end = new Date(b.check_out_date);
+          const dotColor = b.booking_source === "offline" ? "red" : "blue";
+          const units = b.unit_count || 1;
+
           while (curr < end) {
             const dStr = formatYMD(curr);
-            // CRITICAL FIX: Add b.unit_count instead of just +1
-            dateCounts[dStr] = (dateCounts[dStr] || 0) + (b.unit_count || 1);
+            dateCounts[dStr] = (dateCounts[dStr] || 0) + units;
+
+            if (!newBookingDots[dStr]) newBookingDots[dStr] = [];
+            // Add one dot per unit booked or just one per booking
+            for (let i = 0; i < Math.min(units, 3); i++) {
+              newBookingDots[dStr].push({ key: `booking_${Math.random()}`, color: dotColor });
+            }
+
             curr.setDate(curr.getDate() + 1);
           }
         });
 
         const fullDates = [];
         for (const [date, count] of Object.entries(dateCounts)) {
-          // Block if the remaining rooms are less than the units we want to book
           if (totalRoomsOfType - count < unitsInt) {
             fullDates.push(date);
           }
         }
         setBlockedDates(fullDates);
+        setBookingDots(newBookingDots);
       }
     };
 
@@ -393,68 +470,52 @@ export const StaycationOfflineBookingSheet = ({
           if (stayBooking?.guest_name) foundName = stayBooking.guest_name;
         }
         if (foundName) setName(foundName);
-      } catch (err) {
-        // Fallback silently on error
-      }
+      } catch (err) {}
     };
     lookupGuest();
   }, [phone]);
 
   useEffect(() => {
-    setBookingFor(isFarmhouse ? "Farmhouse" : "Rooms");
-    setUnitCount("1");
-    setGuestCount(isFarmhouse ? "10" : "2");
-    setTotalPayment("");
-    setName("");
-    setPhone("");
-    setAdvancePaid("");
+    if (visible) {
+      setBookingFor(isFarmhouse ? "Farmhouse" : "Rooms");
+      setUnitCount("1");
+      setGuestCount(isFarmhouse ? "10" : "2");
+      setTotalPayment("");
+      setName("");
+      setPhone("");
+      setAdvancePaid("");
+      setIsAdvanceActive(false);
+    }
   }, [isFarmhouse, visible]);
 
-  // Add this effect to StaycationOfflineBookingSheet.tsx
   useEffect(() => {
-    if (!visible || isFarmhouse || !venueId || !roomType) return;
+    if (!visible) return;
 
-    const findFirstAvailableDate = async () => {
-      let checkDate = new Date(); // Start from today
-      // let found = false;
+    const currentCheckInStr = formatYMD(checkInDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkInTime = new Date(checkInDate);
+    checkInTime.setHours(0, 0, 0, 0);
 
-      // Safety break at 30 days to prevent infinite loops
-      for (let i = 0; i < 30; i++) {
+    if (blockedDates.includes(currentCheckInStr) || checkInTime < today) {
+      let checkDate = new Date();
+      if (checkInTime > checkDate) {
+        checkDate = new Date(checkInDate);
+      }
+
+      for (let i = 0; i < 60; i++) {
         const dStr = formatYMD(checkDate);
-
-        // We need to check if this specific date has availability
-        // Re-using similar logic to your block calculation
-        const { data: bookings } = await supabase
-          .from("staycation_bookings")
-          .select("check_in_date, check_out_date, unit_count")
-          .eq("venue_id", venueId)
-          .neq("booking_status", "cancelled")
-          .lte("check_in_date", dStr)
-          .gt("check_out_date", dStr);
-
-        const totalOccupied = bookings?.reduce((acc, b) => acc + (b.unit_count || 1), 0) || 0;
-
-        // Assume totalInventory is available in roomConfigs
-        const totalInventory = Object.values(roomConfigs).reduce(
-          (acc, c) => acc + c.totalInventory,
-          0,
-        );
-
-        if (totalOccupied < totalInventory) {
+        if (!blockedDates.includes(dStr)) {
           setCheckInDate(checkDate);
           const tomorrow = new Date(checkDate);
           tomorrow.setDate(tomorrow.getDate() + 1);
           setCheckOutDate(tomorrow);
-          // found = true;
           break;
         }
-
         checkDate.setDate(checkDate.getDate() + 1);
       }
-    };
-
-    findFirstAvailableDate();
-  }, [visible, isFarmhouse, venueId, roomType, roomConfigs]);
+    }
+  }, [visible, blockedDates, checkInDate]);
 
   const handleDropdownSelect = (option: string) => {
     if (!activeDropdown) return;
@@ -465,27 +526,28 @@ export const StaycationOfflineBookingSheet = ({
 
     if (activeDropdown.type === "unitCount") {
       if (option.includes("(Booked)")) {
-        Alert.alert(
-          "Unavailable",
-          "You cannot select this many units for the chosen dates. They are already booked.",
-        );
+        Alert.alert("Unavailable", "You cannot select this many units for the chosen dates.");
         return;
       }
-      // Strip "(Booked)" out if we ever manually bypass the alert, just to be safe
       const cleanValue = option.split(" ")[0];
       setUnitCount(cleanValue);
     }
-
     setActiveDropdown(null);
   };
 
   const handleBookNow = async () => {
-    if (isLoading) {
-      console.warn("[DEBUG: UI] Prevented double submission!");
-      return;
-    }
+    if (isLoading) return;
     if (!venueId) {
       Alert.alert("Error", "Venue information missing.");
+      return;
+    }
+
+    if (!name.trim()) {
+      Alert.alert("Error", "Please enter the guest name.");
+      return;
+    }
+    if (!phone.trim() || phone.replace(/[^\d]/g, "").length !== 10) {
+      Alert.alert("Error", "Please enter a valid 10-digit mobile number.");
       return;
     }
 
@@ -504,31 +566,16 @@ export const StaycationOfflineBookingSheet = ({
         }
         curr.setDate(curr.getDate() + 1);
       }
-
       if (hasConflict) {
         Alert.alert("Error", "The selected dates are already booked or the venue is closed.");
         return;
       }
     }
 
-    const finalName = name.trim();
-    const finalPhone = phone.trim();
-
-    if (!finalName) {
-      Alert.alert("Error", "Please enter the guest name.");
-      return;
-    }
-
-    if (!finalPhone || finalPhone.replace(/[^\d]/g, "").length !== 10) {
-      Alert.alert("Error", "Please enter a valid 10-digit mobile number.");
-      return;
-    }
-
     if (!totalPayment.trim() || isNaN(parseFloat(totalPayment))) {
       Alert.alert("Error", "Please enter a valid total payment amount.");
       return;
     }
-
     const numericTotal = parseFloat(totalPayment);
     const numericAdvance = parseFloat(advancePaid || "0");
 
@@ -539,32 +586,31 @@ export const StaycationOfflineBookingSheet = ({
 
     const result = await createBooking({
       venueId,
-      guestName: finalName,
-      guestPhone: finalPhone,
+      guestName: name.trim(),
+      guestPhone: phone.trim(),
       checkInDate: checkInDate,
       checkOutDate: checkOutDate,
       guestCount: currentGuestInt,
       totalPayment: parseFloat(totalPayment) || 0,
       advancePaid: parseFloat(advancePaid) || 0,
+      paymentMode: selectedMethod,
       bookingType: bookingFor.toLowerCase(),
       roomType: isFarmhouse ? undefined : roomType,
       roomId: undefined,
-      groupType: isFarmhouse ? groupType : undefined,
+      groupType: groupType,
       unitCount: isFarmhouse ? 1 : unitsInt,
       bookingSource: "offline",
     });
 
     if (result.success) {
-      const dueAmount = (parseFloat(totalPayment) || 0) - (parseFloat(advancePaid) || 0);
+      const dueAmount = numericTotal - numericAdvance;
       const appLink =
         Platform.OS === "ios"
           ? "https://apps.apple.com/app/bookr/idYOUR_APP_ID"
           : "https://play.google.com/store/apps/details?id=com.bookr_mobile";
-
       const spicyLine =
         "🔥 Don't let your slot get snatched! Lock in your favorite time instantly on the Bookr app.";
-
-      const shareMessage = `Booking Confirmed! 🎉\nHi ${finalName},\nYour slot at ${
+      const shareMessage = `Booking Confirmed! 🎉\nHi ${name.trim()},\nYour slot at ${
         result.venueName || "our venue"
       } is locked in via Bookr.\n\nDate: ${formatDateLabel(checkInDate)} to ${formatDateLabel(
         checkOutDate,
@@ -587,7 +633,6 @@ export const StaycationOfflineBookingSheet = ({
             const whatsappUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(
               shareMessage,
             )}`;
-
             try {
               const supported = await Linking.canOpenURL(whatsappUrl);
               await Linking.openURL(
@@ -608,66 +653,63 @@ export const StaycationOfflineBookingSheet = ({
     }
   };
 
-  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (event.type === "set" && selectedDate) {
-      const dateStr = formatYMD(selectedDate);
-      if (showDatePicker === "in") {
-        if (blockedDates.includes(dateStr)) {
-          Alert.alert("Date Unavailable", "Not enough rooms available for the selected dates.");
-          setShowDatePicker(null);
-          return;
+  const onDateChange = (selectedDate: Date) => {
+    const dateStr = formatYMD(selectedDate);
+    if (showDatePicker === "in") {
+      if (blockedDates.includes(dateStr)) {
+        Alert.alert("Date Unavailable", "Not enough rooms available for the selected dates.");
+        setShowDatePicker(null);
+        return;
+      }
+      const newCheckIn = selectedDate;
+      const nextDay = new Date(selectedDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      setCheckInDate(newCheckIn);
+      setCheckOutDate(nextDay);
+      const tomorrow = new Date(selectedDate);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      if (selectedDate >= checkOutDate) {
+        setCheckOutDate(tomorrow);
+      } else {
+        let hasBlock = false;
+        let curr = new Date(selectedDate);
+        while (curr < checkOutDate) {
+          if (blockedDates.includes(formatYMD(curr))) {
+            hasBlock = true;
+            break;
+          }
+          curr.setDate(curr.getDate() + 1);
         }
-        const newCheckIn = selectedDate;
-        const nextDay = new Date(selectedDate);
-        nextDay.setDate(nextDay.getDate() + 1); // Force checkout to be at least tomorrow
-
-        setCheckInDate(newCheckIn);
-        setCheckOutDate(nextDay);
-        // setCheckInDate(selectedDate);
-        const tomorrow = new Date(selectedDate);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        if (selectedDate >= checkOutDate) {
+        if (hasBlock) {
+          Alert.alert(
+            "Range Adjusted",
+            "Your previous check-out date overlapped with booked dates. It has been automatically adjusted.",
+          );
           setCheckOutDate(tomorrow);
-        } else {
-          let hasBlock = false;
-          let curr = new Date(selectedDate);
-          while (curr < checkOutDate) {
-            if (blockedDates.includes(formatYMD(curr))) {
-              hasBlock = true;
-              break;
-            }
-            curr.setDate(curr.getDate() + 1);
-          }
-          if (hasBlock) {
-            Alert.alert(
-              "Range Adjusted",
-              "Your previous check-out date overlapped with booked dates. It has been automatically adjusted.",
-            );
-            setCheckOutDate(tomorrow);
-          }
         }
-      } else if (showDatePicker === "out") {
-        if (selectedDate <= checkInDate) {
-          Alert.alert("Invalid Date", "Check-out date must be after check-in date.");
+      }
+    } else if (showDatePicker === "out") {
+      if (selectedDate <= checkInDate) {
+        Alert.alert("Invalid Date", "Check-out date must be after check-in date.");
+      } else {
+        let hasBlock = false;
+        let curr = new Date(checkInDate);
+        while (curr < selectedDate) {
+          if (blockedDates.includes(formatYMD(curr))) {
+            hasBlock = true;
+            break;
+          }
+          curr.setDate(curr.getDate() + 1);
+        }
+        if (hasBlock) {
+          Alert.alert(
+            "Date Unavailable",
+            "The selected date range contains days without enough available rooms.",
+          );
         } else {
-          let hasBlock = false;
-          let curr = new Date(checkInDate);
-          while (curr < selectedDate) {
-            if (blockedDates.includes(formatYMD(curr))) {
-              hasBlock = true;
-              break;
-            }
-            curr.setDate(curr.getDate() + 1);
-          }
-          if (hasBlock) {
-            Alert.alert(
-              "Date Unavailable",
-              "The selected date range contains days without enough available rooms.",
-            );
-          } else {
-            setCheckOutDate(selectedDate);
-          }
+          setCheckOutDate(selectedDate);
         }
       }
     }
@@ -678,367 +720,471 @@ export const StaycationOfflineBookingSheet = ({
     <>
       <Modal
         visible={visible}
-        transparent
+        transparent={false}
         animationType="slide"
         onRequestClose={onClose}
         statusBarTranslucent={true}>
-        <View style={styles.overlay}>
-          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-
+        <KeyboardAvoidingView
+          style={styles.overlay}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={styles.sheetContainer}>
-            <View style={styles.header}>
-              <Text weight="bold" style={styles.title}>
-                OFFLINE BOOKING
-              </Text>
-            </View>
-
             <ScrollView
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.scrollContent}>
-              {/* Name */}
-              {/* {phone.length >= 10 && ( */}
-              <View style={styles.inputGroup}>
-                <View style={styles.labelRow}>
-                  <User size={ms(20)} color={COLORS.text.primary} />
-                  <Text weight="medium" style={styles.label}>
-                    Name
+              {/* Header */}
+              <View style={styles.header}>
+                <TouchableOpacity onPress={onClose} style={styles.backButton}>
+                  <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
+                </TouchableOpacity>
+
+                <View style={styles.headerTitleWrap}>
+                  <Text weight="bold" style={styles.title}>
+                    Add Bookings
                   </Text>
                 </View>
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Yash"
-                    placeholderTextColor={COLORS.text.muted}
-                    value={name}
-                    onChangeText={setName}
-                  />
-                </View>
               </View>
-              {/* )} */}
 
-              {/* Mobile No */}
-              <View style={styles.inputGroup}>
-                <View style={styles.labelRow}>
-                  <Phone size={ms(20)} color={COLORS.text.primary} />
-                  <Text weight="medium" style={styles.label}>
-                    Mobile No
+              {/* BOOKING DETAILS */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Calendar size={ms(20)} color="#000" />
+                  <Text weight="bold" style={styles.sectionTitle}>
+                    BOOKING DETAILS
                   </Text>
                 </View>
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="+91 78349 89934"
-                    placeholderTextColor={COLORS.text.muted}
-                    keyboardType="phone-pad"
-                    value={phone}
-                    onChangeText={text => {
-                      const clean = text.replace(/[^\d]/g, "").slice(0, 10);
-                      setPhone(clean);
-                      if (clean.length < 10) {
-                        setName("");
-                      }
-                    }}
-                  />
-                </View>
-              </View>
-
-              {/* Booking For & Type (OR Units) */}
-              {!isFarmhouse && (
-                <View style={styles.row}>
-                  <View style={styles.col}>
-                    <View style={styles.labelRow}>
-                      <Hash size={ms(20)} color={COLORS.text.primary} />
-                      <Text weight="medium" style={styles.label}>
-                        No. of Units
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.dropdownWrapper}
-                      activeOpacity={0.7}
-                      onPress={() =>
-                        setActiveDropdown({
-                          type: "unitCount",
-                          options: Array.from({ length: currentInventoryCount }, (_, i) => {
-                            const num = i + 1;
-                            const isAvailable = num <= availableUnitsForCurrentDates;
-                            return `${num}${isAvailable ? "" : " (Booked)"}`;
-                          }),
-                          title: `Select Units (${availableUnitsForCurrentDates} Available)`,
-                        })
-                      }>
-                      <Text weight="semiBold" style={styles.dropdownText}>
-                        {unitCount}
-                      </Text>
-                      <ChevronDown size={ms(16)} color={COLORS.text.primary} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.col}>
-                    <View style={styles.labelRow}>
-                      <Text weight="medium" style={styles.label}>
-                        Type
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.dropdownWrapper}
-                      activeOpacity={0.7}
-                      onPress={() =>
-                        setActiveDropdown({
-                          type: "roomType",
-                          options: Object.keys(roomConfigs),
-                          title: "Select Room Type",
-                        })
-                      }>
-                      <Text weight="semiBold" style={styles.dropdownText}>
-                        {roomType}
-                      </Text>
-                      <ChevronDown size={ms(16)} color={COLORS.text.primary} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              {/* Check In & Check Out */}
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <View style={styles.labelRow}>
-                    <Calendar size={ms(20)} color={COLORS.text.primary} />
-                    <Text weight="medium" style={styles.label}>
-                      Check In
-                    </Text>
-                  </View>
+                <View style={styles.grid}>
+                  {/* Check In */}
                   <TouchableOpacity
-                    style={styles.inputWrapper}
-                    activeOpacity={0.7}
-                    onPress={() => setShowDatePicker("in")}>
-                    <Text weight="semiBold" style={styles.inputText}>
-                      {formatDateLabel(checkInDate)}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.col}>
-                  <View style={styles.labelRow}>
-                    <Calendar size={ms(20)} color={COLORS.text.primary} />
-                    <Text weight="medium" style={styles.label}>
-                      Check Out
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.inputWrapper}
-                    activeOpacity={0.7}
-                    onPress={() => setShowDatePicker("out")}>
-                    <Text weight="semiBold" style={styles.inputText}>
-                      {formatDateLabel(checkOutDate)}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Guest Selection */}
-              {isFarmhouse ? (
-                <View style={styles.row}>
-                  <View style={styles.col}>
-                    <View style={styles.labelRow}>
-                      <User size={ms(20)} color={COLORS.text.primary} />
-                      <Text weight="medium" style={styles.label}>
-                        Select Guest
-                      </Text>
+                    style={styles.gridCard}
+                    onPress={() => setShowDatePicker("in")}
+                    activeOpacity={0.7}>
+                    <View style={styles.iconBox}>
+                      <Calendar size={ms(18)} color="#4A80F0" />
                     </View>
+                    <View style={styles.gridCardContent}>
+                      <Text style={styles.gridCardLabel}>Check In</Text>
+                      <Text style={styles.gridCardValue}>{formatDateLabel(checkInDate)}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Check Out */}
+                  <TouchableOpacity
+                    style={styles.gridCard}
+                    onPress={() => setShowDatePicker("out")}
+                    activeOpacity={0.7}>
+                    <View style={styles.iconBox}>
+                      <Calendar size={ms(18)} color="#4A80F0" />
+                    </View>
+                    <View style={styles.gridCardContent}>
+                      <Text style={styles.gridCardLabel}>Check Out</Text>
+                      <Text style={styles.gridCardValue}>{formatDateLabel(checkOutDate)}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* No Of Guest */}
+                  <View style={{ width: "48%" }} ref={guestCountRef}>
                     <TouchableOpacity
-                      style={styles.dropdownWrapper}
-                      activeOpacity={0.7}
-                      onPress={() =>
-                        setActiveDropdown({
-                          type: "guestCount",
-                          options: Array.from({ length: 20 }, (_, i) => (i + 1).toString()),
-                          title: "Select Guest Count",
-                        })
-                      }>
-                      <Text weight="semiBold" style={styles.dropdownText}>
-                        {guestCount}{" "}
-                        {extraGuestsCount > 0 && (
-                          <Text style={{ color: COLORS.danger }}>({extraGuestsCount} Extra)</Text>
-                        )}
-                      </Text>
-                      <ChevronDown size={ms(16)} color={COLORS.text.primary} />
+                      style={[styles.gridCard, { width: "100%" }]}
+                      onPress={() => {
+                        guestCountRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                          setDropdownLayout({
+                            top: pageY + height + vs(4),
+                            left: pageX,
+                            width: ms(200),
+                          });
+                          setActiveDropdown({
+                            type: "guestCount",
+                            options: Array.from(
+                              { length: Math.max(1, totalAllowedGuests) },
+                              (_, i) => (i + 1).toString(),
+                            ),
+                            title: "Select Guest Count",
+                          });
+                        });
+                      }}
+                      activeOpacity={0.7}>
+                      <View style={styles.iconBox}>
+                        <Users size={ms(18)} color="#4A80F0" />
+                      </View>
+                      <View style={styles.gridCardContent}>
+                        <Text style={styles.gridCardLabel}>No Of Guest</Text>
+                        <Text style={styles.gridCardValue}>{guestCount}</Text>
+                      </View>
                     </TouchableOpacity>
-                    {extraGuestsCount > 0 && (
-                      <Text style={styles.extraChargeText}>
-                        Extra Guest Charge: ₹{totalExtraCharge}
+                    {extraGuestAmount > 0 && (
+                      <Text
+                        style={{
+                          fontSize: fs(13),
+                          color: COLORS.danger,
+                          marginTop: vs(-8),
+                          marginBottom: vs(8),
+                          fontFamily: "Gilroy-Medium",
+                          paddingHorizontal: hs(4),
+                        }}>
+                        + ₹{extraGuestAmount} for {extraGuestsCount} extra guest(s)
                       </Text>
                     )}
                   </View>
-                  <View style={styles.col}>
-                    <View style={styles.labelRow}>
-                      <User size={ms(20)} color={COLORS.text.primary} />
-                      <Text weight="medium" style={styles.label}>
-                        Group Type
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.dropdownWrapper}
-                      activeOpacity={0.7}
-                      onPress={() =>
-                        setActiveDropdown({
-                          type: "groupType",
-                          options: ["Family", "Friends", "Corporate", "Couple", "Other"],
-                          title: "Select Group Type",
-                        })
-                      }>
-                      <Text weight="medium" style={styles.dropdownText}>
-                        {groupType}
-                      </Text>
-                      <ChevronDown size={ms(16)} color={COLORS.text.primary} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <User size={ms(20)} color={COLORS.text.primary} />
-                    <Text weight="medium" style={styles.label}>
-                      Select Guest
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.dropdownWrapper}
-                    activeOpacity={0.7}
-                    onPress={() =>
-                      setActiveDropdown({
-                        type: "guestCount",
-                        options: Array.from({ length: Math.max(1, totalAllowedGuests) }, (_, i) =>
-                          (i + 1).toString(),
-                        ),
-                        title: "Select Guest Count",
-                      })
-                    }>
-                    <Text weight="medium" style={styles.dropdownText}>
-                      Select the number of Guest
-                    </Text>
-                    <View style={styles.guestCountRight}>
-                      <Text weight="semiBold" style={styles.guestCountNum}>
-                        {guestCount}{" "}
-                        {extraGuestsCount > 0 && (
-                          <Text style={{ color: COLORS.danger }}>({extraGuestsCount} Extra)</Text>
-                        )}
-                      </Text>
-                      <ChevronDown size={ms(16)} color={COLORS.text.primary} />
-                    </View>
-                  </TouchableOpacity>
-                  {extraGuestsCount > 0 && (
-                    <Text style={styles.extraChargeText}>
-                      Extra Guest Charge: ₹{totalExtraCharge}
-                    </Text>
-                  )}
-                </View>
-              )}
 
-              {/* Payment Details */}
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <View style={styles.labelRow}>
-                    <Wallet size={ms(20)} color={COLORS.text.primary} />
-                    <Text weight="medium" style={styles.label}>
-                      Total Payment
-                    </Text>
-                  </View>
-                  <View style={styles.inputWrapper}>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder={isFarmhouse ? "₹ 1000" : "₹ 2500"}
-                      placeholderTextColor={COLORS.text.muted}
-                      keyboardType="numeric"
-                      value={totalPayment}
-                      onChangeText={setTotalPayment}
-                    />
-                  </View>
-                </View>
-                <View style={styles.col}>
-                  <View style={styles.labelRow}>
-                    <Wallet size={ms(20)} color={COLORS.text.primary} />
-                    <Text weight="medium" style={styles.label}>
-                      Advance Paid
-                    </Text>
-                  </View>
-                  <View style={styles.inputWrapper}>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="₹ 0"
-                      placeholderTextColor="#8C8C8C"
-                      keyboardType="numeric"
-                      value={advancePaid}
-                      onChangeText={text => {
-                        const val = parseFloat(text) || 0;
-                        const total = parseFloat(totalPayment) || 0;
-                        if (val > total) {
-                          setAdvancePaid(total.toString());
-                        } else {
-                          setAdvancePaid(text);
-                        }
+                  {/* Group Type / Room Type */}
+                  <View style={{ width: "48%" }} ref={groupTypeRef}>
+                    <TouchableOpacity
+                      style={[styles.gridCard, { width: "100%" }]}
+                      onPress={() => {
+                        groupTypeRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                          setDropdownLayout({
+                            top: pageY + height + vs(4),
+                            left: pageX + width - ms(200),
+                            width: ms(200),
+                          });
+                          if (isFarmhouse) {
+                            setActiveDropdown({
+                              type: "groupType",
+                              options: ["Family", "Friends", "Corporate", "Couple", "Other"],
+                              title: "Select Group Type",
+                            });
+                          } else {
+                            setActiveDropdown({
+                              type: "roomType",
+                              options: Object.keys(roomConfigs),
+                              title: "Select Room Type",
+                            });
+                          }
+                        });
                       }}
-                    />
+                      activeOpacity={0.7}>
+                      <View style={styles.iconBox}>
+                        <Users size={ms(18)} color="#4A80F0" />
+                      </View>
+                      <View style={styles.gridCardContent}>
+                        <Text style={styles.gridCardLabel}>
+                          {isFarmhouse ? "Group Type" : "Room Type"}
+                        </Text>
+                        <Text style={styles.gridCardValue}>
+                          {isFarmhouse ? groupType : roomType}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </View>
 
-              {/* Submit Button */}
+              {/* CUSTOMER DETAILS */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <User size={ms(20)} color="#000" />
+                  <Text weight="bold" style={styles.sectionTitle}>
+                    CUSTOMER DETAILS
+                  </Text>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputIconBox}>
+                    <Phone size={ms(18)} color="#4A80F0" />
+                  </View>
+                  <View style={styles.inputContent}>
+                    <Text style={styles.inputLabelText}>Mobile No</Text>
+                    <View style={styles.phoneInputRow}>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="Enter Mobile No"
+                        placeholderTextColor={COLORS.text.muted}
+                        keyboardType="phone-pad"
+                        value={phone}
+                        onChangeText={text => {
+                          const clean = text.replace(/[^\d]/g, "").slice(0, 10);
+                          setPhone(clean);
+                          if (clean.length < 10) setName("");
+                        }}
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.autocompleteWrapper}>
+                  <View style={styles.inputContainer}>
+                    <View style={styles.inputIconBox}>
+                      <User size={ms(18)} color="#4A80F0" />
+                    </View>
+                    <View style={styles.inputContent}>
+                      <Text style={styles.inputLabelText}>Name</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="Enter customers name"
+                        placeholderTextColor={COLORS.text.muted}
+                        value={name}
+                        onChangeText={handleNameChange}
+                        onFocus={() => {
+                          if (name.trim().length >= 1 && searchResults.length > 0) {
+                            setShowSearchResults(true);
+                          }
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => setShowSearchResults(false), 300);
+                        }}
+                        autoCorrect={false}
+                        spellCheck={false}
+                        autoComplete="off"
+                      />
+                    </View>
+                  </View>
+
+                  {showSearchResults && searchResults.length > 0 && (
+                    <View style={styles.dropdownContainer}>
+                      <View style={styles.dropdownHeader}>
+                        <Text style={styles.dropdownHeaderText}>Select Customer</Text>
+                        <TouchableOpacity onPress={() => setShowSearchResults(false)}>
+                          <X size={ms(20)} color="#000" />
+                        </TouchableOpacity>
+                      </View>
+                      <ScrollView
+                        keyboardShouldPersistTaps="always"
+                        style={styles.autocompleteScroll}>
+                        {searchResults.map((item, index) => (
+                          <TouchableOpacity
+                            key={`${item.phone}_${index}`}
+                            style={styles.autocompleteItem}
+                            onPress={() => {
+                              setIsSelectingFromResults(true);
+                              setName(item.name);
+                              const cleanPhone = item.phone.replace(/[^\d]/g, "").slice(-10);
+                              setPhone(cleanPhone);
+                              setSearchResults([]);
+                              setShowSearchResults(false);
+                            }}>
+                            <Text style={styles.autocompleteTextLeft}>{item.name}</Text>
+                            <Text style={styles.autocompleteTextRight}>{item.phone}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* PAYMENT DETAILS */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Wallet size={ms(20)} color="#000" />
+                  <Text weight="bold" style={styles.sectionTitle}>
+                    PAYMENT DETAILS
+                  </Text>
+                </View>
+                <View style={styles.grid}>
+                  <View style={styles.gridCard}>
+                    <View style={styles.iconBox}>
+                      <Wallet size={ms(18)} color="#4A80F0" />
+                    </View>
+                    <View style={styles.gridCardContent}>
+                      <Text style={styles.gridCardLabel}>Total Amount</Text>
+                      <View style={styles.currencyRow}>
+                        <Text style={styles.currencySymbol}>₹</Text>
+                        <TextInput
+                          style={styles.amountInput}
+                          placeholder={isFarmhouse ? "1000" : "2500"}
+                          placeholderTextColor={COLORS.text.muted}
+                          keyboardType="numeric"
+                          value={totalPayment}
+                          onChangeText={setTotalPayment}
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.gridCard}>
+                    <View style={styles.iconBoxGreen}>
+                      <MoneySvg width={ms(18)} height={ms(18)} color="#00B562" />
+                    </View>
+                    <View style={styles.gridCardContent}>
+                      <Text style={styles.gridCardLabel}>Advance</Text>
+                      <View style={styles.currencyRow}>
+                        <Text style={styles.currencySymbol}>₹</Text>
+                        <TextInput
+                          style={styles.amountInput}
+                          placeholder="0"
+                          placeholderTextColor="#8C8C8C"
+                          keyboardType="numeric"
+                          value={advancePaid}
+                          onFocus={() => setIsAdvanceActive(true)}
+                          onChangeText={text => {
+                            const val = parseFloat(text) || 0;
+                            const total = parseFloat(totalPayment) || 0;
+                            if (val > total) setAdvancePaid(total.toString());
+                            else setAdvancePaid(text);
+                          }}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {isAdvanceActive || parseFloat(advancePaid) > 0 ? (
+                  <View style={{ marginTop: vs(16) }}>
+                    <Text weight="bold" style={styles.inputLabelText}>
+                      Method
+                    </Text>
+                    <View style={styles.methodsRow}>
+                      {/* Cash */}
+                      <TouchableOpacity
+                        style={[
+                          styles.methodBox,
+                          selectedMethod === "cash" && styles.methodBoxSelectedBlue,
+                        ]}
+                        onPress={() => setSelectedMethod("cash")}>
+                        <Image
+                          source={icCash}
+                          style={[
+                            styles.methodIcon,
+                            selectedMethod === "cash" && styles.methodIconSelected,
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.methodText,
+                            selectedMethod === "cash" && styles.methodTextSelected,
+                          ]}>
+                          Cash
+                        </Text>
+                      </TouchableOpacity>
+                      {/* GPay */}
+                      <TouchableOpacity
+                        style={[
+                          styles.methodBox,
+                          selectedMethod === "gpay" && styles.methodBoxSelectedBlue,
+                        ]}
+                        onPress={() => setSelectedMethod("gpay")}>
+                        <Image
+                          source={icGpay}
+                          style={[
+                            styles.methodIcon,
+                            selectedMethod === "gpay" && styles.methodIconSelected,
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.methodText,
+                            selectedMethod === "gpay" && styles.methodTextSelected,
+                          ]}>
+                          GPay
+                        </Text>
+                      </TouchableOpacity>
+                      {/* PhonePe */}
+                      <TouchableOpacity
+                        style={[
+                          styles.methodBox,
+                          selectedMethod === "phonepe" && styles.methodBoxSelectedBlue,
+                        ]}
+                        onPress={() => setSelectedMethod("phonepe")}>
+                        <Image
+                          source={icPhonepe}
+                          style={[
+                            styles.methodIcon,
+                            selectedMethod === "phonepe" && styles.methodIconSelected,
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.methodText,
+                            selectedMethod === "phonepe" && styles.methodTextSelected,
+                          ]}>
+                          PhonePe
+                        </Text>
+                      </TouchableOpacity>
+                      {/* Paytm */}
+                      <TouchableOpacity
+                        style={[
+                          styles.methodBox,
+                          selectedMethod === "paytm" && styles.methodBoxSelectedBlue,
+                        ]}
+                        onPress={() => setSelectedMethod("paytm")}>
+                        <Image
+                          source={icPaytm}
+                          style={[
+                            styles.methodIcon,
+                            selectedMethod === "paytm" && styles.methodIconSelected,
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.methodText,
+                            selectedMethod === "paytm" && styles.methodTextSelected,
+                          ]}>
+                          Paytm
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            </ScrollView>
+
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
               <TouchableOpacity
-                style={styles.bookNowButton}
-                activeOpacity={0.8}
+                style={styles.bookNowBtn}
                 onPress={handleBookNow}
                 disabled={isLoading}>
                 {isLoading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text weight="bold" family="bison" style={styles.bookNowText}>
-                    Book Now
+                  <Text weight="bold" family="bison" style={styles.bookNowBtnText}>
+                    BOOK NOW
                   </Text>
                 )}
               </TouchableOpacity>
-            </ScrollView>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {showDatePicker && (
-        <DateTimePicker
-          value={showDatePicker === "in" ? checkInDate : checkOutDate}
-          mode="date"
-          display="default"
-          onChange={onDateChange}
-          minimumDate={
-            showDatePicker === "in"
-              ? new Date()
-              : new Date(new Date(checkInDate).setDate(checkInDate.getDate() + 1))
-          }
-        />
-      )}
-
-      {/* Dropdown Modal overlay */}
       <Modal
         visible={!!activeDropdown}
         transparent
         animationType="fade"
         onRequestClose={() => setActiveDropdown(null)}>
         <TouchableWithoutFeedback onPress={() => setActiveDropdown(null)}>
-          <View style={styles.dropdownOverlay}>
+          <View style={{ flex: 1 }}>
             <TouchableWithoutFeedback>
-              <View style={styles.dropdownMenu}>
-                <Text variant="h3" weight="bold" style={styles.dropdownTitle}>
-                  {activeDropdown?.title}
-                </Text>
-                <ScrollView showsVerticalScrollIndicator={false} style={styles.dropdownScroll}>
+              <View
+                style={[
+                  styles.dropdownMenu,
+                  dropdownLayout
+                    ? {
+                        position: "absolute",
+                        top: dropdownLayout.top,
+                        left: dropdownLayout.left,
+                        width: dropdownLayout.width,
+                      }
+                    : {},
+                ]}>
+                <View style={styles.dropdownHeader2}>
+                  <Text style={styles.dropdownTitle}>{activeDropdown?.title}</Text>
+                  <TouchableOpacity
+                    onPress={() => setActiveDropdown(null)}
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                    <X size={ms(20)} color="#000" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView showsVerticalScrollIndicator={true} style={styles.dropdownScroll}>
                   {activeDropdown?.options.map(option => {
-                    // Determine if this count is over the limit
-                    const isOverLimit = parseInt(option, 10) > maxStandardGuests;
+                    const isOverLimit =
+                      activeDropdown.type === "guestCount" &&
+                      parseInt(option, 10) > maxStandardGuests;
+
+                    let isSelected = false;
+                    if (activeDropdown.type === "guestCount") isSelected = guestCount === option;
+                    if (activeDropdown.type === "groupType") isSelected = groupType === option;
+                    if (activeDropdown.type === "roomType") isSelected = roomType === option;
+                    if (activeDropdown.type === "bookingFor") isSelected = bookingFor === option;
+                    if (activeDropdown.type === "unitCount")
+                      isSelected = unitCount === option.split(" ")[0];
+
                     return (
                       <TouchableOpacity
                         key={option}
-                        style={styles.dropdownItem}
+                        style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
                         onPress={() => handleDropdownSelect(option)}>
                         <Text
-                          variant="body1"
-                          weight="medium"
                           style={[
                             styles.dropdownItemText,
                             option.includes("(Booked)") && { color: COLORS.danger },
@@ -1055,87 +1201,293 @@ export const StaycationOfflineBookingSheet = ({
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      <CustomDatePickerModal
+        isVisible={!!showDatePicker}
+        onClose={() => setShowDatePicker(null)}
+        selectedDate={showDatePicker === "in" ? checkInDate : checkOutDate}
+        onSelectDate={onDateChange}
+        minDate={
+          showDatePicker === "in"
+            ? new Date()
+            : new Date(new Date(checkInDate).setDate(checkInDate.getDate() + 1))
+        }
+        blockedDates={
+          showDatePicker === "out"
+            ? blockedDates.filter(d => {
+                const dateObj = new Date(d);
+                dateObj.setDate(dateObj.getDate() - 1);
+                const prevDateStr = formatYMD(dateObj);
+                return blockedDates.includes(prevDateStr);
+              })
+            : blockedDates
+        }
+        bookingDots={bookingDots}
+      />
     </>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0, 0, 0, 0.4)" },
-  backdrop: { ...StyleSheet.absoluteFillObject },
+  overlay: { flex: 1, backgroundColor: COLORS.background },
   sheetContainer: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: ms(20),
-    borderTopRightRadius: ms(20),
-    paddingHorizontal: hs(16),
-    paddingTop: vs(20),
-    paddingBottom: vs(30),
-    maxHeight: "90%",
+    flex: 1,
+    backgroundColor: COLORS.background,
+    paddingTop: vs(50),
   },
-  header: { marginBottom: vs(16) },
-  title: { fontSize: fs(16), color: COLORS.text.primary, textTransform: "uppercase" },
-  scrollContent: { gap: vs(16) },
-  inputGroup: { gap: vs(8) },
-  row: { flexDirection: "row", gap: hs(16) },
-  col: { flex: 1, gap: vs(8) },
-  labelRow: { flexDirection: "row", alignItems: "center", gap: hs(6) },
-  label: { fontSize: fs(14), color: COLORS.text.primary, textTransform: "capitalize" },
-  inputWrapper: {
-    backgroundColor: "#F4F7FC",
-    borderRadius: ms(10),
-    paddingHorizontal: hs(12),
-    height: vs(44),
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: hs(16),
+    marginBottom: vs(24),
+  },
+  backButton: { marginRight: hs(12), marginLeft: -hs(8) },
+  avatarPlaceholder: {
+    width: ms(50),
+    height: ms(50),
+    borderRadius: ms(25),
+    backgroundColor: "#ccc",
+    marginRight: hs(12),
+  },
+  headerTitleWrap: { flex: 1, justifyContent: "center", marginTop: vs(10) },
+  title: { fontSize: fs(20), color: COLORS.text.primary, fontFamily: "Gilroy-Bold" },
+  subtitle: { fontSize: fs(14), color: "#000", fontFamily: "Gilroy-Medium" },
+
+  scrollContent: { paddingHorizontal: hs(16), paddingBottom: vs(120) },
+
+  section: { marginBottom: vs(24) },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(8),
+    marginBottom: vs(12),
+  },
+  sectionTitle: { fontSize: fs(16), color: "#000", fontFamily: "Gilroy-Bold" },
+
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: hs(12),
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  gridCard: {
+    width: "48%",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF3FC",
+    borderRadius: ms(12),
+    padding: ms(10),
+    marginBottom: vs(12),
+  },
+  iconBox: {
+    width: ms(36),
+    height: ms(36),
+    borderRadius: ms(8),
+    backgroundColor: "#CBDFFE",
     justifyContent: "center",
+    alignItems: "center",
+    marginRight: hs(10),
+  },
+  iconBoxGreen: {
+    width: ms(36),
+    height: ms(36),
+    borderRadius: ms(8),
+    backgroundColor: "#D6FFE9",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: hs(10),
+  },
+  gridCardContent: { flex: 1 },
+  gridCardLabel: {
+    fontSize: fs(16),
+    color: "#000",
+    fontFamily: "Gilroy-Bold",
+    marginBottom: vs(2),
+  },
+  gridCardValue: { fontSize: fs(16), color: "#444", fontFamily: "Gilroy-Medium" },
+
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF3FC",
+    borderRadius: ms(12),
+    padding: ms(12),
+    marginBottom: vs(12),
+  },
+  inputIconBox: {
+    width: ms(36),
+    height: ms(36),
+    borderRadius: ms(8),
+    backgroundColor: "#CBDFFE",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: hs(12),
+  },
+  inputContent: { flex: 1, justifyContent: "center" },
+  inputLabelText: {
+    fontSize: fs(16),
+    color: "#000",
+    fontFamily: "Gilroy-Bold",
+    marginBottom: vs(2),
+  },
+  phoneInputRow: { flexDirection: "row", alignItems: "center" },
+  phonePrefix: {
+    fontSize: fs(16),
+    color: "#8C8C8C",
+    fontFamily: "Gilroy-Medium",
+    marginRight: hs(4),
   },
   textInput: {
+    fontFamily: "Gilroy-Medium",
+    fontSize: fs(16),
+    color: COLORS.text.primary,
+    flex: 1,
+    paddingVertical: 0,
+    includeFontPadding: false,
+  },
+  currencyRow: { flexDirection: "row", alignItems: "center" },
+  currencySymbol: {
+    fontSize: fs(16),
+    color: "#000",
+    fontFamily: "Gilroy-Medium",
+    marginRight: hs(2),
+  },
+  amountInput: {
     fontFamily: "Gilroy-SemiBold",
     fontSize: fs(18),
     color: COLORS.text.primary,
-    padding: 0,
-    margin: 0,
+    flex: 1,
+    paddingVertical: 0,
+    includeFontPadding: false,
   },
-  inputText: { fontSize: fs(14), color: COLORS.text.primary },
-  dropdownWrapper: {
-    backgroundColor: "#F4F7FC",
-    borderRadius: ms(10),
-    paddingHorizontal: hs(12),
-    height: vs(44),
+
+  methodsRow: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    marginBottom: vs(16),
+    marginTop: vs(8),
+    gap: hs(8),
   },
-  dropdownText: { fontSize: fs(14), color: COLORS.text.primary, flex: 1 },
-  mutedText: { color: "#8C8C8C" },
-  guestCountRight: { flexDirection: "row", alignItems: "center", gap: hs(6) },
-  guestCountNum: { fontSize: fs(14), color: COLORS.text.primary },
-  extraChargeText: { fontSize: fs(12), color: COLORS.danger, marginTop: vs(2), textAlign: "right" },
-  bookNowButton: {
+  methodBox: {
+    flex: 1,
+    height: vs(75),
+    backgroundColor: "#F4F7FB",
+    borderRadius: ms(8),
+    alignItems: "center",
+    justifyContent: "center",
+    padding: ms(4),
+  },
+  methodBoxSelectedBlue: {
+    backgroundColor: "#63a1fd",
+  },
+  methodIcon: {
+    width: ms(32),
+    height: ms(32),
+    resizeMode: "contain",
+  },
+  methodIconSelected: {
+    tintColor: "",
+  },
+  methodText: {
+    fontFamily: "Gilroy-SemiBold",
+    fontSize: fs(12),
+    color: "#000000",
+    marginTop: vs(4),
+  },
+  methodTextSelected: {
+    color: "#FFFFFF",
+  },
+  autocompleteWrapper: { zIndex: 10, ...Platform.select({ ios: { zIndex: 10 } }) },
+
+  dropdownContainer: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
+    borderRadius: ms(8),
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    zIndex: 100,
+    marginTop: vs(4),
+  },
+  dropdownHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: ms(12),
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  dropdownHeaderText: { fontSize: fs(14), fontFamily: "Gilroy-Bold", color: "#000" },
+  autocompleteScroll: { maxHeight: vs(150) },
+  autocompleteItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: ms(12),
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  autocompleteTextLeft: { fontSize: fs(14), fontFamily: "Gilroy-Medium", color: "#000" },
+  autocompleteTextRight: { fontSize: fs(14), fontFamily: "Gilroy-Medium", color: "#666" },
+
+  footer: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
+    paddingHorizontal: hs(16),
+    paddingTop: vs(12),
+    backgroundColor: COLORS.background,
+  },
+  bookNowBtn: {
     backgroundColor: "#000000",
-    borderRadius: ms(10),
+    borderRadius: ms(12),
     height: vs(50),
     justifyContent: "center",
     alignItems: "center",
-    marginTop: vs(16),
   },
-  bookNowText: { color: "#FFFFFF", fontSize: fs(20), textTransform: "uppercase" },
-  dropdownOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    paddingHorizontal: hs(30),
-  },
+  bookNowBtnText: { color: "#FFFFFF", fontSize: fs(24), textTransform: "uppercase" },
+
   dropdownMenu: {
     backgroundColor: "#FFFFFF",
     borderRadius: ms(12),
-    padding: ms(16),
+    paddingBottom: ms(8),
+    width: ms(200),
     maxHeight: vs(300),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  dropdownTitle: { marginBottom: vs(12), textAlign: "center" },
+  dropdownHeader2: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: vs(12),
+    paddingHorizontal: ms(16),
+    borderBottomWidth: 1,
+    borderBottomColor: "#EAEAEA",
+    marginBottom: vs(8),
+  },
+  dropdownTitle: { fontSize: fs(14), fontFamily: "Gilroy-Bold", color: "#000" },
   dropdownScroll: { maxHeight: vs(250) },
   dropdownItem: {
-    paddingVertical: vs(12),
-    borderBottomWidth: 1,
-    borderBottomColor: "#F4F7FC",
-    alignItems: "center",
+    paddingVertical: vs(10),
+    paddingHorizontal: ms(12),
+    marginHorizontal: ms(8),
+    borderRadius: ms(8),
+    minHeight: vs(35),
+    justifyContent: "center",
+    marginBottom: vs(2),
   },
-  dropdownItemText: { color: COLORS.text.primary },
+  dropdownItemSelected: {
+    backgroundColor: "#E6E6E6",
+  },
+  dropdownItemText: { fontSize: fs(14), fontFamily: "Gilroy-Medium", color: "#000" },
 });

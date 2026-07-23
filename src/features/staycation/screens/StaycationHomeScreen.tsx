@@ -2,9 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useMemo, useEffect } from "react";
-import { StyleSheet, View, ActivityIndicator, TouchableOpacity } from "react-native";
+import { StyleSheet, View, TouchableOpacity } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, StaycationSkeleton } from "@/components/ui";
 import { hs, vs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useStaycationHome } from "../hooks/useStaycationHome";
@@ -48,8 +48,8 @@ export const StaycationHomeScreen = () => {
         backgroundColor={COLORS.background}
         paddingHorizontal={hs(12)}>
         {isLoading && venues.length === 0 ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
+          <View style={{ flex: 1 }}>
+            <StaycationSkeleton />
           </View>
         ) : venues.length === 0 ? (
           <View style={styles.emptyContainer}>

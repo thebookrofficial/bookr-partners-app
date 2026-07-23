@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Alert } from "react-native";
+import { generateTimeSlots, parseTimeTo24Hour as parseTimeTo24 } from "../utils/time.utils";
 
 interface BulkBookingParams {
   ownerId: string | undefined; // Added to securely identify the vendor
@@ -18,45 +19,17 @@ interface BulkBookingParams {
   toTime: string;
   totalAmountPerSlot: number;
   initialPayments: { mode: "cash" | "upi"; amount: number }[];
+  slotDurationMinutes?: number;
 }
-
-const HOURS = [
-  "6 AM",
-  "7 AM",
-  "8 AM",
-  "9 AM",
-  "10 AM",
-  "11 AM",
-  "12 PM",
-  "1 PM",
-  "2 PM",
-  "3 PM",
-  "4 PM",
-  "5 PM",
-  "6 PM",
-  "7 PM",
-  "8 PM",
-  "9 PM",
-  "10 PM",
-  "11 PM",
-  "12 AM",
-];
 
 export const useBulkBooking = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const parseTimeTo24 = (time12h: string) => {
-    if (!time12h || time12h === "12 AM") return "00:00:00";
-    const [time, modifier] = time12h.split(" ");
-    let hours = parseInt(time, 10);
-    if (hours === 12 && modifier === "AM") hours = 0;
-    if (hours < 12 && modifier === "PM") hours += 12;
-    return `${hours.toString().padStart(2, "0")}:00:00`;
-  };
-
   const confirmBulkBooking = async (params: BulkBookingParams) => {
     setIsSubmitting(true);
     try {
+      const slotDuration = params.slotDurationMinutes || 60;
+      const HOURS = generateTimeSlots(6, 24, slotDuration);
       if (!params.ownerId) throw new Error("Authentication error: Could not identify vendor.");
 
       const { venueId, groundId } = params;
@@ -95,18 +68,21 @@ export const useBulkBooking = () => {
 
       for (const d of dates) {
         for (const hour of hourlySlots) {
-          const startTime24 = parseTimeTo24(hour);
-          const nextHour = HOURS[HOURS.indexOf(hour) + 1] || "12 AM";
-          const endTime24 = parseTimeTo24(nextHour);
+          const startTime24 = parseTimeTo24(hour, false);
+          const nextHour =
+            HOURS[HOURS.indexOf(hour) + 1] || (slotDuration < 60 ? "12:00 AM" : "12 AM");
+          const endTime24 = parseTimeTo24(nextHour, true);
 
           // 1. Explicitly check if slot exists first to avoid ghost-slot errors
           const { data: existingSlot } = await supabase
             .from("sports_slots")
-            .select("id, status")
+            .select("id, status, end_time")
             .eq("venue_id", venueId)
             .eq("ground_id", groundId)
             .eq("slot_date", d)
             .eq("start_time", startTime24)
+            .order("end_time", { ascending: true })
+            .limit(1)
             .maybeSingle();
 
           let slotId = existingSlot?.id;
@@ -115,7 +91,29 @@ export const useBulkBooking = () => {
             if (existingSlot.status !== "available") {
               continue;
             }
-            await supabase.from("sports_slots").update({ status: "booked" }).eq("id", slotId);
+
+            if (existingSlot.end_time !== endTime24) {
+              // The existing slot is longer (e.g. 1-hour slot but we want 30-min). We must split it!
+              // 1. Update existing slot's end time and mark as booked
+              await supabase
+                .from("sports_slots")
+                .update({ end_time: endTime24, status: "booked" })
+                .eq("id", slotId);
+
+              // 2. Insert the remaining time as a new available slot
+              await supabase.from("sports_slots").insert({
+                venue_id: venueId,
+                ground_id: groundId,
+                slot_date: d,
+                start_time: endTime24,
+                end_time: existingSlot.end_time,
+                price: params.totalAmountPerSlot,
+                status: "available",
+              });
+            } else {
+              // Exact match, just update status
+              await supabase.from("sports_slots").update({ status: "booked" }).eq("id", slotId);
+            }
           } else {
             const { data: newSlot, error: insErr } = await supabase
               .from("sports_slots")
@@ -143,7 +141,7 @@ export const useBulkBooking = () => {
           const finalBookingType = isBulk ? "multi_slot" : "standard";
 
           // 2. Create Booking Record with ALL missing financial columns
-          const { data: booking, error: bookingError } = await supabase
+          const response: any = await supabase
             .from("sports_bookings")
             .insert({
               user_id: profile?.id || null,
@@ -152,6 +150,7 @@ export const useBulkBooking = () => {
               venue_id: venueId,
               slot_id: slotId,
               booking_status: "confirmed",
+              parent_booking_id: firstBookingId || null,
 
               subtotal: params.totalAmountPerSlot,
               discount_amount: 0,
@@ -166,6 +165,9 @@ export const useBulkBooking = () => {
             })
             .select("id")
             .single();
+
+          const booking = response.data;
+          const bookingError = response.error;
 
           if (bookingError) {
             console.error("Booking Insert Error:", bookingError);

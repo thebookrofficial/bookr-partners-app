@@ -1,148 +1,71 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
-  LayoutAnimation,
-  ActivityIndicator,
+  ScrollView,
+  RefreshControl,
   Modal,
 } from "react-native";
+import { DashboardSkeleton, Text } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
-import { Calendar, ChevronRight, ChevronDown, X } from "lucide-react-native";
+
+import { Calendar, X, ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { Canvas, Path, Skia } from "@shopify/react-native-skia";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import { StaycationTabParamList } from "@/navigation/navigation.types";
-import { useStaycationHome } from "../hooks/useStaycationHome";
-import { useStaycationDashboard } from "../hooks/useStaycationDashboard";
-import { useServiceStore } from "@/store";
 import DatePicker from "react-native-date-picker";
+import Svg, { Path } from "react-native-svg";
 
-const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
+// Navigation & DB Imports
+import { RouteProp, useRoute } from "@react-navigation/native";
+import { StaycationTabParamList } from "@/navigation/navigation.types";
+import { supabase } from "@/lib/supabase";
 
-const FilterTab = ({ label, isActive, onPress, icon }: any) => (
-  <TouchableOpacity
-    style={[styles.selectionTab, isActive && styles.activeSelectionTab]}
-    onPress={onPress}
-    activeOpacity={0.7}>
-    {icon}
-    <Text
-      variant="caption"
-      weight="semiBold"
-      color={isActive ? COLORS.text.inverse : COLORS.text.muted}
-      style={styles.selectionTabText}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
+import { useServiceStore } from "@/store/serviceStore";
+import { useStaycationDashboard } from "../hooks/useStaycationDashboard";
 
-const DonutChart = ({ size = ms(100), strokeWidth = 6, onlineRevenue, totalRevenue }: any) => {
-  const onlineRevNum = parseFloat(onlineRevenue) || 0;
-  const totalRevNum = parseFloat(totalRevenue) || 0;
-
-  const onlineAngle = totalRevNum > 0 ? (onlineRevNum / totalRevNum) * 360 : 0;
-
-  const createArc = (startAngle: number, sweepAngle: number) => {
-    const path = Skia.Path.Make();
-    path.addArc(
-      Skia.XYWHRect(strokeWidth / 2, strokeWidth / 2, size - strokeWidth, size - strokeWidth),
-      startAngle - 90,
-      sweepAngle,
-    );
-    return path;
+const polarToCartesian = (cx: number, cy: number, r: number, angleInDegrees: number) => {
+  const angleInRadians = (Math.PI * (180 - angleInDegrees)) / 180.0;
+  return {
+    x: cx + r * Math.cos(angleInRadians),
+    y: cy - r * Math.sin(angleInRadians),
   };
+};
 
-  const onlinePath = createArc(0, onlineAngle);
-  const offlinePath = createArc(onlineAngle, 360 - onlineAngle);
-
-  return (
-    <View style={{ width: size, height: size }}>
-      <Canvas style={styles.flex1}>
-        {totalRevNum > 0 ? (
-          <>
-            <Path
-              path={onlinePath}
-              color={COLORS.primary}
-              style="stroke"
-              strokeWidth={strokeWidth}
-              strokeCap="round"
-            />
-            <Path
-              path={offlinePath}
-              color={COLORS.danger}
-              style="stroke"
-              strokeWidth={strokeWidth}
-              strokeCap="round"
-            />
-          </>
-        ) : (
-          <Path
-            path={createArc(0, 360)}
-            color="#F4F7FC"
-            style="stroke"
-            strokeWidth={strokeWidth}
-            strokeCap="round"
-          />
-        )}
-      </Canvas>
-      <View style={[StyleSheet.absoluteFill, styles.donutOverlay]}>
-        <Text variant="body2" weight="bold" color="#00B562" style={styles.revenueAmountText}>
-          +₹{totalRevNum.toLocaleString("en-IN")}
-        </Text>
-        <Text variant="body2" color={COLORS.text.primary} style={styles.totalText}>
-          Total
-        </Text>
-      </View>
-    </View>
-  );
+const describeArc = (cx: number, cy: number, r: number, startAngle: number, endAngle: number) => {
+  const start = polarToCartesian(cx, cy, r, startAngle);
+  const end = polarToCartesian(cx, cy, r, endAngle);
+  return ["M", start.x, start.y, "A", r, r, 0, 0, 1, end.x, end.y].join(" ");
 };
 
 export const StaycationDashboardScreen = () => {
-  const navigation = useNavigation<any>();
-  const route = useRoute<RouteProp<StaycationTabParamList, "StaycationDashboard">>();
-  const { activeVenueName } = useServiceStore();
+  const route = useRoute<RouteProp<StaycationTabParamList, any>>();
 
-  // Extract serviceId with fallback from parent navigator
-  let serviceId = route.params?.serviceId;
-  if (!serviceId) {
-    const parentState = navigation.getParent()?.getState();
-    const tabRoute = parentState?.routes.find((r: any) => r.name === "StaycationServiceTabs");
-    const tabParams = tabRoute?.params as any;
-    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
-  }
+  const { selectedCategories, setServiceCategory, activeServiceId } = useServiceStore();
 
-  const { activeVenue: venue } = useStaycationHome(serviceId);
+  // 1. Get Service ID (Priority: Route -> Store)
+  const serviceId = route.params?.serviceId || activeServiceId;
 
-  const [timeFilter, setTimeFilter] = useState("Last Month");
-  const [expandedWeek, setExpandedWeek] = useState<string | null>(null);
+  // 2. Get Category (Priority: Route -> Store)
+  const routeCategory = route.params?.category;
+  const storedCategory = selectedCategories[serviceId];
+  const selectedCategory = routeCategory || storedCategory || "Football";
+
+  const [timeFilter, setTimeFilter] = useState("Last week");
+  const [roomFilter, setRoomFilter] = useState("All Rooms");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Custom Date Range State
+  const [customRange, setCustomRange] = useState({ start: new Date(), end: new Date() });
   const [isCustomModalVisible, setIsCustomModalVisible] = useState(false);
-
-  const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>({
-    start: new Date(),
-    end: new Date(),
-  });
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [tempStart, setTempStart] = useState(new Date());
   const [tempEnd, setTempEnd] = useState(new Date());
-
-  const { isLoading, stats } = useStaycationDashboard(
-    serviceId || "",
-    timeFilter,
-    "All Rooms",
-    customRange,
-  );
-
-  const toggleWeek = (id: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedWeek(expandedWeek === id ? null : id);
-  };
 
   const handleApplyCustomRange = () => {
     setCustomRange({ start: tempStart, end: tempEnd });
@@ -150,52 +73,396 @@ export const StaycationDashboardScreen = () => {
     setIsCustomModalVisible(false);
   };
 
-  return (
-    <ScreenContainer scrollable paddingHorizontal={hs(12)}>
-      <StaycationHeader
-        title={venue?.name || activeVenueName}
-        subtitle="Dashboard"
-        imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : USER_PROFILE}
-      />
+  // Sync route param with store if we arrived via a deep link or specific tab click
+  useEffect(() => {
+    if (routeCategory && routeCategory !== storedCategory) {
+      setServiceCategory(serviceId, routeCategory);
+    }
+  }, [routeCategory, serviceId, storedCategory, setServiceCategory]);
 
-      {/* Selection Tabs */}
-      <View style={styles.sectionHeaderRow}>
-        <Text variant="body1" weight="bold" style={styles.selectionLabel}>
-          Selection
-        </Text>
-        <View style={styles.selectionTabs}>
-          <FilterTab
-            label="Yesterday"
-            isActive={timeFilter === "Yesterday"}
-            onPress={() => setTimeFilter("Yesterday")}
-          />
-          <FilterTab
-            label={"Last\nweek"}
-            isActive={timeFilter === "Last week"}
-            onPress={() => setTimeFilter("Last week")}
-          />
-          <FilterTab
-            label={"Last\nMonth"}
-            isActive={timeFilter === "Last Month"}
-            onPress={() => setTimeFilter("Last Month")}
-          />
-          <FilterTab
-            label="Custom"
-            isActive={timeFilter === "Custom"}
-            onPress={() => {
-              setTempStart(customRange.start);
-              setTempEnd(customRange.end);
-              setIsCustomModalVisible(true);
-            }}
-            icon={
-              <Calendar
-                size={ms(16)}
-                color={timeFilter === "Custom" ? COLORS.text.inverse : COLORS.text.muted}
-              />
-            }
-          />
-        </View>
-      </View>
+  // Dynamic Venue Resolution State
+  const [currentVenueId, setCurrentVenueId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  const {
+    isLoading,
+    rooms,
+    stats: metrics,
+    refetch,
+  } = useStaycationDashboard(currentVenueId, timeFilter, roomFilter, customRange);
+
+  const { activeVenueName } = useServiceStore();
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
+
+  useEffect(() => {
+    const resolveVenue = async () => {
+      setLoading(true);
+      try {
+        const CATEGORY_DB_MAP: Record<string, string> = {
+          Football: "football",
+          "Box Cricket": "box_cricket",
+          Pickleball: "pickleball",
+        };
+        const dbSportType = CATEGORY_DB_MAP[selectedCategory] || selectedCategory;
+
+        const { data: initialVenue } = await supabase
+          .from("venues")
+          .select("id, owner_id, sports_venues(sports_type)")
+          .eq("id", serviceId)
+          .single();
+        if (!initialVenue) return;
+
+        // Check if the initial venue itself matches the sport type
+        const initialSportType = initialVenue.sports_venues?.[0]?.sports_type;
+        let finalVenueId = "";
+
+        if (initialSportType === dbSportType) {
+          finalVenueId = initialVenue.id;
+        } else {
+          const { data: matchedVenue } = await supabase
+            .from("venues")
+            .select("id, sports_venues!inner(sports_type)")
+            .eq("owner_id", initialVenue.owner_id)
+            .eq("sports_venues.sports_type", dbSportType)
+            .limit(1)
+            .maybeSingle();
+
+          if (matchedVenue) finalVenueId = matchedVenue.id;
+        }
+
+        setCurrentVenueId(finalVenueId);
+      } catch (err) {
+        console.error("Dashboard resolution error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (serviceId) resolveVenue();
+  }, [serviceId, selectedCategory]);
+
+  // 6. Revenue Gauge Math
+  const gaugeSize = ms(140);
+  const strokeWidth = ms(24);
+  const gaugeRadius = (gaugeSize - strokeWidth) / 2;
+  const capAngle = (strokeWidth / 2 / gaugeRadius) * (180 / Math.PI);
+  const gapAngle = (ms(6) / gaugeRadius) * (180 / Math.PI);
+  const availableAngle = Math.max(0, 180 - 4 * capAngle - gapAngle);
+
+  const totalRev = metrics.onlineRevenue + metrics.offlineRevenue;
+  const onlinePct = totalRev === 0 ? 0.5 : metrics.onlineRevenue / totalRev;
+
+  const blueAngle = availableAngle * onlinePct;
+  const redAngle = availableAngle * (1 - onlinePct);
+
+  const blueStart = capAngle;
+  const blueEnd = blueStart + blueAngle;
+
+  const redStart = blueEnd + 2 * capAngle + gapAngle;
+  const redEnd = redStart + redAngle;
+
+  return (
+    <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        {/* 1. Header */}
+        <StaycationHeader title={activeVenueName} subtitle="Dashboard" />
+
+        {/* 2. Conditional Rendering for Dashboard Content */}
+        {loading || isLoading ? (
+          <DashboardSkeleton />
+        ) : !currentVenueId ? (
+          <Text style={styles.emptyStateText}>
+            No {selectedCategory} facility setup for this club.
+          </Text>
+        ) : (
+          <>
+            {/* Selection Row */}
+            <View style={styles.selectionRow}>
+              <Text variant="h2" weight="bold" color="#000">
+                Selection
+              </Text>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                activeOpacity={0.7}
+                onPress={() => setIsDropdownOpen(true)}>
+                <Text variant="body1" weight="medium" color="#FFF">
+                  {timeFilter}
+                </Text>
+                <ChevronDown size={ms(18)} color="#FFF" style={{ marginLeft: hs(8) }} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Dropdown Modal */}
+            <Modal visible={isDropdownOpen} transparent animationType="fade">
+              <TouchableOpacity
+                style={styles.modalOverlay}
+                activeOpacity={1}
+                onPress={() => setIsDropdownOpen(false)}>
+                <View style={styles.dropdownContent}>
+                  {["Yesterday", "Last week", "Last Month", "Custom"].map(opt => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={styles.dropdownOption}
+                      onPress={() => {
+                        setIsDropdownOpen(false);
+                        if (opt === "Custom") {
+                          setTempStart(customRange.start);
+                          setTempEnd(customRange.end);
+                          setIsCustomModalVisible(true);
+                        } else {
+                          setTimeFilter(opt);
+                        }
+                      }}>
+                      <Text
+                        variant="body1"
+                        weight="semiBold"
+                        color={timeFilter === opt ? COLORS.primary : "#000"}>
+                        {opt}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </TouchableOpacity>
+            </Modal>
+
+            {/* Ground Row (Conditional) */}
+            {rooms.length > 0 && (
+              <View style={styles.groundSection}>
+                <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+                  Room Filter
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <TouchableOpacity
+                    style={[
+                      styles.groundPill,
+                      roomFilter === "All Rooms" && styles.groundPillActive,
+                    ]}
+                    onPress={() => setRoomFilter("All Rooms")}>
+                    <Text
+                      variant="body2"
+                      weight="semiBold"
+                      color={roomFilter === "All Rooms" ? "#FFF" : COLORS.text.secondary}>
+                      All Rooms
+                    </Text>
+                  </TouchableOpacity>
+                  {rooms.map((room: any) => {
+                    const isActive = roomFilter === room.name;
+                    return (
+                      <TouchableOpacity
+                        key={room.id}
+                        style={[styles.groundPill, isActive && styles.groundPillActive]}
+                        onPress={() => setRoomFilter(room.name)}>
+                        <Text
+                          variant="body2"
+                          weight="semiBold"
+                          color={isActive ? "#FFF" : COLORS.text.secondary}>
+                          {room.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            <Text variant="h2" weight="medium" style={styles.dateRangeText}>
+              {metrics.dateRangeLabel}
+            </Text>
+
+            {/* Booking Details Summary */}
+            <Text variant="h2" weight="bold" style={styles.sectionTitle}>
+              Bookings
+            </Text>
+            <View style={styles.bookingsContainer}>
+              <View style={styles.bookingsLeftCard}>
+                <Text variant="h1" weight="bold" color="#000" style={{ fontSize: fs(36) }}>
+                  {metrics.totalBookings}
+                </Text>
+                <Text variant="caption" weight="medium" color={COLORS.text.secondary}>
+                  Total bookings
+                </Text>
+              </View>
+              <View style={styles.bookingsRightColumn}>
+                <View style={styles.bookingMiniCard}>
+                  <Text variant="h3" weight="bold" color={COLORS.primary}>
+                    {metrics.onlineBookings}
+                  </Text>
+                  <Text variant="caption" weight="medium" color={COLORS.text.secondary}>
+                    Online
+                  </Text>
+                </View>
+                <View style={styles.bookingMiniCard}>
+                  <Text variant="h3" weight="bold" color={COLORS.danger}>
+                    {metrics.offlineBookings}
+                  </Text>
+                  <Text variant="caption" weight="medium" color={COLORS.text.secondary}>
+                    Offline
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Revenue Details Summary */}
+            <Text variant="h2" weight="bold" style={styles.sectionTitle}>
+              Revenue
+            </Text>
+            <View style={styles.bookingsContainer}>
+              <View style={styles.revenueDonutCard}>
+                <View style={styles.revenueDonutContainer}>
+                  <Svg width={gaugeSize} height={gaugeSize / 2 + ms(5)}>
+                    <Path
+                      d={describeArc(gaugeSize / 2, gaugeSize / 2, gaugeRadius, blueStart, blueEnd)}
+                      stroke={COLORS.primary}
+                      strokeWidth={strokeWidth}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d={describeArc(gaugeSize / 2, gaugeSize / 2, gaugeRadius, redStart, redEnd)}
+                      stroke={COLORS.danger}
+                      strokeWidth={strokeWidth}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  </Svg>
+                  <View style={styles.revenueDonutTextContainer}>
+                    <Text variant="body1" weight="bold" color="#000">
+                      +₹{totalRev.toLocaleString("en-IN")}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.revenueRightColumn}>
+                <View style={styles.revenueMiniCard}>
+                  <Text variant="caption" weight="medium" color={COLORS.text.secondary}>
+                    Online{" "}
+                    <Text variant="caption" weight="semiBold" color={COLORS.text.secondary}>
+                      Revenue
+                    </Text>
+                  </Text>
+                  <Text variant="h3" weight="bold" color={COLORS.primary}>
+                    ₹{metrics.onlineRevenue.toLocaleString("en-IN")}
+                  </Text>
+                </View>
+                <View style={styles.revenueMiniCard}>
+                  <Text variant="caption" weight="medium" color={COLORS.text.secondary}>
+                    Offline{" "}
+                    <Text variant="caption" weight="semiBold" color={COLORS.text.secondary}>
+                      Revenue
+                    </Text>
+                  </Text>
+                  <Text variant="h3" weight="bold" color={COLORS.danger}>
+                    ₹{metrics.offlineRevenue.toLocaleString("en-IN")}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Booking Graph */}
+            <Text variant="h2" weight="bold" style={styles.sectionTitle}>
+              Booking graph
+            </Text>
+            <View style={styles.graphContainer}>
+              <View style={styles.yAxis}>
+                {Array.from(
+                  new Set(
+                    Array.from({ length: 9 }, (_, i) =>
+                      Math.round((metrics.maxBookingValue / 8) * (8 - i)),
+                    ),
+                  ),
+                ).map((val, idx) => (
+                  <Text key={idx} variant="caption" weight="medium" style={styles.yAxisText}>
+                    {val}
+                  </Text>
+                ))}
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chartArea}>
+                {metrics.bookingGraphData.map((item: any, index: number) => {
+                  const heightPct = (item.value / (metrics.maxBookingValue || 1)) * 100;
+                  const isMax = item.value === metrics.maxBookingValue && item.value > 0;
+                  return (
+                    <View key={index} style={styles.barColumn}>
+                      <View style={styles.barTrack}>
+                        <View
+                          style={[
+                            styles.barFill,
+                            { height: `${item.value === 0 ? 0 : Math.max(heightPct, 4)}%` },
+                            !isMax && styles.barFillLight,
+                          ]}
+                        />
+                      </View>
+                      <Text variant="caption" weight="bold" color="#000" style={styles.xLabelDate}>
+                        {item.date.split(" ")[0]}
+                      </Text>
+                      <Text
+                        variant="caption"
+                        weight="medium"
+                        color={COLORS.text.muted}
+                        style={styles.xLabelDay}>
+                        {item.day}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Revenue Graph */}
+            <Text variant="h2" weight="bold" style={styles.sectionTitle}>
+              Revenue graph
+            </Text>
+            <View style={styles.revenueGraphContainer}>
+              {metrics.revenueGraphData.length > 0 ? (
+                metrics.revenueGraphData.map((item: any, index: number) => {
+                  const isMax = item.fillPct === "100%";
+                  return (
+                    <View key={index} style={styles.revenueGraphRow}>
+                      <Text
+                        variant="caption"
+                        weight="bold"
+                        color="#000"
+                        style={styles.revenueDateLabel}>
+                        {item.date}
+                      </Text>
+                      <View style={styles.revenueBarContainer}>
+                        <View
+                          style={[
+                            styles.revenueBarTrack,
+                            { width: item.fillPct as any },
+                            isMax && styles.revenueBarTrackMax,
+                          ]}>
+                          <Text
+                            variant="caption"
+                            weight="bold"
+                            color={isMax ? COLORS.primary : "#000"}>
+                            {item.value}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={styles.emptyStateText}>No revenue data available for this range.</Text>
+              )}
+            </View>
+          </>
+        )}
+        <View style={{ height: vs(120) }} />
+      </ScrollView>
 
       {/* Custom Date Selection Modal */}
       <Modal
@@ -263,235 +530,152 @@ export const StaycationDashboardScreen = () => {
         }}
         onCancel={() => setShowEndPicker(false)}
       />
-
-      {isLoading ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-      ) : (
-        <>
-          {/* Booking Details Section */}
-          <View style={styles.sectionContainer}>
-            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              BOOKING DETAILS
-            </Text>
-            <View style={styles.bookingDetailsCard}>
-              <View style={styles.totalBookingsBox}>
-                <View style={styles.totalRow}>
-                  <Text variant="h1" weight="bold" style={styles.totalNumber}>
-                    {stats.totalBookings}
-                  </Text>
-                  <Text variant="body2" weight="semiBold" color="#00B562" style={styles.smallTotal}>
-                    +₹{parseFloat(stats.totalRevenue).toLocaleString("en-IN")}
-                  </Text>
-                </View>
-                <Text variant="body1" color={COLORS.text.primary} style={styles.totalLabel}>
-                  Total bookings
-                </Text>
-              </View>
-
-              <View style={styles.onlineOfflineCol}>
-                <View style={styles.badgeBox}>
-                  <Text variant="body2" color={COLORS.text.primary} style={styles.badgeText}>
-                    Online bookings
-                  </Text>
-                  <Text variant="body1" weight="bold" color={COLORS.primary}>
-                    {stats.onlineBookings}
-                  </Text>
-                </View>
-                <View style={styles.badgeBox}>
-                  <Text variant="body2" color={COLORS.text.primary} style={styles.badgeText}>
-                    Offline bookings
-                  </Text>
-                  <Text variant="body1" weight="bold" color={COLORS.danger}>
-                    {stats.offlineBookings}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Revenue Details Section */}
-          <View style={styles.sectionContainer}>
-            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              REVENUE DETAILS
-            </Text>
-            <View style={styles.revenueCard}>
-              <DonutChart onlineRevenue={stats.onlineRevenue} totalRevenue={stats.totalRevenue} />
-
-              <View style={styles.revenueCol}>
-                <View style={styles.revenueItem}>
-                  <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
-                    Online Collections
-                  </Text>
-                  <Text variant="h2" weight="bold" color={COLORS.primary}>
-                    ₹{parseFloat(stats.onlineRevenue).toLocaleString("en-IN")}
-                  </Text>
-                </View>
-                <View style={styles.revenueItem}>
-                  <Text variant="body2" color={COLORS.text.primary} style={styles.revenueLabel}>
-                    Offline Collections
-                  </Text>
-                  <Text variant="h2" weight="bold" color={COLORS.danger}>
-                    ₹{parseFloat(stats.offlineRevenue).toLocaleString("en-IN")}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Revenue Graph Section */}
-          <View style={styles.sectionContainer}>
-            <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-              REVENUE GRAPH
-            </Text>
-            <View style={styles.graphList}>
-              {stats.weeklyRevenue.length > 0 ? (
-                stats.weeklyRevenue.map(item => {
-                  const isExpanded = expandedWeek === item.id;
-                  return (
-                    <View key={item.id}>
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        onPress={() => item.dailyBreakdown && toggleWeek(item.id)}
-                        style={styles.graphRow}>
-                        <View style={styles.weekLabelBox}>
-                          <Text
-                            variant="body2"
-                            weight="semiBold"
-                            color="#8C8C8C"
-                            style={styles.weekText}>
-                            {item.week}
-                          </Text>
-                          <Text variant="body2" style={styles.dateRangeText}>
-                            {item.dates}
-                          </Text>
-                        </View>
-                        <View style={styles.barWrapper}>
-                          <View
-                            style={[
-                              styles.bar,
-                              { width: hs(Math.max(item.percentage * 2, 20)) }, // Min width for visibility
-                              item.isPrimary && styles.primaryBar,
-                            ]}>
-                            <Text
-                              variant="body2"
-                              weight="semiBold"
-                              color={item.isPrimary ? "#FFFFFF" : "#00B562"}
-                              style={styles.barAmount}>
-                              +₹{item.amount}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.arrowIcon}>
-                          {item.dailyBreakdown ? (
-                            isExpanded ? (
-                              <ChevronDown size={ms(18)} color={COLORS.text.primary} />
-                            ) : (
-                              <ChevronRight size={ms(18)} color={COLORS.text.primary} />
-                            )
-                          ) : (
-                            <ChevronRight size={ms(18)} color={COLORS.text.primary} />
-                          )}
-                        </View>
-                      </TouchableOpacity>
-
-                      {isExpanded && item.dailyBreakdown && (
-                        <View style={styles.dailyList}>
-                          {item.dailyBreakdown.map((day, dIdx) => (
-                            <View key={dIdx} style={styles.dailyRow}>
-                              <View style={styles.dayLabelBox}>
-                                <Text
-                                  variant="body2"
-                                  weight="semiBold"
-                                  color={COLORS.text.primary}
-                                  style={styles.dayText}>
-                                  {day.date}
-                                </Text>
-                              </View>
-                              <View style={styles.barWrapper}>
-                                <View
-                                  style={[
-                                    styles.bar,
-                                    { width: hs(Math.max(day.percentage * 2, 20)) },
-                                  ]}>
-                                  <Text
-                                    variant="body2"
-                                    weight="semiBold"
-                                    color="#63A1FD"
-                                    style={styles.barAmount}>
-                                    +₹{day.amount}
-                                  </Text>
-                                </View>
-                              </View>
-                              <View style={styles.arrowIcon} />
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  );
-                })
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Text variant="body2" color="#8C8C8C">
-                    No revenue data for this period
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </>
-      )}
-
-      <View style={{ height: vs(120) }} />
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  sectionHeaderRow: {
+  scrollContent: { paddingTop: vs(10) },
+
+  // Selection
+  selectionRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
-    marginVertical: vs(12),
-    height: vs(40),
-    gap: hs(10),
+    marginBottom: vs(24),
   },
-  selectionLabel: {
-    fontSize: fs(20),
-    width: hs(120),
-    color: COLORS.text.primary,
-  },
-  selectionTabs: {
-    flex: 1,
+  dropdownButton: {
     flexDirection: "row",
-    gap: hs(10),
-    height: "100%",
+    backgroundColor: "#222",
+    paddingHorizontal: hs(16),
+    paddingVertical: vs(8),
+    borderRadius: ms(8),
+    alignItems: "center",
   },
-  selectionTab: {
-    flex: 1,
-    height: "100%",
+  dropdownContent: {
+    backgroundColor: "#FFF",
+    borderRadius: ms(12),
+    padding: ms(8),
+    width: hs(160),
+    alignSelf: "flex-end",
+    marginTop: vs(120),
+    marginRight: hs(20),
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  dropdownOption: { paddingVertical: vs(12), paddingHorizontal: hs(12) },
+
+  // Ground
+  groundSection: { marginBottom: vs(24) },
+  groundFilterScroll: { gap: hs(10), paddingRight: hs(20) },
+  groundPill: {
+    paddingHorizontal: hs(24),
+    paddingVertical: vs(8),
+    borderRadius: ms(20),
     backgroundColor: "#F4F7FC",
-    borderRadius: ms(10),
+  },
+  groundPillActive: { backgroundColor: "#63A1FD" },
+
+  dateRangeText: { textAlign: "center", marginBottom: vs(24), color: "#555" },
+  sectionTitle: { marginBottom: vs(16), color: "#000" },
+
+  // Bookings
+  bookingsContainer: {
+    flexDirection: "row",
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(16),
+    padding: ms(16),
+    marginBottom: vs(24),
+    gap: hs(12),
+  },
+  bookingsLeftCard: {
+    flex: 1,
     justifyContent: "center",
+    alignItems: "flex-start",
+    paddingLeft: hs(8),
+  },
+  bookingsRightColumn: { flex: 1, flexDirection: "row", gap: hs(8) },
+  bookingMiniCard: {
+    flex: 1,
+    backgroundColor: "#FFF",
+    borderRadius: ms(12),
+    paddingVertical: vs(16),
     alignItems: "center",
-    flexDirection: "column",
-  },
-  activeSelectionTab: {
-    backgroundColor: "#282828",
-    borderWidth: 1,
-    borderColor: "#CBDFFE",
-  },
-  selectionTabText: {
-    fontSize: fs(12),
-    textAlign: "center",
-  },
-  activeSelectionTabText: {
-    color: COLORS.text.inverse,
+    justifyContent: "center",
   },
 
-  // Modal Styles
+  // Revenue
+  revenueDonutCard: { flex: 1, justifyContent: "center", alignItems: "center" },
+  revenueRightColumn: { flex: 1, gap: vs(8) },
+  revenueMiniCard: {
+    backgroundColor: "#FFF",
+    borderRadius: ms(12),
+    paddingVertical: vs(12),
+    paddingHorizontal: hs(12),
+    justifyContent: "center",
+  },
+
+  revenueDonutContainer: {
+    width: ms(140),
+    height: ms(75),
+    position: "relative",
+    alignItems: "center",
+  },
+  revenueDonutTextContainer: {
+    position: "absolute",
+    bottom: vs(0),
+    width: "100%",
+    alignItems: "center",
+  },
+
+  // Booking Graph
+  graphContainer: { flexDirection: "row", height: vs(280), marginBottom: vs(32) },
+  yAxis: {
+    justifyContent: "space-between",
+    paddingRight: hs(10),
+    borderRightWidth: 1,
+    borderRightColor: "#E0E0E0",
+    height: vs(280),
+    paddingBottom: vs(10),
+  },
+  yAxisText: { textAlign: "right", fontSize: fs(10), minWidth: hs(24), color: "#888" },
+  chartArea: {
+    paddingLeft: hs(14),
+    paddingRight: hs(20),
+    flexDirection: "row",
+    gap: hs(16),
+    alignItems: "flex-end",
+    height: vs(280),
+  },
+  barColumn: { alignItems: "center", width: hs(36) },
+  barTrack: { width: "100%", height: vs(280), justifyContent: "flex-end" },
+  barFill: { width: "100%", backgroundColor: COLORS.primary, borderRadius: ms(10) },
+  barFillLight: { backgroundColor: "#CBDFFE" },
+  xLabelDate: { marginTop: vs(8), fontSize: fs(10) },
+  xLabelDay: { fontSize: fs(10) },
+
+  // Revenue Graph
+  revenueGraphContainer: { gap: vs(16), marginBottom: vs(20) },
+  revenueGraphRow: { flexDirection: "row", alignItems: "center" },
+  revenueDateLabel: { width: hs(45), fontSize: fs(10) },
+  revenueBarContainer: { flex: 1 },
+  revenueBarTrack: {
+    height: vs(36),
+    backgroundColor: "#EEF4FF",
+    borderRadius: ms(18),
+    justifyContent: "center",
+    alignItems: "flex-end",
+    paddingRight: hs(16),
+    minWidth: hs(60),
+  },
+  revenueBarTrackMax: {
+    backgroundColor: "#E6F0FF",
+  },
+
+  // Modals
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -513,12 +697,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: vs(20),
   },
-  modalContent: {
-    gap: vs(12),
-  },
-  inputLabel: {
-    color: COLORS.text.muted,
-  },
+  modalContent: { gap: vs(12) },
+  inputLabel: { color: COLORS.text.muted },
   dateInput: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -537,164 +717,6 @@ const styles = StyleSheet.create({
     marginTop: vs(10),
   },
 
-  sectionContainer: {
-    marginTop: vs(24),
-  },
-  sectionTitle: {
-    fontSize: fs(16),
-    color: COLORS.text.primary,
-    marginBottom: vs(12),
-    textTransform: "uppercase",
-  },
-  bookingDetailsCard: {
-    backgroundColor: "#F4F7FC",
-    borderRadius: ms(10),
-    padding: ms(6),
-    flexDirection: "row",
-    minHeight: vs(70),
-  },
-  totalBookingsBox: {
-    flex: 1,
-    paddingLeft: hs(20),
-    justifyContent: "center",
-  },
-  totalRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: hs(4),
-  },
-  totalNumber: {
-    fontSize: fs(36),
-    lineHeight: fs(36),
-    color: COLORS.text.primary,
-  },
-  smallTotal: {
-    fontSize: fs(12),
-    marginBottom: vs(4),
-  },
-  totalLabel: {
-    fontSize: fs(16),
-    marginTop: vs(2),
-  },
-  onlineOfflineCol: {
-    flex: 1.2,
-    gap: vs(6),
-    justifyContent: "center",
-  },
-  badgeBox: {
-    backgroundColor: "rgba(203, 223, 254, 0.5)",
-    paddingVertical: vs(8),
-    paddingHorizontal: hs(12),
-    borderRadius: ms(10),
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  badgeText: {
-    fontSize: fs(14),
-  },
-  revenueCard: {
-    backgroundColor: "#FFFFFF",
-    flexDirection: "row",
-    alignItems: "center",
-    padding: ms(12),
-    borderRadius: ms(10),
-    gap: hs(24),
-  },
-  donutOverlay: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  revenueCol: {
-    flex: 1,
-    gap: vs(12),
-  },
-  revenueItem: {
-    gap: vs(2),
-  },
-  revenueLabel: {
-    fontSize: fs(14),
-  },
-  graphList: {
-    gap: vs(12),
-  },
-  graphRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(10),
-    height: vs(46),
-  },
-  weekLabelBox: {
-    width: hs(70),
-    alignItems: "center",
-  },
-  weekText: {
-    fontSize: fs(10),
-  },
-  dateRangeText: {
-    fontSize: fs(8),
-    color: COLORS.text.primary,
-  },
-  barWrapper: {
-    flex: 1,
-    height: vs(34),
-    justifyContent: "center",
-  },
-  bar: {
-    height: "100%",
-    backgroundColor: "#F4F7FC",
-    borderRadius: ms(10),
-    justifyContent: "center",
-    alignItems: "flex-end",
-    paddingHorizontal: hs(10),
-  },
-  primaryBar: {
-    backgroundColor: "#63A1FD",
-  },
-  barAmount: {
-    fontSize: fs(10),
-  },
-  arrowIcon: {
-    width: ms(20),
-    alignItems: "center",
-  },
-  dailyList: {
-    marginTop: vs(6),
-    paddingLeft: hs(20),
-    gap: vs(6),
-  },
-  dailyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(10),
-    height: vs(34),
-  },
-  dayLabelBox: {
-    width: hs(50),
-    alignItems: "center",
-  },
-  dayText: {
-    fontSize: fs(12),
-  },
-  flex1: {
-    flex: 1,
-  },
-  revenueAmountText: {
-    fontSize: fs(14),
-  },
-  totalText: {
-    fontSize: fs(10),
-  },
-  loaderContainer: {
-    height: vs(300),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyContainer: {
-    height: vs(100),
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F4F7FC",
-    borderRadius: ms(10),
-  },
+  loader: { marginTop: vs(60) },
+  emptyStateText: { textAlign: "center", marginTop: vs(60), color: COLORS.text.muted },
 });
