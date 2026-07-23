@@ -893,7 +893,15 @@ export const StaycationOfflineBookingSheet = ({
                         keyboardType="phone-pad"
                         value={phone}
                         onChangeText={text => {
-                          const clean = text.replace(/[^\d]/g, "").slice(0, 10);
+                          let clean = text.replace(/\D/g, "");
+                          if (
+                            text.includes("+") ||
+                            (clean.length > 10 && (clean.startsWith("91") || clean.startsWith("0")))
+                          ) {
+                            clean = clean.slice(-10);
+                          } else if (clean.length > 10) {
+                            clean = clean.slice(0, 10);
+                          }
                           setPhone(clean);
                           if (clean.length < 10) setName("");
                         }}

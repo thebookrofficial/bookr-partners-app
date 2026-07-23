@@ -547,7 +547,15 @@ export const OfflineBookingSheet = ({
                 prefix=""
                 keyboardType="phone-pad"
                 onChangeText={(text: string) => {
-                  const clean = text.replace(/[^\d]/g, "").slice(0, 10);
+                  let clean = text.replace(/\D/g, "");
+                  if (
+                    text.includes("+") ||
+                    (clean.length > 10 && (clean.startsWith("91") || clean.startsWith("0")))
+                  ) {
+                    clean = clean.slice(-10);
+                  } else if (clean.length > 10) {
+                    clean = clean.slice(0, 10);
+                  }
                   setMobile(clean);
                   if (clean.length < 10) {
                     setName("");
