@@ -549,7 +549,7 @@ export const OfflineBookingSheet = ({
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={[styles.sheetContent, { paddingBottom: vs(120) }]}>
+              contentContainerStyle={styles.sheetContent}>
               <SectionHeader icon={UserIcon} text="CUSTOMER DETAILS" />
               <FieldBox
                 icon={Phone}
@@ -1197,12 +1197,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: hs(10),
   },
   footer: {
-    position: "absolute",
-    bottom: 20,
-    left: 0,
-    right: 0,
     paddingHorizontal: hs(10),
     paddingTop: vs(12),
     backgroundColor: COLORS.background,
+    borderTopWidth: 1,
+    borderColor: "#EBEBEB",
   },
 });

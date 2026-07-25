@@ -114,12 +114,12 @@ export const ScreenContainer = ({
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}>
         <Container {...containerProps} style={!scrollable ? containerProps.style : undefined}>
           <View style={[styles.wrapper, style]}>{children}</View>
         </Container>
+        {footer && <View style={styles.footerContainer}>{footer}</View>}
       </KeyboardAvoidingView>
-      {footer && <View style={styles.footerContainer}>{footer}</View>}
     </SafeAreaView>
   );
 };

@@ -175,7 +175,7 @@ export const useAuthLogic = () => {
         .from("client_profiles")
         .select("client_role, account_status")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (profileError) {
         Alert.alert("Error", "Could not fetch user profile details.");
@@ -191,7 +191,18 @@ export const useAuthLogic = () => {
 
       const pendingInviteToken = await AsyncStorage.getItem("@pending_invite_token");
 
-      if (!isAuthorized && !pendingInviteToken) {
+      let hasPendingInvite = false;
+      if (user.email) {
+        const { data: invites } = await supabase
+          .from("staff_invites")
+          .select("id")
+          .eq("email", user.email)
+          .eq("status", "pending")
+          .limit(1);
+        if (invites && invites.length > 0) hasPendingInvite = true;
+      }
+
+      if (!isAuthorized && !pendingInviteToken && !hasPendingInvite) {
         // Regular Bookr user — boot them out and direct to the consumer app
         await supabase.auth.signOut();
         Alert.alert(

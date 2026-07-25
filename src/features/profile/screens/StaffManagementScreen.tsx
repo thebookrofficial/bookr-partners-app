@@ -68,8 +68,9 @@ export const StaffManagementScreen = () => {
           try {
             await StaffService.deleteStaff(staffId, isInvite);
             fetchStaff();
-          } catch (error) {
-            Alert.alert("Error", "Could not delete staff");
+          } catch (error: any) {
+            console.error("Delete Staff Error:", error);
+            Alert.alert("Error", error?.message || "Could not delete staff");
           }
         },
       },
@@ -119,7 +120,7 @@ export const StaffManagementScreen = () => {
           style={styles.addButton}
           onPress={() => navigation.navigate("AddStaff", { serviceCategory, venueId })}>
           <UserPlus size={ms(16)} color={COLORS.text.inverse} />
-          <Text variant="body2" weight="bold" color={COLORS.text.inverse}>
+          <Text variant="body2" weight="bold" align="center" color={COLORS.text.inverse}>
             Add Staff
           </Text>
         </TouchableOpacity>

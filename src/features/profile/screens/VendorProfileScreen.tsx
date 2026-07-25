@@ -15,6 +15,7 @@ import { COLORS } from "@/constants/theme";
 import { STRINGS } from "@/constants/strings";
 import { useAuthStore, useServiceStore } from "@/store";
 import { useVendorData } from "../hooks/useVendorData";
+import { StaffInvitePopup } from "../components/StaffInvitePopup";
 
 export const VendorProfileScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -81,6 +82,7 @@ export const VendorProfileScreen = () => {
       paddingHorizontal={hs(12)}
       refreshing={loading && venues.length > 0}
       onRefresh={refresh}>
+      <StaffInvitePopup onRefresh={refresh} />
       <View style={styles.appBar}>
         <View style={styles.appBarLeft}>
           <Text variant="h3" weight="bold">

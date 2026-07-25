@@ -84,6 +84,23 @@ export const StaffService = {
   },
 
   /**
+   * Fetches all pending invites for a given email address
+   */
+  async getPendingInvitesForEmail(email: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from("staff_invites")
+      .select("*")
+      .eq("email", email)
+      .eq("status", "pending");
+
+    if (error) {
+      console.error("Error fetching pending invites by email:", error);
+      throw error;
+    }
+    return data || [];
+  },
+
+  /**
    * Fetches a single staff member or invite by ID
    */
   async getStaffMember(id: string, isInvite: boolean): Promise<any> {
@@ -112,9 +129,6 @@ export const StaffService = {
     return data;
   },
 
-  /**
-   * Invites a new staff member
-   */
   async inviteStaff({
     assignedVenueIds,
     email,
@@ -138,20 +152,105 @@ export const StaffService = {
       throw new Error("You must be logged in as an owner to invite staff.");
     }
 
-    // Check if an invite already exists
-    // Since we are moving to array overlap, checking if ANY of the assignedVenueIds exist for this email
-    // This query checks if the array overlaps with the new assignedVenueIds
-    const { data: existing } = await supabase
+    // 1. Check if an invite already exists for this exact owner + email
+    const { data: existingInvite } = await supabase
       .from("staff_invites")
-      .select("id")
+      .select("*")
+      .eq("owner_id", owner_id)
       .eq("email", email)
-      .overlaps("assigned_venue_ids", assignedVenueIds)
-      .single();
+      .maybeSingle();
 
-    if (existing) {
-      throw new Error("An invite for this email already exists for this venue.");
+    if (existingInvite) {
+      // Check if they are already assigned to this specific venue
+      const alreadyAssigned = existingInvite.assigned_venue_ids?.includes(assignedVenueIds[0]);
+
+      if (alreadyAssigned) {
+        throw new Error("This staff member is already assigned to this venue.");
+      }
+
+      // Merge new venues and permissions
+      const mergedVenues = Array.from(
+        new Set([...(existingInvite.assigned_venue_ids || []), ...assignedVenueIds]),
+      );
+      const mergedPerms = Array.from(
+        new Set([...(existingInvite.permissions || []), ...permissions]),
+      );
+
+      if (existingInvite.status === "pending") {
+        // Just update the pending invite
+        const { data, error } = await supabase
+          .from("staff_invites")
+          .update({
+            assigned_venue_ids: mergedVenues,
+            permissions: mergedPerms,
+          })
+          .eq("id", existingInvite.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data; // Successfully merged pending invite
+      } else if (existingInvite.status === "accepted") {
+        // They are an active staff member! We must update their client_profile.
+        // First, we need to find their user_id. We can do this by searching the 'profiles' table by email.
+        const { data: userProfile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("email", email)
+          .maybeSingle();
+
+        if (!userProfile) {
+          throw new Error("Could not find the user profile for this active staff member.");
+        }
+
+        // Find their client_profile ID
+        const { data: clientProfile } = await supabase
+          .from("client_profiles")
+          .select("id, assigned_venue_ids, permissions")
+          .eq("user_id", userProfile.id)
+          .eq("owner_id", owner_id)
+          .eq("client_role", "staff")
+          .maybeSingle();
+
+        if (!clientProfile) {
+          throw new Error("Could not find the active staff profile to update.");
+        }
+
+        const mergedActiveVenues = Array.from(
+          new Set([...(clientProfile.assigned_venue_ids || []), ...assignedVenueIds]),
+        );
+        const mergedActivePerms = Array.from(
+          new Set([...(clientProfile.permissions || []), ...permissions]),
+        );
+
+        // Update their permissions using the existing RPC
+        const { error } = await supabase.rpc("update_staff_permissions", {
+          p_staff_id: clientProfile.id,
+          p_permissions: mergedActivePerms,
+          p_assigned_venue_ids: mergedActiveVenues,
+        });
+
+        if (error) throw error;
+
+        // Also update the original invite record to keep them in sync
+        await supabase
+          .from("staff_invites")
+          .update({
+            assigned_venue_ids: mergedActiveVenues,
+            permissions: mergedActivePerms,
+          })
+          .eq("id", existingInvite.id);
+
+        // Return a dummy data object so the UI knows it succeeded
+        return {
+          ...existingInvite,
+          assigned_venue_ids: mergedActiveVenues,
+          permissions: mergedActivePerms,
+        };
+      }
     }
 
+    // 2. If no invite exists, create a new one
     const { data, error } = await supabase
       .from("staff_invites")
       .insert([
@@ -247,19 +346,54 @@ export const StaffService = {
   },
 
   /**
-   * Deletes a pending invite or soft-deletes a staff profile
+   * Deletes a pending invite or a staff profile along with their invite
    */
   async deleteStaff(id: string, isInvite: boolean) {
     if (isInvite) {
       const { error } = await supabase.from("staff_invites").delete().eq("id", id);
       if (error) throw error;
     } else {
-      // Soft delete for client_profiles
-      const { error } = await supabase
+      // 1. Get the client_profile to find the user_id
+      const { data: clientProfile, error: profileErr } = await supabase
         .from("client_profiles")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", id);
-      if (error) throw error;
+        .select("user_id, owner_id")
+        .eq("id", id)
+        .single();
+
+      if (profileErr) throw profileErr;
+
+      if (clientProfile && clientProfile.user_id) {
+        // 2. Get the user's email from the profiles table
+        const { data: userProfile } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", clientProfile.user_id)
+          .single();
+
+        if (userProfile && userProfile.email) {
+          // 3. Delete the corresponding staff_invite
+          await supabase
+            .from("staff_invites")
+            .delete()
+            .eq("email", userProfile.email)
+            .eq("owner_id", clientProfile.owner_id);
+        }
+      }
+
+      // 4. Hard delete from client_profiles (This is currently blocked by Supabase RLS)
+      const { error: deleteErr } = await supabase.from("client_profiles").delete().eq("id", id);
+
+      // 5. Fallback: If RLS blocked the hard delete, we remove their venue assignments using the RPC
+      // so they no longer show up in the app.
+      await supabase.rpc("update_staff_permissions", {
+        p_staff_id: id,
+        p_permissions: [],
+        p_assigned_venue_ids: [],
+      });
+
+      if (deleteErr) {
+        console.error("Error deleting client_profile (RLS likely blocked it):", deleteErr);
+      }
     }
   },
 

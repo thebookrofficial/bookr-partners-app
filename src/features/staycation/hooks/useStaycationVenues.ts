@@ -49,8 +49,19 @@ export const useStaycationVenues = (options: UseStaycationVenuesOptions = {}) =>
             )
           `,
           )
-          .eq("owner_id", clientProfile.id)
           .eq("vertical", "staycation");
+
+        if (clientProfile.client_role === "staff") {
+          const assignedVenues = clientProfile.assigned_venue_ids || [];
+          if (assignedVenues.length === 0) {
+            setVenues([]);
+            setIsLoading(false);
+            return;
+          }
+          query = query.in("id", assignedVenues);
+        } else {
+          query = query.eq("owner_id", clientProfile.id);
+        }
 
         if (propertyType) query = query.eq("staycation_venues.property_type", propertyType);
         if (bookingType) query = query.eq("staycation_venues.booking_type", bookingType);
@@ -125,7 +136,15 @@ export const useStaycationVenues = (options: UseStaycationVenuesOptions = {}) =>
         setIsLoading(false);
       }
     },
-    [clientProfile?.id, propertyType, bookingType, initialVenueId, activeVenueId],
+    [
+      clientProfile?.id,
+      clientProfile?.client_role,
+      clientProfile?.assigned_venue_ids,
+      propertyType,
+      bookingType,
+      initialVenueId,
+      activeVenueId,
+    ],
   );
 
   useEffect(() => {

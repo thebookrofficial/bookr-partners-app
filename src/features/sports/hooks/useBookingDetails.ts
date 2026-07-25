@@ -371,7 +371,13 @@ export const useBookingDetails = (bookingId: string, idChain?: string[]) => {
       }
 
       const logToRemove = paymentLogs.find(l => l.id === logId);
-      const amountToRemove = logToRemove ? Number(logToRemove.amount) : 0;
+      if (!logToRemove) throw new Error("Payment log not found.");
+
+      if (logToRemove.isInitial || logId.startsWith("initial-chain-")) {
+        throw new Error("The initial advance payment cannot be removed.");
+      }
+
+      const amountToRemove = Number(logToRemove.amount);
 
       // 1. Optimistic Update
       setPaymentLogs(prev => prev.filter(l => l.id !== logId));

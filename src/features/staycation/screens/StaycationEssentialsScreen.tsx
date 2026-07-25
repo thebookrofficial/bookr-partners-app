@@ -58,6 +58,9 @@ export const StaycationEssentialsScreen = () => {
 
   const { activeVenue: venue } = useStaycationHome(serviceId);
 
+  const isFarmhouseLayout =
+    venue?.property_type === "farmhouse" && venue?.booking_type === "full_property";
+
   const handlePress = (label: string) => {
     if (label === "Close date") {
       navigation.navigate("StaycationCloseDate", { serviceId });
@@ -83,15 +86,19 @@ export const StaycationEssentialsScreen = () => {
       />
 
       <View style={styles.listContainer}>
-        <EssentialsItem label="Close date" Icon={Ban} onPress={() => handlePress("Close date")} />
+        {isFarmhouseLayout && (
+          <EssentialsItem label="Close date" Icon={Ban} onPress={() => handlePress("Close date")} />
+        )}
         {/* <EssentialsItem label="Offers" Icon={Ticket} onPress={() => handlePress("Offers")} /> */}
         <EssentialsItem label="Payouts" Icon={Banknote} onPress={() => handlePress("Payouts")} />
         <EssentialsItem label="FAQ's" Icon={HelpCircle} onPress={() => handlePress("FAQ's")} />
-        <EssentialsItem
-          label="Staff Management"
-          Icon={User}
-          onPress={() => handlePress("Staff Management")}
-        />
+        {isFarmhouseLayout && (
+          <EssentialsItem
+            label="Staff Management"
+            Icon={User}
+            onPress={() => handlePress("Staff Management")}
+          />
+        )}
         {/* <EssentialsItem
           label="Update Venue Info"
           Icon={RefreshCw}

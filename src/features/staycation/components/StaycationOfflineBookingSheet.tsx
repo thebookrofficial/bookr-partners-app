@@ -729,9 +729,7 @@ export const StaycationOfflineBookingSheet = ({
         animationType="slide"
         onRequestClose={onClose}
         statusBarTranslucent={true}>
-        <KeyboardAvoidingView
-          style={styles.overlay}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <KeyboardAvoidingView style={styles.overlay} behavior="padding">
           <View style={styles.sheetContainer}>
             <ScrollView
               showsVerticalScrollIndicator={false}
@@ -1282,7 +1280,7 @@ const styles = StyleSheet.create({
   title: { fontSize: fs(20), color: COLORS.text.primary, fontFamily: "Gilroy-Bold" },
   subtitle: { fontSize: fs(14), color: "#000", fontFamily: "Gilroy-Medium" },
 
-  scrollContent: { paddingHorizontal: hs(16), paddingBottom: vs(120) },
+  scrollContent: { paddingHorizontal: hs(16), paddingBottom: vs(24) },
 
   section: { marginBottom: vs(24) },
   sectionHeader: {
@@ -1465,13 +1463,10 @@ const styles = StyleSheet.create({
   autocompleteTextRight: { fontSize: fs(14), fontFamily: "Gilroy-Medium", color: "#666" },
 
   footer: {
-    position: "absolute",
-    bottom: 20,
-    left: 0,
-    right: 0,
-    paddingHorizontal: hs(16),
     paddingTop: vs(12),
     backgroundColor: COLORS.background,
+    borderTopWidth: 1,
+    borderColor: "#EBEBEB",
   },
   bookNowBtn: {
     backgroundColor: "#000000",

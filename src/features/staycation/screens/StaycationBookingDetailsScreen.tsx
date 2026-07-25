@@ -559,12 +559,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  fixedBottomActions: {
-    paddingVertical: vs(16),
-    paddingHorizontal: hs(12),
-    backgroundColor: COLORS.background,
-  },
-
   // Header
   screenHeader: {
     flexDirection: "row",
@@ -823,6 +817,13 @@ const styles = StyleSheet.create({
   },
 
   // Bottom Cancel
+  fixedBottomActions: {
+    paddingVertical: vs(12),
+    paddingHorizontal: hs(10),
+    backgroundColor: COLORS.background,
+    borderTopWidth: 1,
+    borderColor: "#EBEBEB",
+  },
   cancelBtnBottom: {
     flexDirection: "row",
     backgroundColor: "#E55959",

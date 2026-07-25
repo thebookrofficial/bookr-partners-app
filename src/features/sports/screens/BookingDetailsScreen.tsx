@@ -710,9 +710,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   fixedBottomActions: {
-    paddingVertical: vs(20),
+    paddingVertical: vs(12),
     paddingHorizontal: hs(10),
     backgroundColor: COLORS.background,
+    borderTopWidth: 1,
+    borderColor: "#EBEBEB",
   },
   confirmCancelBtn: {
     backgroundColor: COLORS.danger,

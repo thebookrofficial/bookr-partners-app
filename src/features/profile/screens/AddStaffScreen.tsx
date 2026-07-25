@@ -283,7 +283,7 @@ export const AddStaffScreen = () => {
         {loading ? (
           <ActivityIndicator color={COLORS.text.inverse} />
         ) : (
-          <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
+          <Text variant="h3" weight="bold" align="center" color={COLORS.text.inverse}>
             Added Staff
           </Text>
         )}
