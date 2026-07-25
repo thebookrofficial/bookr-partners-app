@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -14,6 +14,7 @@ import {
   Modal,
   Pressable,
   TextInput,
+  Keyboard,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, DetailsSkeleton } from "@/components/ui";
@@ -53,6 +54,20 @@ export const BookingDetailsScreen = () => {
   );
 
   const [showCancelModal, setShowCancelModal] = useState(false);
+
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const subs = [
+      Keyboard.addListener("keyboardWillShow", () => setIsKeyboardVisible(true)),
+      Keyboard.addListener("keyboardDidShow", () => setIsKeyboardVisible(true)),
+      Keyboard.addListener("keyboardWillHide", () => setIsKeyboardVisible(false)),
+      Keyboard.addListener("keyboardDidHide", () => setIsKeyboardVisible(false)),
+    ];
+    return () => {
+      subs.forEach(s => s.remove());
+    };
+  }, []);
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [paymentInput, setPaymentInput] = useState("");
@@ -253,62 +268,64 @@ export const BookingDetailsScreen = () => {
       backgroundColor={COLORS.background}
       paddingHorizontal={hs(12)}
       footer={
-        <View style={styles.fixedBottomActions}>
-          {/* 4. Bottom Action Buttons */}
-          <View style={styles.actionRowBottom}>
-            <TouchableOpacity
-              style={styles.repeatBtn}
-              activeOpacity={0.7}
-              onPress={() =>
-                navigation.navigate("RepeatBooking", {
-                  bookingId: booking.id,
-                  venueId: booking.venue_id,
-                  groundId: booking.sports_slots?.ground_id || "",
-                  idChain: booking.idChain,
-                })
-              }>
-              <Text variant="body1" family="bison" style={styles.repeatBtnText}>
-                REPEAT BOOKING
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.rescheduleBtn}
-              disabled={booking.booking_status === "cancelled"}
-              onPress={() => {
-                if (booking.booking_status !== "cancelled") {
-                  navigation.navigate("RescheduleBooking", {
-                    bookingId,
+        !isKeyboardVisible ? (
+          <View style={styles.fixedBottomActions}>
+            {/* 4. Bottom Action Buttons */}
+            <View style={styles.actionRowBottom}>
+              <TouchableOpacity
+                style={styles.repeatBtn}
+                activeOpacity={0.7}
+                onPress={() =>
+                  navigation.navigate("RepeatBooking", {
+                    bookingId: booking.id,
                     venueId: booking.venue_id,
                     groundId: booking.sports_slots?.ground_id || "",
                     idChain: booking.idChain,
-                  });
-                }
-              }}>
-              <Text
-                variant="body1"
-                family="bison"
-                style={[
-                  styles.rescheduleBtnText,
-                  booking.booking_status === "cancelled" && { color: COLORS.text.muted },
-                ]}>
-                RESCHEDULE
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {booking.booking_status !== "cancelled" &&
-            (!isOnline || booking.venues?.allow_cancellation) && (
-              <TouchableOpacity
-                style={styles.cancelBtnBottom}
-                onPress={() => setShowCancelModal(true)}>
-                <Text variant="body1" family="bison" style={styles.cancelBtnBottomText}>
-                  CANCEL YOUR BOOKING
+                  })
+                }>
+                <Text variant="body1" family="bison" style={styles.repeatBtnText}>
+                  REPEAT BOOKING
                 </Text>
-                <Trash2 size={ms(24)} color="#fff" />
               </TouchableOpacity>
-            )}
-        </View>
+
+              <TouchableOpacity
+                style={styles.rescheduleBtn}
+                disabled={booking.booking_status === "cancelled"}
+                onPress={() => {
+                  if (booking.booking_status !== "cancelled") {
+                    navigation.navigate("RescheduleBooking", {
+                      bookingId,
+                      venueId: booking.venue_id,
+                      groundId: booking.sports_slots?.ground_id || "",
+                      idChain: booking.idChain,
+                    });
+                  }
+                }}>
+                <Text
+                  variant="body1"
+                  family="bison"
+                  style={[
+                    styles.rescheduleBtnText,
+                    booking.booking_status === "cancelled" && { color: COLORS.text.muted },
+                  ]}>
+                  RESCHEDULE
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {booking.booking_status !== "cancelled" &&
+              (!isOnline || booking.venues?.allow_cancellation) && (
+                <TouchableOpacity
+                  style={styles.cancelBtnBottom}
+                  onPress={() => setShowCancelModal(true)}>
+                  <Text variant="body1" family="bison" style={styles.cancelBtnBottomText}>
+                    CANCEL YOUR BOOKING
+                  </Text>
+                  <Trash2 size={ms(24)} color="#fff" />
+                </TouchableOpacity>
+              )}
+          </View>
+        ) : null
       }>
       {/* 0. Screen Header */}
       <View style={styles.screenHeader}>
@@ -456,6 +473,7 @@ export const BookingDetailsScreen = () => {
                     style={styles.amountInput}
                     keyboardType="numeric"
                     value={paymentInput}
+                    onFocus={() => setIsKeyboardVisible(true)}
                     onChangeText={text => {
                       const numericValue = text.replace(/[^0-9]/g, "");
                       setPaymentInput(numericValue);

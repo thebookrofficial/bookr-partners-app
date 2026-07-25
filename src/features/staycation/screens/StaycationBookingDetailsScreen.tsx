@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -13,6 +13,7 @@ import {
   Linking,
   Platform,
   TextInput,
+  Keyboard,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -59,6 +60,20 @@ export const StaycationBookingDetailsScreen = () => {
   const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
     "cash",
   );
+
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const subs = [
+      Keyboard.addListener("keyboardWillShow", () => setIsKeyboardVisible(true)),
+      Keyboard.addListener("keyboardDidShow", () => setIsKeyboardVisible(true)),
+      Keyboard.addListener("keyboardWillHide", () => setIsKeyboardVisible(false)),
+      Keyboard.addListener("keyboardDidHide", () => setIsKeyboardVisible(false)),
+    ];
+    return () => {
+      subs.forEach(s => s.remove());
+    };
+  }, []);
 
   const handleCall = () => {
     const phone = bookingDetails?.profiles?.phone || initialBooking?.phone;
@@ -218,7 +233,7 @@ export const StaycationBookingDetailsScreen = () => {
         backgroundColor={COLORS.background}
         paddingHorizontal={hs(12)}
         footer={
-          !isFromHistory && !isCancelled ? (
+          !isKeyboardVisible && !isFromHistory && !isCancelled ? (
             <View style={styles.fixedBottomActions}>
               <TouchableOpacity
                 style={styles.cancelBtnBottom}
@@ -435,6 +450,7 @@ export const StaycationBookingDetailsScreen = () => {
                       style={styles.amountInput}
                       keyboardType="numeric"
                       value={paymentInput}
+                      onFocus={() => setIsKeyboardVisible(true)}
                       onChangeText={text => setPaymentInput(text.replace(/[^0-9]/g, ""))}
                     />
                     <TouchableOpacity onPress={() => setIsAddingPayment(false)}>

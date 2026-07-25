@@ -13,6 +13,7 @@ import {
   Platform,
   Image,
   ActivityIndicator,
+  Keyboard,
 } from "react-native";
 import { Text } from "@/components/ui";
 import {
@@ -523,6 +524,20 @@ export const OfflineBookingSheet = ({
     currentDate.getFullYear() === now.getFullYear();
   const currentHour = now.getHours();
 
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const subs = [
+      Keyboard.addListener("keyboardWillShow", () => setIsKeyboardVisible(true)),
+      Keyboard.addListener("keyboardDidShow", () => setIsKeyboardVisible(true)),
+      Keyboard.addListener("keyboardWillHide", () => setIsKeyboardVisible(false)),
+      Keyboard.addListener("keyboardDidHide", () => setIsKeyboardVisible(false)),
+    ];
+    return () => {
+      subs.forEach(s => s.remove());
+    };
+  }, []);
+
   return (
     <Modal
       visible={isVisible}
@@ -532,7 +547,7 @@ export const OfflineBookingSheet = ({
       statusBarTranslucent={true}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "padding"}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.keyboardAvoid}>
           <View style={[styles.bottomSheetContainer, { paddingBottom: vs(30) + insets.bottom }]}>
             <View style={styles.sheetHeader}>
@@ -559,6 +574,7 @@ export const OfflineBookingSheet = ({
                 isInput={true}
                 prefix=""
                 keyboardType="phone-pad"
+                onFocus={() => setIsKeyboardVisible(true)}
                 onChangeText={(text: string) => {
                   let clean = text.replace(/\D/g, "");
                   if (
@@ -585,6 +601,7 @@ export const OfflineBookingSheet = ({
                   isInput={true}
                   onChangeText={handleNameChange}
                   onFocus={() => {
+                    setIsKeyboardVisible(true);
                     if (name.trim().length >= 1 && searchResults.length > 0) {
                       setShowSearchResults(true);
                     }
@@ -847,21 +864,23 @@ export const OfflineBookingSheet = ({
                 )}
               </View>
             </ScrollView>
-            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
-              <TouchableOpacity
-                style={styles.saveButton}
-                activeOpacity={0.8}
-                onPress={handleBookNow}
-                disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <ActivityIndicator color={COLORS.text.inverse} />
-                ) : (
-                  <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
-                    BOOK NOW
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            {!isKeyboardVisible && (
+              <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  activeOpacity={0.8}
+                  onPress={handleBookNow}
+                  disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <ActivityIndicator color={COLORS.text.inverse} />
+                  ) : (
+                    <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
+                      BOOK NOW
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </KeyboardAvoidingView>
       </TouchableOpacity>
