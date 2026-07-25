@@ -137,6 +137,11 @@ export const StaycationOfflineBookingSheet = ({
 
   const guestCountRef = useRef<View>(null);
   const groupTypeRef = useRef<View>(null);
+  const mobileInputRef = useRef<TextInput>(null);
+  const nameInputRef = useRef<TextInput>(null);
+  const totalPaymentRef = useRef<TextInput>(null);
+  const advancePaymentRef = useRef<TextInput>(null);
+
   const [dropdownLayout, setDropdownLayout] = useState<{
     top: number;
     left: number;
@@ -879,7 +884,10 @@ export const StaycationOfflineBookingSheet = ({
                   </Text>
                 </View>
 
-                <View style={styles.inputContainer}>
+                <TouchableOpacity
+                  style={styles.inputContainer}
+                  activeOpacity={1}
+                  onPress={() => mobileInputRef.current?.focus()}>
                   <View style={styles.inputIconBox}>
                     <Phone size={ms(18)} color="#4A80F0" />
                   </View>
@@ -887,6 +895,7 @@ export const StaycationOfflineBookingSheet = ({
                     <Text style={styles.inputLabelText}>Mobile No</Text>
                     <View style={styles.phoneInputRow}>
                       <TextInput
+                        ref={mobileInputRef}
                         style={styles.textInput}
                         placeholder="Enter Mobile No"
                         placeholderTextColor={COLORS.text.muted}
@@ -908,16 +917,20 @@ export const StaycationOfflineBookingSheet = ({
                       />
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
 
                 <View style={styles.autocompleteWrapper}>
-                  <View style={styles.inputContainer}>
+                  <TouchableOpacity
+                    style={styles.inputContainer}
+                    activeOpacity={1}
+                    onPress={() => nameInputRef.current?.focus()}>
                     <View style={styles.inputIconBox}>
                       <User size={ms(18)} color="#4A80F0" />
                     </View>
                     <View style={styles.inputContent}>
                       <Text style={styles.inputLabelText}>Name</Text>
                       <TextInput
+                        ref={nameInputRef}
                         style={styles.textInput}
                         placeholder="Enter customers name"
                         placeholderTextColor={COLORS.text.muted}
@@ -936,7 +949,7 @@ export const StaycationOfflineBookingSheet = ({
                         autoComplete="off"
                       />
                     </View>
-                  </View>
+                  </TouchableOpacity>
 
                   {showSearchResults && searchResults.length > 0 && (
                     <View style={styles.dropdownContainer}>
@@ -980,7 +993,10 @@ export const StaycationOfflineBookingSheet = ({
                   </Text>
                 </View>
                 <View style={styles.grid}>
-                  <View style={styles.gridCard}>
+                  <TouchableOpacity
+                    style={styles.gridCard}
+                    activeOpacity={1}
+                    onPress={() => totalPaymentRef.current?.focus()}>
                     <View style={styles.iconBox}>
                       <Wallet size={ms(18)} color="#4A80F0" />
                     </View>
@@ -989,6 +1005,7 @@ export const StaycationOfflineBookingSheet = ({
                       <View style={styles.currencyRow}>
                         <Text style={styles.currencySymbol}>₹</Text>
                         <TextInput
+                          ref={totalPaymentRef}
                           style={styles.amountInput}
                           placeholder={isFarmhouse ? "1000" : "2500"}
                           placeholderTextColor={COLORS.text.muted}
@@ -998,9 +1015,12 @@ export const StaycationOfflineBookingSheet = ({
                         />
                       </View>
                     </View>
-                  </View>
+                  </TouchableOpacity>
 
-                  <View style={styles.gridCard}>
+                  <TouchableOpacity
+                    style={styles.gridCard}
+                    activeOpacity={1}
+                    onPress={() => advancePaymentRef.current?.focus()}>
                     <View style={styles.iconBoxGreen}>
                       <MoneySvg width={ms(18)} height={ms(18)} color="#00B562" />
                     </View>
@@ -1009,6 +1029,7 @@ export const StaycationOfflineBookingSheet = ({
                       <View style={styles.currencyRow}>
                         <Text style={styles.currencySymbol}>₹</Text>
                         <TextInput
+                          ref={advancePaymentRef}
                           style={styles.amountInput}
                           placeholder="0"
                           placeholderTextColor="#8C8C8C"
@@ -1024,7 +1045,7 @@ export const StaycationOfflineBookingSheet = ({
                         />
                       </View>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 </View>
 
                 {isAdvanceActive || parseFloat(advancePaid) > 0 ? (

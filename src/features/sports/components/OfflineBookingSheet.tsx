@@ -112,8 +112,20 @@ const FieldBox = ({
   style,
   ...textInputProps
 }: any) => {
+  const inputRef = React.useRef<RNTextInput>(null);
+
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    } else if (isInput && inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
   const content = (
-    <View style={[styles.fieldBox, hasBorder && styles.fieldBoxBorder, style]}>
+    <View
+      style={[styles.fieldBox, hasBorder && styles.fieldBoxBorder, style]}
+      pointerEvents={onPress ? "none" : "auto"}>
       <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
         <Icon size={ms(18)} color={iconColor} />
       </View>
@@ -133,6 +145,7 @@ const FieldBox = ({
               </Text>
             ) : null}
             <RNTextInput
+              ref={inputRef}
               style={styles.fieldInput}
               placeholder={placeholder}
               placeholderTextColor={COLORS.text.muted}
@@ -153,14 +166,14 @@ const FieldBox = ({
     </View>
   );
 
-  if (onPress) {
-    return (
-      <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={{ width: "100%" }}>
-        {content}
-      </TouchableOpacity>
-    );
-  }
-  return content;
+  return (
+    <TouchableOpacity
+      activeOpacity={onPress ? 0.7 : 1}
+      onPress={handlePress}
+      style={{ width: "100%" }}>
+      {content}
+    </TouchableOpacity>
+  );
 };
 
 export const OfflineBookingSheet = ({

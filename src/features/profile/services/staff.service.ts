@@ -33,7 +33,8 @@ export const StaffService = {
       .from("client_profiles")
       .select("*")
       .contains("assigned_venue_ids", [venueId])
-      .eq("client_role", "staff");
+      .eq("client_role", "staff")
+      .is("deleted_at", null);
 
     if (staffError) {
       console.error("Error fetching active staff:", staffError);
@@ -158,6 +159,7 @@ export const StaffService = {
           owner_id,
           email,
           phone,
+          name: _name,
           address: _address,
           joining_date: _joiningDate,
           assigned_venue_ids: assignedVenueIds,

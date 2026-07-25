@@ -11,6 +11,7 @@ import {
   Platform,
   Pressable,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -97,6 +98,23 @@ export const SportsHomeScreen = () => {
   const [highlightedBookingId, setHighlightedBookingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const shouldReOpenSheet = React.useRef(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("SportsHome_TimeSlotExpanded").then(data => {
+      if (data !== null) {
+        setIsTimeSlotExpanded(data === "true");
+      }
+    });
+  }, []);
+
+  const toggleTimeSlot = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const nextState = !isTimeSlotExpanded;
+    setIsTimeSlotExpanded(nextState);
+    AsyncStorage.setItem("SportsHome_TimeSlotExpanded", nextState.toString()).catch(e =>
+      console.error("Failed to save time slot expanded state", e),
+    );
+  };
 
   const { activeVenueName, setActiveVenueName } = useServiceStore();
   const isFocused = useIsFocused();
@@ -317,10 +335,7 @@ export const SportsHomeScreen = () => {
                   <TouchableOpacity
                     style={styles.timeSlotHeader}
                     activeOpacity={0.7}
-                    onPress={() => {
-                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                      setIsTimeSlotExpanded(!isTimeSlotExpanded);
-                    }}>
+                    onPress={toggleTimeSlot}>
                     <Text variant="body1" weight="bold" style={styles.sectionTitle}>
                       TIME SLOT
                     </Text>

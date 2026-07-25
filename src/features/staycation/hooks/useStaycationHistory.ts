@@ -40,7 +40,10 @@ export const useStaycationHistory = (
   } | null>(null);
 
   const fetchHistoryData = useCallback(async () => {
-    if (!activeVenue?.venueId) return;
+    if (!activeVenue?.venueId) {
+      setIsLoading(false);
+      return;
+    }
 
     try {
       setIsLoading(true);

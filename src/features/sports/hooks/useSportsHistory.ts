@@ -75,8 +75,13 @@ export const useSportsHistory = (
       setCurrentVenueId(finalVenueId);
     } catch (error) {
       console.error("Venue resolution error:", error);
+    } finally {
+      // FIX: Ensure loading state is turned off if venue resolution fails
+      if (!currentVenueId) {
+        setLoading(false);
+      }
     }
-  }, [initialVenueId, category]);
+  }, [initialVenueId, category, currentVenueId]);
 
   // 2. Fetch History using resolved ID
   const fetchHistory = useCallback(async () => {
