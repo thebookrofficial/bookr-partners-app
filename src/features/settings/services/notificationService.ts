@@ -64,7 +64,6 @@ export const notificationService = {
             fcm_token: token,
             platform: Platform.OS,
             last_seen_at: new Date().toISOString(),
-            is_active: true, // Assuming this column exists for soft-disable
           },
           { onConflict: "fcm_token" },
         );
@@ -87,10 +86,10 @@ export const notificationService = {
       } = await supabase.auth.getSession();
 
       if (session?.user?.id && token) {
-        // Option 1: Set is_active to false in DB
-        await supabase.from("user_devices").update({ is_active: false }).eq("fcm_token", token);
+        // Since we don't have an is_active column, we hard delete the device token from the DB.
+        await supabase.from("user_devices").delete().eq("fcm_token", token);
 
-        // Option 2: Delete token from FCM (hard disable)
+        // Optionally, delete token from FCM (hard disable on device level)
         // await messaging().deleteToken();
       }
     } catch (error) {

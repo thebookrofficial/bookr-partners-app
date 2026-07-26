@@ -5,6 +5,8 @@ import { AppNavigator } from "@/navigation";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import * as Sentry from "@sentry/react-native";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useAutoStartCheck } from "@/hooks/useAutoStartCheck";
+import { AutoStartPrompt } from "@/components/ui/AutoStartPrompt";
 import Config from "react-native-config";
 import { withStallion } from "react-native-stallion";
 
@@ -60,6 +62,8 @@ function App() {
     LogBox.ignoreLogs(["NON-FATAL_WARNING_TO_IGNORE"]);
   }, []);
 
+  const { needsAutoStart, openAutoStartSettings } = useAutoStartCheck();
+
   return (
     <SafeAreaProvider>
       <StatusBar
@@ -68,6 +72,7 @@ function App() {
         translucent
       />
       <AppNavigator />
+      <AutoStartPrompt visible={needsAutoStart} onFixSettings={openAutoStartSettings} />
     </SafeAreaProvider>
   );
 }

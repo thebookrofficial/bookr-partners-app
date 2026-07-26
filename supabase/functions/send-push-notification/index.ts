@@ -137,7 +137,8 @@ serve(async req => {
             payload: {
               aps: {
                 "content-available": 1,
-                sound: "default",
+                "interruption-level": "time-sensitive",
+                sound: "notification_audio.wav", // Custom sound for iOS
               },
             },
           },

@@ -1,6 +1,5 @@
-// src/hooks/usePushNotifications.ts
 import { useEffect } from "react";
-import { PermissionsAndroid, Platform } from "react-native";
+import { PermissionsAndroid, Platform, Alert, Linking } from "react-native";
 import messaging, { FirebaseMessagingTypes } from "@react-native-firebase/messaging";
 import { supabase } from "@/lib/supabase";
 
@@ -20,15 +19,30 @@ export const usePushNotifications = () => {
   }, []);
 
   const requestPermissionsAndToken = async () => {
+    // 1. On Android 13+, explicitly request the POST_NOTIFICATIONS permission
     if (Platform.OS === "android" && Platform.Version >= 33) {
       await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
     }
 
+    // 2. Request/Check permission through Firebase (handles iOS and general Android notification settings)
     const authStatus = await messaging().requestPermission();
 
     const enabled =
       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+    if (!enabled) {
+      // If notifications are totally disabled or denied, prompt the user on every cold start
+      Alert.alert(
+        "Notifications Disabled",
+        "You will miss important booking alerts! Please enable notifications in your phone settings to receive new booking banners.",
+        [
+          { text: "Not Now", style: "cancel" },
+          { text: "Open Settings", onPress: () => Linking.openSettings() },
+        ],
+      );
+      return;
+    }
 
     if (enabled) {
       try {
