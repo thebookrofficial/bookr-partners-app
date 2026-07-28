@@ -50,9 +50,8 @@ export type StaycationTabParamList = {
 export type EventTabParamList = {
   EventHome: { serviceId: string };
   EventHistory: { serviceId: string };
-  EventDashboard: { serviceId: string };
   EventScan: { serviceId: string };
-  EventEssentials: { serviceId: string };
+  EventGuestInvite: { serviceId: string };
   EventProfile: undefined;
 };
 

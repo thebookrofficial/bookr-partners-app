@@ -242,7 +242,7 @@ export const EventScanScreen = () => {
         const pass = Array.isArray(b.event_passes) ? b.event_passes[0] : b.event_passes;
         const zone = Array.isArray(b.event_zones) ? b.event_zones[0] : b.event_zones;
 
-        const catName = pass?.name || zone?.zone_name || "General";
+        const catName = pass?.name || zone?.zone_name || "Regular";
         cats.add(catName);
 
         const timeStr = new Date(b.updated_at).toLocaleTimeString("en-GB", {
@@ -310,16 +310,16 @@ export const EventScanScreen = () => {
   // Build tabs cleanly, filtering out Guest from the mapped list to prevent duplicates
   const TABS = [
     { label: "All", count: scannedAttendees.length },
-    {
-      label: "Guest",
-      count: scannedAttendees.filter(a => a.categoryName.toLowerCase() === "guest").length,
-    },
     ...ticketCategories
       .filter(cat => cat.toLowerCase() !== "guest")
       .map(cat => ({
         label: cat,
         count: scannedAttendees.filter(a => a.categoryName === cat).length,
       })),
+    {
+      label: "Guest",
+      count: scannedAttendees.filter(a => a.categoryName.toLowerCase() === "guest").length,
+    },
   ];
 
   const filteredScans =
@@ -443,7 +443,7 @@ export const EventScanScreen = () => {
           const zone = Array.isArray(booking.event_zones)
             ? booking.event_zones[0]
             : booking.event_zones;
-          const actualTicketType = pass?.name || zone?.zone_name || "General";
+          const actualTicketType = pass?.name || zone?.zone_name || "Regular";
 
           setIsScanningMode(false);
           navigation.navigate("EventScanConfirmation", {

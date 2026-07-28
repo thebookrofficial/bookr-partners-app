@@ -8,9 +8,7 @@ import { PillTabs, Text, EventHomeSkeleton } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { EventHeader } from "../components/EventHeader";
-import { EventSummaryStats } from "../components/EventSummaryStats";
 import { EventBookingList } from "../components/EventBookingList";
-import { EventCharts } from "../components/EventCharts";
 import { useEventHomeOpen } from "../hooks/useEventHomeOpen";
 import { useNavigation } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
@@ -33,8 +31,6 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
     bookings,
     totalBookings,
     summaryCategories,
-    chartCategories,
-    chartData,
     activeTab,
     setActiveTab,
     refresh,
@@ -106,14 +102,11 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
           imageSource={USER_PROFILE}
         />
 
-        {/* 2. Summary Stats */}
-        <EventSummaryStats totalBookings={totalBookings} categories={summaryCategories} />
-
-        {/* 3. Controls (Date Filter & Tabs) */}
+        {/* 2. Controls (Date Filter & Tabs) */}
         <View style={styles.controlsContainer}>
           <View style={styles.dateFilterRow}>
             <Text weight="bold" style={styles.dateFilterLabel}>
-              Filter by Date
+              Filter By Date
             </Text>
             <TouchableOpacity
               style={styles.dateSelector}
@@ -142,7 +135,7 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
             </TouchableOpacity>
           </View>
 
-          {tabNames.length > 0 && (
+          {summaryCategories.length > 1 && (
             <View style={styles.tabWrapper}>
               <PillTabs
                 tabs={tabNames}
@@ -154,11 +147,8 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
           )}
         </View>
 
-        {/* 4. Booking List */}
+        {/* 3. Booking List */}
         <EventBookingList bookings={filteredBookings} onBookingPress={handleBookingPress} />
-
-        {/* 5. Charts */}
-        <EventCharts categories={chartCategories} chartData={chartData} />
 
         <View style={{ height: vs(120) }} />
       </ScreenContainer>
@@ -182,17 +172,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   controlsContainer: {
-    marginVertical: vs(10),
+    marginTop: vs(10),
+    marginBottom: vs(2),
   },
   dateFilterRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: hs(6),
-    marginBottom: vs(12),
   },
   dateFilterLabel: {
-    fontSize: fs(14),
+    fontSize: fs(18),
     color: COLORS.text.primary,
   },
   dateSelector: {
@@ -213,6 +203,7 @@ const styles = StyleSheet.create({
     padding: ms(2),
   },
   tabWrapper: {
+    marginTop: vs(12),
     paddingHorizontal: hs(6),
   },
 });

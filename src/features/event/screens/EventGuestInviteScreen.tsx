@@ -17,8 +17,7 @@ import { EventHeader } from "../components/EventHeader";
 import { Trash2, ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { useRoute, RouteProp } from "@react-navigation/native";
-import { MainStackParamList } from "@/navigation/navigation.types";
+import { useRoute, useNavigation } from "@react-navigation/native";
 import { useEventInvites } from "../hooks/useEventInvites";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
@@ -28,8 +27,16 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
  * Sends WhatsApp invitations with obfuscated QR code links.
  */
 export const EventGuestInviteScreen = () => {
-  const route = useRoute<RouteProp<MainStackParamList, "EventGuestInvite">>();
-  const serviceId = route.params?.serviceId || "";
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+
+  let serviceId = route.params?.serviceId;
+  if (!serviceId) {
+    const parentState = navigation.getParent()?.getState();
+    const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
+    const tabParams = tabRoute?.params as any;
+    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+  }
 
   const { invites, loading, isSubmitting, eventTitle, passCategories, sendInvite, deleteInvite } =
     useEventInvites(serviceId);
@@ -38,7 +45,7 @@ export const EventGuestInviteScreen = () => {
   const [guestName, setGuestName] = useState("");
   const [email, setEmail] = useState("");
   const [mobileNo, setMobileNo] = useState("");
-  const [passType, setPassType] = useState("General Entry Pass");
+  const [passType, setPassType] = useState("Regular Entry Pass");
   const [quantity, setQuantity] = useState("1");
 
   // Dropdown Selection State
@@ -76,7 +83,7 @@ export const EventGuestInviteScreen = () => {
       setGuestName("");
       setEmail("");
       setMobileNo("");
-      setPassType(passCategories[0] || "General Entry Pass");
+      setPassType(passCategories[0] || "Regular Entry Pass");
       setQuantity("1");
       Alert.alert("Success", "Invitation sent to guest via WhatsApp!");
     }
@@ -170,7 +177,7 @@ export const EventGuestInviteScreen = () => {
                 onPress={() =>
                   setActiveDropdown({
                     type: "passType",
-                    options: passCategories.length > 0 ? passCategories : ["General Entry Pass"],
+                    options: passCategories.length > 0 ? passCategories : ["Regular Entry Pass"],
                   })
                 }>
                 <Text weight="semiBold" style={styles.inputText}>

@@ -155,7 +155,17 @@ export const useEventHomeOpen = (eventId: string) => {
           // Determine the category name
           const passJoin = Array.isArray(b.event_passes) ? b.event_passes[0] : b.event_passes;
           const zoneJoin = Array.isArray(b.event_zones) ? b.event_zones[0] : b.event_zones;
-          const catName = passJoin?.name || zoneJoin?.zone_name || "General";
+          let catName = passJoin?.name || zoneJoin?.zone_name;
+
+          if (!catName) {
+            if (passesData.length > 0) {
+              catName = passesData[0].name;
+            } else if (zonesData.length > 0) {
+              catName = zonesData[0].zone_name;
+            } else {
+              catName = "Regular";
+            }
+          }
           const passTypeDesc = `${catName} x ${b.ticket_count}`;
 
           // If a booking has a category we didn't pre-fetch, add it dynamically

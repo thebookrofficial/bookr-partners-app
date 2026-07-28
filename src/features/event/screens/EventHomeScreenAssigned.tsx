@@ -8,9 +8,7 @@ import { PillTabs, EventHomeSkeleton } from "@/components/ui";
 import { hs, vs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { EventHeader } from "../components/EventHeader";
-import { EventSummaryStats } from "../components/EventSummaryStats";
 import { EventBookingList } from "../components/EventBookingList";
-import { EventCharts } from "../components/EventCharts";
 import { useEventHomeAssigned } from "../hooks/useEventHomeAssigned";
 import { useNavigation } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
@@ -31,8 +29,6 @@ export const EventHomeScreenAssigned = ({ eventId }: EventHomeScreenAssignedProp
     bookings,
     totalBookings,
     summaryCategories,
-    chartCategories,
-    chartData,
     activeTab,
     setActiveTab,
     refresh,
@@ -73,24 +69,20 @@ export const EventHomeScreenAssigned = ({ eventId }: EventHomeScreenAssignedProp
           imageSource={USER_PROFILE}
         />
 
-        {/* 2. Summary Stats */}
-        <EventSummaryStats totalBookings={totalBookings} categories={summaryCategories} />
+        {/* 2. Filter Tabs */}
+        {summaryCategories.length > 1 && (
+          <View style={styles.tabWrapper}>
+            <PillTabs
+              tabs={tabNames}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              variant="dark"
+            />
+          </View>
+        )}
 
-        {/* 3. Filter Tabs */}
-        <View style={styles.tabWrapper}>
-          <PillTabs
-            tabs={tabNames}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            variant="dark"
-          />
-        </View>
-
-        {/* 4. Booking List */}
+        {/* 3. Booking List */}
         <EventBookingList bookings={filteredBookings} onBookingPress={handleBookingPress} />
-
-        {/* 5. Charts */}
-        <EventCharts categories={chartCategories} chartData={chartData} />
 
         <View style={{ height: vs(120) }} />
       </ScreenContainer>

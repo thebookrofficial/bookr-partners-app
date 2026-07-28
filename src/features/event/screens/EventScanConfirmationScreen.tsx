@@ -59,7 +59,7 @@ export const EventScanConfirmationScreen = () => {
         const profile = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
         const pass = Array.isArray(data.event_passes) ? data.event_passes[0] : data.event_passes;
         const zone = Array.isArray(data.event_zones) ? data.event_zones[0] : data.event_zones;
-        const catName = pass?.name || zone?.zone_name || "General";
+        const catName = pass?.name || zone?.zone_name || "Regular";
 
         setDetails({
           ...data,

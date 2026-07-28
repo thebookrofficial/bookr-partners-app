@@ -22,6 +22,8 @@ import {
   LayoutDashboard,
   MoreHorizontal,
   User,
+  ScanLine,
+  UserPlus,
 } from "lucide-react-native";
 import { Linking, Alert } from "react-native";
 import messaging from "@react-native-firebase/messaging";
@@ -64,11 +66,10 @@ import { DineOffersScreen } from "@/features/dine/screens/DineOffersScreen";
 import { DineBookingDetailsScreen } from "@/features/dine/screens/DineBookingDetailsScreen";
 import { DinePaymentDetailsScreen } from "@/features/dine/screens/DinePaymentDetailsScreen";
 import { EventHomeScreen } from "@/features/event/screens/EventHomeScreen";
-import { EventEssentialsScreen } from "@/features/event/screens/EventEssentialsScreen";
+
 import { EventOffersScreen } from "@/features/event/screens/EventOffersScreen";
 import { EventGuestInviteScreen } from "@/features/event/screens/EventGuestInviteScreen";
 import { EventExportBookingsScreen } from "@/features/event/screens/EventExportBookingsScreen";
-import { EventDashboardScreen } from "@/features/event/screens/EventDashboardScreen";
 import { EventScanScreen } from "@/features/event/screens/EventScanScreen";
 import { EventEntryDetailsScreen } from "@/features/event/screens/EventEntryDetailsScreen";
 import { EventScanConfirmationScreen } from "@/features/event/screens/EventScanConfirmationScreen";
@@ -86,7 +87,7 @@ import { COLORS } from "@/constants/theme";
 
 import { useAuthStore, useServiceStore } from "@/store";
 import { SplashScreen } from "@/screens/SplashScreen";
-import { vs, ms, fs } from "@/utils/responsive.utils";
+import { ms, fs } from "@/utils/responsive.utils";
 
 import { renderCustomTabBar } from "./CustomTabBar";
 // --- AUTHENTICATION IMPORTS ---
@@ -256,14 +257,6 @@ const StaycationTabNavigator = () => {
   );
 };
 
-const ScanTabIcon = () => (
-  <View style={styles.scanButton}>
-    <View style={styles.scanInner}>
-      <View style={styles.scanLine} />
-    </View>
-  </View>
-);
-
 const EventTabNavigator = () => {
   return (
     <EventTab.Navigator
@@ -279,22 +272,18 @@ const EventTabNavigator = () => {
         }}
       />
       <EventTab.Screen
-        name="EventDashboard"
-        component={EventDashboardScreen}
-        options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
-      />
-      <EventTab.Screen
         name="EventScan"
         component={EventScanScreen}
         options={{
           title: "Scan",
-          tabBarIcon: ScanTabIcon,
+          tabBarIcon: TabIcon(ScanLine),
         }}
       />
+
       <EventTab.Screen
-        name="EventEssentials"
-        component={EventEssentialsScreen}
-        options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
+        name="EventGuestInvite"
+        component={EventGuestInviteScreen}
+        options={{ title: "Invites", tabBarIcon: TabIcon(UserPlus) }}
       />
       <EventTab.Screen
         name="EventProfile"
@@ -388,7 +377,6 @@ const MainNavigator = () => {
       <MainStack.Screen name="DineCloseDate" component={DineCloseDateScreen} />
       <MainStack.Screen name="DineOffers" component={DineOffersScreen} />
       <MainStack.Screen name="EventOffers" component={EventOffersScreen} />
-      <MainStack.Screen name="EventGuestInvite" component={EventGuestInviteScreen} />
       <MainStack.Screen name="EventExportBookings" component={EventExportBookingsScreen} />
       <MainStack.Screen name="EventEntryDetails" component={EventEntryDetailsScreen} />
 
@@ -630,33 +618,5 @@ const styles = StyleSheet.create({
     fontSize: fs(24),
     fontWeight: "bold",
     color: COLORS.text.primary,
-  },
-  scanButton: {
-    width: ms(56),
-    height: ms(56),
-    borderRadius: ms(28),
-    backgroundColor: COLORS.text.primary,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: vs(-30),
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  scanInner: {
-    width: ms(24),
-    height: ms(24),
-    borderWidth: 2,
-    borderColor: COLORS.text.inverse,
-    borderRadius: 4,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scanLine: {
-    width: "80%",
-    height: 2,
-    backgroundColor: COLORS.text.inverse,
   },
 });

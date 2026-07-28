@@ -152,7 +152,16 @@ export const useEventHomeAssigned = (eventId: string) => {
             });
           }
 
-          const catName = catId && categoryMap[catId] ? categoryMap[catId] : "General";
+          let catName = catId && categoryMap[catId] ? categoryMap[catId] : null;
+
+          if (!catName) {
+            const keys = Object.keys(categoryMap);
+            if (keys.length > 0) {
+              catName = categoryMap[keys[0]];
+            } else {
+              catName = "Regular";
+            }
+          }
 
           let passTypeDesc = catName;
           if (seatLabels.length > 0) {
