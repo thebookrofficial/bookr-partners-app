@@ -2,7 +2,14 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  DeviceEventEmitter,
+} from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -17,7 +24,6 @@ export const EventScanConfirmationScreen = () => {
   const route = useRoute<any>();
   const { attendee, isInvite } = route.params || {};
 
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [details, setDetails] = useState<any>(null);
 
@@ -28,17 +34,25 @@ export const EventScanConfirmationScreen = () => {
       if (isInvite) {
         const { data, error } = await supabase
           .from("event_guest_invites")
-          .select("*")
+          .select("*, events(start_datetime)")
           .eq("id", attendee.id)
           .single();
 
         if (error) throw error;
+        const evDate = data.events?.start_datetime
+          ? new Date(data.events.start_datetime)
+          : new Date(data.created_at);
         setDetails({
           ...data,
           displayName: data.guest_name || "Guest",
           displayPhone: data.guest_phone || "N/A",
           displayPassType: data.pass_type || "GUEST INVITE",
-          displayTime: "8 PM", // Default or fetch from event
+          displayDate: evDate.toLocaleDateString("en-GB"),
+          displayTime: data.events?.start_datetime
+            ? evDate
+                .toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true })
+                .toUpperCase()
+            : "TBA",
         });
       } else {
         const { data, error } = await supabase
@@ -48,7 +62,8 @@ export const EventScanConfirmationScreen = () => {
             *,
             profiles (full_name, phone, avatar_url),
             event_passes (name),
-            event_zones (zone_name)
+            event_zones (zone_name),
+            events (start_datetime)
           `,
           )
           .eq("id", attendee.id)
@@ -60,13 +75,21 @@ export const EventScanConfirmationScreen = () => {
         const pass = Array.isArray(data.event_passes) ? data.event_passes[0] : data.event_passes;
         const zone = Array.isArray(data.event_zones) ? data.event_zones[0] : data.event_zones;
         const catName = pass?.name || zone?.zone_name || "Regular";
+        const evDate = data.events?.start_datetime
+          ? new Date(data.events.start_datetime)
+          : new Date(data.created_at);
 
         setDetails({
           ...data,
           displayName: data.guest_name || profile?.full_name || "Guest User",
           displayPhone: data.guest_phone || profile?.phone || "N/A",
           displayPassType: `${catName} x ${data.ticket_count}`,
-          displayTime: "8 PM", // Default or fetch from event
+          displayDate: evDate.toLocaleDateString("en-GB"),
+          displayTime: data.events?.start_datetime
+            ? evDate
+                .toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true })
+                .toUpperCase()
+            : "TBA",
         });
       }
     } catch (err) {
@@ -90,77 +113,10 @@ export const EventScanConfirmationScreen = () => {
     );
   }
 
-  const handleConfirmEntry = async () => {
-    setIsProcessing(true);
-    try {
-      let error;
-      let data;
-      const now = new Date().toISOString();
-
-      if (isInvite) {
-        // Use "completed" as the definitive status
-        const { data: updateData, error: updateErr } = await supabase
-          .from("event_guest_invites")
-          .update({
-            status: "completed",
-          })
-          .eq("id", attendee.id)
-          .select();
-        error = updateErr;
-        data = updateData;
-      } else {
-        // Use "completed" as the definitive booking_status
-        const { data: updateData, error: updateErr } = await supabase
-          .from("event_bookings")
-          .update({
-            booking_status: "completed",
-            updated_at: now,
-          } as any)
-          .eq("id", attendee.id)
-          .select();
-        error = updateErr;
-        data = updateData;
-      }
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data || data.length === 0) {
-        Alert.alert(
-          "Update Failed",
-          "The database accepted the request but no changes were made. This usually means you don't have permission to update this record (RLS).",
-        );
-        return;
-      }
-
-      Alert.alert("Success", "Entry confirmed successfully.");
-      navigation.goBack();
-    } catch (err) {
-      console.error("Check-in error:", err);
-      Alert.alert("Error", "Failed to confirm entry.");
-    } finally {
-      setIsProcessing(false);
-    }
+  const handleConfirmEntry = () => {
+    DeviceEventEmitter.emit("reopenScanner");
+    navigation.goBack();
   };
-
-  const InfoRow = ({ label, value, icon: Icon, fullWidth = true }: any) => (
-    <View style={[styles.infoColumn, !fullWidth && { flex: 1 }]}>
-      <View style={styles.labelRow}>
-        <Icon size={ms(20)} color={COLORS.primary} />
-        <Text variant="body2" weight="medium" style={styles.labelText}>
-          {label}
-        </Text>
-      </View>
-      <View style={styles.valueBox}>
-        <Text
-          weight="semiBold"
-          style={[styles.valueText, label === "Pass Type" && { color: COLORS.primary }]}>
-          {value}
-        </Text>
-      </View>
-    </View>
-  );
 
   if (isLoading) {
     return (
@@ -185,12 +141,7 @@ export const EventScanConfirmationScreen = () => {
         <InfoRow label="Pass Type" value={details?.displayPassType} icon={Ticket} />
 
         <View style={styles.row}>
-          <InfoRow
-            label="Date"
-            value={new Date(details?.created_at || Date.now()).toLocaleDateString("en-GB")}
-            icon={Calendar}
-            fullWidth={false}
-          />
+          <InfoRow label="Date" value={details?.displayDate} icon={Calendar} fullWidth={false} />
           <InfoRow
             label="Time / Slot Time"
             value={details?.displayTime}
@@ -204,28 +155,37 @@ export const EventScanConfirmationScreen = () => {
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => navigation.goBack()}
-          disabled={isProcessing}>
-          <Text style={styles.cancelText}>CANCEL</Text>
+        <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.cancelText}>CLOSE</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.confirmButton}
-          onPress={handleConfirmEntry}
-          disabled={isProcessing}>
-          {isProcessing ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <Text style={styles.confirmText}>CONFIRM ENTRY</Text>
-          )}
+        <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmEntry}>
+          <Text style={styles.confirmText}>SCAN NEXT</Text>
         </TouchableOpacity>
       </View>
     </ScreenContainer>
   );
 };
 
+const InfoRow = ({ label, value, icon: Icon, fullWidth = true }: any) => (
+  <View style={[styles.infoColumn, !fullWidth && styles.flex1]}>
+    <View style={styles.labelRow}>
+      <Icon size={ms(20)} color={COLORS.primary} />
+      <Text variant="body2" weight="medium" style={styles.labelText}>
+        {label}
+      </Text>
+    </View>
+    <View style={styles.valueBox}>
+      <Text
+        weight="semiBold"
+        style={[styles.valueText, label === "Pass Type" && { color: COLORS.primary }]}>
+        {value}
+      </Text>
+    </View>
+  </View>
+);
+
 const styles = StyleSheet.create({
+  flex1: { flex: 1 },
   header: {
     marginTop: vs(20),
     marginBottom: vs(20),
