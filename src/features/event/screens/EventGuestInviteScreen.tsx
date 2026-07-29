@@ -10,6 +10,7 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, TextInput } from "@/components/ui";
@@ -38,8 +39,16 @@ export const EventGuestInviteScreen = () => {
     serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
   }
 
-  const { invites, loading, isSubmitting, eventTitle, passCategories, sendInvite, deleteInvite } =
-    useEventInvites(serviceId);
+  const {
+    invites,
+    loading,
+    isSubmitting,
+    eventTitle,
+    passCategories,
+    sendInvite,
+    deleteInvite,
+    refresh,
+  } = useEventInvites(serviceId);
 
   // Form State
   const [guestName, setGuestName] = useState("");
@@ -104,7 +113,17 @@ export const EventGuestInviteScreen = () => {
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={refresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }>
         <View style={styles.headerWrapper}>
           <EventHeader
             title={eventTitle || "Event Name"}

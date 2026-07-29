@@ -51,13 +51,40 @@ serve(async req => {
     if (dbError) throw dbError;
 
     // 3. Construct the masked link (Uses your Cloudflare Proxy)
-    const passUrl = `https://api.thebookr.in/t/${qrCodeToken}`;
+    const passUrl = `https://thebookr.in/pass/${qrCodeToken}`;
 
     // 4. Trigger WhatsApp via AiSensy (V2 API)
     const AISENSY_API_KEY = Deno.env.get("AISENSY_API_KEY");
     if (AISENSY_API_KEY) {
-      // Ensure phone has + prefix for International format if not already there
-      const cleanPhone = mobileNo.startsWith("+") ? mobileNo : `+${mobileNo.replace(/\D/g, "")}`;
+      // Clean phone number for AiSensy (no + sign, prepend 91 for 10-digit India numbers)
+      let cleanPhone = mobileNo.replace(/\D/g, "");
+      if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
+
+      // Fetch Event and Venue details for the template
+      const { data: eventData } = await supabaseClient
+        .from("events")
+        .select("start_datetime, venues(name)")
+        .eq("id", eventId)
+        .single();
+
+      const venueName = eventData?.venues?.name || "The Venue";
+      let eventDate = "TBA";
+      let eventTime = "TBA";
+
+      if (eventData?.start_datetime) {
+        const dateObj = new Date(eventData.start_datetime);
+        eventDate = dateObj.toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+        eventTime = dateObj.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
+      }
 
       const waPayload = {
         apiKey: AISENSY_API_KEY,
@@ -67,9 +94,10 @@ serve(async req => {
         templateParams: [
           guestName, // {{1}}
           eventTitle, // {{2}}
-          passType, // {{3}}
-          quantity, // {{4}}
-          passUrl, // {{5}} - This is your unique, secure link
+          eventDate, // {{3}}
+          eventTime, // {{4}}
+          venueName, // {{5}}
+          passUrl, // {{6}}
         ],
         source: "Bookr_App",
       };
