@@ -19,6 +19,9 @@ interface BookingData {
   time: string;
   date: string;
   avatarUrl?: string;
+  isSpot?: boolean;
+  phone?: string;
+  price?: number;
 }
 
 interface EventBookingListProps {
@@ -72,6 +75,9 @@ export const EventBookingList = ({ bookings, onBookingPress, onPress }: EventBoo
                     name={booking.name}
                     passType={booking.passType}
                     time={booking.time}
+                    isSpot={booking.isSpot}
+                    phone={booking.phone}
+                    price={booking.price}
                     avatarSource={booking.avatarUrl ? { uri: booking.avatarUrl } : DEFAULT_AVATAR}
                     onPress={() => {
                       // Bulletproof click handler: Tries both prop names, or falls back to direct navigation

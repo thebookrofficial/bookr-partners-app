@@ -24,6 +24,7 @@ import {
   User,
   ScanLine,
   UserPlus,
+  MapPin,
 } from "lucide-react-native";
 import { Linking, Alert } from "react-native";
 import messaging from "@react-native-firebase/messaging";
@@ -49,6 +50,7 @@ import { BulkBookingScreen } from "@/features/sports/screens/BulkBookingScreen";
 import { BulkBookingDetailsScreen } from "@/features/sports/screens/BulkBookingDetailsScreen";
 import { RescheduleBookingScreen } from "@/features/sports/screens/RescheduleBookingScreen";
 import { RepeatBookingScreen } from "@/features/sports/screens/RepeatBookingScreen";
+import { EventSpotEntryScreen } from "@/features/event/screens/EventSpotEntryScreen";
 import { StaycationBookingDetailsScreen } from "@/features/staycation/screens/StaycationBookingDetailsScreen";
 import { StaycationInvoiceScreen } from "@/features/staycation/screens/StaycationInvoiceScreen";
 import { StaycationOffersScreen } from "@/features/staycation/screens/StaycationOffersScreen";
@@ -284,6 +286,11 @@ const EventTabNavigator = () => {
         name="EventGuestInvite"
         component={EventGuestInviteScreen}
         options={{ title: "Invites", tabBarIcon: TabIcon(UserPlus) }}
+      />
+      <EventTab.Screen
+        name="EventSpotEntry"
+        component={EventSpotEntryScreen}
+        options={{ title: "Spot Entry", tabBarIcon: TabIcon(MapPin) }}
       />
       <EventTab.Screen
         name="EventProfile"

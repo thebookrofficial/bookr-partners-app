@@ -52,6 +52,7 @@ export type EventTabParamList = {
   EventHistory: { serviceId: string };
   EventScan: { serviceId: string };
   EventGuestInvite: { serviceId: string };
+  EventSpotEntry: { serviceId: string };
   EventProfile: undefined;
 };
 

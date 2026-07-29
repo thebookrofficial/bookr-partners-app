@@ -85,6 +85,11 @@ export const useEventHomeAssigned = (eventId: string) => {
           ticket_count,
           created_at,
           seat_ids,
+          is_spot_entry,
+          booking_source,
+          guest_name,
+          guest_phone,
+          total_amount,
           profiles (
             full_name,
             avatar_url
@@ -170,13 +175,18 @@ export const useEventHomeAssigned = (eventId: string) => {
             passTypeDesc = `${catName} x ${b.ticket_count}`;
           }
 
+          const isSpotBooking = b.is_spot_entry || b.booking_source === "offline";
+
           formattedBookings.push({
             id: b.id,
-            name: profile?.full_name || "Guest User",
+            name: isSpotBooking && b.guest_name ? b.guest_name : profile?.full_name || "Guest User",
             passType: passTypeDesc,
             date: dateStr,
             time: timeStr,
-            avatarUrl: profile?.avatar_url,
+            avatarUrl: isSpotBooking ? undefined : profile?.avatar_url,
+            isSpot: isSpotBooking,
+            phone: isSpotBooking ? b.guest_phone : undefined,
+            price: isSpotBooking ? b.total_amount : undefined,
           });
 
           totalCount += b.ticket_count;
@@ -235,7 +245,7 @@ export const useEventHomeAssigned = (eventId: string) => {
   useEffect(() => {
     if (!eventId) return;
     const channel = supabase
-      .channel(`assigned_event_${eventId}`)
+      .channel(`assigned_event_${eventId}_${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "event_bookings", filter: `event_id=eq.${eventId}` },

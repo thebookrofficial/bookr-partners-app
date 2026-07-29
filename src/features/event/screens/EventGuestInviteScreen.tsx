@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -54,8 +54,14 @@ export const EventGuestInviteScreen = () => {
   const [guestName, setGuestName] = useState("");
   const [email, setEmail] = useState("");
   const [mobileNo, setMobileNo] = useState("");
-  const [passType, setPassType] = useState("Regular Entry Pass");
+  const [passType, setPassType] = useState("");
   const [quantity, setQuantity] = useState("1");
+
+  useEffect(() => {
+    if (passCategories.length > 0 && !passType) {
+      setPassType(passCategories[0]);
+    }
+  }, [passCategories, passType]);
 
   // Dropdown Selection State
   const [activeDropdown, setActiveDropdown] = useState<{
@@ -92,7 +98,7 @@ export const EventGuestInviteScreen = () => {
       setGuestName("");
       setEmail("");
       setMobileNo("");
-      setPassType(passCategories[0] || "Regular Entry Pass");
+      setPassType(passCategories[0] || "");
       setQuantity("1");
       Alert.alert("Success", "Invitation sent to guest via WhatsApp!");
     }
@@ -196,7 +202,7 @@ export const EventGuestInviteScreen = () => {
                 onPress={() =>
                   setActiveDropdown({
                     type: "passType",
-                    options: passCategories.length > 0 ? passCategories : ["Regular Entry Pass"],
+                    options: passCategories.length > 0 ? passCategories : [],
                   })
                 }>
                 <Text weight="semiBold" style={styles.inputText}>
@@ -265,10 +271,10 @@ export const EventGuestInviteScreen = () => {
                   </Text>
                 </View>
                 <View style={styles.passInfo}>
-                  <Text variant="caption" weight="bold" color={COLORS.primary}>
+                  <Text variant="body2" weight="bold" color={COLORS.primary}>
                     {invite.pass_type}
                   </Text>
-                  <Text variant="caption" weight="bold">
+                  <Text variant="body2" weight="bold">
                     Qty: {invite.quantity}
                   </Text>
                 </View>
@@ -390,18 +396,18 @@ const styles = StyleSheet.create({
     gap: hs(10),
   },
   indexText: {
-    fontSize: fs(14),
+    fontSize: fs(16),
     color: COLORS.text.primary,
   },
   inviteInfo: {
     flex: 1,
   },
   guestNameText: {
-    fontSize: fs(14),
+    fontSize: fs(16),
     color: COLORS.text.primary,
   },
   emailText: {
-    fontSize: fs(12),
+    fontSize: fs(14),
     color: COLORS.text.muted,
   },
   passInfo: {

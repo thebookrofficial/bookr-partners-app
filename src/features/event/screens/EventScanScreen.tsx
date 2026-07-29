@@ -39,8 +39,8 @@ export interface Attendee {
   time: string;
   ticketType: string;
   categoryName: string;
-  isAlreadyScanned?: boolean;
   isInvite?: boolean;
+  isSpot?: boolean;
   avatarUrl?: string;
   updatedAt: string; // Used for sorting
 }
@@ -227,7 +227,7 @@ export const EventScanScreen = () => {
           .from("event_bookings")
           .select(
             `
-            id, ticket_count, booking_status, guest_name, guest_phone, updated_at,
+            id, ticket_count, booking_status, guest_name, guest_phone, updated_at, is_spot_entry, booking_source,
             profiles (full_name, phone, avatar_url),
             event_passes (name),
             event_zones (zone_name)
@@ -261,14 +261,17 @@ export const EventScanScreen = () => {
           hour12: true,
         });
 
+        const isSpotBooking = b.is_spot_entry || b.booking_source === "offline";
+
         return {
           id: b.id,
-          name: b.guest_name || profile?.full_name || "Guest",
-          phone: b.guest_phone || profile?.phone || "N/A",
+          name: isSpotBooking && b.guest_name ? b.guest_name : profile?.full_name || "Guest",
+          phone: isSpotBooking && b.guest_phone ? b.guest_phone : profile?.phone || "N/A",
           time: timeStr.toUpperCase(),
           ticketType: `${catName} x ${b.ticket_count}`,
           categoryName: catName,
-          avatarUrl: profile?.avatar_url,
+          isSpot: isSpotBooking,
+          avatarUrl: isSpotBooking ? undefined : profile?.avatar_url,
           updatedAt: b.updated_at,
         };
       });
@@ -330,11 +333,17 @@ export const EventScanScreen = () => {
       label: "Guest",
       count: scannedAttendees.filter(a => a.categoryName.toLowerCase() === "guest").length,
     },
+    {
+      label: "Spot",
+      count: scannedAttendees.filter(a => a.isSpot).length,
+    },
   ];
 
   const filteredScans =
     selectedTab === "All"
       ? scannedAttendees
+      : selectedTab === "Spot"
+      ? scannedAttendees.filter(a => a.isSpot)
       : scannedAttendees.filter(
           a =>
             a.categoryName === selectedTab ||
@@ -416,9 +425,18 @@ export const EventScanScreen = () => {
       <View style={styles.scanInfo}>
         <View style={styles.scanHeader}>
           <View style={styles.nameContainer}>
-            <Text weight="bold" style={styles.scanName}>
-              {item.name}
-            </Text>
+            <View style={styles.nameRow}>
+              <Text weight="bold" style={styles.scanName} numberOfLines={1}>
+                {item.name}
+              </Text>
+              {item.isSpot && (
+                <View style={styles.spotBadge}>
+                  <Text weight="semiBold" style={styles.spotText}>
+                    Spot
+                  </Text>
+                </View>
+              )}
+            </View>
             <View style={styles.phoneContainer}>
               <Phone size={ms(16)} color={COLORS.text.primary} />
               <Text style={styles.scanPhone}>{item.phone}</Text>
@@ -652,7 +670,15 @@ const styles = StyleSheet.create({
   scanInfo: { flex: 1, marginLeft: hs(10) },
   scanHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   nameContainer: { flex: 1, gap: vs(6) },
-  scanName: { fontSize: fs(16), color: COLORS.text.primary },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: hs(6) },
+  scanName: { fontSize: fs(16), color: COLORS.text.primary, flexShrink: 1 },
+  spotBadge: {
+    backgroundColor: "#EEF3FC",
+    paddingHorizontal: hs(6),
+    paddingVertical: vs(2),
+    borderRadius: ms(4),
+  },
+  spotText: { fontSize: fs(10), color: "#4A80F0" },
   phoneContainer: { flexDirection: "row", alignItems: "center", gap: hs(6) },
   scanPhone: { fontSize: fs(14), color: COLORS.text.primary },
   typeContainer: { alignItems: "flex-end", gap: vs(10) },
