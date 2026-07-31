@@ -91,7 +91,7 @@ import { useAuthStore, useServiceStore } from "@/store";
 import { SplashScreen } from "@/screens/SplashScreen";
 import { ms, fs } from "@/utils/responsive.utils";
 
-import { renderCustomTabBar } from "./CustomTabBar";
+import { CustomTabBar, renderCustomTabBar } from "./CustomTabBar";
 // --- AUTHENTICATION IMPORTS ---
 import { supabase } from "@/lib/supabase";
 
@@ -119,51 +119,77 @@ const TabIcon =
 const SportsTabNavigator = () => {
   const { clientProfile } = useAuthStore();
   const isOwner = clientProfile?.client_role === "owner" || !clientProfile; // fallback
-  const perms = clientProfile?.permissions || [];
-  const canAccess = (perm: string) => isOwner || perms.includes(perm);
+
+  // Use useCallback to avoid recreating the function on every render
+  const canAccess = React.useCallback(
+    (perm: string) => isOwner || (clientProfile?.permissions || []).includes(perm),
+    [isOwner, clientProfile?.permissions],
+  );
+
+  const fullTabs = React.useMemo(
+    () => [
+      {
+        name: "SportsHome",
+        label: "Home",
+        Icon: TabIcon(CalendarCheck),
+        disabled: !canAccess("sports:View Sports Home"),
+      },
+      {
+        name: "SportsHistory",
+        label: "History",
+        Icon: TabIcon(HistoryIcon),
+        disabled: !canAccess("sports:View Sports History"),
+      },
+      {
+        name: "SportsDashboard",
+        label: "Dashboard",
+        Icon: TabIcon(LayoutDashboard),
+        disabled: !isOwner,
+      },
+      {
+        name: "SportsEssentials",
+        label: "More",
+        Icon: TabIcon(MoreHorizontal),
+        disabled: !(
+          isOwner ||
+          canAccess("sports:Manage Bulk Bookings") ||
+          canAccess("sports:Block / Unblock Slots")
+        ),
+      },
+      {
+        name: "SportsProfile",
+        label: "Profile",
+        Icon: TabIcon(User),
+        disabled: false,
+        isProfile: true,
+      },
+    ],
+    [canAccess, isOwner],
+  );
+
+  const renderTabBar = React.useCallback(
+    (props: any) => <CustomTabBar {...props} fullTabs={fullTabs} />,
+    [fullTabs],
+  );
 
   return (
     <SportsTab.Navigator
       tabBarPosition="bottom"
-      tabBar={renderCustomTabBar}
-      screenOptions={{ swipeEnabled: true }}>
+      tabBar={renderTabBar}
+      screenOptions={{ swipeEnabled: true, lazy: true, lazyPreloadDistance: 1 }}>
       {canAccess("sports:View Sports Home") && (
-        <SportsTab.Screen
-          name="SportsHome"
-          component={SportsHomeScreen}
-          options={{ title: "Home", tabBarIcon: TabIcon(CalendarCheck) }}
-        />
+        <SportsTab.Screen name="SportsHome" component={SportsHomeScreen} />
       )}
       {canAccess("sports:View Sports History") && (
-        <SportsTab.Screen
-          name="SportsHistory"
-          component={SportsHistoryScreen}
-          options={{ title: "History", tabBarIcon: TabIcon(HistoryIcon) }}
-        />
+        <SportsTab.Screen name="SportsHistory" component={SportsHistoryScreen} />
       )}
-      {/* Dashboard is typically owner-only unless explicitly granted */}
-      {isOwner && (
-        <SportsTab.Screen
-          name="SportsDashboard"
-          component={SportsDashboardScreen}
-          options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
-        />
-      )}
+      {isOwner && <SportsTab.Screen name="SportsDashboard" component={SportsDashboardScreen} />}
       {(isOwner ||
         canAccess("sports:Manage Bulk Bookings") ||
         canAccess("sports:Block / Unblock Slots")) && (
-        <SportsTab.Screen
-          name="SportsEssentials"
-          component={SportsEssentialsScreen}
-          options={{ title: "More", tabBarIcon: TabIcon(MoreHorizontal) }}
-        />
+        <SportsTab.Screen name="SportsEssentials" component={SportsEssentialsScreen} />
       )}
-      {/* Profile can be accessed by everyone */}
-      <SportsTab.Screen
-        name="SportsProfile"
-        component={VendorProfileScreen}
-        options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
-      />
+      <SportsTab.Screen name="SportsProfile" component={VendorProfileScreen} />
     </SportsTab.Navigator>
   );
 };
@@ -173,7 +199,7 @@ const DineTabNavigator = () => {
     <DineTab.Navigator
       tabBarPosition="bottom"
       tabBar={renderCustomTabBar}
-      screenOptions={{ swipeEnabled: true }}>
+      screenOptions={{ swipeEnabled: true, lazy: true, lazyPreloadDistance: 1 }}>
       <DineTab.Screen
         name="DineHome"
         component={DineHomeScreen}
@@ -206,47 +232,72 @@ const DineTabNavigator = () => {
 const StaycationTabNavigator = () => {
   const { clientProfile } = useAuthStore();
   const isOwner = clientProfile?.client_role === "owner" || !clientProfile; // fallback
-  const perms = clientProfile?.permissions || [];
-  const canAccess = (perm: string) => isOwner || perms.includes(perm);
+
+  const canAccess = React.useCallback(
+    (perm: string) => isOwner || (clientProfile?.permissions || []).includes(perm),
+    [isOwner, clientProfile?.permissions],
+  );
+
+  const fullTabs = React.useMemo(
+    () => [
+      {
+        name: "StaycationHome",
+        label: "Home",
+        Icon: TabIcon(CalendarCheck),
+        disabled: !canAccess("staycation:View Staycation Home"),
+      },
+      {
+        name: "StaycationHistory",
+        label: "History",
+        Icon: TabIcon(HistoryIcon),
+        disabled: !canAccess("staycation:View Staycation History"),
+      },
+      {
+        name: "StaycationDashboard",
+        label: "Dashboard",
+        Icon: TabIcon(LayoutDashboard),
+        disabled: !isOwner,
+      },
+      {
+        name: "StaycationEssentials",
+        label: "Essentials",
+        Icon: TabIcon(MoreHorizontal),
+        disabled: !isOwner,
+      },
+      {
+        name: "StaycationProfile",
+        label: "Profile",
+        Icon: TabIcon(User),
+        disabled: false,
+        isProfile: true,
+      },
+    ],
+    [canAccess, isOwner],
+  );
+
+  const renderTabBar = React.useCallback(
+    (props: any) => <CustomTabBar {...props} fullTabs={fullTabs} />,
+    [fullTabs],
+  );
 
   return (
     <StaycationTab.Navigator
       tabBarPosition="bottom"
-      tabBar={renderCustomTabBar}
-      screenOptions={{ swipeEnabled: true }}>
+      tabBar={renderTabBar}
+      screenOptions={{ swipeEnabled: true, lazy: true, lazyPreloadDistance: 1 }}>
       {canAccess("staycation:View Staycation Home") && (
-        <StaycationTab.Screen
-          name="StaycationHome"
-          component={StaycationHomeScreen}
-          options={{ title: "Home", tabBarIcon: TabIcon(CalendarCheck) }}
-        />
+        <StaycationTab.Screen name="StaycationHome" component={StaycationHomeScreen} />
       )}
       {canAccess("staycation:View Staycation History") && (
-        <StaycationTab.Screen
-          name="StaycationHistory"
-          component={StaycationHistoryScreen}
-          options={{ title: "History", tabBarIcon: TabIcon(HistoryIcon) }}
-        />
+        <StaycationTab.Screen name="StaycationHistory" component={StaycationHistoryScreen} />
       )}
       {isOwner && (
-        <StaycationTab.Screen
-          name="StaycationDashboard"
-          component={StaycationDashboardScreen}
-          options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
-        />
+        <StaycationTab.Screen name="StaycationDashboard" component={StaycationDashboardScreen} />
       )}
       {isOwner && (
-        <StaycationTab.Screen
-          name="StaycationEssentials"
-          component={StaycationEssentialsScreen}
-          options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
-        />
+        <StaycationTab.Screen name="StaycationEssentials" component={StaycationEssentialsScreen} />
       )}
-      <StaycationTab.Screen
-        name="StaycationProfile"
-        component={VendorProfileScreen}
-        options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
-      />
+      <StaycationTab.Screen name="StaycationProfile" component={VendorProfileScreen} />
       {/* Hidden tab for deep linking or programmatic navigation without showing icon */}
       <StaycationTab.Screen
         name="StaycationCloseDate"
@@ -264,7 +315,7 @@ const EventTabNavigator = () => {
     <EventTab.Navigator
       tabBarPosition="bottom"
       tabBar={renderCustomTabBar}
-      screenOptions={{ swipeEnabled: true }}>
+      screenOptions={{ swipeEnabled: true, lazy: true, lazyPreloadDistance: 1 }}>
       <EventTab.Screen
         name="EventHome"
         component={EventHomeScreen}
