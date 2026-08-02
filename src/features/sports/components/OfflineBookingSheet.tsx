@@ -46,6 +46,7 @@ import { z } from "zod";
 import { SportsService } from "../services/sports.service";
 import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
 import perf from "@react-native-firebase/perf";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface OfflineBookingSheetProps {
   isVisible: boolean;
@@ -269,22 +270,30 @@ export const OfflineBookingSheet = ({
     setAllDbSlots([]);
   }, [initialDate]);
 
-  const handleNameChange = async (text: string) => {
+  const handleNameChange = (text: string) => {
     setName(text);
-    if (isSelectingFromResults) {
-      setIsSelectingFromResults(false);
-      return;
-    }
-
-    if (text.trim().length >= 1) {
-      const results = await SportsService.lookupGuestsByName(venueId, text);
-      setSearchResults(results);
-      setShowSearchResults(results.length > 0);
-    } else {
-      setSearchResults([]);
-      setShowSearchResults(false);
-    }
   };
+
+  const debouncedName = useDebounce(name, 500);
+
+  useEffect(() => {
+    const fetchGuests = async () => {
+      if (isSelectingFromResults) {
+        setIsSelectingFromResults(false);
+        return;
+      }
+
+      if (debouncedName.trim().length >= 1) {
+        const results = await SportsService.lookupGuestsByName(venueId, debouncedName);
+        setSearchResults(results);
+        setShowSearchResults(results.length > 0);
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    };
+    fetchGuests();
+  }, [debouncedName, venueId, isSelectingFromResults]);
 
   useEffect(() => {
     setCurrentDate(initialDate);

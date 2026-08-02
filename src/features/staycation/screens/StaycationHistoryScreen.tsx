@@ -21,9 +21,9 @@ import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
 import { useAuthStore, useServiceStore } from "@/store";
-import { useStaycationHistory } from "../hooks/useStaycationHistory";
-import { DateFilterOption } from "../hooks/useStaycationHistory";
+import { useStaycationHistory, DateFilterOption } from "../hooks/useStaycationHistory";
 import { FilterBottomSheet } from "../../sports/components/FilterBottomSheet";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -130,13 +130,13 @@ export const StaycationHistoryScreen = () => {
 
   // const displayLabel = useMemo(() => {
   //   return rooms.length > 0 ? "All Rooms" : "Farmhouse";
-  // }, [rooms]);
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const listData = useMemo(() => {
     const data = getGroupedBookings("All Rooms");
-    if (!searchQuery.trim()) return data;
+    if (!debouncedSearchQuery.trim()) return data;
 
-    const query = searchQuery.toLowerCase();
+    const query = debouncedSearchQuery.toLowerCase();
     const filtered = data
       .map(section => {
         return {
@@ -149,7 +149,7 @@ export const StaycationHistoryScreen = () => {
       .filter(section => section.data.length > 0);
 
     return filtered;
-  }, [getGroupedBookings, searchQuery]);
+  }, [getGroupedBookings, debouncedSearchQuery]);
 
   return (
     <ScreenContainer
