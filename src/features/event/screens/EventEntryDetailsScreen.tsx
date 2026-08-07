@@ -79,12 +79,12 @@ export const EventEntryDetailsScreen = () => {
           <View style={styles.detailItem}>
             <View style={styles.labelRow}>
               <Phone size={ms(18)} color={COLORS.text.primary} />
-              <Text variant="body2" family="gilroy" weight="medium" style={styles.label}>
+              <Text variant="body1" family="gilroy" weight="medium" style={styles.label}>
                 Mobile No
               </Text>
             </View>
             <View style={styles.valueContainer}>
-              <Text variant="body2" family="gilroy" weight="semiBold">
+              <Text variant="body1" family="gilroy" weight="semiBold">
                 {data.phone}
               </Text>
             </View>
@@ -94,12 +94,12 @@ export const EventEntryDetailsScreen = () => {
           <View style={styles.detailItem}>
             <View style={styles.labelRow}>
               <Ticket size={ms(18)} color={COLORS.text.primary} />
-              <Text variant="body2" family="gilroy" weight="bold" style={styles.label}>
+              <Text variant="body1" family="gilroy" weight="bold" style={styles.label}>
                 Pass Type
               </Text>
             </View>
             <View style={styles.valueContainer}>
-              <Text variant="body2" family="gilroy" weight="bold" color={COLORS.primary}>
+              <Text variant="body1" family="gilroy" weight="bold" color={COLORS.primary}>
                 {data.passType}
               </Text>
             </View>
@@ -108,21 +108,21 @@ export const EventEntryDetailsScreen = () => {
           {/* Date and Time Row */}
           <View style={styles.row}>
             <View style={[styles.detailItem, styles.halfWidth, styles.marginRight]}>
-              <Text variant="body2" family="gilroy" weight="medium" style={styles.labelOnly}>
+              <Text variant="body1" family="gilroy" weight="medium" style={styles.labelOnly}>
                 Date Of Entry
               </Text>
               <View style={styles.valueContainer}>
-                <Text variant="body2" family="gilroy" weight="semiBold">
+                <Text variant="body1" family="gilroy" weight="semiBold">
                   {data.entryDate}
                 </Text>
               </View>
             </View>
             <View style={[styles.detailItem, styles.halfWidth, styles.marginLeft]}>
-              <Text variant="body2" family="gilroy" weight="medium" style={styles.labelOnly}>
+              <Text variant="body1" family="gilroy" weight="medium" style={styles.labelOnly}>
                 Entry Time
               </Text>
               <View style={styles.valueContainer}>
-                <Text variant="body2" family="gilroy" weight="semiBold">
+                <Text variant="body1" family="gilroy" weight="semiBold">
                   {data.entryTime}
                 </Text>
               </View>
@@ -140,35 +140,28 @@ export const EventEntryDetailsScreen = () => {
           </View>
 
           <View style={styles.paymentRow}>
-            <Text variant="body2" family="gilroy" weight="semiBold">
+            <Text variant="body1" family="gilroy" weight="semiBold">
               Method
             </Text>
-            <Text variant="body2" family="gilroy" weight="medium">
+            <Text variant="body1" family="gilroy" weight="medium">
               {data.paymentMethod}
             </Text>
           </View>
 
           <View style={styles.paymentRow}>
-            <Text weight="semiBold">Transaction ID</Text>
-            <Text variant="body2" family="gilroy" weight="medium">
-              {data.transactionId}
-            </Text>
-          </View>
-
-          <View style={styles.paymentRow}>
-            <Text variant="body2" family="gilroy" weight="semiBold">
+            <Text variant="body1" family="gilroy" weight="semiBold">
               Transaction Date
             </Text>
-            <Text variant="body2" family="gilroy" weight="medium">
+            <Text variant="body1" family="gilroy" weight="medium">
               {data.transactionDate}
             </Text>
           </View>
 
           <View style={styles.paymentRow}>
-            <Text variant="body2" family="gilroy" weight="semiBold">
+            <Text variant="body1" family="gilroy" weight="semiBold">
               Transaction Time
             </Text>
-            <Text variant="body2" family="gilroy" weight="medium">
+            <Text variant="body1" family="gilroy" weight="medium">
               {data.transactionTime}
             </Text>
           </View>

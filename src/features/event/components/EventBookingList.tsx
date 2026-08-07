@@ -1,14 +1,14 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
+import React from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { Text } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { ChevronUp, FileText, Calendar } from "lucide-react-native";
 import { EventBookingCard } from "./EventBookingCard";
 import { useNavigation } from "@react-navigation/native";
+import { Calendar } from "lucide-react-native";
 
 const DEFAULT_AVATAR = require("../../../assets/icons/ic-user-profile.png");
 
@@ -19,6 +19,9 @@ interface BookingData {
   time: string;
   date: string;
   avatarUrl?: string;
+  isSpot?: boolean;
+  phone?: string;
+  price?: number;
 }
 
 interface EventBookingListProps {
@@ -28,7 +31,6 @@ interface EventBookingListProps {
 }
 
 export const EventBookingList = ({ bookings, onBookingPress, onPress }: EventBookingListProps) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const navigation = useNavigation<any>();
 
   // Group bookings by date
@@ -47,80 +49,53 @@ export const EventBookingList = ({ bookings, onBookingPress, onPress }: EventBoo
 
   return (
     <View style={styles.container}>
-      {/* ALL BOOKINGS TITLE */}
-      <Text weight="bold" style={styles.sectionTitle}>
-        ALL BOOKINGS
-      </Text>
-
-      {/* Booking List Header */}
-      <View style={styles.headerRow}>
-        <View style={styles.headerLeft}>
-          <FileText size={ms(24)} color={COLORS.primary} />
-          <Text weight="bold" style={styles.headerTitle}>
-            Booking List
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.headerRight} onPress={() => setIsCollapsed(!isCollapsed)}>
-          <Text weight="semiBold" style={styles.headerActionText}>
-            {isCollapsed ? "Show" : "Hide"}
-          </Text>
-          <View style={isCollapsed ? styles.rotatedIcon : null}>
-            <ChevronUp size={ms(16)} color={COLORS.text.primary} />
+      <View style={styles.listContainer}>
+        {dates.length === 0 ? (
+          <View style={styles.emptyStateContainer}>
+            <Text weight="medium" style={styles.emptyStateText}>
+              No bookings found for this event.
+            </Text>
           </View>
-        </TouchableOpacity>
-      </View>
-
-      {!isCollapsed && (
-        <View style={styles.listContainer}>
-          {dates.length === 0 ? (
-            <View style={styles.emptyStateContainer}>
-              <Text weight="medium" style={styles.emptyStateText}>
-                No bookings found for this event.
-              </Text>
-            </View>
-          ) : (
-            dates.map(date => (
-              <View key={date} style={styles.dateGroup}>
-                <View style={styles.dateHeader}>
-                  <View style={styles.dateHeaderLeft}>
-                    <Calendar size={ms(20)} color={COLORS.primary} />
-                    <Text weight="bold" style={styles.dateText}>
-                      {date}
-                    </Text>
-                  </View>
-                  <TouchableOpacity style={styles.dateHeaderRight} activeOpacity={0.7}>
-                    <Text weight="semiBold" style={styles.dateActionText}>
-                      All
-                    </Text>
-                    <ChevronUp size={ms(16)} color={COLORS.text.primary} />
-                  </TouchableOpacity>
+        ) : (
+          dates.map(date => (
+            <View key={date} style={styles.dateGroup}>
+              <View style={styles.dateHeader}>
+                <View style={styles.dateHeaderLeft}>
+                  <Calendar size={ms(20)} color={COLORS.primary} />
+                  <Text weight="bold" style={styles.dateText}>
+                    {date}
+                  </Text>
                 </View>
-                <View style={styles.cardsWrapper}>
-                  {groupedBookings[date].map(booking => (
-                    <EventBookingCard
-                      key={booking.id}
-                      name={booking.name}
-                      passType={booking.passType}
-                      time={booking.time}
-                      avatarSource={booking.avatarUrl ? { uri: booking.avatarUrl } : DEFAULT_AVATAR}
-                      onPress={() => {
-                        // Bulletproof click handler: Tries both prop names, or falls back to direct navigation
-                        if (onBookingPress) {
-                          onBookingPress(booking);
-                        } else if (onPress) {
-                          onPress(booking);
-                        } else {
-                          navigation.navigate("EventEntryDetails", { entryId: booking.id });
-                        }
-                      }}
-                    />
-                  ))}
-                </View>
+                <TouchableOpacity style={styles.dateHeaderRight} activeOpacity={0.7} />
               </View>
-            ))
-          )}
-        </View>
-      )}
+              <View style={styles.cardsWrapper}>
+                {groupedBookings[date].map(booking => (
+                  <EventBookingCard
+                    key={booking.id}
+                    name={booking.name}
+                    passType={booking.passType}
+                    time={booking.time}
+                    isSpot={booking.isSpot}
+                    phone={booking.phone}
+                    price={booking.price}
+                    avatarSource={booking.avatarUrl ? { uri: booking.avatarUrl } : DEFAULT_AVATAR}
+                    onPress={() => {
+                      // Bulletproof click handler: Tries both prop names, or falls back to direct navigation
+                      if (onBookingPress) {
+                        onBookingPress(booking);
+                      } else if (onPress) {
+                        onPress(booking);
+                      } else {
+                        navigation.navigate("EventEntryDetails", { entryId: booking.id });
+                      }
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
+          ))
+        )}
+      </View>
     </View>
   );
 };
@@ -128,8 +103,7 @@ export const EventBookingList = ({ bookings, onBookingPress, onPress }: EventBoo
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    padding: ms(6),
-    gap: vs(10),
+    paddingHorizontal: ms(6),
   },
   sectionTitle: {
     fontSize: fs(16),
@@ -137,35 +111,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: vs(10),
   },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    height: vs(24),
-    marginBottom: vs(10),
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(6),
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: fs(16),
-    color: COLORS.text.primary,
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: hs(2),
-  },
-  headerActionText: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
-  rotatedIcon: {
-    transform: [{ rotate: "180deg" }],
-  },
+
   listContainer: {
     gap: vs(15),
   },

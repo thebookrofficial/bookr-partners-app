@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, TextInput } from "@/components/ui";
@@ -17,8 +18,7 @@ import { EventHeader } from "../components/EventHeader";
 import { Trash2, ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { useRoute, RouteProp } from "@react-navigation/native";
-import { MainStackParamList } from "@/navigation/navigation.types";
+import { useRoute, useNavigation } from "@react-navigation/native";
 import { useEventInvites } from "../hooks/useEventInvites";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
@@ -28,18 +28,40 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
  * Sends WhatsApp invitations with obfuscated QR code links.
  */
 export const EventGuestInviteScreen = () => {
-  const route = useRoute<RouteProp<MainStackParamList, "EventGuestInvite">>();
-  const serviceId = route.params?.serviceId || "";
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
 
-  const { invites, loading, isSubmitting, eventTitle, passCategories, sendInvite, deleteInvite } =
-    useEventInvites(serviceId);
+  let serviceId = route.params?.serviceId;
+  if (!serviceId) {
+    const parentState = navigation.getParent()?.getState();
+    const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
+    const tabParams = tabRoute?.params as any;
+    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+  }
+
+  const {
+    invites,
+    loading,
+    isSubmitting,
+    eventTitle,
+    passCategories,
+    sendInvite,
+    deleteInvite,
+    refresh,
+  } = useEventInvites(serviceId);
 
   // Form State
   const [guestName, setGuestName] = useState("");
   const [email, setEmail] = useState("");
   const [mobileNo, setMobileNo] = useState("");
-  const [passType, setPassType] = useState("General Entry Pass");
+  const [passType, setPassType] = useState("");
   const [quantity, setQuantity] = useState("1");
+
+  useEffect(() => {
+    if (passCategories.length > 0 && !passType) {
+      setPassType(passCategories[0]);
+    }
+  }, [passCategories, passType]);
 
   // Dropdown Selection State
   const [activeDropdown, setActiveDropdown] = useState<{
@@ -76,7 +98,7 @@ export const EventGuestInviteScreen = () => {
       setGuestName("");
       setEmail("");
       setMobileNo("");
-      setPassType(passCategories[0] || "General Entry Pass");
+      setPassType(passCategories[0] || "");
       setQuantity("1");
       Alert.alert("Success", "Invitation sent to guest via WhatsApp!");
     }
@@ -97,7 +119,17 @@ export const EventGuestInviteScreen = () => {
 
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={refresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }>
         <View style={styles.headerWrapper}>
           <EventHeader
             title={eventTitle || "Event Name"}
@@ -170,7 +202,7 @@ export const EventGuestInviteScreen = () => {
                 onPress={() =>
                   setActiveDropdown({
                     type: "passType",
-                    options: passCategories.length > 0 ? passCategories : ["General Entry Pass"],
+                    options: passCategories.length > 0 ? passCategories : [],
                   })
                 }>
                 <Text weight="semiBold" style={styles.inputText}>
@@ -239,10 +271,10 @@ export const EventGuestInviteScreen = () => {
                   </Text>
                 </View>
                 <View style={styles.passInfo}>
-                  <Text variant="caption" weight="bold" color={COLORS.primary}>
+                  <Text variant="body2" weight="bold" color={COLORS.primary}>
                     {invite.pass_type}
                   </Text>
-                  <Text variant="caption" weight="bold">
+                  <Text variant="body2" weight="bold">
                     Qty: {invite.quantity}
                   </Text>
                 </View>
@@ -364,18 +396,18 @@ const styles = StyleSheet.create({
     gap: hs(10),
   },
   indexText: {
-    fontSize: fs(14),
+    fontSize: fs(16),
     color: COLORS.text.primary,
   },
   inviteInfo: {
     flex: 1,
   },
   guestNameText: {
-    fontSize: fs(14),
+    fontSize: fs(16),
     color: COLORS.text.primary,
   },
   emailText: {
-    fontSize: fs(12),
+    fontSize: fs(14),
     color: COLORS.text.muted,
   },
   passInfo: {

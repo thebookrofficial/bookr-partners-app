@@ -12,6 +12,9 @@ export interface BookingListItem {
   time: string;
   date: string;
   avatarUrl?: string;
+  isSpot?: boolean;
+  phone?: string;
+  price?: number;
 }
 
 export interface EventSummaryCategory {
@@ -104,6 +107,11 @@ export const useEventHomeOpen = (eventId: string) => {
             ticket_count,
             created_at,
             pass_id,
+            is_spot_entry,
+            booking_source,
+            guest_name,
+            guest_phone,
+            total_amount,
             event_passes ( name ),
             event_zones ( zone_name ),
             profiles ( full_name, avatar_url )
@@ -155,7 +163,17 @@ export const useEventHomeOpen = (eventId: string) => {
           // Determine the category name
           const passJoin = Array.isArray(b.event_passes) ? b.event_passes[0] : b.event_passes;
           const zoneJoin = Array.isArray(b.event_zones) ? b.event_zones[0] : b.event_zones;
-          const catName = passJoin?.name || zoneJoin?.zone_name || "General";
+          let catName = passJoin?.name || zoneJoin?.zone_name;
+
+          if (!catName) {
+            if (passesData.length > 0) {
+              catName = passesData[0].name;
+            } else if (zonesData.length > 0) {
+              catName = zonesData[0].zone_name;
+            } else {
+              catName = "Regular";
+            }
+          }
           const passTypeDesc = `${catName} x ${b.ticket_count}`;
 
           // If a booking has a category we didn't pre-fetch, add it dynamically
@@ -165,13 +183,18 @@ export const useEventHomeOpen = (eventId: string) => {
 
           const catData = catsMap.get(catName)!;
 
+          const isSpotBooking = b.is_spot_entry || b.booking_source === "offline";
+
           formattedBookings.push({
             id: b.id,
-            name: profile?.full_name || "Guest User",
+            name: isSpotBooking && b.guest_name ? b.guest_name : profile?.full_name || "Guest User",
             passType: passTypeDesc,
             date: dateStr,
             time: timeStr,
-            avatarUrl: profile?.avatar_url,
+            avatarUrl: isSpotBooking ? undefined : profile?.avatar_url,
+            isSpot: isSpotBooking,
+            phone: isSpotBooking ? b.guest_phone : undefined,
+            price: isSpotBooking ? b.total_amount : undefined,
           });
 
           // Increment Counts
@@ -244,7 +267,7 @@ export const useEventHomeOpen = (eventId: string) => {
   useEffect(() => {
     if (!eventId) return;
     const channel = supabase
-      .channel(`open_event_${eventId}`)
+      .channel(`open_event_${eventId}_${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "event_bookings", filter: `event_id=eq.${eventId}` },

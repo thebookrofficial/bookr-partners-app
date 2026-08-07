@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { useQuery } from "@tanstack/react-query";
 
 export interface MonthGroup {
   month: string;
@@ -32,14 +32,10 @@ export const useSportsHistory = (
   dateFilter: "all" | "yesterday" | "3_months" | "6_months" | "9_months" | "custom" = "all",
   customRange?: { start: Date; end: Date },
 ) => {
-  const [currentVenueId, setCurrentVenueId] = useState<string>(initialVenueId);
-  const [historyGroups, setHistoryGroups] = useState<MonthGroup[]>([]);
-  const [loading, setLoading] = useState(true);
-
   // 1. Resolve Category to actual Venue ID
-  const resolveVenue = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { data: resolvedVenueId, isLoading: isResolvingVenue } = useQuery({
+    queryKey: ["resolveVenue", initialVenueId, category],
+    queryFn: async () => {
       const CATEGORY_DB_MAP: Record<string, string> = {
         Football: "football",
         "Box Cricket": "box_cricket",
@@ -54,12 +50,10 @@ export const useSportsHistory = (
         .single();
       if (!initialVenue) throw new Error("Owner not found");
 
-      // Check if the initial venue itself matches the sport type
       const initialSportType = initialVenue.sports_venues?.[0]?.sports_type;
-      let finalVenueId = "";
 
       if (initialSportType === dbSportType) {
-        finalVenueId = initialVenue.id;
+        return initialVenue.id;
       } else {
         const { data: matchedVenue } = await supabase
           .from("venues")
@@ -69,30 +63,22 @@ export const useSportsHistory = (
           .limit(1)
           .maybeSingle();
 
-        if (matchedVenue) finalVenueId = matchedVenue.id;
+        if (matchedVenue) return matchedVenue.id;
+        return null;
       }
-
-      setCurrentVenueId(finalVenueId);
-    } catch (error) {
-      console.error("Venue resolution error:", error);
-    } finally {
-      // FIX: Ensure loading state is turned off if venue resolution fails
-      if (!currentVenueId) {
-        setLoading(false);
-      }
-    }
-  }, [initialVenueId, category, currentVenueId]);
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes cache
+  });
 
   // 2. Fetch History using resolved ID
-  const fetchHistory = useCallback(async () => {
-    if (!currentVenueId) {
-      setHistoryGroups([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    try {
+  const {
+    data: allHistoryGroups = [],
+    isLoading: isFetchingHistory,
+    refetch,
+  } = useQuery({
+    queryKey: ["sportsHistory", resolvedVenueId],
+    enabled: !!resolvedVenueId,
+    queryFn: async () => {
       const { data: bookings, error } = await supabase
         .from("sports_bookings")
         .select(
@@ -103,7 +89,7 @@ export const useSportsHistory = (
           sports_slots!inner(slot_date, start_time, end_time)
         `,
         )
-        .eq("venue_id", currentVenueId)
+        .eq("venue_id", resolvedVenueId!)
         .neq("booking_status", "cancelled")
         .order("created_at", { ascending: false });
 
@@ -115,7 +101,6 @@ export const useSportsHistory = (
         const slotDate = b.sports_slots.slot_date;
         const dateObj = new Date(slotDate);
 
-        // RESTRICTION: Show only yesterday and before. Exclude Today and Future.
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         if (dateObj.getTime() >= today.getTime()) return;
@@ -138,8 +123,6 @@ export const useSportsHistory = (
         if (!groupedByMonth[monthStr].days[dateStr])
           groupedByMonth[monthStr].days[dateStr] = { rawDate, settlement: 0, transactions: {} };
 
-        // CRITICAL FIX: Sum the 'total_amount' instead of 'paid_amount' so the day/month
-        // headers reflect the overall cost of all bookings for that period.
         const totalAmt = Number(b.total_amount || 0);
         const paidAmt = Number(b.paid_amount || 0);
         const discountAmt = Number(b.discount_amount || 0);
@@ -196,7 +179,6 @@ export const useSportsHistory = (
               a.start_time.localeCompare(b.start_time),
             );
 
-            // LOGIC: Merge consecutive slots into single blocks
             let timeRanges = "";
             if (sortedSlots.length > 0) {
               let currentStart = sortedSlots[0].start_time;
@@ -221,8 +203,6 @@ export const useSportsHistory = (
               status = "Online";
             }
 
-            // User Formula: paid_amount + discount - platform_fee
-            // Applied ONLY to Pickleball as requested
             const isPickleball = category.toLowerCase().includes("pickleball");
             const displayPrice = isPickleball
               ? u.totalPaid + u.totalDiscount - u.totalPlatformFee
@@ -310,25 +290,14 @@ export const useSportsHistory = (
           .filter(monthGroup => monthGroup.days.length > 0);
       }
 
-      setHistoryGroups(finalGroups);
-    } catch (err) {
-      console.error("History fetch error:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentVenueId, searchQuery, dateFilter, customRange, category]);
+      return finalGroups;
+    },
+  });
 
-  useEffect(() => {
-    setHistoryGroups([]);
-    setLoading(true);
-  }, [initialVenueId, category]);
-
-  useEffect(() => {
-    resolveVenue();
-  }, [resolveVenue]);
-  useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
-
-  return { currentVenueId, historyGroups, loading, refetch: fetchHistory };
+  return {
+    currentVenueId: resolvedVenueId || initialVenueId,
+    historyGroups: allHistoryGroups,
+    loading: isResolvingVenue || isFetchingHistory,
+    refetch,
+  };
 };

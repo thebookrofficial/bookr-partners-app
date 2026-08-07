@@ -46,14 +46,14 @@ export const useEventInvites = (venueId: string) => {
             .from("event_passes")
             .select("name")
             .eq("event_id", event.id);
-          setPassCategories(passes?.map(p => p.name) || ["General Entry Pass"]);
+          setPassCategories(passes?.map(p => p.name) || []);
         } else {
           const { data: seats } = await supabase
             .from("event_seats")
             .select("section_name")
             .eq("event_id", event.id);
           const unique = Array.from(new Set(seats?.map(s => s.section_name).filter(Boolean)));
-          setPassCategories((unique as string[]) || ["General Entry Pass"]);
+          setPassCategories((unique as string[]) || []);
         }
       }
     } catch (err: any) {

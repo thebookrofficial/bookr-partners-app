@@ -89,6 +89,14 @@ export const StaycationFarmhouseContent = ({ initialVenueId }: StaycationFarmhou
     return selectedDate ? closedDates.has(selectedDate) : false;
   }, [selectedDate, closedDates]);
 
+  // React.useEffect(() => {
+  //   console.log(
+  //     "=== FARMHOUSE DEBUG ===",
+  //     groupedBookings.map(s => ({ title: s.title, count: s.data.length })),
+  //   );
+  //   console.log("=== FARMHOUSE VENUE ===", activeVenue?.venueId);
+  // }, [groupedBookings, activeVenue]);
+
   const [isOfflineSheetVisible, setIsOfflineSheetVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 

@@ -18,6 +18,8 @@ Bookr operates as an online marketplace and intermediary platform that connects 
 
  2. PARTNER OBLIGATIONS
  Information Accuracy: You represent that all information provided regarding your venue, pricing, availability, and services is accurate and up-to-date.
+ Financial Accuracy: You must provide accurate and up-to-date bank account or UPI details for payouts. Bookr is not responsible for delayed or failed payouts due to incorrect financial information provided by you.
+ Staff Management: You are responsible for the actions of any staff members you add to your account and must ensure they have consented to their information being shared with the platform.
  Service Quality: You are solely responsible for the quality, safety, and delivery of the services booked through the platform.
  Compliance: You agree to comply with all local laws and regulations applicable to your business operations in India.
 
@@ -35,7 +37,7 @@ Bookr reserves the right to modify these fees with prior notice to the Partner.
  Customer Disputes: Any disputes regarding service quality, refunds, no-shows, or cancellations are strictly between the Partner and the Customer. Bookr shall not act as an arbitrator and is not liable for any claims arising from the Partner-Customer relationship.
 
  5. INTELLECTUAL PROPERTY
- Partner Content: You retain ownership of all media (photos/videos) uploaded to the platform. Bookr shall not use your media for general marketing purposes without your explicit written consent.
+ Partner Content: You retain ownership of all media (photos/videos) uploaded to the platform. By uploading media to the platform, you grant Bookr the necessary licenses to display this media to Customers on the Bookr App. Bookr shall not use your media for general off-platform marketing purposes without your explicit written consent.
  Platform Content: All software, design, and trademarks associated with the Bookr App remain the exclusive property of Bookr Enterprise.
 
  6. TERMINATION
@@ -64,13 +66,18 @@ Bookr Enterprise ("we", "us") is committed to protecting the privacy of our Part
 
  1. INFORMATION WE COLLECT
 We collect information necessary to provide and improve our services:
- Account Data: Business name, owner name, email address, and phone number.
+ Account Data: Business name, owner name, email address, phone number, and KYC/business verification documents.
  Venue Data: Static physical addresses of the venues/services you list.
+ Financial Data: Bank account details or UPI IDs required for processing payouts and commissions.
+ Staff Data: Information regarding staff members (names, roles) added by you to manage your venue/services.
+ Media Data: Photos, videos, and documents uploaded by you to showcase your venue, services, or events.
  Operational Data: Booking history, service availability, and staff names.
  Technical Data: Device information and logs via Sentry for error reporting and application stability.
 
  2. HOW WE USE YOUR INFORMATION
  To facilitate and manage bookings between you and Customers.
+ To process payouts and manage financial transactions.
+ To enable staff management and role-based access for your team.
  To provide analytics and dashboard reporting on your business performance.
  To communicate important updates regarding your account or the platform.
  To identify and fix technical bugs using Sentry.

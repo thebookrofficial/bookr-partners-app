@@ -2,13 +2,13 @@
 // Confidential and Proprietary.
 
 import React, { useEffect, useState, useRef } from "react";
-import { View, StyleSheet, TouchableOpacity, Animated } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Animated, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useServiceStore } from "@/store/serviceStore";
 
-export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
+export const CustomTabBar = ({ state, descriptors, navigation, fullTabs }: any) => {
   const insets = useSafeAreaInsets();
   const { routes } = state;
   const { isTabBarVisible, setTabBarVisible } = useServiceStore();
@@ -39,8 +39,15 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
     return true;
   });
 
-  const profileRoute = visibleRoutes.find((r: any) => r.name.toLowerCase().includes("profile"));
-  const capsuleRoutes = visibleRoutes.filter((r: any) => !r.name.toLowerCase().includes("profile"));
+  // If fullTabs is provided, use it. Otherwise, fallback to visibleRoutes from state.
+  const tabsToRender = fullTabs || visibleRoutes;
+
+  const profileRoute = tabsToRender.find(
+    (r: any) => r.isProfile || (r.name && r.name.toLowerCase().includes("profile")),
+  );
+  const capsuleRoutes = tabsToRender.filter(
+    (r: any) => !(r.isProfile || (r.name && r.name.toLowerCase().includes("profile"))),
+  );
 
   const [layouts, setLayouts] = useState<{ [key: number]: { x: number; width: number } }>({});
 
@@ -49,7 +56,17 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const profileOpacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
 
-  const profileIndex = routes.indexOf(profileRoute);
+  // Determine active indices for the indicator
+  const activeRouteName = routes[activeTabIndex]?.name;
+  const isProfileActive =
+    profileRoute && (profileRoute.name || profileRoute.key) === activeRouteName;
+  const activeCapsuleIndex = capsuleRoutes.findIndex(
+    (t: any) => (t.name || t.key) === activeRouteName,
+  );
+
+  const profileIndex = routes.findIndex(
+    (r: any) => r.name === (profileRoute?.name || profileRoute?.key),
+  );
 
   useEffect(() => {
     Animated.timing(translateY, {
@@ -60,8 +77,6 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   }, [isTabBarVisible, translateY]);
 
   useEffect(() => {
-    const isProfileActive = activeTabIndex === profileIndex;
-
     if (isProfileActive) {
       Animated.parallel([
         Animated.timing(capsuleOpacity, {
@@ -90,7 +105,7 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
         }),
       ]).start();
 
-      const activeLayout = layouts[activeTabIndex];
+      const activeLayout = layouts[activeCapsuleIndex];
       if (activeLayout) {
         const CAPSULE_WIDTH = hs(73);
         const targetX = activeLayout.x + (activeLayout.width - CAPSULE_WIDTH) / 2;
@@ -103,21 +118,50 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
         }).start();
       }
     }
-  }, [activeTabIndex, layouts, profileIndex, capsuleOpacity, profileOpacity, translateX]);
+  }, [
+    activeTabIndex,
+    layouts,
+    profileIndex,
+    capsuleOpacity,
+    profileOpacity,
+    translateX,
+    isProfileActive,
+    activeCapsuleIndex,
+  ]);
 
-  const renderTab = (route: any, isProfile = false) => {
-    const { options } = descriptors[route.key];
-    const label =
-      options.tabBarLabel !== undefined
-        ? options.tabBarLabel
-        : options.title !== undefined
-        ? options.title
-        : route.name;
+  const renderTab = (tab: any, isProfile = false) => {
+    const isCustom = !!fullTabs;
+    const routeIndex = isCustom
+      ? routes.findIndex((r: any) => r.name === tab.name)
+      : routes.indexOf(tab);
+    const route = isCustom ? routes[routeIndex] : tab;
 
-    const routeIndex = routes.indexOf(route);
-    const isFocused = activeTabIndex === routeIndex;
+    let label, Icon, isDisabled;
+    if (isCustom) {
+      label = tab.label;
+      Icon = tab.Icon;
+      isDisabled = tab.disabled;
+    } else {
+      const { options } = descriptors[route.key];
+      label =
+        options.tabBarLabel !== undefined
+          ? options.tabBarLabel
+          : options.title !== undefined
+          ? options.title
+          : route.name;
+      Icon = options.tabBarIcon;
+      isDisabled = options.accessibilityState?.disabled === true;
+    }
+
+    const isFocused = routeIndex !== -1 && activeTabIndex === routeIndex;
 
     const onPress = () => {
+      if (isDisabled) {
+        Alert.alert("Permission Denied", "You do not have permission to access this tab.");
+        return;
+      }
+      if (!route) return; // Failsafe
+
       // 1. Instantly update local state for 0ms visual feedback
       setActiveTabIndex(routeIndex);
 
@@ -134,12 +178,10 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
       }
     };
 
-    const Icon = options.tabBarIcon;
-
     if (isProfile) {
       return (
         <View
-          key={route.key}
+          key={route?.key || tab.name || label}
           style={[styles.profileOuterContainer, isFocused && styles.profileOuterContainerActive]}>
           <Animated.View
             style={[
@@ -168,15 +210,26 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
 
     return (
       <TouchableOpacity
-        key={route.key}
+        key={route?.key || tab.name || label}
         onPress={onPress}
-        activeOpacity={0.7}
-        style={styles.capsuleTabItem}>
+        activeOpacity={isDisabled ? 1 : 0.7}
+        style={[styles.capsuleTabItem, isDisabled && { opacity: 0.4 }]}>
         {Icon &&
-          Icon({ color: isFocused ? "#63A1FD" : "#8E8E93", focused: isFocused, size: ms(24) })}
+          Icon({
+            color: isDisabled ? "#8E8E93" : isFocused ? "#63A1FD" : "#8E8E93",
+            focused: isFocused,
+            size: ms(24),
+          })}
         <Text
           weight="bold"
-          style={[styles.tabLabel, isFocused ? styles.tabLabelActive : styles.tabLabelInactive]}>
+          style={[
+            styles.tabLabel,
+            isDisabled
+              ? styles.tabLabelInactive
+              : isFocused
+              ? styles.tabLabelActive
+              : styles.tabLabelInactive,
+          ]}>
           {label}
         </Text>
       </TouchableOpacity>
@@ -199,11 +252,10 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
             },
           ]}
         />
-        {capsuleRoutes.map((route: any) => {
-          const idx = routes.indexOf(route);
+        {capsuleRoutes.map((tab: any, idx: number) => {
           return (
             <View
-              key={route.key}
+              key={tab.name || tab.key}
               onLayout={event => {
                 const { x, width } = event.nativeEvent.layout;
                 setLayouts(prev => ({
@@ -212,7 +264,7 @@ export const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                 }));
               }}
               style={styles.tabWrapper}>
-              {renderTab(route, false)}
+              {renderTab(tab, false)}
             </View>
           );
         })}

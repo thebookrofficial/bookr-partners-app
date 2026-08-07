@@ -51,6 +51,10 @@ const initializeGoogleSignIn = () => {
 // Run global initializations
 initializeGoogleSignIn();
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const queryClient = new QueryClient();
+
 function App() {
   const isDarkMode = useColorScheme() === "dark";
 
@@ -65,15 +69,17 @@ function App() {
   const { needsAutoStart, openAutoStartSettings } = useAutoStartCheck();
 
   return (
-    <SafeAreaProvider>
-      <StatusBar
-        barStyle={isDarkMode ? "light-content" : "dark-content"}
-        backgroundColor="transparent"
-        translucent
-      />
-      <AppNavigator />
-      <AutoStartPrompt visible={needsAutoStart} onFixSettings={openAutoStartSettings} />
-    </SafeAreaProvider>
+    <QueryClientProvider client={queryClient}>
+      <SafeAreaProvider>
+        <StatusBar
+          barStyle={isDarkMode ? "light-content" : "dark-content"}
+          backgroundColor="transparent"
+          translucent
+        />
+        <AppNavigator />
+        <AutoStartPrompt visible={needsAutoStart} onFixSettings={openAutoStartSettings} />
+      </SafeAreaProvider>
+    </QueryClientProvider>
   );
 }
 

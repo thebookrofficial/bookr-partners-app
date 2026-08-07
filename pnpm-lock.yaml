@@ -49,6 +49,9 @@ importers:
       "@supabase/supabase-js":
         specifier: ^2.103.3
         version: 2.106.1
+      "@tanstack/react-query":
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.1.0)
       base64-arraybuffer:
         specifier: ^1.0.2
         version: 1.0.2
@@ -3193,6 +3196,20 @@ packages:
     engines: { node: ">=14" }
     peerDependencies:
       "@svgr/core": "*"
+
+  "@tanstack/query-core@5.101.4":
+    resolution:
+      {
+        integrity: sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw==,
+      }
+
+  "@tanstack/react-query@5.101.4":
+    resolution:
+      {
+        integrity: sha512-yRg2pfOCxIs4ZJW3XYYHU/WgtD04FHSnfHlpRT7h7pR77hwkdRG4wxbKe4aq6P0RvXUTBSQpQeadS1SUYUe+KA==,
+      }
+    peerDependencies:
+      react: ^18 || ^19
 
   "@testing-library/react-native@13.3.3":
     resolution:
@@ -12134,6 +12151,13 @@ snapshots:
       svgo: 3.3.3
     transitivePeerDependencies:
       - typescript
+
+  "@tanstack/query-core@5.101.4": {}
+
+  "@tanstack/react-query@5.101.4(react@19.1.0)":
+    dependencies:
+      "@tanstack/query-core": 5.101.4
+      react: 19.1.0
 
   "@testing-library/react-native@13.3.3(jest@29.7.0(@types/node@25.9.1))(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react-test-renderer@19.1.0(react@19.1.0))(react@19.1.0)":
     dependencies:
