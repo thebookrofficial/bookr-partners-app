@@ -23,7 +23,6 @@ import Svg, { Path } from "react-native-svg";
 // Navigation & DB Imports
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { StaycationTabParamList } from "@/navigation/navigation.types";
-import { supabase } from "@/lib/supabase";
 
 import { useServiceStore } from "@/store/serviceStore";
 import { useStaycationDashboard } from "../hooks/useStaycationDashboard";
@@ -53,10 +52,8 @@ export const StaycationDashboardScreen = () => {
   // 2. Get Category (Priority: Route -> Store)
   const routeCategory = route.params?.category;
   const storedCategory = selectedCategories[serviceId];
-  const selectedCategory = routeCategory || storedCategory || "Football";
 
   const [timeFilter, setTimeFilter] = useState("Last week");
-  const [roomFilter, setRoomFilter] = useState("All Rooms");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Custom Date Range State
@@ -80,18 +77,14 @@ export const StaycationDashboardScreen = () => {
     }
   }, [routeCategory, serviceId, storedCategory, setServiceCategory]);
 
-  // Dynamic Venue Resolution State
-  const [currentVenueId, setCurrentVenueId] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const { activeVenueName, activeStaycationVenueId } = useServiceStore();
+  const resolvedVenueId = activeStaycationVenueId || serviceId;
 
   const {
-    isLoading,
-    rooms,
+    isLoading: isDashboardLoading,
     stats: metrics,
     refetch,
-  } = useStaycationDashboard(currentVenueId, timeFilter, roomFilter, customRange);
-
-  const { activeVenueName } = useServiceStore();
+  } = useStaycationDashboard(resolvedVenueId, timeFilter, "All Rooms", customRange);
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -100,52 +93,6 @@ export const StaycationDashboardScreen = () => {
     await refetch();
     setRefreshing(false);
   }, [refetch]);
-
-  useEffect(() => {
-    const resolveVenue = async () => {
-      setLoading(true);
-      try {
-        const CATEGORY_DB_MAP: Record<string, string> = {
-          Football: "football",
-          "Box Cricket": "box_cricket",
-          Pickleball: "pickleball",
-        };
-        const dbSportType = CATEGORY_DB_MAP[selectedCategory] || selectedCategory;
-
-        const { data: initialVenue } = await supabase
-          .from("venues")
-          .select("id, owner_id, sports_venues(sports_type)")
-          .eq("id", serviceId)
-          .single();
-        if (!initialVenue) return;
-
-        // Check if the initial venue itself matches the sport type
-        const initialSportType = initialVenue.sports_venues?.[0]?.sports_type;
-        let finalVenueId = "";
-
-        if (initialSportType === dbSportType) {
-          finalVenueId = initialVenue.id;
-        } else {
-          const { data: matchedVenue } = await supabase
-            .from("venues")
-            .select("id, sports_venues!inner(sports_type)")
-            .eq("owner_id", initialVenue.owner_id)
-            .eq("sports_venues.sports_type", dbSportType)
-            .limit(1)
-            .maybeSingle();
-
-          if (matchedVenue) finalVenueId = matchedVenue.id;
-        }
-
-        setCurrentVenueId(finalVenueId);
-      } catch (err) {
-        console.error("Dashboard resolution error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (serviceId) resolveVenue();
-  }, [serviceId, selectedCategory]);
 
   // 6. Revenue Gauge Math
   const gaugeSize = ms(140);
@@ -177,12 +124,8 @@ export const StaycationDashboardScreen = () => {
         <StaycationHeader title={activeVenueName} subtitle="Dashboard" />
 
         {/* 2. Conditional Rendering for Dashboard Content */}
-        {loading || isLoading ? (
+        {isDashboardLoading ? (
           <DashboardSkeleton />
-        ) : !currentVenueId ? (
-          <Text style={styles.emptyStateText}>
-            No {selectedCategory} facility setup for this club.
-          </Text>
         ) : (
           <>
             {/* Selection Row */}
@@ -233,46 +176,6 @@ export const StaycationDashboardScreen = () => {
                 </View>
               </TouchableOpacity>
             </Modal>
-
-            {/* Ground Row (Conditional) */}
-            {rooms.length > 0 && (
-              <View style={styles.groundSection}>
-                <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-                  Room Filter
-                </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <TouchableOpacity
-                    style={[
-                      styles.groundPill,
-                      roomFilter === "All Rooms" && styles.groundPillActive,
-                    ]}
-                    onPress={() => setRoomFilter("All Rooms")}>
-                    <Text
-                      variant="body2"
-                      weight="semiBold"
-                      color={roomFilter === "All Rooms" ? "#FFF" : COLORS.text.secondary}>
-                      All Rooms
-                    </Text>
-                  </TouchableOpacity>
-                  {rooms.map((room: any) => {
-                    const isActive = roomFilter === room.name;
-                    return (
-                      <TouchableOpacity
-                        key={room.id}
-                        style={[styles.groundPill, isActive && styles.groundPillActive]}
-                        onPress={() => setRoomFilter(room.name)}>
-                        <Text
-                          variant="body2"
-                          weight="semiBold"
-                          color={isActive ? "#FFF" : COLORS.text.secondary}>
-                          {room.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
 
             <Text variant="h2" weight="medium" style={styles.dateRangeText}>
               {metrics.dateRangeLabel}
@@ -377,7 +280,7 @@ export const StaycationDashboardScreen = () => {
                 {Array.from(
                   new Set(
                     Array.from({ length: 9 }, (_, i) =>
-                      Math.round((metrics.maxBookingValue / 8) * (8 - i)),
+                      Math.round((Math.max(metrics.maxBookingValue, 5) / 8) * (8 - i)),
                     ),
                   ),
                 ).map((val, idx) => (
@@ -391,7 +294,8 @@ export const StaycationDashboardScreen = () => {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.chartArea}>
                 {metrics.bookingGraphData.map((item: any, index: number) => {
-                  const heightPct = (item.value / (metrics.maxBookingValue || 1)) * 100;
+                  const effectiveMax = Math.max(metrics.maxBookingValue, 5);
+                  const heightPct = (item.value / effectiveMax) * 100;
                   const isMax = item.value === metrics.maxBookingValue && item.value > 0;
                   return (
                     <View key={index} style={styles.barColumn}>
