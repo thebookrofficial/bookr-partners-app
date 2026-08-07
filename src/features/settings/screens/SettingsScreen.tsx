@@ -164,7 +164,7 @@ export const SettingsScreen = () => {
       {/* 5. Footer */}
       <View style={styles.footer}>
         <Text variant="caption" weight="bold" color={COLORS.text.muted}>
-          Version 1.0.0 (Beta)
+          Version 1.1.7
         </Text>
       </View>
     </ScreenContainer>
