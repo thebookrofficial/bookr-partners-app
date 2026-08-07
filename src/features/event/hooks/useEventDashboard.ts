@@ -145,7 +145,7 @@ export const useEventDashboard = (serviceId: string) => {
               JSON.stringify(
                 baseCategories.length > 0
                   ? baseCategories
-                  : [{ label: "General", entries: 0, revenue: 0, color: "#6B7280" }],
+                  : [{ label: "Regular", entries: 0, revenue: 0, color: "#6B7280" }],
               ),
             ),
           },
@@ -170,11 +170,11 @@ export const useEventDashboard = (serviceId: string) => {
           }
 
           const dayLabel = dayMap[dateKey];
-          let catName = "General";
+          let catName = "Regular";
 
           if (event.seating_type === "open") {
             const passJoin = Array.isArray(b.event_passes) ? b.event_passes[0] : b.event_passes;
-            catName = passJoin?.name || "General";
+            catName = passJoin?.name || "Regular";
           } else {
             // Priority 1: Check seat sections
             let parsedSeatIds: string[] = Array.isArray(b.seat_ids)
@@ -188,7 +188,7 @@ export const useEventDashboard = (serviceId: string) => {
             } else {
               // Priority 2: Fallback to zone name if no specific seat mapping exists
               const zoneJoin = Array.isArray(b.event_zones) ? b.event_zones[0] : b.event_zones;
-              catName = zoneJoin?.zone_name || "General";
+              catName = zoneJoin?.zone_name || "Regular";
             }
           }
 
@@ -198,7 +198,7 @@ export const useEventDashboard = (serviceId: string) => {
             bucket.totalRevenue += Number(b.vendor_payout || 0);
 
             let cat = bucket.categories.find(c => c.label === catName);
-            if (!cat) cat = bucket.categories.find(c => c.label === "General");
+            if (!cat) cat = bucket.categories.find(c => c.label === "Regular");
 
             if (cat) {
               cat.entries += b.ticket_count;

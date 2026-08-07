@@ -125,7 +125,7 @@ export const useAdminEventStore = create<AdminEventState>(set => ({
         if (createdAt < today) return; // Only today's attendees
 
         const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
-        let passName = "General";
+        let passName = "Regular";
         let seatLabels: string[] = [];
 
         if (event.seating_type === "open" && b.event_passes) {
@@ -143,7 +143,7 @@ export const useAdminEventStore = create<AdminEventState>(set => ({
             parsedSeatIds.forEach((sid: string) => {
               if (seatMap[sid]) {
                 seatLabels.push(seatMap[sid].label);
-                if (passName === "General" && seatMap[sid].sectionName) {
+                if (passName === "Regular" && seatMap[sid].sectionName) {
                   passName = seatMap[sid].sectionName;
                 }
               }

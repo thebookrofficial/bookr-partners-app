@@ -8,15 +8,13 @@ import { PillTabs, Text, EventHomeSkeleton } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { EventHeader } from "../components/EventHeader";
-import { EventSummaryStats } from "../components/EventSummaryStats";
 import { EventBookingList } from "../components/EventBookingList";
-import { EventCharts } from "../components/EventCharts";
 import { useEventHomeOpen } from "../hooks/useEventHomeOpen";
 import { useNavigation } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { Calendar as CalendarIcon, X } from "lucide-react-native";
+import { Calendar as CalendarIcon, X, ChevronLeft, ChevronRight } from "lucide-react-native";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -33,22 +31,28 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
     bookings,
     totalBookings,
     summaryCategories,
-    chartCategories,
-    chartData,
     activeTab,
     setActiveTab,
     refresh,
   } = useEventHomeOpen(eventId);
 
-  // --- Date Picker State ---
+  // --- Date & Pagination State ---
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
 
   const onDateChange = (event: DateTimePickerEvent, date?: Date) => {
     setShowDatePicker(false);
     if (date) {
       setSelectedDate(date);
+      setCurrentPage(1);
     }
+  };
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
   };
 
   const handleBookingPress = (booking: any) => {
@@ -91,6 +95,14 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
     filteredBookings = filteredBookings.filter(b => b.date === selectedDateStr);
   }
 
+  // Slice for Pagination
+  const totalFiltered = filteredBookings.length;
+  const totalPages = Math.ceil(totalFiltered / ITEMS_PER_PAGE) || 1;
+  const paginatedBookings = filteredBookings.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
+
   return (
     <View style={styles.root}>
       <ScreenContainer
@@ -106,14 +118,11 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
           imageSource={USER_PROFILE}
         />
 
-        {/* 2. Summary Stats */}
-        <EventSummaryStats totalBookings={totalBookings} categories={summaryCategories} />
-
-        {/* 3. Controls (Date Filter & Tabs) */}
+        {/* 2. Controls (Date Filter & Tabs) */}
         <View style={styles.controlsContainer}>
           <View style={styles.dateFilterRow}>
             <Text weight="bold" style={styles.dateFilterLabel}>
-              Filter by Date
+              Filter By Date
             </Text>
             <TouchableOpacity
               style={styles.dateSelector}
@@ -142,23 +151,49 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
             </TouchableOpacity>
           </View>
 
-          {tabNames.length > 0 && (
+          {summaryCategories.length > 1 && (
             <View style={styles.tabWrapper}>
               <PillTabs
                 tabs={tabNames}
                 activeTab={currentActiveTab}
-                onTabChange={setActiveTab}
+                onTabChange={handleTabChange}
                 variant="dark"
               />
             </View>
           )}
         </View>
 
-        {/* 4. Booking List */}
-        <EventBookingList bookings={filteredBookings} onBookingPress={handleBookingPress} />
+        {/* 3. Booking List */}
+        <EventBookingList bookings={paginatedBookings} onBookingPress={handleBookingPress} />
 
-        {/* 5. Charts */}
-        <EventCharts categories={chartCategories} chartData={chartData} />
+        {/* 4. Pagination */}
+        {totalPages > 1 && (
+          <View style={styles.paginationContainer}>
+            <TouchableOpacity
+              style={[styles.pageBtn, currentPage === 1 && styles.disabledBtn]}
+              disabled={currentPage === 1}
+              onPress={() => setCurrentPage(p => Math.max(1, p - 1))}>
+              <ChevronLeft
+                size={ms(20)}
+                color={currentPage === 1 ? COLORS.text.muted : COLORS.primary}
+              />
+            </TouchableOpacity>
+
+            <Text style={styles.pageText} weight="semiBold">
+              Page {currentPage} of {totalPages}
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.pageBtn, currentPage === totalPages && styles.disabledBtn]}
+              disabled={currentPage === totalPages}
+              onPress={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>
+              <ChevronRight
+                size={ms(20)}
+                color={currentPage === totalPages ? COLORS.text.muted : COLORS.primary}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={{ height: vs(120) }} />
       </ScreenContainer>
@@ -182,17 +217,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   controlsContainer: {
-    marginVertical: vs(10),
+    marginTop: vs(10),
+    marginBottom: vs(2),
   },
   dateFilterRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: hs(6),
-    marginBottom: vs(12),
   },
   dateFilterLabel: {
-    fontSize: fs(14),
+    fontSize: fs(18),
     color: COLORS.text.primary,
   },
   dateSelector: {
@@ -213,6 +248,29 @@ const styles = StyleSheet.create({
     padding: ms(2),
   },
   tabWrapper: {
+    marginTop: vs(12),
     paddingHorizontal: hs(6),
+  },
+  paginationContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: hs(20),
+    marginTop: vs(15),
+    marginBottom: vs(10),
+  },
+  pageBtn: {
+    padding: ms(8),
+    backgroundColor: COLORS.surface.primary,
+    borderRadius: ms(8),
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  disabledBtn: {
+    opacity: 0.5,
+  },
+  pageText: {
+    fontSize: fs(14),
+    color: COLORS.text.primary,
   },
 });

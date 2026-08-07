@@ -49,22 +49,6 @@ describe("EventScanScreen QR Code Test", () => {
     // Use a hardcoded mock QR payload
     const decodedPayload = "test-qr-payload-token";
 
-    // 2. Mock Supabase responses for event fetch and booking fetch
-    const mockMaybeSingleEvent = jest.fn().mockResolvedValue({
-      data: { id: "event-1", event_passes: [], event_zones: [] },
-      error: null,
-    });
-
-    const mockMaybeSingleBooking = jest.fn().mockResolvedValue({
-      data: {
-        id: "booking-1",
-        booking_status: "pending",
-        ticketType: "VIP",
-        name: "Test User",
-      },
-      error: null,
-    });
-
     (supabase.from as jest.Mock).mockImplementation((table: string) => {
       if (table === "events") {
         return {
@@ -72,22 +56,51 @@ describe("EventScanScreen QR Code Test", () => {
           eq: jest.fn().mockReturnThis(),
           order: jest.fn().mockReturnThis(),
           limit: jest.fn().mockReturnThis(),
-          maybeSingle: mockMaybeSingleEvent,
+          then: jest.fn(resolve =>
+            resolve({
+              data: [
+                {
+                  id: "event-1",
+                  title: "Neon Shadow",
+                  created_at: new Date().toISOString(),
+                  event_passes: [],
+                  event_zones: [],
+                },
+              ],
+              error: null,
+            }),
+          ),
         };
       }
       if (table === "event_bookings") {
         return {
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
-          maybeSingle: mockMaybeSingleBooking,
+          in: jest.fn().mockReturnThis(),
+          update: jest.fn().mockReturnThis(),
           order: jest.fn().mockReturnThis(),
+          maybeSingle: jest.fn().mockResolvedValue({
+            data: {
+              id: "booking-1",
+              booking_status: "pending",
+              ticketType: "VIP",
+              name: "Test User",
+              ticket_count: 1,
+              event_passes: [{ name: "VIP" }],
+            },
+            error: null,
+          }),
+          then: jest.fn(resolve => resolve({ data: [], error: null })),
         };
       }
       return {
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
+        in: jest.fn().mockReturnThis(),
         order: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({ data: [], error: null }),
+        update: jest.fn().mockReturnThis(),
+        maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+        then: jest.fn(resolve => resolve({ data: [], error: null })),
       };
     });
 

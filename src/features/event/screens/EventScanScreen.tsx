@@ -14,6 +14,7 @@ import {
   RefreshControl,
   PermissionsAndroid,
   Vibration,
+  DeviceEventEmitter,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -38,8 +39,8 @@ export interface Attendee {
   time: string;
   ticketType: string;
   categoryName: string;
-  isAlreadyScanned?: boolean;
   isInvite?: boolean;
+  isSpot?: boolean;
   avatarUrl?: string;
   updatedAt: string; // Used for sorting
 }
@@ -160,14 +161,13 @@ export const EventScanScreen = () => {
 
   // Real DB Data states
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
+  const [venueEventIds, setVenueEventIds] = useState<string[]>([]);
   const [scannedAttendees, setScannedAttendees] = useState<Attendee[]>([]);
   const [ticketCategories, setTicketCategories] = useState<string[]>([]);
   const [isFetchingHistory, setIsFetchingHistory] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [showDisclosure, setShowDisclosure] = useState(false);
-
-  // const { hasPermission, requestPermission } = useCameraPermission();
 
   // 1. Fetch Event, Pre-load Passes, and Fetch Scanned History
   const fetchScannedHistory = useCallback(async () => {
@@ -176,28 +176,38 @@ export const EventScanScreen = () => {
       setIsFetchingHistory(true);
 
       // A. Fetch the main event for this venue to get its real event_id and its passes
-      const { data: event, error: eventError } = await supabase
+      const { data: events, error: eventError } = await supabase
         .from("events")
         .select(
           `
           id,
+          title,
+          created_at,
           event_passes ( name ),
           event_zones ( zone_name )
         `,
         )
-        .eq("venue_id", serviceId)
-        .order("total_capacity", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .eq("venue_id", serviceId);
 
       if (eventError) throw eventError;
-      if (!event) {
+      if (!events || events.length === 0) {
         setIsFetchingHistory(false);
         return;
       }
 
+      // 1. Try to specifically find Neon Shadow first
+      let event = events.find((e: any) => e.title && e.title.includes("Neon Shadow"));
+
+      // 2. If not found, sort by oldest created_at
+      if (!event) {
+        event = events.sort(
+          (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        )[0];
+      }
+
       const realEventId = event.id;
       setActiveEventId(realEventId);
+      setVenueEventIds(events.map((e: any) => e.id));
 
       // B. Pre-fill categories from passes and zones so the tabs ALWAYS exist
       const cats = new Set<string>();
@@ -217,7 +227,7 @@ export const EventScanScreen = () => {
           .from("event_bookings")
           .select(
             `
-            id, ticket_count, booking_status, guest_name, guest_phone, updated_at,
+            id, ticket_count, booking_status, guest_name, guest_phone, updated_at, is_spot_entry, booking_source,
             profiles (full_name, phone, avatar_url),
             event_passes (name),
             event_zones (zone_name)
@@ -242,7 +252,7 @@ export const EventScanScreen = () => {
         const pass = Array.isArray(b.event_passes) ? b.event_passes[0] : b.event_passes;
         const zone = Array.isArray(b.event_zones) ? b.event_zones[0] : b.event_zones;
 
-        const catName = pass?.name || zone?.zone_name || "General";
+        const catName = pass?.name || zone?.zone_name || "Regular";
         cats.add(catName);
 
         const timeStr = new Date(b.updated_at).toLocaleTimeString("en-GB", {
@@ -251,14 +261,17 @@ export const EventScanScreen = () => {
           hour12: true,
         });
 
+        const isSpotBooking = b.is_spot_entry || b.booking_source === "offline";
+
         return {
           id: b.id,
-          name: b.guest_name || profile?.full_name || "Guest",
-          phone: b.guest_phone || profile?.phone || "N/A",
+          name: isSpotBooking && b.guest_name ? b.guest_name : profile?.full_name || "Guest",
+          phone: isSpotBooking && b.guest_phone ? b.guest_phone : profile?.phone || "N/A",
           time: timeStr.toUpperCase(),
           ticketType: `${catName} x ${b.ticket_count}`,
           categoryName: catName,
-          avatarUrl: profile?.avatar_url,
+          isSpot: isSpotBooking,
+          avatarUrl: isSpotBooking ? undefined : profile?.avatar_url,
           updatedAt: b.updated_at,
         };
       });
@@ -310,21 +323,27 @@ export const EventScanScreen = () => {
   // Build tabs cleanly, filtering out Guest from the mapped list to prevent duplicates
   const TABS = [
     { label: "All", count: scannedAttendees.length },
-    {
-      label: "Guest",
-      count: scannedAttendees.filter(a => a.categoryName.toLowerCase() === "guest").length,
-    },
     ...ticketCategories
       .filter(cat => cat.toLowerCase() !== "guest")
       .map(cat => ({
         label: cat,
         count: scannedAttendees.filter(a => a.categoryName === cat).length,
       })),
+    {
+      label: "Guest",
+      count: scannedAttendees.filter(a => a.categoryName.toLowerCase() === "guest").length,
+    },
+    {
+      label: "Spot",
+      count: scannedAttendees.filter(a => a.isSpot).length,
+    },
   ];
 
   const filteredScans =
     selectedTab === "All"
       ? scannedAttendees
+      : selectedTab === "Spot"
+      ? scannedAttendees.filter(a => a.isSpot)
       : scannedAttendees.filter(
           a =>
             a.categoryName === selectedTab ||
@@ -342,7 +361,7 @@ export const EventScanScreen = () => {
     } catch (err) {
       console.warn("Camera permission error:", err);
     }
-  }, []); // Empty dependency array is correct now
+  }, []);
 
   const handleAcceptDisclosure = async () => {
     setShowDisclosure(false);
@@ -353,6 +372,20 @@ export const EventScanScreen = () => {
       Alert.alert("Permission Required", "Allow camera access in settings to scan tickets.");
     }
   };
+
+  useEffect(() => {
+    fetchScannedHistory();
+  }, [fetchScannedHistory]);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener("reopenScanner", () => {
+      fetchScannedHistory();
+      setTimeout(() => {
+        setIsScanningMode(true);
+      }, 500);
+    });
+    return () => subscription.remove();
+  }, [fetchScannedHistory]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("tabPress", (e: any) => {
@@ -392,9 +425,18 @@ export const EventScanScreen = () => {
       <View style={styles.scanInfo}>
         <View style={styles.scanHeader}>
           <View style={styles.nameContainer}>
-            <Text weight="bold" style={styles.scanName}>
-              {item.name}
-            </Text>
+            <View style={styles.nameRow}>
+              <Text weight="bold" style={styles.scanName} numberOfLines={1}>
+                {item.name}
+              </Text>
+              {item.isSpot && (
+                <View style={styles.spotBadge}>
+                  <Text weight="semiBold" style={styles.spotText}>
+                    Spot
+                  </Text>
+                </View>
+              )}
+            </View>
             <View style={styles.phoneContainer}>
               <Phone size={ms(16)} color={COLORS.text.primary} />
               <Text style={styles.scanPhone}>{item.phone}</Text>
@@ -428,7 +470,7 @@ export const EventScanScreen = () => {
           `,
           )
           .eq("qr_code_token", code.trim())
-          .eq("event_id", activeEventId)
+          .in("event_id", venueEventIds)
           .maybeSingle();
 
         if (booking) {
@@ -437,13 +479,22 @@ export const EventScanScreen = () => {
             return;
           }
 
+          const { error: updateError } = await supabase
+            .from("event_bookings")
+            .update({ booking_status: "completed", updated_at: new Date().toISOString() })
+            .eq("id", booking.id);
+
+          if (updateError) throw updateError;
+
+          fetchScannedHistory();
+
           const pass = Array.isArray(booking.event_passes)
             ? booking.event_passes[0]
             : booking.event_passes;
           const zone = Array.isArray(booking.event_zones)
             ? booking.event_zones[0]
             : booking.event_zones;
-          const actualTicketType = pass?.name || zone?.zone_name || "General";
+          const actualTicketType = pass?.name || zone?.zone_name || "Regular";
 
           setIsScanningMode(false);
           navigation.navigate("EventScanConfirmation", {
@@ -461,7 +512,7 @@ export const EventScanScreen = () => {
             .from("event_guest_invites")
             .select("*")
             .eq("qr_code_token", code.trim())
-            .eq("event_id", activeEventId)
+            .in("event_id", venueEventIds)
             .maybeSingle();
 
           if (invite) {
@@ -469,6 +520,14 @@ export const EventScanScreen = () => {
               Alert.alert("Already Scanned", "This invite has already been used.");
               return;
             }
+
+            const { error: updateError } = await supabase
+              .from("event_guest_invites")
+              .update({ status: "completed" })
+              .eq("id", invite.id);
+            if (updateError) throw updateError;
+
+            fetchScannedHistory();
 
             setIsScanningMode(false);
             navigation.navigate("EventScanConfirmation", {
@@ -488,7 +547,7 @@ export const EventScanScreen = () => {
         console.error(err);
       }
     },
-    [activeEventId, navigation],
+    [activeEventId, navigation, venueEventIds, fetchScannedHistory],
   );
 
   return (
@@ -504,12 +563,12 @@ export const EventScanScreen = () => {
           <EventHeader title="Event Scans" subtitle="Scan & Verify" imageSource={USER_PROFILE} />
 
           <View style={styles.historyHeader}>
-            <Text weight="bold" style={styles.historyTitle}>
+            <Text weight="bold" variant="body1" style={styles.historyTitle}>
               SCANNED TICKETS
             </Text>
             <TouchableOpacity onPress={handleOpenScanner} style={styles.debugBtn}>
               <CameraIcon size={16} color={COLORS.primary} />
-              <Text color={COLORS.primary} variant="caption">
+              <Text color={COLORS.primary} variant="body1">
                 Open Scanner
               </Text>
             </TouchableOpacity>
@@ -576,7 +635,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: vs(10),
   },
-  historyTitle: { fontSize: fs(16), color: COLORS.text.primary },
+  historyTitle: { fontSize: fs(18), color: COLORS.text.primary },
   debugBtn: { flexDirection: "row", alignItems: "center", gap: hs(4), padding: hs(4) },
   tabsWrapper: { marginBottom: vs(10) },
   tabsContainer: { gap: hs(10) },
@@ -611,7 +670,15 @@ const styles = StyleSheet.create({
   scanInfo: { flex: 1, marginLeft: hs(10) },
   scanHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   nameContainer: { flex: 1, gap: vs(6) },
-  scanName: { fontSize: fs(16), color: COLORS.text.primary },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: hs(6) },
+  scanName: { fontSize: fs(16), color: COLORS.text.primary, flexShrink: 1 },
+  spotBadge: {
+    backgroundColor: "#EEF3FC",
+    paddingHorizontal: hs(6),
+    paddingVertical: vs(2),
+    borderRadius: ms(4),
+  },
+  spotText: { fontSize: fs(10), color: "#4A80F0" },
   phoneContainer: { flexDirection: "row", alignItems: "center", gap: hs(6) },
   scanPhone: { fontSize: fs(14), color: COLORS.text.primary },
   typeContainer: { alignItems: "flex-end", gap: vs(10) },

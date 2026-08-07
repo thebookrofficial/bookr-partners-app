@@ -8,14 +8,19 @@ Bookr Enterprise ("we", "us") is committed to protecting the privacy of our Part
 
 We collect information necessary to provide and improve our services:
 
-- **Account Data:** Business name, owner name, email address, and phone number.
+- **Account Data:** Business name, owner name, email address, phone number, and KYC/business verification documents.
 - **Venue Data:** Static physical addresses of the venues/services you list.
+- **Financial Data:** Bank account details or UPI IDs required for processing payouts and commissions.
+- **Staff Data:** Information regarding staff members (names, roles) added by you to manage your venue/services.
+- **Media Data:** Photos, videos, and documents uploaded by you to showcase your venue, services, or events.
 - **Operational Data:** Booking history, service availability, and staff names.
 - **Technical Data:** Device information and logs via Sentry for error reporting and application stability.
 
 ### 2. HOW WE USE YOUR INFORMATION
 
 - To facilitate and manage bookings between you and Customers.
+- To process payouts and manage financial transactions.
+- To enable staff management and role-based access for your team.
 - To provide analytics and dashboard reporting on your business performance.
 - To communicate important updates regarding your account or the platform.
 - To identify and fix technical bugs using Sentry.

@@ -22,6 +22,7 @@ import { COLORS } from "@/constants/theme";
 import { useServiceStore } from "@/store/serviceStore";
 import { useSportsHistory } from "../hooks/useSportsHistory";
 import { FilterBottomSheet, DateFilterOption } from "../components/FilterBottomSheet";
+import { useDebounce } from "@/hooks/useDebounce";
 
 // Navigation Imports
 import { RouteProp, useNavigation, useRoute, useIsFocused } from "@react-navigation/native";
@@ -143,11 +144,13 @@ export const SportsHistoryScreen = () => {
     }));
   };
 
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+
   // Pass dynamic IDs and filters to the updated hook
   const { currentVenueId, historyGroups, loading, refetch } = useSportsHistory(
     serviceId,
     selectedCategory,
-    searchQuery,
+    debouncedSearchQuery,
     dateFilter,
     customRange,
   );

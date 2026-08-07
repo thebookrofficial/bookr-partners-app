@@ -74,7 +74,7 @@ export const useEventEntryDetails = (bookingId: string) => {
         ? booking.event_zones[0]
         : booking.event_zones;
 
-      const catName = pass?.name || zone?.zone_name || "General";
+      const catName = pass?.name || zone?.zone_name || "Regular";
       const entryDateObj = new Date(booking.updated_at);
       const paymentDateObj = payment?.created_at ? new Date(payment.created_at) : new Date();
 

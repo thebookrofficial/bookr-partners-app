@@ -9,19 +9,16 @@ import { COLORS } from "@/constants/theme";
 import { EventHeader } from "../components/EventHeader";
 import { EventActionRow } from "../components/EventActionRow";
 import {
-  Calendar,
   Star,
-  Banknote,
   //  RotateCcw
 } from "lucide-react-native";
-import { useNavigation, RouteProp, useRoute } from "@react-navigation/native";
-import { EventTabParamList } from "@/navigation/navigation.types";
+import { useNavigation, useRoute } from "@react-navigation/native";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
 export const EventEssentialsScreen = () => {
   const navigation = useNavigation<any>();
-  const route = useRoute<RouteProp<EventTabParamList, "EventEssentials">>();
+  const route = useRoute<any>();
 
   // Safely resolve serviceId from params or parent navigator
   let serviceId = route.params?.serviceId;
@@ -46,24 +43,9 @@ export const EventEssentialsScreen = () => {
         {/* 2. Essentials List */}
         <View style={styles.listContainer}>
           <EventActionRow
-            icon={<Calendar size={ms(20)} color={COLORS.primary} />}
-            label="Offers"
-            onPress={() => navigation.navigate("EventOffers", { serviceId })}
-          />
-          <EventActionRow
             icon={<Star size={ms(20)} color={COLORS.primary} />}
             label="Guest Invite"
             onPress={() => navigation.navigate("EventGuestInvite", { serviceId })}
-          />
-          <EventActionRow
-            icon={<Calendar size={ms(20)} color={COLORS.primary} />}
-            label="Export Bookings"
-            onPress={() => navigation.navigate("EventExportBookings", { serviceId })}
-          />
-          <EventActionRow
-            icon={<Banknote size={ms(20)} color={COLORS.primary} />}
-            label="Payouts"
-            onPress={() => navigation.navigate("Payouts", { venueId: serviceId })}
           />
           {/* <EventActionRow
             icon={<RotateCcw size={ms(20)} color={COLORS.primary} />}

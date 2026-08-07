@@ -26,6 +26,7 @@ import { COLORS } from "@/constants/theme";
 import { CustomDatePickerModal } from "@/components/ui/CustomDatePickerModal";
 import { supabase } from "@/lib/supabase";
 import { useCreateStaycationOfflineBooking } from "../hooks/useCreateStaycationOfflineBooking";
+import { useDebounce } from "@/hooks/useDebounce";
 
 import MoneySvg from "@/assets/icons/ic-tdesign-money.svg";
 
@@ -95,7 +96,9 @@ export const StaycationOfflineBookingSheet = ({
         .select("guest_name, guest_phone")
         .eq("venue_id", vId)
         .ilike("guest_name", `%${q}%`)
-        .limit(10);
+        .not("guest_name", "is", null)
+        .order("guest_name", { ascending: true })
+        .limit(30);
       if (!data) return [];
       const unique = new Map();
       data.forEach(d => {
@@ -109,22 +112,31 @@ export const StaycationOfflineBookingSheet = ({
     }
   };
 
-  const handleNameChange = async (text: string) => {
+  const handleNameChange = (text: string) => {
     setName(text);
-    if (isSelectingFromResults) {
-      setIsSelectingFromResults(false);
-      return;
-    }
-
-    if (text.trim().length >= 1) {
-      const results = await lookupGuestsByName(venueId, text);
-      setSearchResults(results);
-      setShowSearchResults(results.length > 0);
-    } else {
-      setSearchResults([]);
-      setShowSearchResults(false);
-    }
   };
+
+  const [name, setName] = useState("");
+  const debouncedName = useDebounce(name, 500);
+
+  useEffect(() => {
+    const fetchGuests = async () => {
+      if (isSelectingFromResults) {
+        setIsSelectingFromResults(false);
+        return;
+      }
+
+      if (debouncedName.trim().length >= 1) {
+        const results = await lookupGuestsByName(venueId, debouncedName);
+        setSearchResults(results);
+        setShowSearchResults(results.length > 0);
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    };
+    fetchGuests();
+  }, [debouncedName, venueId, isSelectingFromResults]);
 
   const [bookingFor, setBookingFor] = useState(isFarmhouse ? "Farmhouse" : "Cottages");
   const [roomType, setRoomType] = useState("");
@@ -132,7 +144,6 @@ export const StaycationOfflineBookingSheet = ({
   const [guestCount, setGuestCount] = useState("2");
   const [groupType, setGroupType] = useState("Family");
 
-  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [totalPayment, setTotalPayment] = useState("");
   const [advancePaid, setAdvancePaid] = useState("");

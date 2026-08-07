@@ -12,11 +12,13 @@ interface ServiceState {
   selectedCategories: Record<string, string>;
   activeVenueName: string;
   activeServiceId: string;
+  activeStaycationVenueId: string;
   lastSelectedService: LastSelectedService | null;
   hasNavigatedInitially: boolean;
   setServiceCategory: (serviceId: string, category: string) => void;
   setActiveVenueName: (name: string) => void;
   setActiveServiceId: (id: string) => void;
+  setActiveStaycationVenueId: (id: string) => void;
   setLastSelectedService: (service: LastSelectedService | null) => void;
   setHasNavigatedInitially: (status: boolean) => void;
   isTabBarVisible: boolean;
@@ -29,6 +31,7 @@ export const useServiceStore = create<ServiceState>()(
       selectedCategories: {},
       activeVenueName: "Loading...",
       activeServiceId: "",
+      activeStaycationVenueId: "",
       lastSelectedService: null,
       hasNavigatedInitially: false,
       setServiceCategory: (serviceId, category) => {
@@ -41,6 +44,7 @@ export const useServiceStore = create<ServiceState>()(
       },
       setActiveVenueName: name => set({ activeVenueName: name }),
       setActiveServiceId: id => set({ activeServiceId: id }),
+      setActiveStaycationVenueId: id => set({ activeStaycationVenueId: id }),
       setLastSelectedService: service => set({ lastSelectedService: service }),
       setHasNavigatedInitially: status => set({ hasNavigatedInitially: status }),
       isTabBarVisible: true,

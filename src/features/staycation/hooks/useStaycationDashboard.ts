@@ -242,7 +242,6 @@ export const useStaycationDashboard = (
       const todayStr = formatDate(new Date());
 
       activeBookings.forEach(b => {
-        const amount = parseFloat(b.total_amount) || 0;
         const isOnline = b.booking_source === "online" || !!b.user_id;
         const bookingDate = b.check_in_date;
 
@@ -268,13 +267,14 @@ export const useStaycationDashboard = (
             dailyData[bookingDate].revenue += netPayout;
           }
         } else {
+          const paidAmount = parseFloat(b.paid_amount || "0") || 0;
           offlineBookings++;
-          offlineRevenue += amount;
-          totalRevenue += amount;
+          offlineRevenue += paidAmount;
+          totalRevenue += paidAmount;
 
           if (dailyData[bookingDate]) {
             dailyData[bookingDate].bookings += 1;
-            dailyData[bookingDate].revenue += amount;
+            dailyData[bookingDate].revenue += paidAmount;
           }
         }
       });
@@ -349,6 +349,10 @@ export const useStaycationDashboard = (
   useEffect(() => {
     fetchRooms();
   }, [fetchRooms]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   useFocusEffect(
     useCallback(() => {

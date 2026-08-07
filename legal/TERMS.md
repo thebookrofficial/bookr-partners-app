@@ -13,6 +13,8 @@ Bookr operates as an online marketplace and intermediary platform that connects 
 ### 2. PARTNER OBLIGATIONS
 
 - **Information Accuracy:** You represent that all information provided regarding your venue, pricing, availability, and services is accurate and up-to-date.
+- **Financial Accuracy:** You must provide accurate and up-to-date bank account or UPI details for payouts. Bookr is not responsible for delayed or failed payouts due to incorrect financial information provided by you.
+- **Staff Management:** You are responsible for the actions of any staff members you add to your account and must ensure they have consented to their information being shared with the platform.
 - **Service Quality:** You are solely responsible for the quality, safety, and delivery of the services booked through the platform.
 - **Compliance:** You agree to comply with all local laws and regulations applicable to your business operations in India.
 
@@ -34,7 +36,7 @@ Bookr reserves the right to modify these fees with prior notice to the Partner.
 
 ### 5. INTELLECTUAL PROPERTY
 
-- **Partner Content:** You retain ownership of all media (photos/videos) uploaded to the platform. Bookr shall not use your media for general marketing purposes without your explicit written consent.
+- **Partner Content:** You retain ownership of all media (photos/videos) uploaded to the platform. By uploading media to the platform, you grant Bookr the necessary licenses to display this media to Customers on the Bookr App. Bookr shall not use your media for general off-platform marketing purposes without your explicit written consent.
 - **Platform Content:** All software, design, and trademarks associated with the Bookr App remain the exclusive property of Bookr Enterprise.
 
 ### 6. TERMINATION

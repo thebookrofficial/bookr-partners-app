@@ -2,12 +2,10 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import { View, StyleSheet, Image, ImageSourcePropType, TouchableOpacity } from "react-native";
+import { View, StyleSheet, Image, ImageSourcePropType } from "react-native";
 import { Text } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { useNavigation } from "@react-navigation/native";
-import { ArrowLeft } from "lucide-react-native";
 
 interface EventHeaderProps {
   title: string;
@@ -17,14 +15,8 @@ interface EventHeaderProps {
 }
 
 export const EventHeader = ({ title, subtitle, imageSource, logoSource }: EventHeaderProps) => {
-  const navigation = useNavigation();
-
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-        <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
-      </TouchableOpacity>
-
       <View style={styles.imageContainer}>
         {imageSource ? (
           <Image source={imageSource} style={styles.image} resizeMode="cover" />

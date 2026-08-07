@@ -17,7 +17,7 @@ import { useServiceStore } from "@/store/serviceStore";
 export const StaycationHomeScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationHome">>();
-  const { setActiveVenueName } = useServiceStore();
+  const { setActiveVenueName, setActiveStaycationVenueId } = useServiceStore();
 
   let initialServiceId = route.params?.serviceId;
   if (!initialServiceId) {
@@ -33,7 +33,10 @@ export const StaycationHomeScreen = () => {
     if (activeVenue?.name) {
       setActiveVenueName(activeVenue.name);
     }
-  }, [activeVenue?.name, setActiveVenueName]);
+    if (activeVenue?.venueId) {
+      setActiveStaycationVenueId(activeVenue.venueId);
+    }
+  }, [activeVenue?.name, activeVenue?.venueId, setActiveVenueName, setActiveStaycationVenueId]);
 
   const isFarmhouseLayout = useMemo(
     () =>
