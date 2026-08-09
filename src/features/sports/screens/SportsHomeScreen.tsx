@@ -182,8 +182,18 @@ export const SportsHomeScreen = () => {
   useEffect(() => {
     if (availableCategories.length > 0 && !availableCategories.includes(selectedCategory)) {
       setServiceCategory(serviceId, availableCategories[0]);
+      if (route.params?.category) {
+        navigation.setParams({ category: undefined } as any);
+      }
     }
-  }, [availableCategories, selectedCategory, serviceId, setServiceCategory]);
+  }, [
+    availableCategories,
+    selectedCategory,
+    serviceId,
+    setServiceCategory,
+    route.params?.category,
+    navigation,
+  ]);
 
   const getFormattedDate = (date: Date) => {
     const today = new Date();
