@@ -12,6 +12,7 @@ interface CustomDatePickerModalProps {
   minDate?: Date;
   blockedDates?: string[];
   bookingDots?: Record<string, { key: string; color: string }[]>;
+  useModal?: boolean;
 }
 
 export const CustomDatePickerModal: React.FC<CustomDatePickerModalProps> = ({
@@ -22,6 +23,7 @@ export const CustomDatePickerModal: React.FC<CustomDatePickerModalProps> = ({
   minDate = new Date(),
   blockedDates = [],
   bookingDots = {},
+  useModal = true,
 }) => {
   const getLocalISODate = (date: Date) => {
     const year = date.getFullYear();
@@ -30,62 +32,84 @@ export const CustomDatePickerModal: React.FC<CustomDatePickerModalProps> = ({
     return `${year}-${month}-${day}`;
   };
 
-  return (
-    <Modal visible={isVisible} transparent={true} animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
-        <View style={styles.calendarContainer}>
-          <Calendar
-            current={getLocalISODate(selectedDate)}
-            minDate={getLocalISODate(minDate)}
-            hideExtraDays={true}
-            onDayPress={(day: any) => {
-              const dateStr = day.dateString;
-              if (blockedDates.includes(dateStr)) return;
-              onSelectDate(new Date(day.year, day.month - 1, day.day));
-              onClose();
-            }}
-            markingType={"multi-dot"}
-            markedDates={{
-              ...Object.keys(bookingDots).reduce((acc, date) => {
-                acc[date] = { dots: bookingDots[date] };
-                return acc;
-              }, {} as any),
-              ...blockedDates.reduce((acc, date) => {
-                acc[date] = {
-                  ...(bookingDots[date] ? { dots: bookingDots[date] } : {}),
-                  disabled: true,
-                  disableTouchEvent: true,
-                  textColor: "#d9e1e8",
-                };
-                return acc;
-              }, {} as any),
-              [getLocalISODate(selectedDate)]: {
-                ...(bookingDots[getLocalISODate(selectedDate)]
-                  ? { dots: bookingDots[getLocalISODate(selectedDate)] }
-                  : {}),
-                ...(blockedDates.includes(getLocalISODate(selectedDate))
-                  ? { disabled: true, disableTouchEvent: true }
-                  : {}),
-                selected: true,
-                selectedColor: "#000000",
-                selectedTextColor: "#FFFFFF",
-              },
-            }}
-            theme={{
-              todayTextColor: COLORS.primary,
-              arrowColor: COLORS.primary,
-              textDayFontFamily: "Gilroy-SemiBold",
-              textMonthFontFamily: "Gilroy-ExtraBold",
-              textDayHeaderFontFamily: "Gilroy-SemiBold",
-            }}
-          />
-        </View>
-      </TouchableOpacity>
-    </Modal>
+  if (!isVisible) return null;
+
+  const content = (
+    <TouchableOpacity
+      style={[styles.modalOverlay, !useModal && styles.absoluteOverlay]}
+      activeOpacity={1}
+      onPress={onClose}>
+      <View style={styles.calendarContainer}>
+        <Calendar
+          current={getLocalISODate(selectedDate)}
+          minDate={getLocalISODate(minDate)}
+          hideExtraDays={true}
+          onDayPress={(day: any) => {
+            const dateStr = day.dateString;
+            if (blockedDates.includes(dateStr)) return;
+            onSelectDate(new Date(day.year, day.month - 1, day.day));
+            onClose();
+          }}
+          markingType={"multi-dot"}
+          markedDates={{
+            ...Object.keys(bookingDots).reduce((acc, date) => {
+              acc[date] = { dots: bookingDots[date] };
+              return acc;
+            }, {} as any),
+            ...blockedDates.reduce((acc, date) => {
+              acc[date] = {
+                ...(bookingDots[date] ? { dots: bookingDots[date] } : {}),
+                disabled: true,
+                disableTouchEvent: true,
+                textColor: "#d9e1e8",
+              };
+              return acc;
+            }, {} as any),
+            [getLocalISODate(selectedDate)]: {
+              ...(bookingDots[getLocalISODate(selectedDate)]
+                ? { dots: bookingDots[getLocalISODate(selectedDate)] }
+                : {}),
+              ...(blockedDates.includes(getLocalISODate(selectedDate))
+                ? { disabled: true, disableTouchEvent: true }
+                : {}),
+              selected: true,
+              selectedColor: "#000000",
+              selectedTextColor: "#FFFFFF",
+            },
+          }}
+          theme={{
+            todayTextColor: COLORS.primary,
+            arrowColor: COLORS.primary,
+            textDayFontFamily: "Gilroy-SemiBold",
+            textMonthFontFamily: "Gilroy-ExtraBold",
+            textDayHeaderFontFamily: "Gilroy-SemiBold",
+          }}
+        />
+      </View>
+    </TouchableOpacity>
   );
+
+  if (useModal) {
+    return (
+      <Modal visible={isVisible} transparent={true} animationType="fade" onRequestClose={onClose}>
+        {content}
+      </Modal>
+    );
+  }
+
+  return content;
 };
 
 const styles = StyleSheet.create({
+  absoluteOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+    elevation: 9999,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
