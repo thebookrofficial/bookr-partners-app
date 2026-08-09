@@ -7,7 +7,7 @@ import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "@/features/sports/components/ServiceHeader";
 import { Calendar, DateData } from "react-native-calendars";
-import DatePicker from "react-native-date-picker";
+import { PlatformDatePicker as DatePicker } from "@/components/ui/PlatformDatePicker";
 import { Calendar as CalendarIcon, Plus, X, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";

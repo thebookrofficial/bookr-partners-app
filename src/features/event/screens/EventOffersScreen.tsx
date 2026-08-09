@@ -15,7 +15,7 @@ import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs, TextInput } from "@/components/ui";
 import { EventHeader } from "../components/EventHeader";
 import { Calendar, DateData } from "react-native-calendars";
-import DatePicker from "react-native-date-picker";
+import { PlatformDatePicker as DatePicker } from "@/components/ui/PlatformDatePicker";
 import {
   Calendar as CalendarIcon,
   Plus,

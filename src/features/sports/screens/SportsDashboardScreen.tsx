@@ -16,7 +16,7 @@ import { ServiceHeader } from "../components/ServiceHeader";
 import { Calendar, X, ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import DatePicker from "react-native-date-picker";
+import { PlatformDatePicker as DatePicker } from "@/components/ui/PlatformDatePicker";
 import Svg, { Path } from "react-native-svg";
 
 // Navigation & DB Imports

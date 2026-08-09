@@ -6,7 +6,7 @@ import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { Text } from "@/components/ui/Text";
 import { Button } from "@/components/ui/Button";
-import DatePicker from "react-native-date-picker";
+import { PlatformDatePicker as DatePicker } from "@/components/ui/PlatformDatePicker";
 import { Calendar } from "lucide-react-native";
 import { useRoute, RouteProp } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
