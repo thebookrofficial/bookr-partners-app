@@ -1196,32 +1196,32 @@ export const StaycationOfflineBookingSheet = ({
                 </TouchableOpacity>
               </View>
             )}
-
-            <CustomDatePickerModal
-              isVisible={!!showDatePicker}
-              onClose={() => setShowDatePicker(null)}
-              selectedDate={showDatePicker === "in" ? checkInDate : checkOutDate}
-              onSelectDate={onDateChange}
-              minDate={
-                showDatePicker === "in"
-                  ? new Date()
-                  : new Date(new Date(checkInDate).setDate(checkInDate.getDate() + 1))
-              }
-              blockedDates={
-                showDatePicker === "out"
-                  ? blockedDates.filter(d => {
-                      const dateObj = new Date(d);
-                      dateObj.setDate(dateObj.getDate() - 1);
-                      const prevDateStr = formatYMD(dateObj);
-                      return blockedDates.includes(prevDateStr);
-                    })
-                  : blockedDates
-              }
-              bookingDots={bookingDots}
-              useModal={false}
-            />
           </View>
         </KeyboardAvoidingView>
+
+        <CustomDatePickerModal
+          isVisible={!!showDatePicker}
+          onClose={() => setShowDatePicker(null)}
+          selectedDate={showDatePicker === "in" ? checkInDate : checkOutDate}
+          onSelectDate={onDateChange}
+          minDate={
+            showDatePicker === "in"
+              ? new Date()
+              : new Date(new Date(checkInDate).setDate(checkInDate.getDate() + 1))
+          }
+          blockedDates={
+            showDatePicker === "out"
+              ? blockedDates.filter(d => {
+                  const dateObj = new Date(d);
+                  dateObj.setDate(dateObj.getDate() - 1);
+                  const prevDateStr = formatYMD(dateObj);
+                  return blockedDates.includes(prevDateStr);
+                })
+              : blockedDates
+          }
+          bookingDots={bookingDots}
+          useModal={false}
+        />
       </Modal>
 
       <Modal
