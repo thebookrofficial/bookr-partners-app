@@ -1,8 +1,8 @@
 diff --git a/node_modules/react-native-date-picker/ios/RNDatePickerManager.h b/node_modules/react-native-date-picker/ios/RNDatePickerManager.h
-index b754ea9..f87dbdf 100644
+index 6a4f206..b5f4cd8 100644
 --- a/node_modules/react-native-date-picker/ios/RNDatePickerManager.h
 +++ b/node_modules/react-native-date-picker/ios/RNDatePickerManager.h
-@@ -8,8 +8,15 @@
+@@ -8,7 +8,14 @@
  #import <React/RCTConvert.h>
  #import <React/RCTViewManager.h>
  
@@ -17,15 +17,15 @@ index b754ea9..f87dbdf 100644
  
  @property (strong, nonatomic) UIViewController *topViewController;
  
- @end
 diff --git a/node_modules/react-native-date-picker/ios/RNDatePickerManager.mm b/node_modules/react-native-date-picker/ios/RNDatePickerManager.mm
-index 45143a4..dbbd127 100644
+index da42873..bd9bd86 100644
 --- a/node_modules/react-native-date-picker/ios/RNDatePickerManager.mm
 +++ b/node_modules/react-native-date-picker/ios/RNDatePickerManager.mm
-@@ -235,5 +235,9 @@ - (double) getPickerHeight :(UIView *) alertView
-     return 216;
- }
+@@ -16,6 +16,13 @@ @implementation RCTConvert(UIDatePicker)
+   @"countdown": @(UIDatePickerModeCountDownTimer), // not supported yet
+ }), UIDatePickerModeTime, integerValue)
  
++
 +#ifdef RCT_NEW_ARCH_ENABLED
 +- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const facebook::react::ObjCTurboModule::InitParams &)params {
 +    return nullptr;
@@ -33,3 +33,5 @@ index 45143a4..dbbd127 100644
 +#endif
 +
  @end
+ 
+ @implementation RNDatePickerManager
