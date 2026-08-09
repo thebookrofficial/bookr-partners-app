@@ -46,6 +46,10 @@ export const usePushNotifications = () => {
 
     if (enabled) {
       try {
+        if (Platform.OS === "ios") {
+          await messaging().registerDeviceForRemoteMessages();
+        }
+
         // 1. Get the FCM Token
         const token = await messaging().getToken();
 
