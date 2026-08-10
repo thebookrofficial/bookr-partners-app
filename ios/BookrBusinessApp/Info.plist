@@ -32,9 +32,9 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Bookr needs access to your camera to scan tickets and take profile pictures.</string>
+	<string>Bookr needs access to your camera to scan ticket</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Bookr needs your location to show venues near you.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Bookr needs access to your gallery to update your business profile picture.</string>
 	<key>RCTNewArchEnabled</key>
