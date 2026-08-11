@@ -581,40 +581,46 @@ export const AppNavigator = () => {
           setInitialized(true);
         }
 
-        // Non-blocking: fetch client profile in the background
+        // Non-blocking: fetch profile & client profile in the background
         if (newSession?.user) {
           const userId = newSession.user.id;
           (async () => {
             try {
-              const { data: clientData } = await supabase
-                .from("client_profiles")
-                .select("*")
-                .eq("user_id", userId)
-                .maybeSingle();
-              if (clientData) {
-                useAuthStore.getState().setClientProfile(clientData);
+              const [profileResult, clientResult] = await Promise.all([
+                supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+                supabase.from("client_profiles").select("*").eq("user_id", userId).maybeSingle(),
+              ]);
+
+              if (profileResult.data) {
+                useAuthStore.getState().setProfile(profileResult.data);
+              }
+              if (clientResult.data) {
+                useAuthStore.getState().setClientProfile(clientResult.data);
               }
             } catch (error) {
-              console.error("Error fetching initial client profile:", error);
+              console.error("Error fetching initial profiles:", error);
             }
           })();
         }
       } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         if (newSession?.user) {
-          // Non-blocking: fetch client profile in the background
+          // Non-blocking: fetch profile & client profile in the background
           const userId = newSession.user.id;
           (async () => {
             try {
-              const { data: clientData } = await supabase
-                .from("client_profiles")
-                .select("*")
-                .eq("user_id", userId)
-                .maybeSingle();
-              if (clientData) {
-                useAuthStore.getState().setClientProfile(clientData);
+              const [profileResult, clientResult] = await Promise.all([
+                supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+                supabase.from("client_profiles").select("*").eq("user_id", userId).maybeSingle(),
+              ]);
+
+              if (profileResult.data) {
+                useAuthStore.getState().setProfile(profileResult.data);
+              }
+              if (clientResult.data) {
+                useAuthStore.getState().setClientProfile(clientResult.data);
               }
             } catch (error) {
-              console.error("Error fetching client profile on SIGNED_IN:", error);
+              console.error("Error fetching profiles on SIGNED_IN:", error);
             }
           })();
         }
