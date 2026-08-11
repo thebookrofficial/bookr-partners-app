@@ -150,7 +150,15 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
       });
       if (logError) throw logError;
 
-      // Re-fetch to update UI (trigger should have finished by now)
+      // Manually update the master paid_amount (since there is no DB trigger)
+      const { error: updateError } = await supabase
+        .from("staycation_bookings")
+        .update({ paid_amount: newPaidTotal })
+        .eq("id", bookingDetails.id);
+
+      if (updateError) throw updateError;
+
+      // Re-fetch to update UI
       await fetchBookingDetails();
       Alert.alert("Success", "Payment updated successfully!");
       return true;
@@ -209,12 +217,71 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
     }
   };
 
+  const deletePaymentLog = async (logId: string) => {
+    if (!bookingDetails?.id) return false;
+
+    try {
+      setIsUpdating(true);
+
+      const logToDelete = paymentLogs.find(l => l.id === logId);
+      if (!logToDelete) throw new Error("Log not found.");
+
+      const newPaidAmount = Math.max(
+        0,
+        Number(bookingDetails.paid_amount || 0) - Number(logToDelete.amount),
+      );
+
+      if (logId.startsWith("initial-")) {
+        if (bookingDetails.user_id) {
+          Alert.alert(
+            "Action Not Allowed",
+            "You cannot delete the initial advance payment for online bookings.",
+          );
+          return false;
+        }
+
+        const { error: updateError } = await supabase
+          .from("staycation_bookings")
+          .update({ paid_amount: newPaidAmount })
+          .eq("id", bookingDetails.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Direct DB delete (assuming RLS allows it for vendor)
+        const { error: logError } = await supabase
+          .from("offline_payment_logs")
+          .delete()
+          .eq("id", logId);
+
+        if (logError) throw logError;
+
+        // Manually deduct the amount
+        const { error: updateError } = await supabase
+          .from("staycation_bookings")
+          .update({ paid_amount: newPaidAmount })
+          .eq("id", bookingDetails.id);
+
+        if (updateError) throw updateError;
+      }
+
+      await fetchBookingDetails();
+      return true;
+    } catch (error: any) {
+      console.error("Error deleting payment log:", error);
+      Alert.alert("Error", "Could not delete payment log.");
+      return false;
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return {
     isLoading,
     isUpdating,
     bookingDetails,
     paymentLogs,
     updatePayment,
+    deletePaymentLog,
     cancelBooking,
     refetch: fetchBookingDetails,
   };

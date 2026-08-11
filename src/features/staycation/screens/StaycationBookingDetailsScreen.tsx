@@ -14,10 +14,12 @@ import {
   Platform,
   TextInput,
   Keyboard,
+  Modal,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ArrowLeft, Trash2, ChevronUp, ChevronDown, Phone } from "lucide-react-native";
+import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -51,11 +53,20 @@ export const StaycationBookingDetailsScreen = () => {
   const route = useRoute<any>();
   const { booking: initialBooking, isFromHistory } = route.params || {};
 
-  const { isLoading, isUpdating, bookingDetails, paymentLogs, updatePayment, cancelBooking } =
-    useStaycationBookingDetails(initialBooking?.dbId || initialBooking?.id);
+  const {
+    isLoading,
+    isUpdating,
+    bookingDetails,
+    paymentLogs,
+    updatePayment,
+    cancelBooking,
+    deletePaymentLog,
+  } = useStaycationBookingDetails(initialBooking?.dbId || initialBooking?.id);
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(true);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [selectedLogToDelete, setSelectedLogToDelete] = useState<any>(null);
   const [paymentInput, setPaymentInput] = useState("");
   const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
     "cash",
@@ -125,17 +136,20 @@ export const StaycationBookingDetailsScreen = () => {
 
   const units = bookingDetails?.unit_count || 1;
 
-  const totalPayment = bookingDetails?.total_amount
-    ? parseFloat(bookingDetails.total_amount) / units
-    : parseFloat(initialBooking?.amount) || 0;
+  const totalPayment =
+    bookingDetails?.total_amount != null
+      ? parseFloat(bookingDetails.total_amount) / units
+      : parseFloat(initialBooking?.amount) || 0;
 
-  const discountAmount = bookingDetails?.discount_amount
-    ? parseFloat(bookingDetails.discount_amount) / units
-    : parseFloat(initialBooking?.discountAmount) || 0;
+  const discountAmount =
+    bookingDetails?.discount_amount != null
+      ? parseFloat(bookingDetails.discount_amount) / units
+      : parseFloat(initialBooking?.discountAmount) || 0;
 
-  const amountPaid = bookingDetails?.paid_amount
-    ? parseFloat(bookingDetails.paid_amount) / units + discountAmount
-    : (parseFloat(initialBooking?.paidAmount) || 0) + discountAmount;
+  const amountPaid =
+    bookingDetails?.paid_amount != null
+      ? parseFloat(bookingDetails.paid_amount) / units + discountAmount
+      : (parseFloat(initialBooking?.paidAmount) || 0) + discountAmount;
 
   const remainingAmount = Math.max(0, totalPayment - amountPaid);
 
@@ -227,7 +241,7 @@ export const StaycationBookingDetailsScreen = () => {
   };
 
   return (
-    <View style={styles.root}>
+    <GestureHandlerRootView style={styles.root}>
       <ScreenContainer
         scrollable
         backgroundColor={COLORS.background}
@@ -538,28 +552,44 @@ export const StaycationBookingDetailsScreen = () => {
               <View style={styles.paymentLogsWrapper}>
                 {paymentLogs.map((log, index) => {
                   const icon = getIconForLog(log.payment_mode);
-                  return (
-                    <View
-                      key={log.id}
-                      style={[
-                        styles.logCard,
-                        index === paymentLogs.length - 1 && { marginBottom: 0 },
-                      ]}>
-                      <Image source={icon} style={styles.logIcon} />
-                      <Text variant="body1" weight="bold" style={styles.logName}>
-                        {getNameForMethod(log.payment_mode)}
-                      </Text>
-                      <Text variant="body1" weight="bold" style={styles.logDate}>
-                        {new Date(log.created_at).toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </Text>
-                      <Text variant="h3" weight="bold" style={styles.logAmount}>
-                        ₹{log.amount}
-                      </Text>
+                  const renderRightActions = () => (
+                    <View style={styles.swipeActionsContainer}>
+                      <TouchableOpacity
+                        style={styles.swipeActionDelete}
+                        onPress={() => {
+                          setSelectedLogToDelete(log);
+                          setDeleteModalVisible(true);
+                        }}>
+                        <Trash2 size={ms(18)} color="#E55959" />
+                      </TouchableOpacity>
                     </View>
+                  );
+
+                  return (
+                    <Swipeable
+                      key={log.id}
+                      renderRightActions={renderRightActions}
+                      overshootRight={false}
+                      containerStyle={[
+                        index !== paymentLogs.length - 1 && { marginBottom: vs(20) },
+                      ]}>
+                      <View style={styles.logCard}>
+                        <Image source={icon} style={styles.logIcon} />
+                        <Text variant="body1" weight="bold" style={styles.logName}>
+                          {getNameForMethod(log.payment_mode)}
+                        </Text>
+                        <Text variant="body1" weight="bold" style={styles.logDate}>
+                          {new Date(log.created_at).toLocaleDateString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </Text>
+                        <Text variant="h3" weight="bold" style={styles.logAmount}>
+                          ₹{log.amount}
+                        </Text>
+                      </View>
+                    </Swipeable>
                   );
                 })}
               </View>
@@ -567,7 +597,58 @@ export const StaycationBookingDetailsScreen = () => {
           </View>
         )}
       </ScreenContainer>
-    </View>
+
+      {/* Delete Confirmation Modal */}
+      <Modal visible={deleteModalVisible} transparent animationType="slide">
+        <View style={styles.overlay}>
+          <TouchableOpacity
+            style={styles.backdrop}
+            onPress={() => setDeleteModalVisible(false)}
+            activeOpacity={1}
+          />
+          <View style={styles.bottomSheetContainer}>
+            <View style={styles.deleteModalRow}>
+              <View style={styles.deleteModalLeft}>
+                <Text variant="body1" weight="bold" style={styles.deleteModalTitle}>
+                  Delete
+                </Text>
+                <Text variant="h2" weight="bold" style={styles.deleteModalAmount}>
+                  ₹{selectedLogToDelete?.amount}
+                </Text>
+                <Text variant="body2" style={styles.deleteModalWarning}>
+                  Are you sure you want to cancel{"\n"}this Payment?
+                </Text>
+              </View>
+              <View style={styles.deleteModalRight}>
+                <TouchableOpacity
+                  style={styles.deleteConfirmBtn}
+                  onPress={async () => {
+                    if (selectedLogToDelete) {
+                      const success = await deletePaymentLog(selectedLogToDelete.id);
+                      if (success) {
+                        setDeleteModalVisible(false);
+                        setSelectedLogToDelete(null);
+                      }
+                    }
+                  }}
+                  disabled={isUpdating}>
+                  {isUpdating ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Trash2 size={ms(20)} color="#fff" style={{ marginRight: hs(8) }} />
+                      <Text variant="body1" weight="bold" style={styles.deleteConfirmBtnText}>
+                        CANCEL
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </GestureHandlerRootView>
   );
 };
 
@@ -813,7 +894,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
-    marginBottom: vs(20),
   },
   logIcon: { width: ms(36), height: ms(36), resizeMode: "contain", marginRight: hs(12) },
   logName: { flex: 1, fontSize: fs(14), color: "#000", fontFamily: "Gilroy-Bold" },
@@ -850,4 +930,87 @@ const styles = StyleSheet.create({
     gap: hs(8),
   },
   cancelBtnBottomText: { fontSize: fs(20), color: "#fff" },
+
+  // Swipe Actions
+  swipeActionsContainer: {
+    flexDirection: "row",
+    gap: hs(8),
+    paddingLeft: hs(8),
+    alignItems: "center",
+  },
+  swipeActionDelete: {
+    backgroundColor: "#FFE5E5",
+    width: ms(38),
+    height: ms(38),
+    borderRadius: ms(12),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  swipeActionEdit: {
+    backgroundColor: "#CBDFFE",
+    width: ms(38),
+    height: ms(38),
+    borderRadius: ms(12),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Modal Bottom Sheet
+  overlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  bottomSheetContainer: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: ms(24),
+    borderTopRightRadius: ms(24),
+    paddingHorizontal: hs(20),
+    paddingTop: vs(24),
+    paddingBottom: vs(34),
+  },
+  deleteModalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  deleteModalLeft: {
+    flex: 1,
+    paddingRight: hs(16),
+  },
+  deleteModalRight: {
+    flexShrink: 0,
+  },
+  deleteModalTitle: {
+    fontSize: fs(18),
+    color: "#000",
+    marginBottom: vs(8),
+  },
+  deleteModalAmount: {
+    fontSize: fs(24),
+    color: "#000",
+    marginBottom: vs(8),
+  },
+  deleteModalWarning: {
+    fontSize: fs(16),
+    color: "#7A7A7A",
+    fontFamily: "Gilroy-Medium",
+  },
+  deleteConfirmBtn: {
+    backgroundColor: "#E55959",
+    borderRadius: ms(12),
+    paddingVertical: vs(12),
+    paddingHorizontal: hs(16),
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteConfirmBtnText: {
+    color: "#fff",
+    fontSize: fs(20),
+    fontFamily: "bison",
+  },
 });
