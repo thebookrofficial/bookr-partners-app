@@ -4,7 +4,7 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { Text, Avatar } from "@/components/ui";
-import { Trash2, Ban } from "lucide-react-native";
+import { Trash2 } from "lucide-react-native";
 import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
@@ -20,14 +20,7 @@ interface StaffCardProps {
   onBlock?: () => void;
 }
 
-export const StaffCard = ({
-  name,
-  permissions,
-  isInvite,
-  onPress,
-  onDelete,
-  onBlock,
-}: StaffCardProps) => {
+export const StaffCard = ({ name, permissions, isInvite, onPress, onDelete }: StaffCardProps) => {
   const hasSports = permissions?.sports && permissions.sports.length > 0;
   const hasStaycation = permissions?.staycation && permissions.staycation.length > 0;
 
@@ -79,9 +72,6 @@ export const StaffCard = ({
       <View style={styles.actionsContainer}>
         <TouchableOpacity style={styles.iconBtn} onPress={onDelete}>
           <Trash2 size={ms(20)} color={COLORS.danger} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconBtn} onPress={onBlock}>
-          <Ban size={ms(20)} color={COLORS.warning} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

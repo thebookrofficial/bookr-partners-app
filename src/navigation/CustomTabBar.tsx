@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React, { useEffect, useState, useRef } from "react";
-import { View, StyleSheet, TouchableOpacity, Animated, Alert } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Animated } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -157,7 +157,6 @@ export const CustomTabBar = ({ state, descriptors, navigation, fullTabs }: any) 
 
     const onPress = () => {
       if (isDisabled) {
-        Alert.alert("Permission Denied", "You do not have permission to access this tab.");
         return;
       }
       if (!route) return; // Failsafe
