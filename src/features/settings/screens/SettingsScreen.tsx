@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   LogOut,
   Trash2,
-  Bell,
 } from "lucide-react-native";
 import { vs, hs, ms } from "@/utils/responsive.utils";
 import { useNavigation } from "@react-navigation/native";
@@ -76,20 +75,6 @@ export const SettingsScreen = () => {
         <Text variant="h3" weight="bold">
           Settings
         </Text>
-      </View>
-
-      {/* 2. Preferences Section */}
-      <View style={styles.sectionContainer}>
-        <Text variant="body1" weight="bold" style={styles.sectionTitle}>
-          APP SETTINGS
-        </Text>
-        <View style={styles.listContainer}>
-          <SettingsActionRow
-            icon={<Bell size={ms(20)} color={COLORS.primary} />}
-            label="Notification Center"
-            onPress={() => navigation.navigate("NotificationSettings")}
-          />
-        </View>
       </View>
 
       {/* 3. Help and Support Section */}

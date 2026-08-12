@@ -55,7 +55,6 @@ export type MainStackParamList = {
   EditProfile: undefined;
   AddService: undefined;
   Settings: undefined;
-  NotificationSettings: undefined;
   LegalView: { title: string; content: string };
 
   SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;

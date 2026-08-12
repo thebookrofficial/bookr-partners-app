@@ -65,7 +65,6 @@ import { EventScanScreen } from "@/features/event/screens/EventScanScreen";
 import { EventEntryDetailsScreen } from "@/features/event/screens/EventEntryDetailsScreen";
 import { EventScanConfirmationScreen } from "@/features/event/screens/EventScanConfirmationScreen";
 import { LegalViewScreen } from "@/features/settings/screens/LegalViewScreen";
-import { NotificationSettingsScreen } from "@/features/settings/screens/NotificationSettingsScreen";
 import { FAQScreen } from "@/features/settings/screens/FAQScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
@@ -378,7 +377,6 @@ const MainNavigator = () => {
     <MainStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
       <MainStack.Screen name="VendorProfile" component={VendorProfileScreen} />
       <MainStack.Screen name="Settings" component={SettingsScreen} />
-      <MainStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
       <MainStack.Screen name="StaffManagement" component={StaffManagementScreen} />
       <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
