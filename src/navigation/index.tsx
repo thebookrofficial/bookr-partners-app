@@ -118,7 +118,7 @@ const TabIcon =
 
 const SportsTabNavigator = () => {
   const { clientProfile } = useAuthStore();
-  const isOwner = clientProfile?.client_role === "owner" || !clientProfile; // fallback
+  const isOwner = clientProfile?.client_role === "owner";
 
   // Use useCallback to avoid recreating the function on every render
   const canAccess = React.useCallback(
@@ -231,7 +231,7 @@ const DineTabNavigator = () => {
 
 const StaycationTabNavigator = () => {
   const { clientProfile } = useAuthStore();
-  const isOwner = clientProfile?.client_role === "owner" || !clientProfile; // fallback
+  const isOwner = clientProfile?.client_role === "owner";
 
   const canAccess = React.useCallback(
     (perm: string) => isOwner || (clientProfile?.permissions || []).includes(perm),
@@ -311,43 +311,74 @@ const StaycationTabNavigator = () => {
 };
 
 const EventTabNavigator = () => {
+  const { clientProfile } = useAuthStore();
+  const isOwner = clientProfile?.client_role === "owner";
+
+  const canAccess = React.useCallback(
+    (perm: string) => isOwner || (clientProfile?.permissions || []).includes(perm),
+    [isOwner, clientProfile?.permissions],
+  );
+
+  const fullTabs = React.useMemo(
+    () => [
+      {
+        name: "EventHome",
+        label: "Bookings",
+        Icon: TabIcon(FileText),
+        disabled: !canAccess("events:bookings"),
+      },
+      {
+        name: "EventScan",
+        label: "Scan",
+        Icon: TabIcon(ScanLine),
+        disabled: !canAccess("events:scan_page"),
+      },
+      {
+        name: "EventGuestInvite",
+        label: "Invites",
+        Icon: TabIcon(UserPlus),
+        disabled: !canAccess("events:guest_invite"),
+      },
+      {
+        name: "EventSpotEntry",
+        label: "Spot Entry",
+        Icon: TabIcon(MapPin),
+        disabled: !canAccess("events:spot_entry"),
+      },
+      {
+        name: "EventProfile",
+        label: "Profile",
+        Icon: TabIcon(User),
+        disabled: false,
+        isProfile: true,
+      },
+    ],
+    [canAccess],
+  );
+
+  const renderTabBar = React.useCallback(
+    (props: any) => <CustomTabBar {...props} fullTabs={fullTabs} />,
+    [fullTabs],
+  );
+
   return (
     <EventTab.Navigator
       tabBarPosition="bottom"
-      tabBar={renderCustomTabBar}
+      tabBar={renderTabBar}
       screenOptions={{ swipeEnabled: true, lazy: true, lazyPreloadDistance: 1 }}>
-      <EventTab.Screen
-        name="EventHome"
-        component={EventHomeScreen}
-        options={{
-          title: "Bookings",
-          tabBarIcon: TabIcon(FileText),
-        }}
-      />
-      <EventTab.Screen
-        name="EventScan"
-        component={EventScanScreen}
-        options={{
-          title: "Scan",
-          tabBarIcon: TabIcon(ScanLine),
-        }}
-      />
-
-      <EventTab.Screen
-        name="EventGuestInvite"
-        component={EventGuestInviteScreen}
-        options={{ title: "Invites", tabBarIcon: TabIcon(UserPlus) }}
-      />
-      <EventTab.Screen
-        name="EventSpotEntry"
-        component={EventSpotEntryScreen}
-        options={{ title: "Spot Entry", tabBarIcon: TabIcon(MapPin) }}
-      />
-      <EventTab.Screen
-        name="EventProfile"
-        component={VendorProfileScreen}
-        options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
-      />
+      {canAccess("events:bookings") && (
+        <EventTab.Screen name="EventHome" component={EventHomeScreen} />
+      )}
+      {canAccess("events:scan_page") && (
+        <EventTab.Screen name="EventScan" component={EventScanScreen} />
+      )}
+      {canAccess("events:guest_invite") && (
+        <EventTab.Screen name="EventGuestInvite" component={EventGuestInviteScreen} />
+      )}
+      {canAccess("events:spot_entry") && (
+        <EventTab.Screen name="EventSpotEntry" component={EventSpotEntryScreen} />
+      )}
+      <EventTab.Screen name="EventProfile" component={VendorProfileScreen} />
     </EventTab.Navigator>
   );
 };
@@ -636,6 +667,36 @@ export const AppNavigator = () => {
       subscription.unsubscribe();
     };
   }, [setSession, setInitialized]);
+
+  // Instantly log out the staff member if their access is revoked (record deleted by vendor)
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const userId = session.user.id;
+    const accessChannel = supabase
+      .channel("access-revocation")
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "client_profiles",
+          filter: `user_id=eq.${userId}`,
+        },
+        async () => {
+          Alert.alert(
+            "Access Revoked",
+            "Your access has been removed by the owner. You will now be logged out.",
+          );
+          await supabase.auth.signOut();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(accessChannel);
+    };
+  }, [session?.user]);
 
   useEffect(() => {
     if (session) {
