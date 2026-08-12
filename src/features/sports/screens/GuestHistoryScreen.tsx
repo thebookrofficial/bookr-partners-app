@@ -52,8 +52,6 @@ export const GuestHistoryScreen = () => {
       navigation.navigate("SportsInvoice", { bookingId: item.id });
     } else if (item.vertical === "staycation") {
       navigation.navigate("StaycationInvoice", { bookingId: item.id });
-    } else if (item.vertical === "dining") {
-      navigation.navigate("DineBookingDetails", { bookingId: item.id });
     } else if (item.vertical === "events") {
       navigation.navigate("EventEntryDetails", { entryId: item.id });
     }

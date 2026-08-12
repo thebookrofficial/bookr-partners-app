@@ -24,17 +24,6 @@ export type SportsTabParamList = {
   BlockUnblock: { venueId: string; groundId: string };
 };
 
-// 2.1 Define the Bottom Tab screens for Dine
-export type DineTabParamList = {
-  DineHome: { serviceId: string };
-  DineHistory: { serviceId: string };
-  DineDashboard: { serviceId: string };
-  DineEssentials: { serviceId: string };
-  DineProfile: undefined;
-  DineCloseDate: { serviceId: string };
-  DineOffers: { serviceId: string };
-};
-
 // 2.2 Define the Bottom Tab screens for Staycation
 export type StaycationTabParamList = {
   StaycationHome: { serviceId: string };
@@ -70,7 +59,6 @@ export type MainStackParamList = {
   LegalView: { title: string; content: string };
 
   SportsServiceTabs: NavigatorScreenParams<SportsTabParamList>;
-  DineServiceTabs: NavigatorScreenParams<DineTabParamList>;
   StaycationServiceTabs: NavigatorScreenParams<StaycationTabParamList>;
   EventServiceTabs: NavigatorScreenParams<EventTabParamList>;
   BookingDetails: { bookingId: string; idChain?: string[] };
@@ -78,11 +66,7 @@ export type MainStackParamList = {
   StaycationInvoice: { bookingId: string };
   StaycationCloseDate: { serviceId: string };
   StaycationOffers: { serviceId: string };
-  DineBookingDetails: { bookingId: string; isFromPayment?: boolean };
-  DinePaymentDetails: { bookingId: string };
-  DineCloseDate: { serviceId: string };
-  DineOffers: { serviceId: string };
-  EventOffers: { serviceId: string };
+  EventCloseDate: { serviceId: string };
   EventGuestInvite: { serviceId: string };
   EventExportBookings: { serviceId: string };
   EventEntryDetails: { entryId: string };
