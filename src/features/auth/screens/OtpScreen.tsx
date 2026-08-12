@@ -7,10 +7,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput as RNTextInput,
-  Image,
   ScrollView,
   Dimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ArrowLeft } from "lucide-react-native";
 import { Text, Button } from "@/components/ui";
 import { AuthScreenProps } from "@/navigation/navigation.types";
 import { COLORS } from "@/constants/theme";
@@ -20,13 +21,13 @@ import { LEGAL_TEXT } from "@/constants/legal";
 
 // Assets
 import LoginIllustration from "@/assets/images/login-screen-client-side.svg";
-import DividerLine from "@/assets/icons/ic_divider_line.svg";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const OTP_LENGTH = 6;
 const TIMER_SECONDS = 30;
 
 export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
+  const insets = useSafeAreaInsets();
   const { email } = route.params;
   const { isLoading, verifyOtpCode, resendOtpCode } = useAuthLogic();
 
@@ -86,6 +87,12 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        style={[styles.backButton, { top: insets.top + vs(10) }]}
+        onPress={() => navigation.goBack()}>
+        <ArrowLeft color={COLORS.text.inverse} size={ms(24)} />
+      </TouchableOpacity>
+
       <View style={styles.header}>
         <View style={styles.illustrationContainer}>
           <LoginIllustration width={hs(380)} height={vs(345)} />
@@ -159,30 +166,6 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
             textStyle={styles.loginButtonText}
           />
 
-          <View style={styles.dividerContainer}>
-            <DividerLine
-              width={hs(70)}
-              height={1}
-              stroke={COLORS.text.muted}
-              style={styles.dividerLine}
-            />
-            <Text style={styles.dividerText}>Or login with</Text>
-            <DividerLine
-              width={hs(70)}
-              height={1}
-              stroke={COLORS.text.muted}
-              style={styles.dividerLine}
-            />
-          </View>
-
-          <TouchableOpacity style={styles.socialButton}>
-            <Image
-              source={{ uri: "https://img.icons8.com/color/48/google-logo.png" }}
-              style={styles.socialIcon}
-            />
-            <Text style={styles.socialButtonText}>Sign in with Google</Text>
-          </TouchableOpacity>
-
           <View style={styles.footer}>
             <Text variant="caption" color={COLORS.text.secondary}>
               By continuing, you agree to our
@@ -222,6 +205,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.danger,
+  },
+  backButton: {
+    position: "absolute",
+    left: hs(20),
+    zIndex: 20,
+    width: ms(40),
+    height: ms(40),
+    justifyContent: "center",
+    alignItems: "center",
   },
   header: {
     height: SCREEN_HEIGHT * 0.4,
@@ -356,44 +348,6 @@ const styles = StyleSheet.create({
   loginButtonText: {
     fontFamily: "Gilroy-Bold",
     fontSize: fs(16),
-  },
-  dividerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: vs(28),
-    width: "100%",
-    justifyContent: "center",
-  },
-  dividerLine: {
-    width: hs(70),
-    height: 1,
-    tintColor: COLORS.text.muted,
-  },
-  dividerText: {
-    fontFamily: "Gilroy-Medium",
-    fontSize: fs(16),
-    color: COLORS.text.muted,
-    marginHorizontal: hs(10),
-  },
-  socialButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
-    height: vs(54),
-    backgroundColor: "#E1E1E1",
-    borderRadius: ms(21),
-    marginBottom: vs(20),
-  },
-  socialIcon: {
-    width: 24,
-    height: 24,
-    marginRight: hs(10),
-  },
-  socialButtonText: {
-    fontFamily: "Gilroy-Bold",
-    fontSize: fs(14),
-    color: COLORS.text.muted,
   },
   footer: {
     alignItems: "center",
