@@ -4,8 +4,8 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { Text, Avatar } from "@/components/ui";
-import { Trash2, Ban } from "lucide-react-native";
-import { hs, vs, ms } from "@/utils/responsive.utils";
+import { Trash2 } from "lucide-react-native";
+import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
 interface StaffCardProps {
@@ -13,6 +13,7 @@ interface StaffCardProps {
   permissions?: {
     sports?: string[];
     staycation?: string[];
+    events?: string[];
   };
   isInvite?: boolean;
   onPress?: () => void;
@@ -20,16 +21,10 @@ interface StaffCardProps {
   onBlock?: () => void;
 }
 
-export const StaffCard = ({
-  name,
-  permissions,
-  isInvite,
-  onPress,
-  onDelete,
-  onBlock,
-}: StaffCardProps) => {
+export const StaffCard = ({ name, permissions, isInvite, onPress, onDelete }: StaffCardProps) => {
   const hasSports = permissions?.sports && permissions.sports.length > 0;
   const hasStaycation = permissions?.staycation && permissions.staycation.length > 0;
+  const hasEvents = permissions?.events && permissions.events.length > 0;
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
@@ -47,7 +42,7 @@ export const StaffCard = ({
               variant="caption"
               weight="bold"
               color={isInvite ? COLORS.warning : COLORS.success}
-              style={{ fontSize: 10 }}>
+              style={styles.statusText}>
               {isInvite ? "Pending" : "Active"}
             </Text>
           </View>
@@ -67,7 +62,14 @@ export const StaffCard = ({
               </Text>
             </View>
           )}
-          {!hasSports && !hasStaycation && (
+          {hasEvents && (
+            <View style={styles.badge}>
+              <Text variant="caption" weight="bold" color={COLORS.text.secondary}>
+                Events
+              </Text>
+            </View>
+          )}
+          {!hasSports && !hasStaycation && !hasEvents && (
             <Text variant="caption" color={COLORS.text.muted}>
               No Access
             </Text>
@@ -79,9 +81,6 @@ export const StaffCard = ({
       <View style={styles.actionsContainer}>
         <TouchableOpacity style={styles.iconBtn} onPress={onDelete}>
           <Trash2 size={ms(20)} color={COLORS.danger} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconBtn} onPress={onBlock}>
-          <Ban size={ms(20)} color={COLORS.warning} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -121,6 +120,9 @@ const styles = StyleSheet.create({
   },
   statusActive: {
     backgroundColor: COLORS.success + "20", // light success background
+  },
+  statusText: {
+    fontSize: fs(10),
   },
   badgesContainer: {
     flexDirection: "row",

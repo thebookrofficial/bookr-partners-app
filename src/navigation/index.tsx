@@ -10,7 +10,6 @@ import {
   AuthStackParamList,
   MainStackParamList,
   SportsTabParamList,
-  DineTabParamList,
   StaycationTabParamList,
   EventTabParamList,
 } from "./navigation.types";
@@ -59,24 +58,13 @@ import { StaycationHistoryScreen } from "@/features/staycation/screens/Staycatio
 import { StaycationDashboardScreen } from "@/features/staycation/screens/StaycationDashboardScreen";
 import { StaycationEssentialsScreen } from "@/features/staycation/screens/StaycationEssentialsScreen";
 import { StaycationCloseDateScreen } from "@/features/staycation/screens/StaycationCloseDateScreen";
-import { DineHomeScreen } from "@/features/dine/screens/DineHomeScreen";
-import { DineDashboardScreen } from "@/features/dine/screens/DineDashboardScreen";
-import { DineHistoryScreen } from "@/features/dine/screens/DineHistoryScreen";
-import { DineEssentialsScreen } from "@/features/dine/screens/DineEssentialsScreen";
-import { DineCloseDateScreen } from "@/features/dine/screens/DineCloseDateScreen";
-import { DineOffersScreen } from "@/features/dine/screens/DineOffersScreen";
-import { DineBookingDetailsScreen } from "@/features/dine/screens/DineBookingDetailsScreen";
-import { DinePaymentDetailsScreen } from "@/features/dine/screens/DinePaymentDetailsScreen";
 import { EventHomeScreen } from "@/features/event/screens/EventHomeScreen";
-
-import { EventOffersScreen } from "@/features/event/screens/EventOffersScreen";
 import { EventGuestInviteScreen } from "@/features/event/screens/EventGuestInviteScreen";
 import { EventExportBookingsScreen } from "@/features/event/screens/EventExportBookingsScreen";
 import { EventScanScreen } from "@/features/event/screens/EventScanScreen";
 import { EventEntryDetailsScreen } from "@/features/event/screens/EventEntryDetailsScreen";
 import { EventScanConfirmationScreen } from "@/features/event/screens/EventScanConfirmationScreen";
 import { LegalViewScreen } from "@/features/settings/screens/LegalViewScreen";
-import { NotificationSettingsScreen } from "@/features/settings/screens/NotificationSettingsScreen";
 import { FAQScreen } from "@/features/settings/screens/FAQScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
@@ -91,7 +79,7 @@ import { useAuthStore, useServiceStore } from "@/store";
 import { SplashScreen } from "@/screens/SplashScreen";
 import { ms, fs } from "@/utils/responsive.utils";
 
-import { CustomTabBar, renderCustomTabBar } from "./CustomTabBar";
+import { CustomTabBar } from "./CustomTabBar";
 // --- AUTHENTICATION IMPORTS ---
 import { supabase } from "@/lib/supabase";
 
@@ -107,7 +95,6 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainStack = createNativeStackNavigator<MainStackParamList>();
 const SportsTab = createMaterialTopTabNavigator<SportsTabParamList>();
-const DineTab = createMaterialTopTabNavigator<DineTabParamList>();
 const StaycationTab = createMaterialTopTabNavigator<StaycationTabParamList>();
 const EventTab = createMaterialTopTabNavigator<EventTabParamList>();
 
@@ -118,7 +105,7 @@ const TabIcon =
 
 const SportsTabNavigator = () => {
   const { clientProfile } = useAuthStore();
-  const isOwner = clientProfile?.client_role === "owner" || !clientProfile; // fallback
+  const isOwner = clientProfile?.client_role === "owner";
 
   // Use useCallback to avoid recreating the function on every render
   const canAccess = React.useCallback(
@@ -194,44 +181,9 @@ const SportsTabNavigator = () => {
   );
 };
 
-const DineTabNavigator = () => {
-  return (
-    <DineTab.Navigator
-      tabBarPosition="bottom"
-      tabBar={renderCustomTabBar}
-      screenOptions={{ swipeEnabled: true, lazy: true, lazyPreloadDistance: 1 }}>
-      <DineTab.Screen
-        name="DineHome"
-        component={DineHomeScreen}
-        options={{ title: "Home", tabBarIcon: TabIcon(CalendarCheck) }}
-      />
-      <DineTab.Screen
-        name="DineHistory"
-        component={DineHistoryScreen}
-        options={{ title: "History", tabBarIcon: TabIcon(HistoryIcon) }}
-      />
-      <DineTab.Screen
-        name="DineDashboard"
-        component={DineDashboardScreen}
-        options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
-      />
-      <DineTab.Screen
-        name="DineEssentials"
-        component={DineEssentialsScreen}
-        options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
-      />
-      <DineTab.Screen
-        name="DineProfile"
-        component={VendorProfileScreen}
-        options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
-      />
-    </DineTab.Navigator>
-  );
-};
-
 const StaycationTabNavigator = () => {
   const { clientProfile } = useAuthStore();
-  const isOwner = clientProfile?.client_role === "owner" || !clientProfile; // fallback
+  const isOwner = clientProfile?.client_role === "owner";
 
   const canAccess = React.useCallback(
     (perm: string) => isOwner || (clientProfile?.permissions || []).includes(perm),
@@ -311,43 +263,74 @@ const StaycationTabNavigator = () => {
 };
 
 const EventTabNavigator = () => {
+  const { clientProfile } = useAuthStore();
+  const isOwner = clientProfile?.client_role === "owner";
+
+  const canAccess = React.useCallback(
+    (perm: string) => isOwner || (clientProfile?.permissions || []).includes(perm),
+    [isOwner, clientProfile?.permissions],
+  );
+
+  const fullTabs = React.useMemo(
+    () => [
+      {
+        name: "EventHome",
+        label: "Bookings",
+        Icon: TabIcon(FileText),
+        disabled: !canAccess("events:bookings"),
+      },
+      {
+        name: "EventScan",
+        label: "Scan",
+        Icon: TabIcon(ScanLine),
+        disabled: !canAccess("events:scan_page"),
+      },
+      {
+        name: "EventGuestInvite",
+        label: "Invites",
+        Icon: TabIcon(UserPlus),
+        disabled: !canAccess("events:guest_invite"),
+      },
+      {
+        name: "EventSpotEntry",
+        label: "Spot Entry",
+        Icon: TabIcon(MapPin),
+        disabled: !canAccess("events:spot_entry"),
+      },
+      {
+        name: "EventProfile",
+        label: "Profile",
+        Icon: TabIcon(User),
+        disabled: false,
+        isProfile: true,
+      },
+    ],
+    [canAccess],
+  );
+
+  const renderTabBar = React.useCallback(
+    (props: any) => <CustomTabBar {...props} fullTabs={fullTabs} />,
+    [fullTabs],
+  );
+
   return (
     <EventTab.Navigator
       tabBarPosition="bottom"
-      tabBar={renderCustomTabBar}
+      tabBar={renderTabBar}
       screenOptions={{ swipeEnabled: true, lazy: true, lazyPreloadDistance: 1 }}>
-      <EventTab.Screen
-        name="EventHome"
-        component={EventHomeScreen}
-        options={{
-          title: "Bookings",
-          tabBarIcon: TabIcon(FileText),
-        }}
-      />
-      <EventTab.Screen
-        name="EventScan"
-        component={EventScanScreen}
-        options={{
-          title: "Scan",
-          tabBarIcon: TabIcon(ScanLine),
-        }}
-      />
-
-      <EventTab.Screen
-        name="EventGuestInvite"
-        component={EventGuestInviteScreen}
-        options={{ title: "Invites", tabBarIcon: TabIcon(UserPlus) }}
-      />
-      <EventTab.Screen
-        name="EventSpotEntry"
-        component={EventSpotEntryScreen}
-        options={{ title: "Spot Entry", tabBarIcon: TabIcon(MapPin) }}
-      />
-      <EventTab.Screen
-        name="EventProfile"
-        component={VendorProfileScreen}
-        options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
-      />
+      {canAccess("events:bookings") && (
+        <EventTab.Screen name="EventHome" component={EventHomeScreen} />
+      )}
+      {canAccess("events:scan_page") && (
+        <EventTab.Screen name="EventScan" component={EventScanScreen} />
+      )}
+      {canAccess("events:guest_invite") && (
+        <EventTab.Screen name="EventGuestInvite" component={EventGuestInviteScreen} />
+      )}
+      {canAccess("events:spot_entry") && (
+        <EventTab.Screen name="EventSpotEntry" component={EventSpotEntryScreen} />
+      )}
+      <EventTab.Screen name="EventProfile" component={VendorProfileScreen} />
     </EventTab.Navigator>
   );
 };
@@ -374,9 +357,6 @@ const MainNavigator = () => {
     if (vertical === "sports") {
       initialRouteName = "SportsServiceTabs";
       initialParams = { screen: "SportsHome", params: { serviceId, category } };
-    } else if (vertical === "dining") {
-      initialRouteName = "DineServiceTabs";
-      initialParams = { screen: "DineHome", params: { serviceId } };
     } else if (vertical === "staycation") {
       initialRouteName = "StaycationServiceTabs";
       initialParams = { screen: "StaycationHome", params: { serviceId } };
@@ -397,7 +377,6 @@ const MainNavigator = () => {
     <MainStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
       <MainStack.Screen name="VendorProfile" component={VendorProfileScreen} />
       <MainStack.Screen name="Settings" component={SettingsScreen} />
-      <MainStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
       <MainStack.Screen name="StaffManagement" component={StaffManagementScreen} />
       <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
@@ -407,11 +386,6 @@ const MainNavigator = () => {
         name="SportsServiceTabs"
         component={SportsTabNavigator}
         initialParams={initialRouteName === "SportsServiceTabs" ? initialParams : undefined}
-      />
-      <MainStack.Screen
-        name="DineServiceTabs"
-        component={DineTabNavigator}
-        initialParams={initialRouteName === "DineServiceTabs" ? initialParams : undefined}
       />
       <MainStack.Screen
         name="StaycationServiceTabs"
@@ -430,11 +404,6 @@ const MainNavigator = () => {
       />
       <MainStack.Screen name="StaycationInvoice" component={StaycationInvoiceScreen} />
       <MainStack.Screen name="StaycationOffers" component={StaycationOffersScreen} />
-      <MainStack.Screen name="DineBookingDetails" component={DineBookingDetailsScreen} />
-      <MainStack.Screen name="DinePaymentDetails" component={DinePaymentDetailsScreen} />
-      <MainStack.Screen name="DineCloseDate" component={DineCloseDateScreen} />
-      <MainStack.Screen name="DineOffers" component={DineOffersScreen} />
-      <MainStack.Screen name="EventOffers" component={EventOffersScreen} />
       <MainStack.Screen name="EventExportBookings" component={EventExportBookingsScreen} />
       <MainStack.Screen name="EventEntryDetails" component={EventEntryDetailsScreen} />
 
@@ -581,40 +550,46 @@ export const AppNavigator = () => {
           setInitialized(true);
         }
 
-        // Non-blocking: fetch client profile in the background
+        // Non-blocking: fetch profile & client profile in the background
         if (newSession?.user) {
           const userId = newSession.user.id;
           (async () => {
             try {
-              const { data: clientData } = await supabase
-                .from("client_profiles")
-                .select("*")
-                .eq("user_id", userId)
-                .maybeSingle();
-              if (clientData) {
-                useAuthStore.getState().setClientProfile(clientData);
+              const [profileResult, clientResult] = await Promise.all([
+                supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+                supabase.from("client_profiles").select("*").eq("user_id", userId).maybeSingle(),
+              ]);
+
+              if (profileResult.data) {
+                useAuthStore.getState().setProfile(profileResult.data);
+              }
+              if (clientResult.data) {
+                useAuthStore.getState().setClientProfile(clientResult.data);
               }
             } catch (error) {
-              console.error("Error fetching initial client profile:", error);
+              console.error("Error fetching initial profiles:", error);
             }
           })();
         }
       } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         if (newSession?.user) {
-          // Non-blocking: fetch client profile in the background
+          // Non-blocking: fetch profile & client profile in the background
           const userId = newSession.user.id;
           (async () => {
             try {
-              const { data: clientData } = await supabase
-                .from("client_profiles")
-                .select("*")
-                .eq("user_id", userId)
-                .maybeSingle();
-              if (clientData) {
-                useAuthStore.getState().setClientProfile(clientData);
+              const [profileResult, clientResult] = await Promise.all([
+                supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+                supabase.from("client_profiles").select("*").eq("user_id", userId).maybeSingle(),
+              ]);
+
+              if (profileResult.data) {
+                useAuthStore.getState().setProfile(profileResult.data);
+              }
+              if (clientResult.data) {
+                useAuthStore.getState().setClientProfile(clientResult.data);
               }
             } catch (error) {
-              console.error("Error fetching client profile on SIGNED_IN:", error);
+              console.error("Error fetching profiles on SIGNED_IN:", error);
             }
           })();
         }
@@ -630,6 +605,36 @@ export const AppNavigator = () => {
       subscription.unsubscribe();
     };
   }, [setSession, setInitialized]);
+
+  // Instantly log out the staff member if their access is revoked (record deleted by vendor)
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const userId = session.user.id;
+    const accessChannel = supabase
+      .channel("access-revocation")
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "client_profiles",
+          filter: `user_id=eq.${userId}`,
+        },
+        async () => {
+          Alert.alert(
+            "Access Revoked",
+            "Your access has been removed by the owner. You will now be logged out.",
+          );
+          await supabase.auth.signOut();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(accessChannel);
+    };
+  }, [session?.user]);
 
   useEffect(() => {
     if (session) {

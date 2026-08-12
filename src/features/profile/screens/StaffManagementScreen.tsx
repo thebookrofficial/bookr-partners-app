@@ -101,7 +101,8 @@ export const StaffManagementScreen = () => {
     const staycation = perms
       .filter(p => p.startsWith("staycation:"))
       .map(p => p.replace("staycation:", ""));
-    return { sports, staycation };
+    const events = perms.filter(p => p.startsWith("events:")).map(p => p.replace("events:", ""));
+    return { sports, staycation, events };
   };
 
   return (
