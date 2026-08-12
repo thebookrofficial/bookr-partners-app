@@ -8,7 +8,7 @@ import { Text, Avatar, PillTabs, ListSkeleton } from "@/components/ui";
 import { ServiceCard } from "../components/ServiceCard";
 import { Settings } from "lucide-react-native";
 import { vs, hs, ms } from "@/utils/responsive.utils";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { COLORS } from "@/constants/theme";
@@ -21,7 +21,50 @@ export const VendorProfileScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { user, clientProfile } = useAuthStore();
   const { loading, venues, refresh } = useVendorData();
-  const { setLastSelectedService } = useServiceStore();
+  const { setLastSelectedService, setTabBarVisible } = useServiceStore();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (clientProfile?.client_role !== "owner") {
+        setTabBarVisible(false);
+        return () => setTabBarVisible(true);
+      }
+    }, [setTabBarVisible, clientProfile?.client_role]),
+  );
+
+  // Helper to determine the first permitted screen for a given vertical
+  const getTargetScreen = (vertical: string): any => {
+    const isOwner = clientProfile?.client_role === "owner";
+    const perms = clientProfile?.permissions || [];
+    const has = (p: string) => isOwner || perms.includes(p);
+
+    if (vertical === "events") {
+      if (has("events:bookings")) return "EventHome";
+      if (has("events:scan_page")) return "EventScan";
+      if (has("events:guest_invite")) return "EventGuestInvite";
+      if (has("events:spot_entry")) return "EventSpotEntry";
+      return "EventProfile";
+    }
+    if (vertical === "staycation") {
+      if (has("staycation:View Staycation Home")) return "StaycationHome";
+      if (has("staycation:View Staycation History")) return "StaycationHistory";
+      if (isOwner) return "StaycationDashboard";
+      if (isOwner) return "StaycationEssentials";
+      return "StaycationProfile";
+    }
+    if (vertical === "sports") {
+      if (has("sports:View Sports Home")) return "SportsHome";
+      if (has("sports:View Sports History")) return "SportsHistory";
+      if (isOwner) return "SportsDashboard";
+      if (isOwner || has("sports:Manage Bulk Bookings") || has("sports:Block / Unblock Slots"))
+        return "SportsEssentials";
+      return "SportsProfile";
+    }
+    if (vertical === "dining") {
+      return "DineHome";
+    }
+    return "VendorProfile";
+  };
 
   const [activeTab, setActiveTab] = useState(STRINGS.profile.tabs[0]);
 
@@ -170,27 +213,31 @@ export const VendorProfileScreen = () => {
 
                   const category = sportsType ? categoryMap[sportsType] || sportsType : undefined;
 
+                  const targetScreen = getTargetScreen(venue.vertical);
                   setLastSelectedService({ ...baseService, category });
                   navigation.navigate("SportsServiceTabs", {
-                    screen: "SportsHome",
+                    screen: targetScreen,
                     params: { serviceId: venue.id, category },
                   });
                 } else if (venue.vertical === "dining") {
+                  const targetScreen = getTargetScreen(venue.vertical);
                   setLastSelectedService(baseService);
                   navigation.navigate("DineServiceTabs", {
-                    screen: "DineHome",
+                    screen: targetScreen,
                     params: { serviceId: venue.id },
                   });
                 } else if (venue.vertical === "staycation") {
+                  const targetScreen = getTargetScreen(venue.vertical);
                   setLastSelectedService(baseService);
                   navigation.navigate("StaycationServiceTabs", {
-                    screen: "StaycationHome",
+                    screen: targetScreen,
                     params: { serviceId: venue.id },
                   });
                 } else if (venue.vertical === "events") {
+                  const targetScreen = getTargetScreen(venue.vertical);
                   setLastSelectedService(baseService);
                   navigation.navigate("EventServiceTabs", {
-                    screen: "EventHome",
+                    screen: targetScreen,
                     params: { serviceId: venue.id },
                   });
                 } else if (venue.vertical === "profile") {
