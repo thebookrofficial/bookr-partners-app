@@ -78,11 +78,7 @@ export const VendorProfileScreen = () => {
       if (index === 0) return true;
 
       const tabKey = tab.toLowerCase();
-      return (
-        activeVerticals.has(tabKey) ||
-        activeVerticals.has(tabKey.replace(/s$/, "")) ||
-        (tabKey === "dining" && activeVerticals.has("dining"))
-      );
+      return activeVerticals.has(tabKey) || activeVerticals.has(tabKey.replace(/s$/, ""));
     });
   }, [venues]);
 
@@ -219,13 +215,6 @@ export const VendorProfileScreen = () => {
                     screen: targetScreen,
                     params: { serviceId: venue.id, category },
                   });
-                } else if (venue.vertical === "dining") {
-                  const targetScreen = getTargetScreen(venue.vertical);
-                  setLastSelectedService(baseService);
-                  navigation.navigate("DineServiceTabs", {
-                    screen: targetScreen,
-                    params: { serviceId: venue.id },
-                  });
                 } else if (venue.vertical === "staycation") {
                   const targetScreen = getTargetScreen(venue.vertical);
                   setLastSelectedService(baseService);
@@ -240,7 +229,7 @@ export const VendorProfileScreen = () => {
                     screen: targetScreen,
                     params: { serviceId: venue.id },
                   });
-                } else if (venue.vertical === "profile") {
+                } else if ((venue.vertical as string) === "profile") {
                   navigation.navigate("VendorProfile");
                 }
               }}

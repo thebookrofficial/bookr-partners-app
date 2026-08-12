@@ -10,7 +10,6 @@ import {
   AuthStackParamList,
   MainStackParamList,
   SportsTabParamList,
-  DineTabParamList,
   StaycationTabParamList,
   EventTabParamList,
 } from "./navigation.types";
@@ -59,24 +58,13 @@ import { StaycationHistoryScreen } from "@/features/staycation/screens/Staycatio
 import { StaycationDashboardScreen } from "@/features/staycation/screens/StaycationDashboardScreen";
 import { StaycationEssentialsScreen } from "@/features/staycation/screens/StaycationEssentialsScreen";
 import { StaycationCloseDateScreen } from "@/features/staycation/screens/StaycationCloseDateScreen";
-import { DineHomeScreen } from "@/features/dine/screens/DineHomeScreen";
-import { DineDashboardScreen } from "@/features/dine/screens/DineDashboardScreen";
-import { DineHistoryScreen } from "@/features/dine/screens/DineHistoryScreen";
-import { DineEssentialsScreen } from "@/features/dine/screens/DineEssentialsScreen";
-import { DineCloseDateScreen } from "@/features/dine/screens/DineCloseDateScreen";
-import { DineOffersScreen } from "@/features/dine/screens/DineOffersScreen";
-import { DineBookingDetailsScreen } from "@/features/dine/screens/DineBookingDetailsScreen";
-import { DinePaymentDetailsScreen } from "@/features/dine/screens/DinePaymentDetailsScreen";
 import { EventHomeScreen } from "@/features/event/screens/EventHomeScreen";
-
-import { EventOffersScreen } from "@/features/event/screens/EventOffersScreen";
 import { EventGuestInviteScreen } from "@/features/event/screens/EventGuestInviteScreen";
 import { EventExportBookingsScreen } from "@/features/event/screens/EventExportBookingsScreen";
 import { EventScanScreen } from "@/features/event/screens/EventScanScreen";
 import { EventEntryDetailsScreen } from "@/features/event/screens/EventEntryDetailsScreen";
 import { EventScanConfirmationScreen } from "@/features/event/screens/EventScanConfirmationScreen";
 import { LegalViewScreen } from "@/features/settings/screens/LegalViewScreen";
-import { NotificationSettingsScreen } from "@/features/settings/screens/NotificationSettingsScreen";
 import { FAQScreen } from "@/features/settings/screens/FAQScreen";
 import { LoginScreen } from "@/features/auth/screens/LoginScreen";
 import { OtpScreen } from "@/features/auth/screens/OtpScreen";
@@ -91,7 +79,7 @@ import { useAuthStore, useServiceStore } from "@/store";
 import { SplashScreen } from "@/screens/SplashScreen";
 import { ms, fs } from "@/utils/responsive.utils";
 
-import { CustomTabBar, renderCustomTabBar } from "./CustomTabBar";
+import { CustomTabBar } from "./CustomTabBar";
 // --- AUTHENTICATION IMPORTS ---
 import { supabase } from "@/lib/supabase";
 
@@ -107,7 +95,6 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainStack = createNativeStackNavigator<MainStackParamList>();
 const SportsTab = createMaterialTopTabNavigator<SportsTabParamList>();
-const DineTab = createMaterialTopTabNavigator<DineTabParamList>();
 const StaycationTab = createMaterialTopTabNavigator<StaycationTabParamList>();
 const EventTab = createMaterialTopTabNavigator<EventTabParamList>();
 
@@ -191,41 +178,6 @@ const SportsTabNavigator = () => {
       )}
       <SportsTab.Screen name="SportsProfile" component={VendorProfileScreen} />
     </SportsTab.Navigator>
-  );
-};
-
-const DineTabNavigator = () => {
-  return (
-    <DineTab.Navigator
-      tabBarPosition="bottom"
-      tabBar={renderCustomTabBar}
-      screenOptions={{ swipeEnabled: true, lazy: true, lazyPreloadDistance: 1 }}>
-      <DineTab.Screen
-        name="DineHome"
-        component={DineHomeScreen}
-        options={{ title: "Home", tabBarIcon: TabIcon(CalendarCheck) }}
-      />
-      <DineTab.Screen
-        name="DineHistory"
-        component={DineHistoryScreen}
-        options={{ title: "History", tabBarIcon: TabIcon(HistoryIcon) }}
-      />
-      <DineTab.Screen
-        name="DineDashboard"
-        component={DineDashboardScreen}
-        options={{ title: "Dashboard", tabBarIcon: TabIcon(LayoutDashboard) }}
-      />
-      <DineTab.Screen
-        name="DineEssentials"
-        component={DineEssentialsScreen}
-        options={{ title: "Essentials", tabBarIcon: TabIcon(MoreHorizontal) }}
-      />
-      <DineTab.Screen
-        name="DineProfile"
-        component={VendorProfileScreen}
-        options={{ title: "Profile", tabBarIcon: TabIcon(User) }}
-      />
-    </DineTab.Navigator>
   );
 };
 
@@ -405,9 +357,6 @@ const MainNavigator = () => {
     if (vertical === "sports") {
       initialRouteName = "SportsServiceTabs";
       initialParams = { screen: "SportsHome", params: { serviceId, category } };
-    } else if (vertical === "dining") {
-      initialRouteName = "DineServiceTabs";
-      initialParams = { screen: "DineHome", params: { serviceId } };
     } else if (vertical === "staycation") {
       initialRouteName = "StaycationServiceTabs";
       initialParams = { screen: "StaycationHome", params: { serviceId } };
@@ -428,7 +377,6 @@ const MainNavigator = () => {
     <MainStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
       <MainStack.Screen name="VendorProfile" component={VendorProfileScreen} />
       <MainStack.Screen name="Settings" component={SettingsScreen} />
-      <MainStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <MainStack.Screen name="EditProfile" component={EditProfileScreen} />
       <MainStack.Screen name="StaffManagement" component={StaffManagementScreen} />
       <MainStack.Screen name="AddStaff" component={AddStaffScreen} />
@@ -438,11 +386,6 @@ const MainNavigator = () => {
         name="SportsServiceTabs"
         component={SportsTabNavigator}
         initialParams={initialRouteName === "SportsServiceTabs" ? initialParams : undefined}
-      />
-      <MainStack.Screen
-        name="DineServiceTabs"
-        component={DineTabNavigator}
-        initialParams={initialRouteName === "DineServiceTabs" ? initialParams : undefined}
       />
       <MainStack.Screen
         name="StaycationServiceTabs"
@@ -461,11 +404,6 @@ const MainNavigator = () => {
       />
       <MainStack.Screen name="StaycationInvoice" component={StaycationInvoiceScreen} />
       <MainStack.Screen name="StaycationOffers" component={StaycationOffersScreen} />
-      <MainStack.Screen name="DineBookingDetails" component={DineBookingDetailsScreen} />
-      <MainStack.Screen name="DinePaymentDetails" component={DinePaymentDetailsScreen} />
-      <MainStack.Screen name="DineCloseDate" component={DineCloseDateScreen} />
-      <MainStack.Screen name="DineOffers" component={DineOffersScreen} />
-      <MainStack.Screen name="EventOffers" component={EventOffersScreen} />
       <MainStack.Screen name="EventExportBookings" component={EventExportBookingsScreen} />
       <MainStack.Screen name="EventEntryDetails" component={EventEntryDetailsScreen} />
 

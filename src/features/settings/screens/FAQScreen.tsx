@@ -108,8 +108,14 @@ export const FAQScreen = () => {
   const vertical = route.params?.vertical || "sports";
   const data = FAQ_DATA[vertical as keyof typeof FAQ_DATA] || FAQ_DATA.sports;
 
+  const SUPPORT_NUMBERS: Record<string, string> = {
+    sports: "+919270368494",
+    staycation: "+918999099780",
+  };
+
   const handleCall = () => {
-    Linking.openURL("tel:+919270368494");
+    const number = SUPPORT_NUMBERS[vertical] || SUPPORT_NUMBERS.sports;
+    Linking.openURL(`tel:${number}`);
   };
 
   return (

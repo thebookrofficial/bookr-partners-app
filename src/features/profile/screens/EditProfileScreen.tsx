@@ -14,6 +14,9 @@ import { useNavigation } from "@react-navigation/native";
 import { COLORS } from "@/constants/theme";
 import { useAuthStore } from "@/store";
 import { useEditProfile } from "../hooks/useEditProfile";
+import { SUPPORT_TEXT } from "@/constants/support";
+import { MainStackParamList } from "@/navigation/navigation.types";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 // import { launchImageLibrary } from "react-native-image-picker";
 
 // const GstinLabel = () => (
@@ -31,7 +34,7 @@ import { useEditProfile } from "../hooks/useEditProfile";
 // );
 
 export const EditProfileScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   // Destructure 'profile' instead of 'user' for custom DB fields
   const { user, profile, clientProfile } = useAuthStore();
   const {
@@ -197,6 +200,12 @@ export const EditProfileScreen = () => {
         <SettingsActionRow
           icon={<HelpCircle size={ms(20)} color={COLORS.primary} />}
           label="Support and Help"
+          onPress={() =>
+            navigation.navigate("LegalView", {
+              title: SUPPORT_TEXT.help.title,
+              content: SUPPORT_TEXT.help.content,
+            })
+          }
         />
       </View>
 

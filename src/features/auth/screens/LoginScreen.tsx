@@ -70,7 +70,7 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
 
           <View style={styles.inputContainer}>
             <View style={styles.inputWrapper}>
-              <EmailIcon width={hs(20)} height={vs(16)} />
+              <EmailIcon width={hs(20)} height={vs(16)} style={{ marginRight: hs(8) }} />
               <AuthTextInput
                 placeholder="Email address"
                 value={email}
