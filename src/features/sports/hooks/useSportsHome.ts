@@ -207,7 +207,7 @@ export const useSportsHome = (
           });
 
           const isManual = validBooking
-            ? !validBooking.user_id || validBooking.sports_booking_type === "multi_slot"
+            ? !validBooking.platform_fee || parseFloat(validBooking.platform_fee) === 0
             : false;
 
           const startH = parseInt(startHStr, 10);

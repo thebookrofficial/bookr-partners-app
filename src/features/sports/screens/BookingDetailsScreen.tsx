@@ -271,47 +271,49 @@ export const BookingDetailsScreen = () => {
         !isKeyboardVisible ? (
           <View style={styles.fixedBottomActions}>
             {/* 4. Bottom Action Buttons */}
-            <View style={styles.actionRowBottom}>
-              <TouchableOpacity
-                style={styles.repeatBtn}
-                activeOpacity={0.7}
-                onPress={() =>
-                  navigation.navigate("RepeatBooking", {
-                    bookingId: booking.id,
-                    venueId: booking.venue_id,
-                    groundId: booking.sports_slots?.ground_id || "",
-                    idChain: booking.idChain,
-                  })
-                }>
-                <Text variant="body1" family="bison" style={styles.repeatBtnText}>
-                  REPEAT BOOKING
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.rescheduleBtn}
-                disabled={booking.booking_status === "cancelled"}
-                onPress={() => {
-                  if (booking.booking_status !== "cancelled") {
-                    navigation.navigate("RescheduleBooking", {
-                      bookingId,
+            {!isOnline && (
+              <View style={styles.actionRowBottom}>
+                <TouchableOpacity
+                  style={styles.repeatBtn}
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    navigation.navigate("RepeatBooking", {
+                      bookingId: booking.id,
                       venueId: booking.venue_id,
                       groundId: booking.sports_slots?.ground_id || "",
                       idChain: booking.idChain,
-                    });
-                  }
-                }}>
-                <Text
-                  variant="body1"
-                  family="bison"
-                  style={[
-                    styles.rescheduleBtnText,
-                    booking.booking_status === "cancelled" && { color: COLORS.text.muted },
-                  ]}>
-                  RESCHEDULE
-                </Text>
-              </TouchableOpacity>
-            </View>
+                    })
+                  }>
+                  <Text variant="body1" family="bison" style={styles.repeatBtnText}>
+                    REPEAT BOOKING
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.rescheduleBtn}
+                  disabled={booking.booking_status === "cancelled"}
+                  onPress={() => {
+                    if (booking.booking_status !== "cancelled") {
+                      navigation.navigate("RescheduleBooking", {
+                        bookingId,
+                        venueId: booking.venue_id,
+                        groundId: booking.sports_slots?.ground_id || "",
+                        idChain: booking.idChain,
+                      });
+                    }
+                  }}>
+                  <Text
+                    variant="body1"
+                    family="bison"
+                    style={[
+                      styles.rescheduleBtnText,
+                      booking.booking_status === "cancelled" && { color: COLORS.text.muted },
+                    ]}>
+                    RESCHEDULE
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {booking.booking_status !== "cancelled" &&
               (!isOnline || booking.venues?.allow_cancellation) && (
@@ -911,17 +913,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   amountLabel: {
-    fontSize: fs(16),
-    color: "#444",
+    fontSize: fs(12),
+    color: "#000",
     marginBottom: vs(2),
+    fontFamily: "Gilroy-Medium",
   },
   amountValueRed: {
-    fontSize: fs(24),
+    fontSize: fs(20),
     color: "#E55959",
+    fontFamily: "Gilroy-Medium",
   },
   amountValueGreen: {
-    fontSize: fs(24),
+    fontSize: fs(20),
     color: "#00B562",
+    fontFamily: "Gilroy-Medium",
   },
   inputLabel: {
     fontSize: fs(14),
