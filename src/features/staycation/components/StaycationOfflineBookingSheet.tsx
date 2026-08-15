@@ -814,9 +814,9 @@ export const StaycationOfflineBookingSheet = ({
                   </TouchableOpacity>
 
                   {/* No Of Guest */}
-                  <View style={{ width: "48%" }} ref={guestCountRef}>
+                  <View style={styles.halfWidth} ref={guestCountRef}>
                     <TouchableOpacity
-                      style={[styles.gridCard, { width: "100%" }]}
+                      style={[styles.gridCard, styles.fullWidth]}
                       onPress={() => {
                         guestCountRef.current?.measure((x, y, width, height, pageX, pageY) => {
                           setDropdownLayout({
@@ -844,24 +844,16 @@ export const StaycationOfflineBookingSheet = ({
                       </View>
                     </TouchableOpacity>
                     {extraGuestAmount > 0 && (
-                      <Text
-                        style={{
-                          fontSize: fs(13),
-                          color: COLORS.danger,
-                          marginTop: vs(-8),
-                          marginBottom: vs(8),
-                          fontFamily: "Gilroy-Medium",
-                          paddingHorizontal: hs(4),
-                        }}>
+                      <Text style={styles.extraGuestText}>
                         + ₹{extraGuestAmount} for {extraGuestsCount} extra guest(s)
                       </Text>
                     )}
                   </View>
 
                   {/* Group Type / Room Type */}
-                  <View style={{ width: "48%" }} ref={groupTypeRef}>
+                  <View style={styles.halfWidth} ref={groupTypeRef}>
                     <TouchableOpacity
-                      style={[styles.gridCard, { width: "100%" }]}
+                      style={[styles.gridCard, styles.fullWidth]}
                       onPress={() => {
                         groupTypeRef.current?.measure((x, y, width, height, pageX, pageY) => {
                           setDropdownLayout({
@@ -1222,71 +1214,73 @@ export const StaycationOfflineBookingSheet = ({
           bookingDots={bookingDots}
           useModal={false}
         />
-      </Modal>
 
-      <Modal
-        visible={!!activeDropdown}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setActiveDropdown(null)}>
-        <TouchableWithoutFeedback onPress={() => setActiveDropdown(null)}>
-          <View style={{ flex: 1 }}>
-            <TouchableWithoutFeedback>
-              <View
-                style={[
-                  styles.dropdownMenu,
-                  dropdownLayout
-                    ? {
-                        position: "absolute",
-                        top: dropdownLayout.top,
-                        left: dropdownLayout.left,
-                        width: dropdownLayout.width,
-                      }
-                    : {},
-                ]}>
-                <View style={styles.dropdownHeader2}>
-                  <Text style={styles.dropdownTitle}>{activeDropdown?.title}</Text>
-                  <TouchableOpacity
-                    onPress={() => setActiveDropdown(null)}
-                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-                    <X size={ms(20)} color="#000" />
-                  </TouchableOpacity>
-                </View>
-                <ScrollView showsVerticalScrollIndicator={true} style={styles.dropdownScroll}>
-                  {activeDropdown?.options.map(option => {
-                    const isOverLimit =
-                      activeDropdown.type === "guestCount" &&
-                      parseInt(option, 10) > maxStandardGuests;
-
-                    let isSelected = false;
-                    if (activeDropdown.type === "guestCount") isSelected = guestCount === option;
-                    if (activeDropdown.type === "groupType") isSelected = groupType === option;
-                    if (activeDropdown.type === "roomType") isSelected = roomType === option;
-                    if (activeDropdown.type === "bookingFor") isSelected = bookingFor === option;
-                    if (activeDropdown.type === "unitCount")
-                      isSelected = unitCount === option.split(" ")[0];
-
-                    return (
+        {!!activeDropdown && (
+          <View style={[StyleSheet.absoluteFill, styles.overlayWrapper]}>
+            <TouchableWithoutFeedback onPress={() => setActiveDropdown(null)}>
+              <View style={styles.overlayInner}>
+                <TouchableWithoutFeedback>
+                  <View
+                    style={[
+                      styles.dropdownMenu,
+                      dropdownLayout
+                        ? [
+                            styles.dropdownAbsolute,
+                            {
+                              top: dropdownLayout.top,
+                              left: dropdownLayout.left,
+                              width: dropdownLayout.width,
+                            },
+                          ]
+                        : {},
+                    ]}>
+                    <View style={styles.dropdownHeader2}>
+                      <Text style={styles.dropdownTitle}>{activeDropdown?.title}</Text>
                       <TouchableOpacity
-                        key={option}
-                        style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
-                        onPress={() => handleDropdownSelect(option)}>
-                        <Text
-                          style={[
-                            styles.dropdownItemText,
-                            option.includes("(Booked)") && { color: COLORS.danger },
-                            isOverLimit && { color: COLORS.danger },
-                          ]}>
-                          {option}
-                        </Text>
+                        onPress={() => setActiveDropdown(null)}
+                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                        <X size={ms(20)} color="#000" />
                       </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+                    </View>
+                    <ScrollView showsVerticalScrollIndicator={true} style={styles.dropdownScroll}>
+                      {activeDropdown?.options.map(option => {
+                        const isOverLimit =
+                          activeDropdown.type === "guestCount" &&
+                          parseInt(option, 10) > maxStandardGuests;
+
+                        let isSelected = false;
+                        if (activeDropdown.type === "guestCount")
+                          isSelected = guestCount === option;
+                        if (activeDropdown.type === "groupType") isSelected = groupType === option;
+                        if (activeDropdown.type === "roomType") isSelected = roomType === option;
+                        if (activeDropdown.type === "bookingFor")
+                          isSelected = bookingFor === option;
+                        if (activeDropdown.type === "unitCount")
+                          isSelected = unitCount === option.split(" ")[0];
+
+                        return (
+                          <TouchableOpacity
+                            key={option}
+                            style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
+                            onPress={() => handleDropdownSelect(option)}>
+                            <Text
+                              style={[
+                                styles.dropdownItemText,
+                                option.includes("(Booked)") && { color: COLORS.danger },
+                                isOverLimit && { color: COLORS.danger },
+                              ]}>
+                              {option}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                </TouchableWithoutFeedback>
               </View>
             </TouchableWithoutFeedback>
           </View>
-        </TouchableWithoutFeedback>
+        )}
       </Modal>
     </>
   );
@@ -1553,4 +1547,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#E6E6E6",
   },
   dropdownItemText: { fontSize: fs(14), fontFamily: "Gilroy-Medium", color: "#000" },
+  halfWidth: { width: "48%" },
+  fullWidth: { width: "100%" },
+  extraGuestText: {
+    fontSize: fs(13),
+    color: COLORS.danger,
+    marginTop: vs(-8),
+    marginBottom: vs(8),
+    fontFamily: "Gilroy-Medium",
+    paddingHorizontal: hs(4),
+  },
+  overlayWrapper: { zIndex: 9999, elevation: 9999 },
+  overlayInner: { flex: 1, backgroundColor: "transparent" },
+  dropdownAbsolute: { position: "absolute" },
 });
