@@ -249,7 +249,10 @@ export const StaycationBookingDetailsScreen = () => {
         backgroundColor={COLORS.background}
         paddingHorizontal={hs(12)}
         footer={
-          !isKeyboardVisible && !isFromHistory && !isCancelled ? (
+          !isKeyboardVisible &&
+          !isFromHistory &&
+          !isCancelled &&
+          (!isOnline || bookingDetails?.venues?.allow_cancellation) ? (
             <View style={styles.fixedBottomActions}>
               <TouchableOpacity
                 style={styles.cancelBtnBottom}
