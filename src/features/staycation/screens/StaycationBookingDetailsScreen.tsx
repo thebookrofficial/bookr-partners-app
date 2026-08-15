@@ -141,15 +141,17 @@ export const StaycationBookingDetailsScreen = () => {
       ? parseFloat(bookingDetails.total_amount) / units
       : parseFloat(initialBooking?.amount) || 0;
 
-  const discountAmount =
-    bookingDetails?.discount_amount != null
-      ? parseFloat(bookingDetails.discount_amount) / units
-      : parseFloat(initialBooking?.discountAmount) || 0;
+  const isOnline =
+    bookingDetails?.booking_source === "online" ||
+    !!bookingDetails?.user_id ||
+    initialBooking?.status === "Online";
 
   const amountPaid =
-    bookingDetails?.paid_amount != null
-      ? parseFloat(bookingDetails.paid_amount) / units + discountAmount
-      : (parseFloat(initialBooking?.paidAmount) || 0) + discountAmount;
+    bookingDetails != null
+      ? (isOnline
+          ? parseFloat(bookingDetails.subtotal || "0")
+          : parseFloat(bookingDetails.paid_amount || "0")) / units
+      : parseFloat(initialBooking?.paidAmount) || 0;
 
   const remainingAmount = Math.max(0, totalPayment - amountPaid);
 
@@ -169,7 +171,7 @@ export const StaycationBookingDetailsScreen = () => {
   };
 
   const groupType = getGroupType(bookingDetails?.special_requests);
-  const isOnline = bookingDetails?.booking_source === "online" || !!bookingDetails?.user_id;
+
   const isCancelled = bookingDetails?.booking_status === "cancelled";
 
   const profileData = bookingDetails?.profiles;

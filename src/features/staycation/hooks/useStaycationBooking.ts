@@ -35,6 +35,7 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
           guest_count,
           total_amount,
           paid_amount,
+          subtotal,
           guest_name,
           guest_phone,
           profiles:user_id ( full_name, phone, avatar_url )
@@ -57,7 +58,9 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
         let statusTag: StaycationBooking["status"] = isOnline ? "Online" : "Offline";
 
         const totalAmount = parseFloat(bookingData.total_amount) || 0;
-        const paidAmount = parseFloat(bookingData.paid_amount) || 0;
+        const rawPaidAmount = parseFloat(bookingData.paid_amount) || 0;
+        const rawSubtotal = parseFloat(bookingData.subtotal) || 0;
+        const paidAmount = isOnline ? rawSubtotal : rawPaidAmount;
 
         // Priority 1: Cancelled
         if (bookingData.booking_status === "cancelled") {

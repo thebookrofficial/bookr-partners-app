@@ -84,7 +84,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         .select(
           `
             id, user_id, booking_type, booking_status, platform_fee, check_in_date, check_out_date,
-            guest_count, total_amount, paid_amount, guest_name, guest_phone, booking_source,
+            guest_count, total_amount, paid_amount, subtotal, guest_name, guest_phone, booking_source,
             profiles ( full_name, phone, avatar_url )
           `,
         )
@@ -148,13 +148,17 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
           curr.setDate(curr.getDate() + 1);
         }
 
+        const rawPaid = parseFloat(b.paid_amount) || 0;
+        const rawSubtotal = parseFloat(b.subtotal) || 0;
+        const finalPaid = isOnline ? rawSubtotal : rawPaid;
+
         const formatted: StaycationBooking = {
           id: b.id,
           name: finalDisplayName,
           phone: finalPhone,
           avatarUrl: profile?.avatar_url,
           amount: b.total_amount.toString(),
-          paidAmount: parseFloat(b.paid_amount) || 0,
+          paidAmount: finalPaid,
           totalAmount: parseFloat(b.total_amount) || 0,
           status: isOnline ? "Online" : "Offline",
           checkIn: b.check_in_date,

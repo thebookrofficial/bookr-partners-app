@@ -78,7 +78,7 @@ export const useStaycationResort = (
         .select(
           `
             id, user_id, booking_type, booking_status, platform_fee, check_in_date, check_out_date,
-            guest_count, total_amount, paid_amount, guest_name, guest_phone, room_id, unit_count,
+            guest_count, total_amount, paid_amount, subtotal, guest_name, guest_phone, room_id, unit_count,
             staycation_rooms ( room_name, room_number ),
             profiles ( full_name, phone, avatar_url )
           `,
@@ -197,6 +197,10 @@ export const useStaycationResort = (
         const assignedRoom = assignedRoomsForThisBooking[i];
         const currentGuestCount = baseGuestsPerUnit + (i < remainderGuests ? 1 : 0);
 
+        const rawPaid = (parseFloat(b.paid_amount) || 0) / units;
+        const rawSubtotal = (parseFloat(b.subtotal) || 0) / units;
+        const finalPaid = isOnline ? rawSubtotal : rawPaid;
+
         const formatted: StaycationBooking = {
           id: `${b.id}-unit-${i + 1}`,
           dbId: b.id,
@@ -204,7 +208,7 @@ export const useStaycationResort = (
           phone: b.guest_phone || profile?.phone || "N/A",
           avatarUrl: profile?.avatar_url,
           amount: (parseFloat(b.total_amount) / units).toFixed(2),
-          paidAmount: (parseFloat(b.paid_amount) || 0) / units,
+          paidAmount: finalPaid,
           totalAmount: (parseFloat(b.total_amount) || 0) / units,
           status: isOnline ? "Online" : "Offline",
           checkIn: b.check_in_date,

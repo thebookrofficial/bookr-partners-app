@@ -46,7 +46,8 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
           platform_fee,
           total_amount,
           paid_amount,
-          discount_amount,
+          subtotal,
+          booking_source,
           guest_name,   
           guest_phone,   
           booking_status,
@@ -78,7 +79,8 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
 
       // Reconstruct Initial Advance Payment
       const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
-      const totalPaidAmount = Number(data.paid_amount) || 0;
+      const isOnline = data.booking_source === "online" || !!data.user_id;
+      const totalPaidAmount = isOnline ? Number(data.subtotal) || 0 : Number(data.paid_amount) || 0;
 
       if (totalPaidAmount > totalLoggedAmount) {
         const initialAmount = totalPaidAmount - totalLoggedAmount;

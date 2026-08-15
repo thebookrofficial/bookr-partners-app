@@ -149,8 +149,8 @@ export const useStaycationHistory = (
           statusTag = "Cancelled";
         }
 
-        const rawSubtotal = parseFloat(booking.subtotal) || 0;
         const rawPaid = parseFloat(booking.paid_amount) || 0;
+        const rawSubtotal = parseFloat(booking.subtotal) || 0;
 
         formattedBookings.push({
           id: booking.id,
