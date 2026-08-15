@@ -73,7 +73,7 @@ export const StaycationOfflineBookingSheet = ({
 
   const [searchResults, setSearchResults] = useState<{ name: string; phone: string }[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [isSelectingFromResults, setIsSelectingFromResults] = useState(false);
+  const isSelectingFromResults = useRef(false);
 
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
@@ -113,6 +113,7 @@ export const StaycationOfflineBookingSheet = ({
   };
 
   const handleNameChange = (text: string) => {
+    isSelectingFromResults.current = false;
     setName(text);
   };
 
@@ -121,8 +122,7 @@ export const StaycationOfflineBookingSheet = ({
 
   useEffect(() => {
     const fetchGuests = async () => {
-      if (isSelectingFromResults) {
-        setIsSelectingFromResults(false);
+      if (isSelectingFromResults.current) {
         return;
       }
 
@@ -136,7 +136,7 @@ export const StaycationOfflineBookingSheet = ({
       }
     };
     fetchGuests();
-  }, [debouncedName, venueId, isSelectingFromResults]);
+  }, [debouncedName, venueId]);
 
   const [bookingFor, setBookingFor] = useState(isFarmhouse ? "Farmhouse" : "Cottages");
   const [roomType, setRoomType] = useState("");
@@ -987,7 +987,7 @@ export const StaycationOfflineBookingSheet = ({
                             key={`${item.phone}_${index}`}
                             style={styles.autocompleteItem}
                             onPress={() => {
-                              setIsSelectingFromResults(true);
+                              isSelectingFromResults.current = true;
                               setName(item.name);
                               const cleanPhone = item.phone.replace(/[^\d]/g, "").slice(-10);
                               setPhone(cleanPhone);

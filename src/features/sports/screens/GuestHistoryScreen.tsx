@@ -212,7 +212,11 @@ export const GuestHistoryScreen = () => {
                       {bookings.map((item, index) => (
                         <BookingCard
                           key={item.id || index}
-                          name={item.venue_name || guestName}
+                          name={
+                            item.status === "Offline" && item.guest_name
+                              ? item.guest_name
+                              : item.venue_name || guestName
+                          }
                           subtitle={
                             item.vertical === "staycation" ? "Staycation Booking" : "Sports Booking"
                           }

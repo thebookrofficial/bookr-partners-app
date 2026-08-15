@@ -8,6 +8,7 @@ export interface HistoryBooking {
   id: string;
   vertical: "sports" | "staycation" | "dining" | "events";
   venue_name: string;
+  guest_name?: string;
   raw_date: string;
   display_date: string;
   display_time: string;
@@ -79,8 +80,10 @@ export const useGuestHistory = (identifier: string, vertical: string, currentVen
         .eq("phone", resolvedPhone)
         .maybeSingle();
 
+      let hasProfileName = false;
       if (profileData?.full_name) {
         setGuestName(profileData.full_name);
+        hasProfileName = true;
       }
 
       // 3. Prepare Base Query
@@ -182,6 +185,7 @@ export const useGuestHistory = (identifier: string, vertical: string, currentVen
           id: b.id,
           vertical: vertical as any,
           venue_name: vName,
+          guest_name: b.guest_name,
           raw_date: rawDate,
           display_date: displayDate,
           display_time: displayTime,
@@ -194,6 +198,14 @@ export const useGuestHistory = (identifier: string, vertical: string, currentVen
       filteredBookings.sort(
         (a, b) => new Date(b.raw_date).getTime() - new Date(a.raw_date).getTime(),
       );
+
+      if (!hasProfileName && results && results.length > 0) {
+        // Find the most recent booking that has a guest_name
+        const bookingWithName = results.find((b: any) => !!b.guest_name);
+        if (bookingWithName) {
+          setGuestName(bookingWithName.guest_name);
+        }
+      }
 
       setHistory(filteredBookings);
       setStats({ past: pastCount, upcoming: upcomingCount, cancelled: cancelledCount });

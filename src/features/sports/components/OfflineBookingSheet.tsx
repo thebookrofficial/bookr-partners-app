@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -209,7 +209,7 @@ export const OfflineBookingSheet = ({
   // Guest Autocomplete Search State
   const [searchResults, setSearchResults] = useState<{ name: string; phone: string }[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [isSelectingFromResults, setIsSelectingFromResults] = useState(false);
+  const isSelectingFromResults = useRef(false);
 
   // Pricing State
   const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0, slotDurationMinutes: 60 });
@@ -265,12 +265,13 @@ export const OfflineBookingSheet = ({
     setHasHistory(false);
     setSearchResults([]);
     setShowSearchResults(false);
-    setIsSelectingFromResults(false);
+    isSelectingFromResults.current = false;
     setIsFetchingSlots(false);
     setAllDbSlots([]);
   }, [initialDate]);
 
   const handleNameChange = (text: string) => {
+    isSelectingFromResults.current = false;
     setName(text);
   };
 
@@ -278,8 +279,7 @@ export const OfflineBookingSheet = ({
 
   useEffect(() => {
     const fetchGuests = async () => {
-      if (isSelectingFromResults) {
-        setIsSelectingFromResults(false);
+      if (isSelectingFromResults.current) {
         return;
       }
 
@@ -293,7 +293,7 @@ export const OfflineBookingSheet = ({
       }
     };
     fetchGuests();
-  }, [debouncedName, venueId, isSelectingFromResults]);
+  }, [debouncedName, venueId]);
 
   useEffect(() => {
     setCurrentDate(initialDate);
@@ -639,7 +639,7 @@ export const OfflineBookingSheet = ({
                           key={`${item.name}_${item.phone}_${index}`}
                           style={styles.dropdownItem}
                           onPress={() => {
-                            setIsSelectingFromResults(true);
+                            isSelectingFromResults.current = true;
                             setName(item.name);
                             const cleanPhone = item.phone.replace(/[^\d]/g, "").slice(-10);
                             setMobile(cleanPhone);
@@ -845,22 +845,7 @@ export const OfflineBookingSheet = ({
                 )}
 
                 {hasHistory && (
-                  <TouchableOpacity
-                    style={styles.historyButton}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      if (onCheckHistory) {
-                        onCheckHistory();
-                      } else {
-                        onClose();
-                      }
-                      navigation.navigate("GuestHistory", {
-                        guestId: mobile,
-                        bookingId: "",
-                        vertical: "sports",
-                        venueId: venueId,
-                      });
-                    }}>
+                  <View style={styles.historyButton}>
                     <FieldBox
                       icon={FileText}
                       label="Previous History"
@@ -868,8 +853,25 @@ export const OfflineBookingSheet = ({
                       hasBorder={true}
                       iconBg="#E8F0FE"
                       style={{ paddingVertical: vs(10) }}
+                      onPress={() => {
+                        if (onCheckHistory) {
+                          onCheckHistory();
+                        } else {
+                          onClose();
+                        }
+                        // Delay navigation slightly to allow the Modal to start closing,
+                        // avoiding native animation conflicts that swallow the navigation action.
+                        setTimeout(() => {
+                          navigation.navigate("GuestHistory", {
+                            guestId: mobile,
+                            bookingId: "",
+                            vertical: "sports",
+                            venueId: venueId,
+                          });
+                        }, 300);
+                      }}
                     />
-                  </TouchableOpacity>
+                  </View>
                 )}
               </View>
             </ScrollView>
