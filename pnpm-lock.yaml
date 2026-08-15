@@ -7,6 +7,9 @@ settings:
 importers:
   .:
     dependencies:
+      "@invertase/react-native-apple-authentication":
+        specifier: ^2.5.1
+        version: 2.5.1
       "@react-native-async-storage/async-storage":
         specifier: ^3.0.2
         version: 3.0.3(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0)
@@ -1874,6 +1877,13 @@ packages:
     peerDependenciesMeta:
       "@types/node":
         optional: true
+
+  "@invertase/react-native-apple-authentication@2.5.1":
+    resolution:
+      {
+        integrity: sha512-KPKKc0wtRYpH4J0RkDfHzoKSZ+dYPEHmCXhpPdgHsT2MbK5AIkW1cYurjhAgev/kL7nOHFmWITjY1At5WhFEMQ==,
+      }
+    engines: { node: ">=14" }
 
   "@isaacs/cliui@8.0.2":
     resolution:
@@ -11016,6 +11026,8 @@ snapshots:
   "@inquirer/type@3.0.10(@types/node@25.9.1)":
     optionalDependencies:
       "@types/node": 25.9.1
+
+  "@invertase/react-native-apple-authentication@2.5.1": {}
 
   "@isaacs/cliui@8.0.2":
     dependencies:

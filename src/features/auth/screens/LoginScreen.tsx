@@ -2,7 +2,16 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Dimensions } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+  Dimensions,
+  Platform,
+} from "react-native";
+import { AppleButton } from "@invertase/react-native-apple-authentication";
 import { Text, Button } from "@/components/ui";
 import { AuthScreenProps } from "@/navigation/navigation.types";
 import { COLORS } from "@/constants/theme";
@@ -19,7 +28,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
   const [email, setEmail] = useState("");
-  const { isLoading, loginWithEmail, loginWithGoogle } = useAuthLogic();
+  const { isLoading, loginWithEmail, loginWithGoogle, loginWithApple } = useAuthLogic();
 
   const handleEmailContinue = () => {
     loginWithEmail(email, isBypass => {
@@ -115,6 +124,15 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
             />
             <Text style={styles.socialButtonText}>Sign in with Google</Text>
           </TouchableOpacity>
+
+          {Platform.OS === "ios" && (
+            <AppleButton
+              buttonStyle={AppleButton.Style.BLACK}
+              buttonType={AppleButton.Type.SIGN_IN}
+              style={styles.appleButton}
+              onPress={loginWithApple}
+            />
+          )}
 
           <View style={styles.footer}>
             <Text variant="caption" color={COLORS.text.secondary}>
@@ -299,5 +317,10 @@ const styles = StyleSheet.create({
   },
   linkText: {
     textDecorationLine: "underline",
+  },
+  appleButton: {
+    width: "100%",
+    height: vs(54),
+    marginBottom: vs(20),
   },
 });

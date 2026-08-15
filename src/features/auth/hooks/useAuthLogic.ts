@@ -11,6 +11,7 @@ import {
   isSuccessResponse,
   isErrorWithCode,
 } from "@react-native-google-signin/google-signin";
+import { appleAuth } from "@invertase/react-native-apple-authentication";
 
 export const useAuthLogic = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +98,39 @@ export const useAuthLogic = () => {
         }
       } else {
         Alert.alert("Google Login Error", error?.message || "An unknown error occurred.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginWithApple = async () => {
+    try {
+      setIsLoading(true);
+      const appleAuthRequestResponse = await appleAuth.performRequest({
+        requestedOperation: appleAuth.Operation.LOGIN,
+        requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
+      });
+
+      const { identityToken } = appleAuthRequestResponse;
+
+      if (!identityToken) {
+        throw new Error("No identity token returned from Apple");
+      }
+
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: "apple",
+        token: identityToken,
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      if (error.code === appleAuth.Error.CANCELED) {
+        // User canceled Apple Sign-in
+      } else {
+        Alert.alert("Apple Login Error", error.message || "An unknown error occurred.");
       }
     } finally {
       setIsLoading(false);
@@ -253,6 +287,7 @@ export const useAuthLogic = () => {
     isLoading,
     loginWithEmail,
     loginWithGoogle,
+    loginWithApple,
     verifyOtpCode,
     resendOtpCode,
     logout,
