@@ -15,6 +15,7 @@ import {
   PermissionsAndroid,
   Vibration,
   DeviceEventEmitter,
+  Platform,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
@@ -352,11 +353,15 @@ export const EventScanScreen = () => {
 
   const handleOpenScanner = useCallback(async () => {
     try {
-      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+      if (Platform.OS === "ios") {
         setIsScanningMode(true);
       } else {
-        Alert.alert("Permission Required", "Camera access is required to scan tickets.");
+        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          setIsScanningMode(true);
+        } else {
+          Alert.alert("Permission Required", "Camera access is required to scan tickets.");
+        }
       }
     } catch (err) {
       console.warn("Camera permission error:", err);
@@ -365,11 +370,19 @@ export const EventScanScreen = () => {
 
   const handleAcceptDisclosure = async () => {
     setShowDisclosure(false);
-    const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
-    if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-      setIsScanningMode(true);
-    } else {
-      Alert.alert("Permission Required", "Allow camera access in settings to scan tickets.");
+    try {
+      if (Platform.OS === "ios") {
+        setIsScanningMode(true);
+      } else {
+        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          setIsScanningMode(true);
+        } else {
+          Alert.alert("Permission Required", "Allow camera access in settings to scan tickets.");
+        }
+      }
+    } catch (err) {
+      console.warn("Camera permission error:", err);
     }
   };
 
