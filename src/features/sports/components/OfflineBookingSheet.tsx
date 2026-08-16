@@ -1259,10 +1259,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   keyboardAccessoryWrapper: {
-    alignItems: "flex-end",
-    padding: hs(10),
-    paddingBottom: vs(10),
+    position: "absolute",
+    right: hs(10),
+    bottom: vs(10),
     backgroundColor: "transparent",
+    zIndex: 10,
   },
   keyboardAccessoryButton: {
     backgroundColor: COLORS.primary,
