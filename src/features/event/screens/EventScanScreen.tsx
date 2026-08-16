@@ -169,7 +169,7 @@ export const EventScanScreen = () => {
 
   // Real DB Data states
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
-  const [activeEventTitle, setActiveEventTitle] = useState<string>("Event Scans");
+  const [activeEventTitle, setActiveEventTitle] = useState<string>("");
   const [activeEventImage, setActiveEventImage] = useState<string | null>(null);
   const [venueEventIds, setVenueEventIds] = useState<string[]>([]);
   const [scannedAttendees, setScannedAttendees] = useState<Attendee[]>([]);

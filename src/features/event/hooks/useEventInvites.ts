@@ -122,12 +122,24 @@ export const useEventInvites = (venueId: string) => {
 
   const deleteInvite = async (inviteId: string) => {
     try {
-      const { error } = await supabase.from("event_guest_invites").delete().eq("id", inviteId);
+      const { data, error } = await supabase
+        .from("event_guest_invites")
+        .delete()
+        .eq("id", inviteId)
+        .select();
+
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error(
+          "No record was deleted. You may not have permission to delete this invite.",
+        );
+      }
+
       setInvites(prev => prev.filter(i => i.id !== inviteId));
       return true;
     } catch (err: any) {
-      Alert.alert("Error", err.message);
+      Alert.alert("Error", err.message || "Failed to delete the invite.");
       return false;
     }
   };

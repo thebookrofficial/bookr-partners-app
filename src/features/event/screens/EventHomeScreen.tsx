@@ -1,14 +1,14 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { View, StyleSheet, Text } from "react-native";
 import { EventHomeSkeleton } from "@/components/ui";
 import { EventHomeScreenOpen } from "./EventHomeScreenOpen";
 import { EventHomeScreenAssigned } from "./EventHomeScreenAssigned";
 import { supabase } from "@/lib/supabase";
 import { COLORS } from "@/constants/theme";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { useServiceStore } from "@/store/serviceStore";
 
 export const EventHomeScreen = () => {
@@ -29,79 +29,81 @@ export const EventHomeScreen = () => {
     }
   }, [eventData?.title, setActiveVenueName]);
 
-  useEffect(() => {
-    let isMounted = true;
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
 
-    const fetchBaseEvent = async () => {
-      // 1. Resolve serviceId
-      let serviceId = route.params?.serviceId;
-      if (!serviceId) {
+      const fetchBaseEvent = async () => {
+        // 1. Resolve serviceId
+        let serviceId = route.params?.serviceId;
+        if (!serviceId) {
+          try {
+            const parentState = navigation.getParent()?.getState();
+            const currentRoute = parentState?.routes[parentState.index];
+            serviceId = currentRoute?.params?.serviceId;
+
+            if (!serviceId) {
+              const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
+              const tabParams = tabRoute?.params as any;
+              serviceId = tabParams?.serviceId || tabParams?.params?.serviceId;
+            }
+          } catch (e) {
+            console.warn("EventHome: Failed to resolve serviceId from parent state", e);
+          }
+        }
+
+        if (!isMounted) return;
+
+        if (!serviceId) {
+          console.warn("EventHome: No serviceId found, stopping loading.");
+          setLoading(false);
+          return;
+        }
+
+        setLoading(true);
         try {
-          const parentState = navigation.getParent()?.getState();
-          const currentRoute = parentState?.routes[parentState.index];
-          serviceId = currentRoute?.params?.serviceId;
+          // Fetch ALL events for this venue to see what's going on!
+          const { data, error } = await supabase
+            .from("events")
+            .select("id, seating_type, title, total_capacity, created_at")
+            .eq("venue_id", serviceId);
 
-          if (!serviceId) {
-            const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
-            const tabParams = tabRoute?.params as any;
-            serviceId = tabParams?.serviceId || tabParams?.params?.serviceId;
-          }
-        } catch (e) {
-          console.warn("EventHome: Failed to resolve serviceId from parent state", e);
-        }
-      }
-
-      if (!isMounted) return;
-
-      if (!serviceId) {
-        console.warn("EventHome: No serviceId found, stopping loading.");
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        // Fetch ALL events for this venue to see what's going on!
-        const { data, error } = await supabase
-          .from("events")
-          .select("id, seating_type, title, total_capacity, created_at")
-          .eq("venue_id", serviceId);
-
-        if (error) {
-          console.error("EventHome: Supabase error:", error.message);
-          throw error;
-        }
-
-        if (isMounted && data && data.length > 0) {
-          // 1. Try to specifically find Neon Shadow first
-          let selectedEvent = data.find(e => e.title.includes("Neon Shadow"));
-
-          // 2. If not found, sort by oldest created_at (usually the main one you set up first)
-          if (!selectedEvent) {
-            selectedEvent = data.sort(
-              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-            )[0];
+          if (error) {
+            console.error("EventHome: Supabase error:", error.message);
+            throw error;
           }
 
-          setEventData(selectedEvent);
-        } else {
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error("EventHome: Error fetching base event:", err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
+          if (isMounted && data && data.length > 0) {
+            // 1. Try to specifically find Neon Shadow first
+            let selectedEvent = data.find(e => e.title.includes("Neon Shadow"));
 
-    fetchBaseEvent();
+            // 2. If not found, sort by oldest created_at (usually the main one you set up first)
+            if (!selectedEvent) {
+              selectedEvent = data.sort(
+                (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+              )[0];
+            }
 
-    return () => {
-      isMounted = false;
-    };
-  }, [route.params?.serviceId, navigation]);
+            setEventData(selectedEvent);
+          } else {
+            setLoading(false);
+          }
+        } catch (err) {
+          console.error("EventHome: Error fetching base event:", err);
+        } finally {
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      };
+
+      fetchBaseEvent();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [route.params?.serviceId, navigation]),
+  );
 
   if (loading) {
     return (

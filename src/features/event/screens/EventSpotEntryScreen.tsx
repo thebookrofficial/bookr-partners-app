@@ -152,7 +152,7 @@ export const EventSpotEntryScreen = () => {
         }>
         <View style={styles.headerWrapper}>
           <EventHeader
-            title={eventTitle || "Event Name"}
+            title={eventTitle || ""}
             subtitle="Spot Entry"
             imageSource={eventImage ? { uri: eventImage } : USER_PROFILE}
           />

@@ -140,7 +140,7 @@ export const EventGuestInviteScreen = () => {
         }>
         <View style={styles.headerWrapper}>
           <EventHeader
-            title={eventTitle || "Event Name"}
+            title={eventTitle || ""}
             subtitle="Guest Invite"
             imageSource={eventImage ? { uri: eventImage } : USER_PROFILE}
           />
