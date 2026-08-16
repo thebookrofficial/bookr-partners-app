@@ -99,6 +99,30 @@ export const useStaycationCloseDate = (venueId: string) => {
         ? getDatesBetween(record.startDate, record.endDate)
         : [record.startDate];
 
+      // Check for active bookings overlapping with these dates
+      const { data: activeBookings } = await supabase
+        .from("staycation_bookings")
+        .select("booking_status, check_in_date, check_out_date")
+        .eq("venue_id", venueId)
+        .gt("check_out_date", targetDates[0]);
+
+      const hasBookingOverlap = activeBookings?.some(b => {
+        const status = (b.booking_status || "").toLowerCase().trim();
+        if (status === "cancelled" || status === "refunded" || status === "rescheduled")
+          return false;
+
+        // A booking occupies check_in_date up to (but not including) check_out_date
+        return targetDates.some(td => td >= b.check_in_date && td < b.check_out_date);
+      });
+
+      if (hasBookingOverlap) {
+        Alert.alert(
+          "Cannot Close Dates",
+          "You have active bookings on one or more of the selected dates. Please cancel or reschedule them first.",
+        );
+        return false;
+      }
+
       const { data: rooms } = await supabase
         .from("staycation_rooms")
         .select("id")
