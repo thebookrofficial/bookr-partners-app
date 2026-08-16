@@ -11,15 +11,19 @@ export const GlobalKeyboardAccessory = () => {
   const isNumericFocused = useKeyboardStore(state => state.isNumericFocused);
 
   useEffect(() => {
-    // Listen to both willShow (smoother) and didShow (fallback for Modals on iOS)
+    let hideTimeout: ReturnType<typeof setTimeout>;
+
     const showHandler = (e: any) => {
+      clearTimeout(hideTimeout);
       setKeyboardVisible(true);
       setKeyboardHeight(Platform.OS === "ios" ? e.endCoordinates.height : 0);
     };
 
     const hideHandler = () => {
-      setKeyboardVisible(false);
-      setKeyboardHeight(0);
+      hideTimeout = setTimeout(() => {
+        setKeyboardVisible(false);
+        setKeyboardHeight(0);
+      }, 50);
     };
 
     const subscriptions = [
@@ -36,6 +40,7 @@ export const GlobalKeyboardAccessory = () => {
     ];
 
     return () => {
+      clearTimeout(hideTimeout);
       subscriptions.forEach(sub => sub.remove());
     };
   }, []);

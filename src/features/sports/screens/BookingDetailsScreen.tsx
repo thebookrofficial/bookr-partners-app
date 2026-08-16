@@ -17,7 +17,7 @@ import {
   Keyboard,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, DetailsSkeleton, GlobalKeyboardAccessory } from "@/components/ui";
+import { Text, DetailsSkeleton } from "@/components/ui";
 import { useKeyboardStore } from "@/store/keyboardStore";
 import { Clock, Trash2, X, ChevronLeft, Phone, ChevronUp, ChevronDown } from "lucide-react-native";
 import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
@@ -744,8 +744,6 @@ export const BookingDetailsScreen = () => {
             </View>
           </View>
         </Modal>
-
-        <GlobalKeyboardAccessory />
       </ScreenContainer>
 
       <Modal visible={deleteModalVisible} transparent animationType="slide">
