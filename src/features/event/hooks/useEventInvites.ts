@@ -22,6 +22,7 @@ export const useEventInvites = (venueId: string) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [eventId, setEventId] = useState<string | null>(null);
   const [eventTitle, setEventTitle] = useState("");
+  const [eventImage, setEventImage] = useState<string | null>(null);
   const [passCategories, setPassCategories] = useState<string[]>([]);
 
   const fetchEventContext = useCallback(async () => {
@@ -29,7 +30,7 @@ export const useEventInvites = (venueId: string) => {
     try {
       const { data: event, error } = await supabase
         .from("events")
-        .select("id, title, seating_type")
+        .select("id, title, seating_type, cover_image_url")
         .eq("venue_id", venueId)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -40,6 +41,7 @@ export const useEventInvites = (venueId: string) => {
       if (event) {
         setEventId(event.id);
         setEventTitle(event.title);
+        setEventImage(event.cover_image_url);
 
         if (event.seating_type === "open") {
           const { data: passes } = await supabase
@@ -140,6 +142,7 @@ export const useEventInvites = (venueId: string) => {
     loading,
     isSubmitting,
     eventTitle,
+    eventImage,
     passCategories,
     sendInvite,
     deleteInvite,

@@ -37,13 +37,6 @@ export const EventBookingCard = ({
               <Text weight="bold" style={styles.name} numberOfLines={1}>
                 {name}
               </Text>
-              {isSpot && (
-                <View style={styles.spotBadge}>
-                  <Text weight="semiBold" style={styles.spotText}>
-                    Spot
-                  </Text>
-                </View>
-              )}
             </View>
 
             <Text weight="medium" style={styles.passInfo}>
@@ -55,6 +48,13 @@ export const EventBookingCard = ({
             <Text weight="semiBold" style={styles.time}>
               {time}
             </Text>
+            {isSpot && (
+              <View style={styles.spotBadge}>
+                <Text weight="semiBold" style={styles.spotText}>
+                  Spot
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -106,12 +106,12 @@ const styles = StyleSheet.create({
   },
   spotBadge: {
     backgroundColor: "#EEF3FC",
-    paddingHorizontal: hs(6),
-    paddingVertical: vs(2),
-    borderRadius: ms(4),
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(4),
+    borderRadius: ms(6),
   },
   spotText: {
-    fontSize: fs(10),
+    fontSize: fs(14),
     color: "#4A80F0",
   },
   phoneInfo: {

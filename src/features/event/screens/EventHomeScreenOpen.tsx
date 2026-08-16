@@ -2,7 +2,7 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { PillTabs, Text, EventHomeSkeleton } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -17,7 +17,13 @@ import {
   EventFilterBottomSheet,
   EventDateFilterOption,
 } from "../components/EventFilterBottomSheet";
-import { Calendar as CalendarIcon, X, ChevronLeft, ChevronRight } from "lucide-react-native";
+import {
+  Calendar as CalendarIcon,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+} from "lucide-react-native";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -43,6 +49,7 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
   const [dateFilter, setDateFilter] = useState<EventDateFilterOption>("all");
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
 
@@ -93,27 +100,40 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
       const bDate = new Date(b.rawDate || b.date);
       bDate.setHours(0, 0, 0, 0);
 
+      let matchesDate = true;
       if (dateFilter === "today") {
-        return bDate.getTime() === today.getTime();
+        matchesDate = bDate.getTime() === today.getTime();
       } else if (dateFilter === "yesterday") {
-        return bDate.getTime() === yesterday.getTime();
+        matchesDate = bDate.getTime() === yesterday.getTime();
       } else if (dateFilter === "last_week") {
         const lastWeek = new Date(today);
         lastWeek.setDate(lastWeek.getDate() - 7);
-        return bDate >= lastWeek && bDate <= today;
+        matchesDate = bDate >= lastWeek && bDate <= today;
       } else if (dateFilter === "last_month") {
         const lastMonth = new Date(today);
         lastMonth.setMonth(lastMonth.getMonth() - 1);
-        return bDate >= lastMonth && bDate <= today;
+        matchesDate = bDate >= lastMonth && bDate <= today;
       } else if (dateFilter === "custom" && customRange) {
         const start = new Date(customRange.start);
         start.setHours(0, 0, 0, 0);
         const end = new Date(customRange.end);
         end.setHours(0, 0, 0, 0);
-        return bDate >= start && bDate <= end;
+        matchesDate = bDate >= start && bDate <= end;
       }
-      return true;
+      return matchesDate;
     });
+  }
+
+  // Filter THIRD by search query
+  if (searchQuery.trim() !== "") {
+    const q = searchQuery.toLowerCase();
+    filteredBookings = filteredBookings.filter(
+      b =>
+        b.name.toLowerCase().includes(q) ||
+        (b.phone && b.phone.toLowerCase().includes(q)) ||
+        b.id.toLowerCase().includes(q) ||
+        b.passType.toLowerCase().includes(q),
+    );
   }
 
   // Slice for Pagination
@@ -136,54 +156,38 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
         <EventHeader
           title={eventData?.title || "Event Dashboard"}
           subtitle="Bookings"
-          imageSource={USER_PROFILE}
+          imageSource={
+            eventData?.cover_image_url ? { uri: eventData.cover_image_url } : USER_PROFILE
+          }
         />
 
         {/* 2. Controls (Date Filter & Tabs) */}
         <View style={styles.controlsContainer}>
           <View style={styles.dateFilterRow}>
-            <Text weight="bold" style={styles.dateFilterLabel}>
-              Filter By Date
-            </Text>
-            <View style={styles.dateSelector}>
-              <TouchableOpacity
-                style={styles.dateSelectorInner}
-                activeOpacity={0.7}
-                onPress={() => setIsFilterOpen(true)}>
-                <CalendarIcon size={ms(16)} color={COLORS.primary} />
-                <Text weight="semiBold" style={styles.dateSelectorText}>
-                  {dateFilter === "all"
-                    ? "All Dates"
-                    : dateFilter === "today"
-                    ? "Today"
-                    : dateFilter === "yesterday"
-                    ? "Yesterday"
-                    : dateFilter === "last_week"
-                    ? "Last Week"
-                    : dateFilter === "last_month"
-                    ? "Last Month"
-                    : customRange
-                    ? `${customRange.start.toLocaleDateString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                      })} - ${customRange.end.toLocaleDateString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                      })}`
-                    : "Custom Range"}
-                </Text>
-              </TouchableOpacity>
-              {dateFilter !== "all" && (
-                <TouchableOpacity
-                  onPress={() => {
-                    setDateFilter("all");
-                    setCustomRange(undefined);
-                    setCurrentPage(1);
-                  }}
-                  style={styles.clearBtn}>
-                  <X size={ms(14)} color={COLORS.danger} />
+            <View style={styles.searchBarContainer}>
+              <Search size={ms(18)} color={COLORS.text.muted} />
+              <RNTextInput
+                style={styles.searchInput}
+                placeholder="Search Name or Mobile..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholderTextColor={COLORS.text.muted}
+                autoCapitalize="none"
+              />
+              {searchQuery !== "" && (
+                <TouchableOpacity onPress={() => setSearchQuery("")}>
+                  <X size={ms(16)} color={COLORS.text.muted} />
                 </TouchableOpacity>
               )}
+            </View>
+            <View style={styles.dateSelector}>
+              <TouchableOpacity
+                style={styles.filterIconBtn}
+                activeOpacity={0.7}
+                onPress={() => setIsFilterOpen(true)}>
+                <CalendarIcon size={ms(20)} color={COLORS.primary} />
+                {dateFilter !== "all" && <View style={styles.activeFilterBadge} />}
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -264,31 +268,46 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: hs(6),
+    gap: hs(12),
   },
-  dateFilterLabel: {
-    fontSize: fs(18),
+  searchBarContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F4F7FC",
+    paddingHorizontal: hs(12),
+    height: vs(40),
+    borderRadius: ms(8),
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: hs(8),
+    fontSize: fs(14),
+    fontFamily: "Gilroy-Medium",
     color: COLORS.text.primary,
+    paddingVertical: 0, // important for android
   },
   dateSelector: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F4F7FC", // Match PillTabs background feel
-    paddingHorizontal: hs(12),
-    paddingVertical: vs(6),
+  },
+  filterIconBtn: {
+    width: vs(40),
+    height: vs(40),
+    backgroundColor: "#F4F7FC",
     borderRadius: ms(8),
-  },
-  dateSelectorInner: {
-    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    gap: hs(8),
+    position: "relative",
   },
-  dateSelectorText: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
-  clearBtn: {
-    marginLeft: hs(4),
-    padding: ms(2),
+  activeFilterBadge: {
+    position: "absolute",
+    top: vs(8),
+    right: hs(8),
+    width: ms(8),
+    height: ms(8),
+    borderRadius: ms(4),
+    backgroundColor: COLORS.danger,
   },
   tabWrapper: {
     marginTop: vs(12),

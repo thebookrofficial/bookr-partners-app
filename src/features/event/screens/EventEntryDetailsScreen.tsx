@@ -62,9 +62,20 @@ export const EventEntryDetailsScreen = () => {
           </TouchableOpacity>
           <View style={styles.userInfo}>
             <Avatar source={data.avatarUrl ? { uri: data.avatarUrl } : USER_PROFILE} size={50} />
-            <Text variant="h3" family="gilroy" weight="bold" style={styles.userName}>
-              {data.name}
-            </Text>
+            <View style={styles.userNameContainer}>
+              <View style={styles.nameRow}>
+                <Text variant="h3" family="gilroy" weight="bold" style={styles.userName}>
+                  {data.name}
+                </Text>
+                {data.isSpot && (
+                  <View style={styles.spotBadge}>
+                    <Text weight="semiBold" style={styles.spotText}>
+                      Spot
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
         </View>
 
@@ -142,7 +153,7 @@ export const EventEntryDetailsScreen = () => {
             <Text variant="body1" family="gilroy" weight="semiBold">
               Ticket Price
             </Text>
-            <Text variant="body1" family="gilroy" weight="bold" color={COLORS.primary}>
+            <Text variant="body1" family="gilroy" weight="bold" color={COLORS.success}>
               ₹{data.totalAmount}
             </Text>
           </View>
@@ -191,7 +202,16 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", marginBottom: vs(24) },
   backButton: { marginRight: hs(8) },
   userInfo: { flexDirection: "row", alignItems: "center", flex: 1 },
-  userName: { marginLeft: hs(12), fontSize: fs(22) },
+  userNameContainer: { marginLeft: hs(12) },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: hs(6) },
+  userName: { fontSize: fs(22) },
+  spotBadge: {
+    backgroundColor: "#EEF3FC",
+    paddingHorizontal: hs(8),
+    paddingVertical: vs(3),
+    borderRadius: ms(4),
+  },
+  spotText: { fontSize: fs(12), color: "#4A80F0" },
   section: { marginBottom: vs(24) },
   sectionTitle: { marginBottom: vs(16), textTransform: "uppercase" },
   detailItem: { marginBottom: vs(16) },

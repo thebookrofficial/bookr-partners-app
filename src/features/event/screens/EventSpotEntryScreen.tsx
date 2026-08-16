@@ -35,8 +35,15 @@ export const EventSpotEntryScreen = () => {
     serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
   }
 
-  const { loading, isSubmitting, eventTitle, passCategories, createSpotEntry, refresh } =
-    useEventSpotEntry(serviceId);
+  const {
+    loading,
+    isSubmitting,
+    eventTitle,
+    eventImage,
+    passCategories,
+    createSpotEntry,
+    refresh,
+  } = useEventSpotEntry(serviceId);
 
   // Form State
   const [guestName, setGuestName] = useState("");
@@ -140,7 +147,7 @@ export const EventSpotEntryScreen = () => {
           <EventHeader
             title={eventTitle || "Event Name"}
             subtitle="Spot Entry"
-            imageSource={USER_PROFILE}
+            imageSource={eventImage ? { uri: eventImage } : USER_PROFILE}
           />
         </View>
 

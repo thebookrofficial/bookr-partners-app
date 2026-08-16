@@ -17,6 +17,7 @@ export interface EventEntryDetails {
   transactionDate: string;
   transactionTime: string;
   totalAmount?: number;
+  isSpot?: boolean;
 }
 
 export const useEventEntryDetails = (bookingId: string) => {
@@ -40,7 +41,7 @@ export const useEventEntryDetails = (bookingId: string) => {
         .from("event_bookings")
         .select(
           `
-          id, ticket_count, guest_name, guest_phone, updated_at, total_amount,
+          id, ticket_count, guest_name, guest_phone, updated_at, total_amount, is_spot_entry, booking_source,
           profiles (full_name, phone, avatar_url),
           event_passes (name),
           event_zones (zone_name)
@@ -79,12 +80,15 @@ export const useEventEntryDetails = (bookingId: string) => {
       const entryDateObj = new Date(booking.updated_at);
       const paymentDateObj = payment?.created_at ? new Date(payment.created_at) : new Date();
 
+      const isSpotBooking = booking.is_spot_entry || booking.booking_source === "offline";
+
       const formattedData = {
         id: booking.id,
         name: booking.guest_name || profile?.full_name || "Guest",
         phone: booking.guest_phone || profile?.phone || "N/A",
         passType: `${catName} x ${booking.ticket_count}`,
         avatarUrl: profile?.avatar_url,
+        isSpot: isSpotBooking,
 
         entryDate: entryDateObj.toLocaleDateString("en-GB", {
           day: "2-digit",
@@ -95,7 +99,7 @@ export const useEventEntryDetails = (bookingId: string) => {
           .toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true })
           .toUpperCase(),
 
-        paymentMethod: payment?.payment_method?.toUpperCase() || "OFFLINE/CASH",
+        paymentMethod: isSpotBooking ? "OFFLINE/CASH" : "ONLINE",
         transactionId:
           payment?.razorpay_payment_id || `OFF-${booking.id.split("-")[0].toUpperCase()}`,
         transactionDate: paymentDateObj.toLocaleDateString("en-GB", {

@@ -44,6 +44,7 @@ export const EventGuestInviteScreen = () => {
     loading,
     isSubmitting,
     eventTitle,
+    eventImage,
     passCategories,
     sendInvite,
     deleteInvite,
@@ -134,7 +135,7 @@ export const EventGuestInviteScreen = () => {
           <EventHeader
             title={eventTitle || "Event Name"}
             subtitle="Guest Invite"
-            imageSource={USER_PROFILE}
+            imageSource={eventImage ? { uri: eventImage } : USER_PROFILE}
           />
         </View>
 

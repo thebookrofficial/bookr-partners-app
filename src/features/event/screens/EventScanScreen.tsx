@@ -162,6 +162,8 @@ export const EventScanScreen = () => {
 
   // Real DB Data states
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
+  const [activeEventTitle, setActiveEventTitle] = useState<string>("Event Scans");
+  const [activeEventImage, setActiveEventImage] = useState<string | null>(null);
   const [venueEventIds, setVenueEventIds] = useState<string[]>([]);
   const [scannedAttendees, setScannedAttendees] = useState<Attendee[]>([]);
   const [ticketCategories, setTicketCategories] = useState<string[]>([]);
@@ -184,6 +186,7 @@ export const EventScanScreen = () => {
           id,
           title,
           created_at,
+          cover_image_url,
           event_passes ( name ),
           event_zones ( zone_name )
         `,
@@ -208,6 +211,8 @@ export const EventScanScreen = () => {
 
       const realEventId = event.id;
       setActiveEventId(realEventId);
+      setActiveEventTitle(event.title || "Event Scans");
+      setActiveEventImage(event.cover_image_url || null);
       const fetchedVenueEventIds = events.map((e: any) => e.id);
       setVenueEventIds(fetchedVenueEventIds);
 
@@ -583,7 +588,11 @@ export const EventScanScreen = () => {
         />
       ) : (
         <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
-          <EventHeader title="Event Scans" subtitle="Scan & Verify" imageSource={USER_PROFILE} />
+          <EventHeader
+            title={activeEventTitle}
+            subtitle="Scan & Verify"
+            imageSource={activeEventImage ? { uri: activeEventImage } : USER_PROFILE}
+          />
 
           <View style={styles.historyHeader}>
             <Text weight="bold" variant="body1" style={styles.historyTitle}>
