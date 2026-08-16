@@ -15,7 +15,7 @@ import {
   ActivityIndicator,
   Keyboard,
 } from "react-native";
-import { Text, GlobalKeyboardAccessory } from "@/components/ui";
+import { Text } from "@/components/ui";
 import {
   Calendar as CalendarIcon,
   Phone,
@@ -27,6 +27,7 @@ import {
   ArrowLeft,
   Wallet,
   X,
+  ArrowRightToLine,
 } from "lucide-react-native";
 import { TextInput as RNTextInput } from "react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -140,7 +141,7 @@ const FieldBox = ({
           {label}
         </Text>
         {isInput ? (
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={styles.customerDetailsHeaderRight}>
             {prefix ? (
               <Text variant="body1" weight="semiBold" color="#000" style={{ marginRight: hs(4) }}>
                 {prefix}
@@ -172,7 +173,7 @@ const FieldBox = ({
     <TouchableOpacity
       activeOpacity={onPress ? 0.7 : 1}
       onPress={handlePress}
-      style={{ width: "100%" }}>
+      style={styles.fullWidth}>
       {content}
     </TouchableOpacity>
   );
@@ -895,10 +896,19 @@ export const OfflineBookingSheet = ({
                   </TouchableOpacity>
                 </View>
               )}
+              {isKeyboardVisible && (
+                <View style={styles.keyboardAccessoryWrapper}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={styles.keyboardAccessoryButton}
+                    onPress={() => Keyboard.dismiss()}>
+                    <ArrowRightToLine size={ms(24)} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </KeyboardAvoidingView>
         </TouchableOpacity>
-        {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
       </Modal>
 
       <TimePickerModal
@@ -1237,5 +1247,34 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderTopWidth: 1,
     borderColor: "#EBEBEB",
+  },
+  customerDetailsHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  fullWidth: {
+    width: "100%",
+  },
+  modalRoot: {
+    flex: 1,
+  },
+  keyboardAccessoryWrapper: {
+    alignItems: "flex-end",
+    padding: hs(10),
+    paddingBottom: vs(10),
+    backgroundColor: "transparent",
+  },
+  keyboardAccessoryButton: {
+    backgroundColor: COLORS.primary,
+    width: ms(44),
+    height: ms(44),
+    borderRadius: ms(10),
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });

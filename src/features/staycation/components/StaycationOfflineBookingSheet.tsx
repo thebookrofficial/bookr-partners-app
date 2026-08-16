@@ -18,8 +18,17 @@ import {
   Image,
   Keyboard,
 } from "react-native";
-import { Text, GlobalKeyboardAccessory } from "@/components/ui";
-import { User, Phone, Wallet, ArrowLeft, Users, X, Calendar } from "lucide-react-native";
+import { Text } from "@/components/ui";
+import {
+  User,
+  Phone,
+  Wallet,
+  ArrowLeft,
+  Users,
+  X,
+  Calendar,
+  ArrowRightToLine,
+} from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/theme";
@@ -755,442 +764,472 @@ export const StaycationOfflineBookingSheet = ({
         animationType="slide"
         onRequestClose={onClose}
         statusBarTranslucent={true}>
-        <KeyboardAvoidingView
-          style={styles.overlay}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <View style={styles.sheetContainer}>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.scrollContent}>
-              {/* Header */}
-              <View style={styles.header}>
-                <TouchableOpacity onPress={onClose} style={styles.backButton}>
-                  <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
-                </TouchableOpacity>
-
-                <View style={styles.headerTitleWrap}>
-                  <Text weight="bold" style={styles.title}>
-                    Add Bookings
-                  </Text>
-                </View>
-              </View>
-
-              {/* BOOKING DETAILS */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Calendar size={ms(20)} color="#000" />
-                  <Text weight="bold" style={styles.sectionTitle}>
-                    BOOKING DETAILS
-                  </Text>
-                </View>
-                <View style={styles.grid}>
-                  {/* Check In */}
-                  <TouchableOpacity
-                    style={styles.gridCard}
-                    onPress={() => setShowDatePicker("in")}
-                    activeOpacity={0.7}>
-                    <View style={styles.iconBox}>
-                      <Calendar size={ms(18)} color="#4A80F0" />
-                    </View>
-                    <View style={styles.gridCardContent}>
-                      <Text style={styles.gridCardLabel}>Check In</Text>
-                      <Text style={styles.gridCardValue}>{formatDateLabel(checkInDate)}</Text>
-                    </View>
+        <View style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            style={styles.overlay}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={styles.sheetContainer}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.scrollContent}>
+                {/* Header */}
+                <View style={styles.header}>
+                  <TouchableOpacity onPress={onClose} style={styles.backButton}>
+                    <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
                   </TouchableOpacity>
 
-                  {/* Check Out */}
-                  <TouchableOpacity
-                    style={styles.gridCard}
-                    onPress={() => setShowDatePicker("out")}
-                    activeOpacity={0.7}>
-                    <View style={styles.iconBox}>
-                      <Calendar size={ms(18)} color="#4A80F0" />
-                    </View>
-                    <View style={styles.gridCardContent}>
-                      <Text style={styles.gridCardLabel}>Check Out</Text>
-                      <Text style={styles.gridCardValue}>{formatDateLabel(checkOutDate)}</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  {/* No Of Guest */}
-                  <View style={styles.halfWidth} ref={guestCountRef}>
-                    <TouchableOpacity
-                      style={[styles.gridCard, styles.fullWidth]}
-                      onPress={() => {
-                        guestCountRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                          setDropdownLayout({
-                            top: pageY + height + vs(4),
-                            left: pageX,
-                            width: ms(200),
-                          });
-                          setActiveDropdown({
-                            type: "guestCount",
-                            options: Array.from(
-                              { length: Math.max(1, totalAllowedGuests) },
-                              (_, i) => (i + 1).toString(),
-                            ),
-                            title: "Select Guest Count",
-                          });
-                        });
-                      }}
-                      activeOpacity={0.7}>
-                      <View style={styles.iconBox}>
-                        <Users size={ms(18)} color="#4A80F0" />
-                      </View>
-                      <View style={styles.gridCardContent}>
-                        <Text style={styles.gridCardLabel}>No Of Guest</Text>
-                        <Text style={styles.gridCardValue}>{guestCount}</Text>
-                      </View>
-                    </TouchableOpacity>
-                    {extraGuestAmount > 0 && (
-                      <Text style={styles.extraGuestText}>
-                        + ₹{extraGuestAmount} for {extraGuestsCount} extra guest(s)
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* Group Type / Room Type */}
-                  <View style={styles.halfWidth} ref={groupTypeRef}>
-                    <TouchableOpacity
-                      style={[styles.gridCard, styles.fullWidth]}
-                      onPress={() => {
-                        groupTypeRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                          setDropdownLayout({
-                            top: pageY + height + vs(4),
-                            left: pageX + width - ms(200),
-                            width: ms(200),
-                          });
-                          if (isFarmhouse) {
-                            setActiveDropdown({
-                              type: "groupType",
-                              options: ["Family", "Friends", "Corporate", "Couple", "Other"],
-                              title: "Select Group Type",
-                            });
-                          } else {
-                            setActiveDropdown({
-                              type: "roomType",
-                              options: Object.keys(roomConfigs),
-                              title: "Select Room Type",
-                            });
-                          }
-                        });
-                      }}
-                      activeOpacity={0.7}>
-                      <View style={styles.iconBox}>
-                        <Users size={ms(18)} color="#4A80F0" />
-                      </View>
-                      <View style={styles.gridCardContent}>
-                        <Text style={styles.gridCardLabel}>
-                          {isFarmhouse ? "Group Type" : "Room Type"}
-                        </Text>
-                        <Text style={styles.gridCardValue}>
-                          {isFarmhouse ? groupType : roomType}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
+                  <View style={styles.headerTitleWrap}>
+                    <Text weight="bold" style={styles.title}>
+                      Add Bookings
+                    </Text>
                   </View>
                 </View>
-              </View>
 
-              {/* CUSTOMER DETAILS */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <User size={ms(20)} color="#000" />
-                  <Text weight="bold" style={styles.sectionTitle}>
-                    CUSTOMER DETAILS
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.inputContainer}
-                  activeOpacity={1}
-                  onPress={() => mobileInputRef.current?.focus()}>
-                  <View style={styles.inputIconBox}>
-                    <Phone size={ms(18)} color="#4A80F0" />
+                {/* BOOKING DETAILS */}
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Calendar size={ms(20)} color="#000" />
+                    <Text weight="bold" style={styles.sectionTitle}>
+                      BOOKING DETAILS
+                    </Text>
                   </View>
-                  <View style={styles.inputContent}>
-                    <Text style={styles.inputLabelText}>Mobile No</Text>
-                    <View style={styles.phoneInputRow}>
-                      <TextInput
-                        ref={mobileInputRef}
-                        style={styles.textInput}
-                        placeholder="Enter Mobile No"
-                        placeholderTextColor={COLORS.text.muted}
-                        keyboardType="phone-pad"
-                        value={phone}
-                        onFocus={() => setIsKeyboardVisible(true)}
-                        onChangeText={text => {
-                          let clean = text.replace(/\D/g, "");
-                          if (
-                            text.includes("+") ||
-                            (clean.length > 10 && (clean.startsWith("91") || clean.startsWith("0")))
-                          ) {
-                            clean = clean.slice(-10);
-                          } else if (clean.length > 10) {
-                            clean = clean.slice(0, 10);
-                          }
-                          setPhone(clean);
-                          if (clean.length < 10) setName("");
+                  <View style={styles.grid}>
+                    {/* Check In */}
+                    <TouchableOpacity
+                      style={styles.gridCard}
+                      onPress={() => setShowDatePicker("in")}
+                      activeOpacity={0.7}>
+                      <View style={styles.iconBox}>
+                        <Calendar size={ms(18)} color="#4A80F0" />
+                      </View>
+                      <View style={styles.gridCardContent}>
+                        <Text style={styles.gridCardLabel}>Check In</Text>
+                        <Text style={styles.gridCardValue}>{formatDateLabel(checkInDate)}</Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Check Out */}
+                    <TouchableOpacity
+                      style={styles.gridCard}
+                      onPress={() => setShowDatePicker("out")}
+                      activeOpacity={0.7}>
+                      <View style={styles.iconBox}>
+                        <Calendar size={ms(18)} color="#4A80F0" />
+                      </View>
+                      <View style={styles.gridCardContent}>
+                        <Text style={styles.gridCardLabel}>Check Out</Text>
+                        <Text style={styles.gridCardValue}>{formatDateLabel(checkOutDate)}</Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* No Of Guest */}
+                    <View style={styles.halfWidth} ref={guestCountRef}>
+                      <TouchableOpacity
+                        style={[styles.gridCard, styles.fullWidth]}
+                        onPress={() => {
+                          guestCountRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                            setDropdownLayout({
+                              top: pageY + height + vs(4),
+                              left: pageX,
+                              width: ms(200),
+                            });
+                            setActiveDropdown({
+                              type: "guestCount",
+                              options: Array.from(
+                                { length: Math.max(1, totalAllowedGuests) },
+                                (_, i) => (i + 1).toString(),
+                              ),
+                              title: "Select Guest Count",
+                            });
+                          });
                         }}
-                      />
+                        activeOpacity={0.7}>
+                        <View style={styles.iconBox}>
+                          <Users size={ms(18)} color="#4A80F0" />
+                        </View>
+                        <View style={styles.gridCardContent}>
+                          <Text style={styles.gridCardLabel}>No Of Guest</Text>
+                          <Text style={styles.gridCardValue}>{guestCount}</Text>
+                        </View>
+                      </TouchableOpacity>
+                      {extraGuestAmount > 0 && (
+                        <Text style={styles.extraGuestText}>
+                          + ₹{extraGuestAmount} for {extraGuestsCount} extra guest(s)
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Group Type / Room Type */}
+                    <View style={styles.halfWidth} ref={groupTypeRef}>
+                      <TouchableOpacity
+                        style={[styles.gridCard, styles.fullWidth]}
+                        onPress={() => {
+                          groupTypeRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                            setDropdownLayout({
+                              top: pageY + height + vs(4),
+                              left: pageX + width - ms(200),
+                              width: ms(200),
+                            });
+                            if (isFarmhouse) {
+                              setActiveDropdown({
+                                type: "groupType",
+                                options: ["Family", "Friends", "Corporate", "Couple", "Other"],
+                                title: "Select Group Type",
+                              });
+                            } else {
+                              setActiveDropdown({
+                                type: "roomType",
+                                options: Object.keys(roomConfigs),
+                                title: "Select Room Type",
+                              });
+                            }
+                          });
+                        }}
+                        activeOpacity={0.7}>
+                        <View style={styles.iconBox}>
+                          <Users size={ms(18)} color="#4A80F0" />
+                        </View>
+                        <View style={styles.gridCardContent}>
+                          <Text style={styles.gridCardLabel}>
+                            {isFarmhouse ? "Group Type" : "Room Type"}
+                          </Text>
+                          <Text style={styles.gridCardValue}>
+                            {isFarmhouse ? groupType : roomType}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
                     </View>
                   </View>
-                </TouchableOpacity>
+                </View>
 
-                <View style={styles.autocompleteWrapper}>
+                {/* CUSTOMER DETAILS */}
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <User size={ms(20)} color="#000" />
+                    <Text weight="bold" style={styles.sectionTitle}>
+                      CUSTOMER DETAILS
+                    </Text>
+                  </View>
+
                   <TouchableOpacity
                     style={styles.inputContainer}
                     activeOpacity={1}
-                    onPress={() => nameInputRef.current?.focus()}>
+                    onPress={() => mobileInputRef.current?.focus()}>
                     <View style={styles.inputIconBox}>
-                      <User size={ms(18)} color="#4A80F0" />
+                      <Phone size={ms(18)} color="#4A80F0" />
                     </View>
                     <View style={styles.inputContent}>
-                      <Text style={styles.inputLabelText}>Name</Text>
-                      <TextInput
-                        ref={nameInputRef}
-                        style={styles.textInput}
-                        placeholder="Enter customers name"
-                        placeholderTextColor={COLORS.text.muted}
-                        value={name}
-                        onChangeText={handleNameChange}
-                        onFocus={() => {
-                          setIsKeyboardVisible(true);
-                          if (name.trim().length >= 1 && searchResults.length > 0) {
-                            setShowSearchResults(true);
-                          }
-                        }}
-                        onBlur={() => {
-                          setTimeout(() => setShowSearchResults(false), 300);
-                        }}
-                        autoCorrect={false}
-                        spellCheck={false}
-                        autoComplete="off"
-                      />
+                      <Text style={styles.inputLabelText}>Mobile No</Text>
+                      <View style={styles.phoneInputRow}>
+                        <TextInput
+                          ref={mobileInputRef}
+                          style={styles.textInput}
+                          placeholder="Enter Mobile No"
+                          placeholderTextColor={COLORS.text.muted}
+                          keyboardType="phone-pad"
+                          value={phone}
+                          onFocus={() => setIsKeyboardVisible(true)}
+                          onChangeText={text => {
+                            let clean = text.replace(/\D/g, "");
+                            if (
+                              text.includes("+") ||
+                              (clean.length > 10 &&
+                                (clean.startsWith("91") || clean.startsWith("0")))
+                            ) {
+                              clean = clean.slice(-10);
+                            } else if (clean.length > 10) {
+                              clean = clean.slice(0, 10);
+                            }
+                            setPhone(clean);
+                            if (clean.length < 10) setName("");
+                          }}
+                        />
+                      </View>
                     </View>
                   </TouchableOpacity>
 
-                  {showSearchResults && searchResults.length > 0 && (
-                    <View style={styles.dropdownContainer}>
-                      <View style={styles.dropdownHeader}>
-                        <Text style={styles.dropdownHeaderText}>Select Customer</Text>
-                        <TouchableOpacity onPress={() => setShowSearchResults(false)}>
-                          <X size={ms(20)} color="#000" />
+                  <View style={styles.autocompleteWrapper}>
+                    <TouchableOpacity
+                      style={styles.inputContainer}
+                      activeOpacity={1}
+                      onPress={() => nameInputRef.current?.focus()}>
+                      <View style={styles.inputIconBox}>
+                        <User size={ms(18)} color="#4A80F0" />
+                      </View>
+                      <View style={styles.inputContent}>
+                        <Text style={styles.inputLabelText}>Name</Text>
+                        <TextInput
+                          ref={nameInputRef}
+                          style={styles.textInput}
+                          placeholder="Enter customers name"
+                          placeholderTextColor={COLORS.text.muted}
+                          value={name}
+                          onChangeText={handleNameChange}
+                          onFocus={() => {
+                            setIsKeyboardVisible(true);
+                            if (name.trim().length >= 1 && searchResults.length > 0) {
+                              setShowSearchResults(true);
+                            }
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => setShowSearchResults(false), 300);
+                          }}
+                          autoCorrect={false}
+                          spellCheck={false}
+                          autoComplete="off"
+                        />
+                      </View>
+                    </TouchableOpacity>
+
+                    {showSearchResults && searchResults.length > 0 && (
+                      <View style={styles.dropdownContainer}>
+                        <View style={styles.dropdownHeader}>
+                          <Text style={styles.dropdownHeaderText}>Select Customer</Text>
+                          <TouchableOpacity onPress={() => setShowSearchResults(false)}>
+                            <X size={ms(20)} color="#000" />
+                          </TouchableOpacity>
+                        </View>
+                        <ScrollView
+                          keyboardShouldPersistTaps="always"
+                          style={styles.autocompleteScroll}>
+                          {searchResults.map((item, index) => (
+                            <TouchableOpacity
+                              key={`${item.phone}_${index}`}
+                              style={styles.autocompleteItem}
+                              onPress={() => {
+                                isSelectingFromResults.current = true;
+                                setName(item.name);
+                                const cleanPhone = item.phone.replace(/[^\d]/g, "").slice(-10);
+                                setPhone(cleanPhone);
+                                setSearchResults([]);
+                                setShowSearchResults(false);
+                              }}>
+                              <Text style={styles.autocompleteTextLeft}>{item.name}</Text>
+                              <Text style={styles.autocompleteTextRight}>{item.phone}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* PAYMENT DETAILS */}
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Wallet size={ms(20)} color="#000" />
+                    <Text weight="bold" style={styles.sectionTitle}>
+                      PAYMENT DETAILS
+                    </Text>
+                  </View>
+                  <View style={styles.grid}>
+                    <TouchableOpacity
+                      style={styles.gridCard}
+                      activeOpacity={1}
+                      onPress={() => totalPaymentRef.current?.focus()}>
+                      <View style={styles.iconBox}>
+                        <Wallet size={ms(18)} color="#4A80F0" />
+                      </View>
+                      <View style={styles.gridCardContent}>
+                        <Text style={styles.gridCardLabel}>Total Amount</Text>
+                        <View style={styles.currencyRow}>
+                          <Text style={styles.currencySymbol}>₹</Text>
+                          <TextInput
+                            ref={totalPaymentRef}
+                            style={styles.amountInput}
+                            placeholder={isFarmhouse ? "1000" : "2500"}
+                            placeholderTextColor={COLORS.text.muted}
+                            keyboardType="numeric"
+                            value={totalPayment}
+                            onFocus={() => setIsKeyboardVisible(true)}
+                            onChangeText={setTotalPayment}
+                          />
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.gridCard}
+                      activeOpacity={1}
+                      onPress={() => advancePaymentRef.current?.focus()}>
+                      <View style={styles.iconBoxGreen}>
+                        <MoneySvg width={ms(18)} height={ms(18)} color="#00B562" />
+                      </View>
+                      <View style={styles.gridCardContent}>
+                        <Text style={styles.gridCardLabel}>Advance</Text>
+                        <View style={styles.currencyRow}>
+                          <Text style={styles.currencySymbol}>₹</Text>
+                          <TextInput
+                            ref={advancePaymentRef}
+                            style={styles.amountInput}
+                            placeholder="0"
+                            placeholderTextColor="#8C8C8C"
+                            keyboardType="numeric"
+                            value={advancePaid}
+                            onFocus={() => {
+                              setIsAdvanceActive(true);
+                              setIsKeyboardVisible(true);
+                            }}
+                            onChangeText={text => {
+                              const val = parseFloat(text) || 0;
+                              const total = parseFloat(totalPayment) || 0;
+                              if (val > total) setAdvancePaid(total.toString());
+                              else setAdvancePaid(text);
+                            }}
+                          />
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+
+                  {isAdvanceActive || parseFloat(advancePaid) > 0 ? (
+                    <View style={{ marginTop: vs(16) }}>
+                      <Text weight="bold" style={styles.inputLabelText}>
+                        Method
+                      </Text>
+                      <View style={styles.methodsRow}>
+                        {/* Cash */}
+                        <TouchableOpacity
+                          style={[
+                            styles.methodBox,
+                            selectedMethod === "cash" && styles.methodBoxSelectedBlue,
+                          ]}
+                          onPress={() => setSelectedMethod("cash")}>
+                          <Image
+                            source={icCash}
+                            style={[
+                              styles.methodIcon,
+                              selectedMethod === "cash" && styles.methodIconSelected,
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.methodText,
+                              selectedMethod === "cash" && styles.methodTextSelected,
+                            ]}>
+                            Cash
+                          </Text>
+                        </TouchableOpacity>
+                        {/* GPay */}
+                        <TouchableOpacity
+                          style={[
+                            styles.methodBox,
+                            selectedMethod === "gpay" && styles.methodBoxSelectedBlue,
+                          ]}
+                          onPress={() => setSelectedMethod("gpay")}>
+                          <Image
+                            source={icGpay}
+                            style={[
+                              styles.methodIcon,
+                              selectedMethod === "gpay" && styles.methodIconSelected,
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.methodText,
+                              selectedMethod === "gpay" && styles.methodTextSelected,
+                            ]}>
+                            GPay
+                          </Text>
+                        </TouchableOpacity>
+                        {/* PhonePe */}
+                        <TouchableOpacity
+                          style={[
+                            styles.methodBox,
+                            selectedMethod === "phonepe" && styles.methodBoxSelectedBlue,
+                          ]}
+                          onPress={() => setSelectedMethod("phonepe")}>
+                          <Image
+                            source={icPhonepe}
+                            style={[
+                              styles.methodIcon,
+                              selectedMethod === "phonepe" && styles.methodIconSelected,
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.methodText,
+                              selectedMethod === "phonepe" && styles.methodTextSelected,
+                            ]}>
+                            PhonePe
+                          </Text>
+                        </TouchableOpacity>
+                        {/* Paytm */}
+                        <TouchableOpacity
+                          style={[
+                            styles.methodBox,
+                            selectedMethod === "paytm" && styles.methodBoxSelectedBlue,
+                          ]}
+                          onPress={() => setSelectedMethod("paytm")}>
+                          <Image
+                            source={icPaytm}
+                            style={[
+                              styles.methodIcon,
+                              selectedMethod === "paytm" && styles.methodIconSelected,
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.methodText,
+                              selectedMethod === "paytm" && styles.methodTextSelected,
+                            ]}>
+                            Paytm
+                          </Text>
                         </TouchableOpacity>
                       </View>
-                      <ScrollView
-                        keyboardShouldPersistTaps="always"
-                        style={styles.autocompleteScroll}>
-                        {searchResults.map((item, index) => (
-                          <TouchableOpacity
-                            key={`${item.phone}_${index}`}
-                            style={styles.autocompleteItem}
-                            onPress={() => {
-                              isSelectingFromResults.current = true;
-                              setName(item.name);
-                              const cleanPhone = item.phone.replace(/[^\d]/g, "").slice(-10);
-                              setPhone(cleanPhone);
-                              setSearchResults([]);
-                              setShowSearchResults(false);
-                            }}>
-                            <Text style={styles.autocompleteTextLeft}>{item.name}</Text>
-                            <Text style={styles.autocompleteTextRight}>{item.phone}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
                     </View>
-                  )}
+                  ) : null}
                 </View>
-              </View>
+              </ScrollView>
 
-              {/* PAYMENT DETAILS */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Wallet size={ms(20)} color="#000" />
-                  <Text weight="bold" style={styles.sectionTitle}>
-                    PAYMENT DETAILS
-                  </Text>
-                </View>
-                <View style={styles.grid}>
+              {!isKeyboardVisible && (
+                <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
                   <TouchableOpacity
-                    style={styles.gridCard}
-                    activeOpacity={1}
-                    onPress={() => totalPaymentRef.current?.focus()}>
-                    <View style={styles.iconBox}>
-                      <Wallet size={ms(18)} color="#4A80F0" />
-                    </View>
-                    <View style={styles.gridCardContent}>
-                      <Text style={styles.gridCardLabel}>Total Amount</Text>
-                      <View style={styles.currencyRow}>
-                        <Text style={styles.currencySymbol}>₹</Text>
-                        <TextInput
-                          ref={totalPaymentRef}
-                          style={styles.amountInput}
-                          placeholder={isFarmhouse ? "1000" : "2500"}
-                          placeholderTextColor={COLORS.text.muted}
-                          keyboardType="numeric"
-                          value={totalPayment}
-                          onFocus={() => setIsKeyboardVisible(true)}
-                          onChangeText={setTotalPayment}
-                        />
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.gridCard}
-                    activeOpacity={1}
-                    onPress={() => advancePaymentRef.current?.focus()}>
-                    <View style={styles.iconBoxGreen}>
-                      <MoneySvg width={ms(18)} height={ms(18)} color="#00B562" />
-                    </View>
-                    <View style={styles.gridCardContent}>
-                      <Text style={styles.gridCardLabel}>Advance</Text>
-                      <View style={styles.currencyRow}>
-                        <Text style={styles.currencySymbol}>₹</Text>
-                        <TextInput
-                          ref={advancePaymentRef}
-                          style={styles.amountInput}
-                          placeholder="0"
-                          placeholderTextColor="#8C8C8C"
-                          keyboardType="numeric"
-                          value={advancePaid}
-                          onFocus={() => {
-                            setIsAdvanceActive(true);
-                            setIsKeyboardVisible(true);
-                          }}
-                          onChangeText={text => {
-                            const val = parseFloat(text) || 0;
-                            const total = parseFloat(totalPayment) || 0;
-                            if (val > total) setAdvancePaid(total.toString());
-                            else setAdvancePaid(text);
-                          }}
-                        />
-                      </View>
-                    </View>
+                    style={styles.bookNowBtn}
+                    onPress={handleBookNow}
+                    disabled={isLoading}>
+                    {isLoading ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text weight="bold" family="bison" style={styles.bookNowBtnText}>
+                        BOOK NOW
+                      </Text>
+                    )}
                   </TouchableOpacity>
                 </View>
-
-                {isAdvanceActive || parseFloat(advancePaid) > 0 ? (
-                  <View style={{ marginTop: vs(16) }}>
-                    <Text weight="bold" style={styles.inputLabelText}>
-                      Method
-                    </Text>
-                    <View style={styles.methodsRow}>
-                      {/* Cash */}
-                      <TouchableOpacity
-                        style={[
-                          styles.methodBox,
-                          selectedMethod === "cash" && styles.methodBoxSelectedBlue,
-                        ]}
-                        onPress={() => setSelectedMethod("cash")}>
-                        <Image
-                          source={icCash}
-                          style={[
-                            styles.methodIcon,
-                            selectedMethod === "cash" && styles.methodIconSelected,
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.methodText,
-                            selectedMethod === "cash" && styles.methodTextSelected,
-                          ]}>
-                          Cash
-                        </Text>
-                      </TouchableOpacity>
-                      {/* GPay */}
-                      <TouchableOpacity
-                        style={[
-                          styles.methodBox,
-                          selectedMethod === "gpay" && styles.methodBoxSelectedBlue,
-                        ]}
-                        onPress={() => setSelectedMethod("gpay")}>
-                        <Image
-                          source={icGpay}
-                          style={[
-                            styles.methodIcon,
-                            selectedMethod === "gpay" && styles.methodIconSelected,
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.methodText,
-                            selectedMethod === "gpay" && styles.methodTextSelected,
-                          ]}>
-                          GPay
-                        </Text>
-                      </TouchableOpacity>
-                      {/* PhonePe */}
-                      <TouchableOpacity
-                        style={[
-                          styles.methodBox,
-                          selectedMethod === "phonepe" && styles.methodBoxSelectedBlue,
-                        ]}
-                        onPress={() => setSelectedMethod("phonepe")}>
-                        <Image
-                          source={icPhonepe}
-                          style={[
-                            styles.methodIcon,
-                            selectedMethod === "phonepe" && styles.methodIconSelected,
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.methodText,
-                            selectedMethod === "phonepe" && styles.methodTextSelected,
-                          ]}>
-                          PhonePe
-                        </Text>
-                      </TouchableOpacity>
-                      {/* Paytm */}
-                      <TouchableOpacity
-                        style={[
-                          styles.methodBox,
-                          selectedMethod === "paytm" && styles.methodBoxSelectedBlue,
-                        ]}
-                        onPress={() => setSelectedMethod("paytm")}>
-                        <Image
-                          source={icPaytm}
-                          style={[
-                            styles.methodIcon,
-                            selectedMethod === "paytm" && styles.methodIconSelected,
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.methodText,
-                            selectedMethod === "paytm" && styles.methodTextSelected,
-                          ]}>
-                          Paytm
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-            </ScrollView>
-
-            {!isKeyboardVisible && (
-              <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
-                <TouchableOpacity
-                  style={styles.bookNowBtn}
-                  onPress={handleBookNow}
-                  disabled={isLoading}>
-                  {isLoading ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text weight="bold" family="bison" style={styles.bookNowBtnText}>
-                      BOOK NOW
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-        {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
+              )}
+              {isKeyboardVisible && (
+                <View
+                  style={{
+                    alignItems: "flex-end",
+                    padding: hs(10),
+                    paddingBottom: vs(10),
+                    backgroundColor: "transparent",
+                  }}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{
+                      backgroundColor: COLORS.primary,
+                      width: ms(44),
+                      height: ms(44),
+                      borderRadius: ms(10),
+                      justifyContent: "center",
+                      alignItems: "center",
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 4,
+                      elevation: 4,
+                    }}
+                    onPress={() => Keyboard.dismiss()}>
+                    <ArrowRightToLine size={ms(24)} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        </View>
 
         <CustomDatePickerModal
           isVisible={!!showDatePicker}

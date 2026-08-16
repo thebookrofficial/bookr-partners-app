@@ -34,6 +34,7 @@ export const StaycationCloseDateScreen = () => {
   const {
     upcomingClosedDates,
     pastClosedDates,
+    bookedDates = [],
     loading: dbLoading,
     setClosedDate,
     removeClosedDate,
@@ -85,12 +86,18 @@ export const StaycationCloseDateScreen = () => {
   const onDayPress = useCallback(
     (day: DateData) => {
       const isDayClosed = (dateStr: string) => {
-        return [...upcomingClosedDates, ...pastClosedDates].some(record => {
+        const closed = [...upcomingClosedDates, ...pastClosedDates].some(record => {
           if (record.endDate) {
             return dateStr >= record.startDate && dateStr <= record.endDate;
           }
           return dateStr === record.startDate;
         });
+
+        const booked = bookedDates.some(record => {
+          return dateStr >= record.startDate && dateStr < record.endDate;
+        });
+
+        return closed || booked;
       };
 
       if (isDayClosed(day.dateString)) {
@@ -124,7 +131,7 @@ export const StaycationCloseDateScreen = () => {
         }
       }
     },
-    [dateRange, upcomingClosedDates, pastClosedDates],
+    [dateRange, upcomingClosedDates, pastClosedDates, bookedDates],
   );
 
   const getMarkedDates = () => {
@@ -151,6 +158,24 @@ export const StaycationCloseDateScreen = () => {
           color: COLORS.border.navBar,
           textColor: COLORS.text.muted,
         };
+      }
+    });
+
+    // Add booked dates
+    bookedDates.forEach(record => {
+      let start = new Date(record.startDate);
+      let end = new Date(record.endDate);
+      for (let d = new Date(start.getTime()); d < end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split("T")[0];
+        // Don't overwrite if it's already marked as closed (though technically shouldn't overlap)
+        if (!marked[dateStr]) {
+          marked[dateStr] = {
+            disabled: true,
+            disableTouchEvent: true,
+            color: "#FDECE8", // Light red for booked
+            textColor: COLORS.danger,
+          };
+        }
       }
     });
 

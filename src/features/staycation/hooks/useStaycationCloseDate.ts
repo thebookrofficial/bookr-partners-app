@@ -28,6 +28,9 @@ const getDatesBetween = (startDate: string, endDate: string) => {
 export const useStaycationCloseDate = (venueId: string) => {
   const [upcomingClosedDates, setUpcomingClosedDates] = useState<ClosedDateRecord[]>([]);
   const [pastClosedDates, setPastClosedDates] = useState<ClosedDateRecord[]>([]);
+  const [bookedDates, setBookedDates] = useState<
+    { startDate: string; endDate: string; source: string }[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
   const fetchClosedDates = useCallback(
@@ -71,6 +74,26 @@ export const useStaycationCloseDate = (venueId: string) => {
 
         setUpcomingClosedDates(active);
         setPastClosedDates(past);
+
+        // Fetch active bookings
+        const { data: bookingsData, error: bookingsError } = await supabase
+          .from("staycation_bookings")
+          .select("check_in_date, check_out_date, booking_source, booking_status")
+          .eq("venue_id", venueId)
+          .gte("check_out_date", todayStr)
+          .neq("booking_status", "cancelled");
+
+        if (bookingsError) {
+          console.error("Error fetching staycation bookings for calendar:", bookingsError.message);
+        } else {
+          setBookedDates(
+            (bookingsData || []).map(b => ({
+              startDate: b.check_in_date,
+              endDate: b.check_out_date,
+              source: b.booking_source || "online",
+            })),
+          );
+        }
       } catch (err: any) {
         console.error("Error fetching staycation closed dates:", err.message);
       } finally {
@@ -230,6 +253,7 @@ export const useStaycationCloseDate = (venueId: string) => {
   return {
     upcomingClosedDates,
     pastClosedDates,
+    bookedDates,
     loading,
     setClosedDate,
     removeClosedDate,

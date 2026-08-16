@@ -9,26 +9,32 @@ export const GlobalKeyboardAccessory = () => {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
-    // On iOS we use willShow/willHide for smoother animation tracking.
-    // On Android we use didShow/didHide.
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
-    const showSubscription = Keyboard.addListener(showEvent, e => {
+    // Listen to both willShow (smoother) and didShow (fallback for Modals on iOS)
+    const showHandler = (e: any) => {
       setKeyboardVisible(true);
-      // Android adjusts window size automatically if windowSoftInputMode is adjustResize.
-      // So we only push it up on iOS.
       setKeyboardHeight(Platform.OS === "ios" ? e.endCoordinates.height : 0);
-    });
+    };
 
-    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+    const hideHandler = () => {
       setKeyboardVisible(false);
       setKeyboardHeight(0);
-    });
+    };
+
+    const subscriptions = [
+      Keyboard.addListener(
+        Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+        showHandler,
+      ),
+      Keyboard.addListener(
+        Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+        hideHandler,
+      ),
+      Keyboard.addListener("keyboardDidShow", showHandler),
+      Keyboard.addListener("keyboardDidHide", hideHandler),
+    ];
 
     return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
+      subscriptions.forEach(sub => sub.remove());
     };
   }, []);
 
