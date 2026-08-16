@@ -198,8 +198,34 @@ export const SportsHistoryScreen = () => {
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
-            <TouchableOpacity onPress={() => setIsFilterOpen(true)}>
+            <TouchableOpacity
+              onPress={() => setIsFilterOpen(true)}
+              style={{ position: "relative" }}>
               <SlidersHorizontal size={ms(20)} color="#000" />
+              {dateFilter !== "all" && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: -ms(6),
+                    right: -ms(6),
+                    backgroundColor: COLORS.primary,
+                    width: ms(16),
+                    height: ms(16),
+                    borderRadius: ms(8),
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}>
+                  <Text
+                    style={{
+                      fontSize: fs(10),
+                      color: "#FFF",
+                      fontFamily: "Gilroy-Bold",
+                      lineHeight: fs(10),
+                    }}>
+                    1
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>

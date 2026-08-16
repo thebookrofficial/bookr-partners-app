@@ -117,7 +117,7 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
         const start = new Date(customRange.start);
         start.setHours(0, 0, 0, 0);
         const end = new Date(customRange.end);
-        end.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
         matchesDate = bDate >= start && bDate <= end;
       }
       return matchesDate;
@@ -186,7 +186,30 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
                 activeOpacity={0.7}
                 onPress={() => setIsFilterOpen(true)}>
                 <CalendarIcon size={ms(20)} color={COLORS.primary} />
-                {dateFilter !== "all" && <View style={styles.activeFilterBadge} />}
+                {dateFilter !== "all" && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: -ms(6),
+                      right: -ms(6),
+                      backgroundColor: COLORS.primary,
+                      width: ms(16),
+                      height: ms(16),
+                      borderRadius: ms(8),
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}>
+                    <Text
+                      style={{
+                        fontSize: fs(10),
+                        color: "#FFF",
+                        fontFamily: "Gilroy-Bold",
+                        lineHeight: fs(10),
+                      }}>
+                      1
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
           </View>

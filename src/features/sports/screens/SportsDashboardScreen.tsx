@@ -16,7 +16,7 @@ import { ServiceHeader } from "../components/ServiceHeader";
 import { Calendar, X, ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { PlatformDatePicker as DatePicker } from "@/components/ui/PlatformDatePicker";
+import { CustomDatePickerModal as DatePicker } from "@/components/ui/CustomDatePickerModal";
 import Svg, { Path } from "react-native-svg";
 
 // Navigation & DB Imports
@@ -511,26 +511,24 @@ export const SportsDashboardScreen = () => {
       </Modal>
 
       <DatePicker
-        modal
-        open={showStartPicker}
-        date={tempStart}
-        mode="date"
-        onConfirm={date => {
+        isVisible={showStartPicker}
+        onClose={() => setShowStartPicker(false)}
+        minDate={new Date(2000, 0, 1)}
+        selectedDate={tempStart}
+        onSelectDate={date => {
           setShowStartPicker(false);
           setTempStart(date);
         }}
-        onCancel={() => setShowStartPicker(false)}
       />
       <DatePicker
-        modal
-        open={showEndPicker}
-        date={tempEnd}
-        mode="date"
-        onConfirm={date => {
+        isVisible={showEndPicker}
+        onClose={() => setShowEndPicker(false)}
+        minDate={new Date(2000, 0, 1)}
+        selectedDate={tempEnd}
+        onSelectDate={date => {
           setShowEndPicker(false);
           setTempEnd(date);
         }}
-        onCancel={() => setShowEndPicker(false)}
       />
     </ScreenContainer>
   );

@@ -234,40 +234,6 @@ export const useSportsHistory = (
         };
       });
 
-      if (dateFilter !== "all") {
-        const now = new Date().getTime();
-        let cutoff = 0;
-        let maxCutoff = Infinity;
-
-        if (dateFilter === "3_months") cutoff = now - 90 * 24 * 60 * 60 * 1000;
-        else if (dateFilter === "6_months") cutoff = now - 180 * 24 * 60 * 60 * 1000;
-        else if (dateFilter === "9_months") cutoff = now - 270 * 24 * 60 * 60 * 1000;
-        else if (dateFilter === "yesterday") {
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
-          cutoff = yesterday.setHours(0, 0, 0, 0);
-          maxCutoff = yesterday.setHours(23, 59, 59, 999);
-        }
-
-        finalGroups = finalGroups
-          .map(monthGroup => {
-            const filteredDays = monthGroup.days.filter(dayGroup => {
-              if (dateFilter === "custom" && customRange) {
-                const start = customRange.start.getTime();
-                const end = new Date(customRange.end).setHours(23, 59, 59, 999);
-                return dayGroup.rawDate >= start && dayGroup.rawDate <= end;
-              }
-              if (dateFilter === "yesterday") {
-                return dayGroup.rawDate >= cutoff && dayGroup.rawDate <= maxCutoff;
-              }
-              return dayGroup.rawDate >= cutoff;
-            });
-            const newSettlement = filteredDays.reduce((sum, d) => sum + d.settlement, 0);
-            return { ...monthGroup, days: filteredDays, totalSettlement: newSettlement };
-          })
-          .filter(monthGroup => monthGroup.days.length > 0);
-      }
-
       finalGroups.sort((a, b) => b.rawMonth - a.rawMonth);
 
       return finalGroups;
@@ -276,6 +242,42 @@ export const useSportsHistory = (
 
   const filteredHistoryGroups = useMemo(() => {
     let groups = allHistoryGroups;
+
+    // Apply date filter
+    if (dateFilter !== "all") {
+      const now = new Date().getTime();
+      let cutoff = 0;
+      let maxCutoff = Infinity;
+
+      if (dateFilter === "3_months") cutoff = now - 90 * 24 * 60 * 60 * 1000;
+      else if (dateFilter === "6_months") cutoff = now - 180 * 24 * 60 * 60 * 1000;
+      else if (dateFilter === "9_months") cutoff = now - 270 * 24 * 60 * 60 * 1000;
+      else if (dateFilter === "yesterday") {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        cutoff = yesterday.setHours(0, 0, 0, 0);
+        maxCutoff = yesterday.setHours(23, 59, 59, 999);
+      }
+
+      groups = groups
+        .map(monthGroup => {
+          const filteredDays = monthGroup.days.filter(dayGroup => {
+            if (dateFilter === "custom" && customRange) {
+              const start = customRange.start.getTime();
+              const end = new Date(customRange.end).setHours(23, 59, 59, 999);
+              return dayGroup.rawDate >= start && dayGroup.rawDate <= end;
+            }
+            if (dateFilter === "yesterday") {
+              return dayGroup.rawDate >= cutoff && dayGroup.rawDate <= maxCutoff;
+            }
+            return dayGroup.rawDate >= cutoff;
+          });
+          const newSettlement = filteredDays.reduce((sum, d) => sum + d.settlement, 0);
+          return { ...monthGroup, days: filteredDays, totalSettlement: newSettlement };
+        })
+        .filter(monthGroup => monthGroup.days.length > 0);
+    }
+
     if (searchQuery.trim() !== "") {
       const lowerQuery = searchQuery.toLowerCase();
       groups = groups
@@ -298,7 +300,7 @@ export const useSportsHistory = (
         .filter(monthGroup => monthGroup.days.length > 0);
     }
     return groups;
-  }, [allHistoryGroups, searchQuery]);
+  }, [allHistoryGroups, searchQuery, dateFilter, customRange]);
 
   return {
     currentVenueId: resolvedVenueId || initialVenueId,

@@ -7,7 +7,7 @@ import { Text } from "@/components/ui";
 import { X, Calendar } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { CustomDatePickerModal } from "@/components/ui";
 
 export type EventDateFilterOption =
   | "all"
@@ -117,28 +117,53 @@ export const EventFilterBottomSheet = ({
             </View>
           )}
 
-          {/* Apply Button */}
-          <TouchableOpacity style={styles.applyBtn} onPress={handleApply}>
-            <Text style={styles.applyBtnText}>APPLY FILTER</Text>
-          </TouchableOpacity>
+          {/* Action Buttons */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[
+                styles.applyBtn,
+                styles.clearBtn,
+                tempFilter === "all" && {
+                  backgroundColor: COLORS.background,
+                  borderWidth: 1,
+                  borderColor: COLORS.border.navBar,
+                },
+              ]}
+              disabled={tempFilter === "all"}
+              onPress={() => {
+                setTempFilter("all");
+                setTempCustomRange({ start: new Date(), end: new Date() });
+              }}>
+              <Text
+                style={[
+                  styles.applyBtnText,
+                  styles.clearBtnText,
+                  tempFilter === "all" && { color: COLORS.text.muted },
+                ]}>
+                CLEAR
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.applyBtn, { flex: 1 }]} onPress={handleApply}>
+              <Text style={styles.applyBtnText}>APPLY</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
-      {/* Standard Date Picker Overlay */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={showDatePicker === "start" ? tempCustomRange.start : tempCustomRange.end}
-          mode="date"
-          onChange={(e, date) => {
-            setShowDatePicker(null);
-            if (date) {
-              if (showDatePicker === "start")
-                setTempCustomRange(prev => ({ ...prev, start: date }));
-              else setTempCustomRange(prev => ({ ...prev, end: date }));
-            }
-          }}
-        />
-      )}
+      <CustomDatePickerModal
+        isVisible={showDatePicker !== null}
+        onClose={() => setShowDatePicker(null)}
+        minDate={new Date(2000, 0, 1)}
+        selectedDate={showDatePicker === "start" ? tempCustomRange.start : tempCustomRange.end}
+        onSelectDate={date => {
+          if (showDatePicker === "start") {
+            setTempCustomRange(prev => ({ ...prev, start: date }));
+          } else {
+            setTempCustomRange(prev => ({ ...prev, end: date }));
+          }
+          setShowDatePicker(null);
+        }}
+      />
     </Modal>
   );
 };
@@ -190,17 +215,29 @@ const styles = StyleSheet.create({
   },
   dateText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: COLORS.text.primary },
 
+  actionRow: {
+    flexDirection: "row",
+    gap: hs(12),
+    marginTop: vs(10),
+  },
   applyBtn: {
     backgroundColor: COLORS.text.primary,
     height: vs(48),
     borderRadius: ms(10),
     justifyContent: "center",
     alignItems: "center",
-    marginTop: vs(10),
   },
   applyBtnText: {
     fontFamily: "MDNichromeTest-Bold",
     fontSize: fs(22),
     color: COLORS.surface.primary,
+  },
+  clearBtn: {
+    flex: 1,
+    backgroundColor: "lightskyblue",
+    borderWidth: 0,
+  },
+  clearBtnText: {
+    color: COLORS.text.primary,
   },
 });
