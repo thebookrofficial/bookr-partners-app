@@ -26,6 +26,7 @@ import { CustomDatePickerModal } from "@/components/ui/CustomDatePickerModal";
 import { supabase } from "@/lib/supabase";
 import { useCreateStaycationOfflineBooking } from "../hooks/useCreateStaycationOfflineBooking";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useKeyboardVisible } from "@/hooks/useKeyboardVisible";
 
 import MoneySvg from "@/assets/icons/ic-tdesign-money.svg";
 
@@ -66,6 +67,7 @@ export const StaycationOfflineBookingSheet = ({
   const isFarmhouse = activeCategory === "Farmhouse";
   const { createBooking, isLoading } = useCreateStaycationOfflineBooking();
   const insets = useSafeAreaInsets();
+  const isKeyboardVisible = useKeyboardVisible();
   const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
     "cash",
   );
@@ -1155,20 +1157,22 @@ export const StaycationOfflineBookingSheet = ({
                 </View>
               </ScrollView>
 
-              <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
-                <TouchableOpacity
-                  style={styles.bookNowBtn}
-                  onPress={handleBookNow}
-                  disabled={isLoading}>
-                  {isLoading ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text weight="bold" family="bison" style={styles.bookNowBtnText}>
-                      BOOK NOW
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+              {!isKeyboardVisible && (
+                <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
+                  <TouchableOpacity
+                    style={styles.bookNowBtn}
+                    onPress={handleBookNow}
+                    disabled={isLoading}>
+                    {isLoading ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text weight="bold" family="bison" style={styles.bookNowBtnText}>
+                        BOOK NOW
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </KeyboardAvoidingView>
         </View>

@@ -2,6 +2,7 @@
 // Confidential and Proprietary.
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useKeyboardVisible } from "@/hooks/useKeyboardVisible";
 import {
   View,
   StyleSheet,
@@ -189,6 +190,7 @@ export const OfflineBookingSheet = ({
 }: OfflineBookingSheetProps) => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const insets = useSafeAreaInsets();
+  const isKeyboardVisible = useKeyboardVisible();
 
   const [currentDate, setCurrentDate] = useState<Date>(initialDate);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -861,21 +863,23 @@ export const OfflineBookingSheet = ({
                   )}
                 </View>
               </ScrollView>
-              <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
-                <TouchableOpacity
-                  style={styles.saveButton}
-                  activeOpacity={0.8}
-                  onPress={handleBookNow}
-                  disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <ActivityIndicator color={COLORS.text.inverse} />
-                  ) : (
-                    <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
-                      BOOK NOW
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+              {!isKeyboardVisible && (
+                <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
+                  <TouchableOpacity
+                    style={styles.saveButton}
+                    activeOpacity={0.8}
+                    onPress={handleBookNow}
+                    disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <ActivityIndicator color={COLORS.text.inverse} />
+                    ) : (
+                      <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
+                        BOOK NOW
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </KeyboardAvoidingView>
         </TouchableOpacity>
