@@ -28,6 +28,7 @@ import { SportsService } from "../services/sports.service";
 import { useBookingDetails } from "../hooks/useBookingDetails";
 import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
 import perf from "@react-native-firebase/perf";
+import { useKeyboardStore } from "@/store/keyboardStore";
 
 import CalendarSvg from "@/assets/icons/ic-solar-calendar-outline.svg";
 import MoneySvg from "@/assets/icons/ic-tdesign-money.svg";
@@ -39,6 +40,7 @@ export const RepeatBookingScreen = () => {
   const { bookingId, venueId, groundId, idChain } = route.params;
 
   const { booking, loading } = useBookingDetails(bookingId, idChain);
+  const setIsNumericFocused = useKeyboardStore(state => state.setIsNumericFocused);
 
   const [repeatDate, setRepeatDate] = useState<Date>(new Date());
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -497,6 +499,8 @@ export const RepeatBookingScreen = () => {
                       value={totalPrice}
                       onChangeText={setTotalPrice}
                       keyboardType="numeric"
+                      onFocus={() => setIsNumericFocused(true)}
+                      onBlur={() => setIsNumericFocused(false)}
                     />
                   </View>
                 </View>
@@ -525,7 +529,11 @@ export const RepeatBookingScreen = () => {
                       keyboardType="numeric"
                       placeholder="0"
                       placeholderTextColor="#999"
-                      onFocus={() => setIsAddingPayment(true)}
+                      onFocus={() => {
+                        setIsAddingPayment(true);
+                        setIsNumericFocused(true);
+                      }}
+                      onBlur={() => setIsNumericFocused(false)}
                     />
                     {isAddingPayment && (
                       <TouchableOpacity

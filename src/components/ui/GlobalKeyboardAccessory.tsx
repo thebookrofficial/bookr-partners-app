@@ -64,6 +64,7 @@ const styles = StyleSheet.create({
     paddingRight: hs(16),
     alignItems: "flex-end",
     zIndex: 999, // Ensure it floats above other content
+    elevation: 100, // Required for Android to sit above StackNavigator screens
   },
   button: {
     backgroundColor: COLORS.primary,

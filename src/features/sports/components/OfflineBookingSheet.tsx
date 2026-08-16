@@ -918,6 +918,7 @@ export const OfflineBookingSheet = ({
             } else {
               setToTime(hour);
             }
+            setShowHourPicker(null);
           }}
           isHourDisabled={(hour, index) => {
             const hour24 =

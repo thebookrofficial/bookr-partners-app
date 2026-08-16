@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Image, Alert, ScrollView } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView } from "react-native";
 import { GuestHistorySkeleton } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
-import { ArrowLeft, Flag, Phone, ChevronDown, ChevronUp } from "lucide-react-native";
+import { ArrowLeft, Phone, ChevronDown, ChevronUp } from "lucide-react-native";
 import { BookingCard } from "../components/BookingCard";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -57,10 +57,6 @@ export const GuestHistoryScreen = () => {
     }
   };
 
-  const handleFlagUser = () => {
-    Alert.alert("Coming Soon", "Flag user feature will be available in a future update.");
-  };
-
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -84,12 +80,6 @@ export const GuestHistoryScreen = () => {
               Profile
             </Text>
           </View>
-          <TouchableOpacity style={styles.flagBtn} onPress={handleFlagUser}>
-            <Flag size={ms(14)} color="#E55959" strokeWidth={2.5} />
-            <Text variant="caption" weight="semiBold" style={{ color: "#E55959" }}>
-              Flag User
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* Profile Card */}
@@ -260,16 +250,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  flagBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E55959",
-    borderRadius: ms(8),
-    paddingHorizontal: hs(8),
-    paddingVertical: vs(6),
-    gap: hs(4),
-  },
+
   profileCard: {
     backgroundColor: "#F4F7FC",
     borderColor: "#CBDFFE",
