@@ -149,13 +149,20 @@ export const EventScanScreen = () => {
   const route = useRoute<any>();
   const isFocused = useIsFocused();
 
-  let serviceId = route.params?.serviceId;
-  if (!serviceId) {
-    const parentState = navigation.getParent()?.getState();
-    const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
-    const tabParams = tabRoute?.params as any;
-    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
-  }
+  const [serviceId, setServiceId] = useState<string>("");
+
+  useFocusEffect(
+    useCallback(() => {
+      let id = route.params?.serviceId;
+      if (!id) {
+        const parentState = navigation.getParent()?.getState();
+        const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
+        const tabParams = tabRoute?.params as any;
+        id = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+      }
+      setServiceId(id || "");
+    }, [route.params?.serviceId, navigation]),
+  );
 
   const [selectedTab, setSelectedTab] = useState("All");
   const [isScanningMode, setIsScanningMode] = useState(false);
@@ -306,7 +313,7 @@ export const EventScanScreen = () => {
         (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
       );
 
-      setTicketCategories(Array.from(cats));
+      setTicketCategories(Array.from(new Set(cats)));
       setScannedAttendees(combined);
     } catch (err) {
       console.error("Error fetching scanned history:", err);
@@ -327,11 +334,17 @@ export const EventScanScreen = () => {
     setIsRefreshing(false);
   }, [fetchScannedHistory]);
 
-  // Build tabs cleanly, filtering out Guest from the mapped list to prevent duplicates
+  // Build tabs cleanly, filtering out duplicates and Guest from the mapped list
+  const seenLabels = new Set<string>(["All", "Guest", "Spot"]);
   const TABS = [
     { label: "All", count: scannedAttendees.length },
     ...ticketCategories
-      .filter(cat => cat.toLowerCase() !== "guest")
+      .filter(cat => {
+        if (cat.toLowerCase() === "guest") return false;
+        if (seenLabels.has(cat)) return false;
+        seenLabels.add(cat);
+        return true;
+      })
       .map(cat => ({
         label: cat,
         count: scannedAttendees.filter(a => a.categoryName === cat).length,

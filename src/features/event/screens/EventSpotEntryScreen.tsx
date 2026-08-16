@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -15,10 +15,10 @@ import {
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, TextInput } from "@/components/ui";
 import { EventHeader } from "../components/EventHeader";
-import { ChevronDown, X } from "lucide-react-native";
+import { ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { useRoute, useNavigation } from "@react-navigation/native";
+import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useEventSpotEntry } from "../hooks/useEventSpotEntry";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
@@ -27,13 +27,20 @@ export const EventSpotEntryScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
 
-  let serviceId = route.params?.serviceId;
-  if (!serviceId) {
-    const parentState = navigation.getParent()?.getState();
-    const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
-    const tabParams = tabRoute?.params as any;
-    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
-  }
+  const [serviceId, setServiceId] = useState<string>("");
+
+  useFocusEffect(
+    useCallback(() => {
+      let id = route.params?.serviceId;
+      if (!id) {
+        const parentState = navigation.getParent()?.getState();
+        const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
+        const tabParams = tabRoute?.params as any;
+        id = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+      }
+      setServiceId(id || "");
+    }, [route.params?.serviceId, navigation]),
+  );
 
   const {
     loading,
@@ -275,31 +282,17 @@ export const EventSpotEntryScreen = () => {
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setActiveDropdown(null)}>
-          <View style={styles.dropdownMenu}>
-            <View style={styles.dropdownHeader2}>
-              <Text weight="bold" style={styles.dropdownTitle}>
-                Select {activeDropdown?.type === "passType" ? "Pass Type" : "Quantity"}
-              </Text>
-              <TouchableOpacity onPress={() => setActiveDropdown(null)}>
-                <X size={ms(20)} color="#000" />
+          <View style={styles.optionsContainer}>
+            {Array.from(new Set(activeDropdown?.options || [])).map(option => (
+              <TouchableOpacity
+                key={option}
+                style={styles.optionItem}
+                onPress={() => selectOption(option)}>
+                <Text variant="body1" weight="semiBold">
+                  {option}
+                </Text>
               </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
-              {activeDropdown?.options.map(option => {
-                const isSelected =
-                  (activeDropdown.type === "passType" ? passType : quantity) === option;
-                return (
-                  <TouchableOpacity
-                    key={option}
-                    style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
-                    onPress={() => selectOption(option)}>
-                    <Text weight="medium" style={styles.dropdownItemText}>
-                      {option}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            ))}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -402,45 +395,21 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
     justifyContent: "center",
     alignItems: "center",
   },
-  dropdownMenu: {
-    backgroundColor: "#FFFFFF",
+  optionsContainer: {
+    width: "80%",
+    backgroundColor: COLORS.background,
     borderRadius: ms(12),
-    paddingBottom: ms(8),
-    width: ms(250),
-    maxHeight: vs(350),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    padding: ms(10),
+    maxHeight: vs(400),
   },
-  dropdownHeader2: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  optionItem: {
     paddingVertical: vs(12),
-    paddingHorizontal: ms(16),
+    paddingHorizontal: hs(15),
     borderBottomWidth: 1,
-    borderBottomColor: "#EAEAEA",
-    marginBottom: vs(8),
+    borderBottomColor: COLORS.surface.primary,
   },
-  dropdownTitle: { fontSize: fs(16), color: "#000" },
-  dropdownScroll: { maxHeight: vs(250) },
-  dropdownItem: {
-    paddingVertical: vs(10),
-    paddingHorizontal: ms(12),
-    marginHorizontal: ms(8),
-    borderRadius: ms(8),
-    minHeight: vs(35),
-    justifyContent: "center",
-    marginBottom: vs(2),
-  },
-  dropdownItemSelected: {
-    backgroundColor: "#E6E6E6",
-  },
-  dropdownItemText: { fontSize: fs(14), color: "#000" },
 });

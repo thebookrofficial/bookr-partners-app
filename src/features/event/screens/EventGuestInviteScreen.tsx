@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -18,7 +18,7 @@ import { EventHeader } from "../components/EventHeader";
 import { Trash2, ChevronDown } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
-import { useRoute, useNavigation } from "@react-navigation/native";
+import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useEventInvites } from "../hooks/useEventInvites";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
@@ -31,13 +31,20 @@ export const EventGuestInviteScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
 
-  let serviceId = route.params?.serviceId;
-  if (!serviceId) {
-    const parentState = navigation.getParent()?.getState();
-    const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
-    const tabParams = tabRoute?.params as any;
-    serviceId = tabParams?.serviceId || tabParams?.params?.serviceId || "";
-  }
+  const [serviceId, setServiceId] = useState<string>("");
+
+  useFocusEffect(
+    useCallback(() => {
+      let id = route.params?.serviceId;
+      if (!id) {
+        const parentState = navigation.getParent()?.getState();
+        const tabRoute = parentState?.routes.find((r: any) => r.name === "EventServiceTabs");
+        const tabParams = tabRoute?.params as any;
+        id = tabParams?.serviceId || tabParams?.params?.serviceId || "";
+      }
+      setServiceId(id || "");
+    }, [route.params?.serviceId, navigation]),
+  );
 
   const {
     invites,
@@ -301,7 +308,7 @@ export const EventGuestInviteScreen = () => {
           activeOpacity={1}
           onPress={() => setActiveDropdown(null)}>
           <View style={styles.optionsContainer}>
-            {activeDropdown?.options.map(option => (
+            {Array.from(new Set(activeDropdown?.options || [])).map(option => (
               <TouchableOpacity
                 key={option}
                 style={styles.optionItem}
