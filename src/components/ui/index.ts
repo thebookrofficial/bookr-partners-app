@@ -7,3 +7,4 @@ export * from "./PillTabs";
 export * from "./CustomDatePickerModal";
 export * from "./Skeleton";
 export * from "./SkeletonLayouts";
+export * from "./GlobalKeyboardAccessory";

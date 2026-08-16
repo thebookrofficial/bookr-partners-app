@@ -7,6 +7,7 @@ import * as Sentry from "@sentry/react-native";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useAutoStartCheck } from "@/hooks/useAutoStartCheck";
 import { AutoStartPrompt } from "@/components/ui/AutoStartPrompt";
+import { GlobalKeyboardAccessory } from "@/components/ui/GlobalKeyboardAccessory";
 import Config from "react-native-config";
 import { withStallion } from "react-native-stallion";
 
@@ -78,6 +79,7 @@ function App() {
         />
         <AppNavigator />
         <AutoStartPrompt visible={needsAutoStart} onFixSettings={openAutoStartSettings} />
+        <GlobalKeyboardAccessory />
       </SafeAreaProvider>
     </QueryClientProvider>
   );
