@@ -2,9 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ScrollView, Platform } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, BulkBookingSkeleton } from "@/components/ui";
+import { Text, BulkBookingSkeleton, GlobalKeyboardAccessory } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
 import { BookingCard } from "../components/BookingCard";
 import { Plus } from "lucide-react-native";
@@ -290,6 +290,7 @@ export const BulkBookingScreen = () => {
         }>
         <Plus size={ms(30)} color={COLORS.text.inverse} />
       </TouchableOpacity>
+      {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
     </ScreenContainer>
   );
 };

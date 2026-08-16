@@ -12,7 +12,7 @@ import {
   Platform,
 } from "react-native";
 import { AppleButton } from "@invertase/react-native-apple-authentication";
-import { Text, Button } from "@/components/ui";
+import { Text, Button, GlobalKeyboardAccessory } from "@/components/ui";
 import { AuthScreenProps } from "@/navigation/navigation.types";
 import { COLORS } from "@/constants/theme";
 import { vs, hs, ms, fs } from "@/utils/responsive.utils";
@@ -165,6 +165,7 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
           </View>
         </ScrollView>
       </View>
+      {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
     </View>
   );
 };

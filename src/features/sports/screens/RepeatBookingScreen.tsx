@@ -13,8 +13,9 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from "react-native";
-import { FormSkeleton, Text } from "@/components/ui";
+import { FormSkeleton, Text, GlobalKeyboardAccessory } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { ArrowLeft, Clock } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -674,6 +675,7 @@ export const RepeatBookingScreen = () => {
         }}
         isFetching={isFetchingSlots}
       />
+      {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
     </ScreenContainer>
   );
 };

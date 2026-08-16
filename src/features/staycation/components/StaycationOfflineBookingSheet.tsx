@@ -18,7 +18,7 @@ import {
   Image,
   Keyboard,
 } from "react-native";
-import { Text } from "@/components/ui";
+import { Text, GlobalKeyboardAccessory } from "@/components/ui";
 import { User, Phone, Wallet, ArrowLeft, Users, X, Calendar } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -1190,6 +1190,7 @@ export const StaycationOfflineBookingSheet = ({
             )}
           </View>
         </KeyboardAvoidingView>
+        {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
 
         <CustomDatePickerModal
           isVisible={!!showDatePicker}

@@ -25,7 +25,7 @@ import {
   UserPlus,
   MapPin,
 } from "lucide-react-native";
-import { Linking, Alert } from "react-native";
+import { Linking, Alert, Platform } from "react-native";
 import messaging from "@react-native-firebase/messaging";
 import { LinkingOptions } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -80,6 +80,7 @@ import { SplashScreen } from "@/screens/SplashScreen";
 import { ms, fs } from "@/utils/responsive.utils";
 
 import { CustomTabBar } from "./CustomTabBar";
+import { GlobalKeyboardAccessory } from "@/components/ui/GlobalKeyboardAccessory";
 // --- AUTHENTICATION IMPORTS ---
 import { supabase } from "@/lib/supabase";
 
@@ -658,15 +659,18 @@ export const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer linking={linking}>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {session ? (
-          <RootStack.Screen name="Main" component={MainNavigator} />
-        ) : (
-          <RootStack.Screen name="Auth" component={AuthNavigator} />
-        )}
-      </RootStack.Navigator>
-    </NavigationContainer>
+    <>
+      <NavigationContainer linking={linking}>
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          {session ? (
+            <RootStack.Screen name="Main" component={MainNavigator} />
+          ) : (
+            <RootStack.Screen name="Auth" component={AuthNavigator} />
+          )}
+        </RootStack.Navigator>
+      </NavigationContainer>
+      {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
+    </>
   );
 };
 

@@ -17,8 +17,9 @@ import {
   Keyboard,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, DetailsSkeleton } from "@/components/ui";
+import { Text, DetailsSkeleton, GlobalKeyboardAccessory } from "@/components/ui";
 import { Clock, Trash2, X, ChevronLeft, Phone, ChevronUp, ChevronDown } from "lucide-react-native";
+import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
@@ -44,8 +45,16 @@ export const BookingDetailsScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, "BookingDetails">>();
   const { bookingId, idChain } = route.params;
 
-  const { booking, paymentLogs, loading, isSaving, logPayment, cancelBooking, refresh } =
-    useBookingDetails(bookingId, idChain);
+  const {
+    booking,
+    paymentLogs,
+    loading,
+    isSaving,
+    logPayment,
+    cancelBooking,
+    refresh,
+    removePaymentLog,
+  } = useBookingDetails(bookingId, idChain);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -76,6 +85,8 @@ export const BookingDetailsScreen = () => {
   );
 
   const [showPaymentHistory, setShowPaymentHistory] = useState(true);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [selectedLogToDelete, setSelectedLogToDelete] = useState<any>(null);
 
   const getIconForMode = (mode: string, note?: string) => {
     const noteUpper = note?.toUpperCase() || "";
@@ -263,464 +274,607 @@ export const BookingDetailsScreen = () => {
   };
 
   return (
-    <ScreenContainer
-      scrollable
-      backgroundColor={COLORS.background}
-      paddingHorizontal={hs(12)}
-      footer={
-        !isKeyboardVisible ? (
-          <View style={styles.fixedBottomActions}>
-            {/* 4. Bottom Action Buttons */}
-            {!isOnline && (
-              <View style={styles.actionRowBottom}>
-                <TouchableOpacity
-                  style={styles.repeatBtn}
-                  activeOpacity={0.7}
-                  onPress={() =>
-                    navigation.navigate("RepeatBooking", {
-                      bookingId: booking.id,
-                      venueId: booking.venue_id,
-                      groundId: booking.sports_slots?.ground_id || "",
-                      idChain: booking.idChain,
-                    })
-                  }>
-                  <Text variant="body1" family="bison" style={styles.repeatBtnText}>
-                    REPEAT BOOKING
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.rescheduleBtn}
-                  disabled={booking.booking_status === "cancelled"}
-                  onPress={() => {
-                    if (booking.booking_status !== "cancelled") {
-                      navigation.navigate("RescheduleBooking", {
-                        bookingId,
+    <GestureHandlerRootView style={styles.root}>
+      <ScreenContainer
+        scrollable
+        backgroundColor={COLORS.background}
+        paddingHorizontal={hs(12)}
+        footer={
+          !isKeyboardVisible ? (
+            <View style={styles.fixedBottomActions}>
+              {/* 4. Bottom Action Buttons */}
+              {!isOnline && (
+                <View style={styles.actionRowBottom}>
+                  <TouchableOpacity
+                    style={styles.repeatBtn}
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      navigation.navigate("RepeatBooking", {
+                        bookingId: booking.id,
                         venueId: booking.venue_id,
                         groundId: booking.sports_slots?.ground_id || "",
                         idChain: booking.idChain,
-                      });
+                      })
+                    }>
+                    <Text variant="body1" family="bison" style={styles.repeatBtnText}>
+                      REPEAT BOOKING
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.rescheduleBtn}
+                    disabled={booking.booking_status === "cancelled"}
+                    onPress={() => {
+                      if (booking.booking_status !== "cancelled") {
+                        navigation.navigate("RescheduleBooking", {
+                          bookingId,
+                          venueId: booking.venue_id,
+                          groundId: booking.sports_slots?.ground_id || "",
+                          idChain: booking.idChain,
+                        });
+                      }
+                    }}>
+                    <Text
+                      variant="body1"
+                      family="bison"
+                      style={[
+                        styles.rescheduleBtnText,
+                        booking.booking_status === "cancelled" && { color: COLORS.text.muted },
+                      ]}>
+                      RESCHEDULE
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {booking.booking_status !== "cancelled" &&
+                (!isOnline || booking.venues?.allow_cancellation) && (
+                  <TouchableOpacity
+                    style={styles.cancelBtnBottom}
+                    onPress={() => setShowCancelModal(true)}>
+                    <Text variant="body1" family="bison" style={styles.cancelBtnBottomText}>
+                      CANCEL YOUR BOOKING
+                    </Text>
+                    <Trash2 size={ms(24)} color="#fff" />
+                  </TouchableOpacity>
+                )}
+            </View>
+          ) : null
+        }>
+        {/* 0. Screen Header */}
+        <View style={styles.screenHeader}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <ChevronLeft size={ms(28)} color={COLORS.text.primary} />
+          </TouchableOpacity>
+          <Text variant="h2" weight="bold" style={styles.screenTitle}>
+            Booking Details
+          </Text>
+        </View>
+
+        {/* 1. Profile Card */}
+        <TouchableOpacity
+          style={styles.profileCard}
+          activeOpacity={0.7}
+          onPress={() => {
+            navigation.navigate("GuestHistory", {
+              bookingId,
+              vertical: "sports",
+              venueId: booking.venue_id,
+            });
+          }}>
+          {profileData?.avatar_url ? (
+            <Image source={{ uri: profileData.avatar_url }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <PersonSvg width={ms(32)} height={ms(32)} color="#63a1fd" />
+            </View>
+          )}
+          <View style={styles.profileInfo}>
+            <Text variant="h3" weight="bold" style={styles.profileName}>
+              {guestName}
+            </Text>
+            <Text variant="body2" style={styles.profilePhone}>
+              {guestPhone}
+            </Text>
+            <View style={[styles.onlineBadge, { backgroundColor: statusStyle.bg }]}>
+              <Text style={[styles.onlineBadgeText, { color: statusStyle.color }]}>
+                {statusStyle.text}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.profileActions}>
+            <TouchableOpacity onPress={handleShareWhatsApp}>
+              <Image source={icWhatsapp} style={styles.socialIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtnBlue} onPress={handleCall}>
+              <Phone size={ms(20)} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+
+        {/* 2. Date & Time Slots */}
+        <View style={styles.dateTimeRow}>
+          <View style={styles.dateCard}>
+            <View style={styles.iconBoxLightBlue}>
+              <CalendarSvg width={ms(20)} height={ms(20)} color="#63a1fd" />
+            </View>
+            <View style={styles.dateCardTextCol}>
+              <Text variant="body2" weight="bold" style={styles.labelTitle}>
+                Date
+              </Text>
+              <Text variant="body2" style={styles.labelValue}>
+                {new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.dateCard}>
+            <View style={styles.iconBoxLightBlue}>
+              <Clock size={ms(20)} color="#63a1fd" />
+            </View>
+            <View style={styles.dateCardTextCol}>
+              <Text variant="body1" weight="bold" style={styles.labelTitle}>
+                Time Slots
+              </Text>
+              <Text variant="body1" style={styles.labelValue}>
+                {formatHour(booking.sports_slots.start_time)} to{" "}
+                {formatHour(booking.sports_slots.end_time)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* 3. Payment Container */}
+        <View style={styles.paymentCard}>
+          <View style={styles.amountsRow}>
+            <View style={styles.amountBoxLightRed}>
+              <View style={styles.amountIconRed}>
+                <ClockSvg width={ms(20)} height={ms(20)} color="#E55959" />
+              </View>
+              <View style={styles.amountTextCol}>
+                <Text variant="body1" weight="bold" style={styles.amountLabel}>
+                  Pending Amount
+                </Text>
+                <Text variant="body1" weight="semiBold" style={styles.amountValueRed}>
+                  ₹{remainingAmount}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.amountBoxLightGreen}>
+              <View style={styles.amountIconGreen}>
+                <DownloadSvg width={ms(20)} height={ms(20)} color="#00B562" />
+              </View>
+              <View style={styles.amountTextCol}>
+                <Text variant="body1" weight="bold" style={styles.amountLabel}>
+                  Received Amount
+                </Text>
+                <Text variant="body1" weight="semiBold" style={styles.amountValueGreen}>
+                  ₹{displayAmountPaid}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {remainingAmount <= 0 ? (
+            <View style={[styles.addMoneyBtn, styles.addMoneyBtnCompleted]}>
+              <Text variant="body1" weight="bold" style={styles.addMoneyBtnText}>
+                Payment Completed
+              </Text>
+            </View>
+          ) : (
+            <>
+              {!isAddingPayment ? (
+                <TouchableOpacity
+                  style={styles.addMoneyBtn}
+                  onPress={() => setIsAddingPayment(true)}>
+                  <Text variant="body1" weight="bold" align="center" style={styles.addMoneyBtnText}>
+                    Add Money +
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <Text variant="body2" weight="bold" style={styles.inputLabel}>
+                    Amount
+                  </Text>
+                  <View style={styles.amountInputContainer}>
+                    <Text variant="h3" weight="bold" style={styles.currencySymbol}>
+                      ₹
+                    </Text>
+                    <TextInput
+                      style={styles.amountInput}
+                      keyboardType="numeric"
+                      value={paymentInput}
+                      onFocus={() => setIsKeyboardVisible(true)}
+                      onChangeText={text => {
+                        const numericValue = text.replace(/[^0-9]/g, "");
+                        setPaymentInput(numericValue);
+                      }}
+                    />
+                    <TouchableOpacity onPress={() => setIsAddingPayment(false)}>
+                      <Text variant="body2" weight="bold" style={styles.cancelText}>
+                        - Cancel
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text variant="body2" weight="bold" style={styles.inputLabel}>
+                    Method
+                  </Text>
+                  <View style={styles.methodsRow}>
+                    {/* Cash */}
+                    <TouchableOpacity
+                      style={[
+                        styles.methodBox,
+                        selectedMethod === "cash" && styles.methodBoxSelectedBlue,
+                      ]}
+                      onPress={() => setSelectedMethod("cash")}>
+                      <Image
+                        source={icCash}
+                        style={[
+                          styles.methodIcon,
+                          selectedMethod === "cash" && styles.methodIconSelected,
+                        ]}
+                      />
+                      <Text
+                        variant="body1"
+                        weight="bold"
+                        style={[
+                          styles.methodText,
+                          selectedMethod === "cash" && styles.methodTextSelected,
+                        ]}>
+                        Cash
+                      </Text>
+                    </TouchableOpacity>
+                    {/* GPay */}
+                    <TouchableOpacity
+                      style={[
+                        styles.methodBox,
+                        selectedMethod === "gpay" && styles.methodBoxSelectedBlue,
+                      ]}
+                      onPress={() => setSelectedMethod("gpay")}>
+                      <Image
+                        source={icGpay}
+                        style={[
+                          styles.methodIcon,
+                          selectedMethod === "gpay" && styles.methodIconSelected,
+                        ]}
+                      />
+                      <Text
+                        variant="body1"
+                        weight="bold"
+                        style={[
+                          styles.methodText,
+                          selectedMethod === "gpay" && styles.methodTextSelected,
+                        ]}>
+                        GPay
+                      </Text>
+                    </TouchableOpacity>
+                    {/* PhonePe */}
+                    <TouchableOpacity
+                      style={[
+                        styles.methodBox,
+                        selectedMethod === "phonepe" && styles.methodBoxSelectedBlue,
+                      ]}
+                      onPress={() => setSelectedMethod("phonepe")}>
+                      <Image
+                        source={icPhonepe}
+                        style={[
+                          styles.methodIcon,
+                          selectedMethod === "phonepe" && styles.methodIconSelected,
+                        ]}
+                      />
+                      <Text
+                        variant="body1"
+                        weight="bold"
+                        style={[
+                          styles.methodText,
+                          selectedMethod === "phonepe" && styles.methodTextSelected,
+                        ]}>
+                        PhonePe
+                      </Text>
+                    </TouchableOpacity>
+                    {/* Paytm */}
+                    <TouchableOpacity
+                      style={[
+                        styles.methodBox,
+                        selectedMethod === "paytm" && styles.methodBoxSelectedBlue,
+                      ]}
+                      onPress={() => setSelectedMethod("paytm")}>
+                      <Image
+                        source={icPaytm}
+                        style={[
+                          styles.methodIcon,
+                          selectedMethod === "paytm" && styles.methodIconSelected,
+                        ]}
+                      />
+                      <Text
+                        variant="body1"
+                        weight="bold"
+                        style={[
+                          styles.methodText,
+                          selectedMethod === "paytm" && styles.methodTextSelected,
+                        ]}>
+                        Paytm
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.addMoneyBtn}
+                    onPress={handleSavePayment}
+                    disabled={isSaving}>
+                    {isSaving ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text variant="body1" weight="bold" style={styles.addMoneyBtnText}>
+                        Save Payment
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+            </>
+          )}
+        </View>
+
+        {/* Payment History Accordion */}
+        {paymentLogs.length > 0 && (
+          <View style={styles.paymentHistoryContainer}>
+            <TouchableOpacity
+              style={styles.paymentHistoryBtn}
+              activeOpacity={0.7}
+              onPress={() => setShowPaymentHistory(!showPaymentHistory)}>
+              <View style={styles.paymentHistoryLeft}>
+                <MoneySvg width={ms(24)} height={ms(24)} color="#000" />
+                <Text variant="body1" weight="semiBold" style={styles.paymentHistoryText}>
+                  Payment History
+                </Text>
+              </View>
+              {showPaymentHistory ? (
+                <ChevronUp size={ms(24)} color={COLORS.text.primary} />
+              ) : (
+                <ChevronDown size={ms(24)} color={COLORS.text.primary} />
+              )}
+            </TouchableOpacity>
+            {showPaymentHistory && (
+              <View style={styles.paymentLogsWrapper}>
+                {paymentLogs.map((log, index) => {
+                  const icon = getIconForMode(log.payment_mode, log.note);
+                  const name = getNameForMode(log.payment_mode, log.note);
+
+                  const renderRightActions = () => (
+                    <View style={styles.swipeActionsContainer}>
+                      <TouchableOpacity
+                        style={styles.swipeActionDelete}
+                        onPress={() => {
+                          setSelectedLogToDelete(log);
+                          setDeleteModalVisible(true);
+                        }}>
+                        <Trash2 size={ms(18)} color="#E55959" />
+                      </TouchableOpacity>
+                    </View>
+                  );
+
+                  return (
+                    <Swipeable
+                      key={log.id}
+                      renderRightActions={renderRightActions}
+                      overshootRight={false}
+                      containerStyle={[
+                        index !== paymentLogs.length - 1 && { marginBottom: vs(8) },
+                      ]}>
+                      <TouchableOpacity
+                        style={[styles.logCard, { marginBottom: 0 }]}
+                        activeOpacity={0.7}
+                        onPress={() =>
+                          navigation.navigate("PaymentHistory", { bookingId: booking.id })
+                        }>
+                        <View style={styles.logLeftCol}>
+                          <Image source={icon} style={styles.logIcon} />
+                          <Text variant="body2" weight="semiBold" style={styles.logName}>
+                            {name}
+                          </Text>
+                        </View>
+                        <Text variant="body2" weight="semiBold" style={styles.logDate}>
+                          {new Date(log.created_at).toLocaleDateString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </Text>
+                        <Text variant="body1" weight="semiBold" style={styles.logAmount}>
+                          ₹{log.amount}
+                        </Text>
+                      </TouchableOpacity>
+                    </Swipeable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
+        <Modal visible={showCancelModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCancelModal(false)} />
+            <View style={styles.cancelModalContainer}>
+              <View style={styles.modalHeader}>
+                <Text variant="body1" weight="bold" style={styles.modalTitle}>
+                  BOOKING CANCELLATION
+                </Text>
+                <TouchableOpacity onPress={() => setShowCancelModal(false)}>
+                  <X size={ms(20)} color={COLORS.text.primary} />
+                </TouchableOpacity>
+              </View>
+
+              <Text variant="body1" weight="bold" style={styles.modalMessage}>
+                Are you sure you want to cancel this booking?
+              </Text>
+
+              <Text variant="body2" color={COLORS.text.muted} style={styles.modalSubtext}>
+                Once cancelled, this booking cannot be restored, and refund will be processed as per
+                our cancellation policy.
+              </Text>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={styles.modalBackBtn}
+                  onPress={() => setShowCancelModal(false)}>
+                  <Text variant="h3" family="nichrome" style={styles.modalBackText}>
+                    Back
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.modalConfirmBtn}
+                  onPress={async () => {
+                    setShowCancelModal(false);
+                    const trace = await perf().startTrace("cancel_booking");
+                    try {
+                      const success = await cancelBooking();
+                      if (success) {
+                        navigation.goBack();
+                      }
+                    } finally {
+                      await trace.stop();
                     }
                   }}>
-                  <Text
-                    variant="body1"
-                    family="bison"
-                    style={[
-                      styles.rescheduleBtnText,
-                      booking.booking_status === "cancelled" && { color: COLORS.text.muted },
-                    ]}>
-                    RESCHEDULE
+                  <Text variant="h3" family="nichrome" color="#FFF" style={styles.modalConfirmText}>
+                    Yes, cancel
                   </Text>
                 </TouchableOpacity>
               </View>
-            )}
+            </View>
+          </View>
+        </Modal>
+        {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
+      </ScreenContainer>
 
-            {booking.booking_status !== "cancelled" &&
-              (!isOnline || booking.venues?.allow_cancellation) && (
+      {/* Delete Confirmation Modal */}
+      <Modal visible={deleteModalVisible} transparent animationType="slide">
+        <View style={styles.overlay}>
+          <TouchableOpacity
+            style={styles.backdrop}
+            onPress={() => setDeleteModalVisible(false)}
+            activeOpacity={1}
+          />
+          <View style={styles.bottomSheetContainer}>
+            <View style={styles.deleteModalRow}>
+              <View style={styles.deleteModalLeft}>
+                <Text variant="body1" weight="bold" style={styles.deleteModalTitle}>
+                  Delete
+                </Text>
+                <Text variant="h2" weight="bold" style={styles.deleteModalAmount}>
+                  ₹{selectedLogToDelete?.amount}
+                </Text>
+                <Text variant="body2" style={styles.deleteModalWarning}>
+                  Are you sure you want to cancel{"\n"}this Payment?
+                </Text>
+              </View>
+              <View style={styles.deleteModalRight}>
                 <TouchableOpacity
-                  style={styles.cancelBtnBottom}
-                  onPress={() => setShowCancelModal(true)}>
-                  <Text variant="body1" family="bison" style={styles.cancelBtnBottomText}>
-                    CANCEL YOUR BOOKING
-                  </Text>
-                  <Trash2 size={ms(24)} color="#fff" />
-                </TouchableOpacity>
-              )}
-          </View>
-        ) : null
-      }>
-      {/* 0. Screen Header */}
-      <View style={styles.screenHeader}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ChevronLeft size={ms(28)} color={COLORS.text.primary} />
-        </TouchableOpacity>
-        <Text variant="h2" weight="bold" style={styles.screenTitle}>
-          Booking Details
-        </Text>
-      </View>
-
-      {/* 1. Profile Card */}
-      <TouchableOpacity
-        style={styles.profileCard}
-        activeOpacity={0.7}
-        onPress={() => {
-          navigation.navigate("GuestHistory", {
-            bookingId,
-            vertical: "sports",
-            venueId: booking.venue_id,
-          });
-        }}>
-        {profileData?.avatar_url ? (
-          <Image source={{ uri: profileData.avatar_url }} style={styles.avatarImage} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <PersonSvg width={ms(32)} height={ms(32)} color="#63a1fd" />
-          </View>
-        )}
-        <View style={styles.profileInfo}>
-          <Text variant="h3" weight="bold" style={styles.profileName}>
-            {guestName}
-          </Text>
-          <Text variant="body2" style={styles.profilePhone}>
-            {guestPhone}
-          </Text>
-          <View style={[styles.onlineBadge, { backgroundColor: statusStyle.bg }]}>
-            <Text style={[styles.onlineBadgeText, { color: statusStyle.color }]}>
-              {statusStyle.text}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.profileActions}>
-          <TouchableOpacity onPress={handleShareWhatsApp}>
-            <Image source={icWhatsapp} style={styles.socialIcon} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtnBlue} onPress={handleCall}>
-            <Phone size={ms(20)} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-
-      {/* 2. Date & Time Slots */}
-      <View style={styles.dateTimeRow}>
-        <View style={styles.dateCard}>
-          <View style={styles.iconBoxLightBlue}>
-            <CalendarSvg width={ms(20)} height={ms(20)} color="#63a1fd" />
-          </View>
-          <View style={styles.dateCardTextCol}>
-            <Text variant="body2" weight="bold" style={styles.labelTitle}>
-              Date
-            </Text>
-            <Text variant="body2" style={styles.labelValue}>
-              {new Date(booking.sports_slots.slot_date).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.dateCard}>
-          <View style={styles.iconBoxLightBlue}>
-            <Clock size={ms(20)} color="#63a1fd" />
-          </View>
-          <View style={styles.dateCardTextCol}>
-            <Text variant="body1" weight="bold" style={styles.labelTitle}>
-              Time Slots
-            </Text>
-            <Text variant="body1" style={styles.labelValue}>
-              {formatHour(booking.sports_slots.start_time)} to{" "}
-              {formatHour(booking.sports_slots.end_time)}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* 3. Payment Container */}
-      <View style={styles.paymentCard}>
-        <View style={styles.amountsRow}>
-          <View style={styles.amountBoxLightRed}>
-            <View style={styles.amountIconRed}>
-              <ClockSvg width={ms(20)} height={ms(20)} color="#E55959" />
-            </View>
-            <View style={styles.amountTextCol}>
-              <Text variant="body1" weight="bold" style={styles.amountLabel}>
-                Pending Amount
-              </Text>
-              <Text variant="body1" weight="semiBold" style={styles.amountValueRed}>
-                ₹{remainingAmount}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.amountBoxLightGreen}>
-            <View style={styles.amountIconGreen}>
-              <DownloadSvg width={ms(20)} height={ms(20)} color="#00B562" />
-            </View>
-            <View style={styles.amountTextCol}>
-              <Text variant="body1" weight="bold" style={styles.amountLabel}>
-                Received Amount
-              </Text>
-              <Text variant="body1" weight="semiBold" style={styles.amountValueGreen}>
-                ₹{displayAmountPaid}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {remainingAmount <= 0 ? (
-          <View style={[styles.addMoneyBtn, styles.addMoneyBtnCompleted]}>
-            <Text variant="body1" weight="bold" style={styles.addMoneyBtnText}>
-              Payment Completed
-            </Text>
-          </View>
-        ) : (
-          <>
-            {!isAddingPayment ? (
-              <TouchableOpacity style={styles.addMoneyBtn} onPress={() => setIsAddingPayment(true)}>
-                <Text variant="body1" weight="bold" align="center" style={styles.addMoneyBtnText}>
-                  Add Money +
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <>
-                <Text variant="body2" weight="bold" style={styles.inputLabel}>
-                  Amount
-                </Text>
-                <View style={styles.amountInputContainer}>
-                  <Text variant="h3" weight="bold" style={styles.currencySymbol}>
-                    ₹
-                  </Text>
-                  <TextInput
-                    style={styles.amountInput}
-                    keyboardType="numeric"
-                    value={paymentInput}
-                    onFocus={() => setIsKeyboardVisible(true)}
-                    onChangeText={text => {
-                      const numericValue = text.replace(/[^0-9]/g, "");
-                      setPaymentInput(numericValue);
-                    }}
-                  />
-                  <TouchableOpacity onPress={() => setIsAddingPayment(false)}>
-                    <Text variant="body2" weight="bold" style={styles.cancelText}>
-                      - Cancel
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <Text variant="body2" weight="bold" style={styles.inputLabel}>
-                  Method
-                </Text>
-                <View style={styles.methodsRow}>
-                  {/* Cash */}
-                  <TouchableOpacity
-                    style={[
-                      styles.methodBox,
-                      selectedMethod === "cash" && styles.methodBoxSelectedBlue,
-                    ]}
-                    onPress={() => setSelectedMethod("cash")}>
-                    <Image
-                      source={icCash}
-                      style={[
-                        styles.methodIcon,
-                        selectedMethod === "cash" && styles.methodIconSelected,
-                      ]}
-                    />
-                    <Text
-                      variant="body1"
-                      weight="bold"
-                      style={[
-                        styles.methodText,
-                        selectedMethod === "cash" && styles.methodTextSelected,
-                      ]}>
-                      Cash
-                    </Text>
-                  </TouchableOpacity>
-                  {/* GPay */}
-                  <TouchableOpacity
-                    style={[
-                      styles.methodBox,
-                      selectedMethod === "gpay" && styles.methodBoxSelectedBlue,
-                    ]}
-                    onPress={() => setSelectedMethod("gpay")}>
-                    <Image
-                      source={icGpay}
-                      style={[
-                        styles.methodIcon,
-                        selectedMethod === "gpay" && styles.methodIconSelected,
-                      ]}
-                    />
-                    <Text
-                      variant="body1"
-                      weight="bold"
-                      style={[
-                        styles.methodText,
-                        selectedMethod === "gpay" && styles.methodTextSelected,
-                      ]}>
-                      GPay
-                    </Text>
-                  </TouchableOpacity>
-                  {/* PhonePe */}
-                  <TouchableOpacity
-                    style={[
-                      styles.methodBox,
-                      selectedMethod === "phonepe" && styles.methodBoxSelectedBlue,
-                    ]}
-                    onPress={() => setSelectedMethod("phonepe")}>
-                    <Image
-                      source={icPhonepe}
-                      style={[
-                        styles.methodIcon,
-                        selectedMethod === "phonepe" && styles.methodIconSelected,
-                      ]}
-                    />
-                    <Text
-                      variant="body1"
-                      weight="bold"
-                      style={[
-                        styles.methodText,
-                        selectedMethod === "phonepe" && styles.methodTextSelected,
-                      ]}>
-                      PhonePe
-                    </Text>
-                  </TouchableOpacity>
-                  {/* Paytm */}
-                  <TouchableOpacity
-                    style={[
-                      styles.methodBox,
-                      selectedMethod === "paytm" && styles.methodBoxSelectedBlue,
-                    ]}
-                    onPress={() => setSelectedMethod("paytm")}>
-                    <Image
-                      source={icPaytm}
-                      style={[
-                        styles.methodIcon,
-                        selectedMethod === "paytm" && styles.methodIconSelected,
-                      ]}
-                    />
-                    <Text
-                      variant="body1"
-                      weight="bold"
-                      style={[
-                        styles.methodText,
-                        selectedMethod === "paytm" && styles.methodTextSelected,
-                      ]}>
-                      Paytm
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.addMoneyBtn}
-                  onPress={handleSavePayment}
+                  style={styles.deleteConfirmBtn}
+                  onPress={async () => {
+                    if (selectedLogToDelete) {
+                      const success = await removePaymentLog(selectedLogToDelete.id);
+                      if (success) {
+                        setDeleteModalVisible(false);
+                        setSelectedLogToDelete(null);
+                      }
+                    }
+                  }}
                   disabled={isSaving}>
                   {isSaving ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text variant="body1" weight="bold" style={styles.addMoneyBtnText}>
-                      Save Payment
-                    </Text>
+                    <>
+                      <Trash2 size={ms(20)} color="#fff" style={{ marginRight: hs(8) }} />
+                      <Text variant="body1" weight="bold" style={styles.deleteConfirmBtnText}>
+                        CANCEL
+                      </Text>
+                    </>
                   )}
                 </TouchableOpacity>
-              </>
-            )}
-          </>
-        )}
-      </View>
-
-      {/* Payment History Accordion */}
-      {paymentLogs.length > 0 && (
-        <View style={styles.paymentHistoryContainer}>
-          <TouchableOpacity
-            style={styles.paymentHistoryBtn}
-            activeOpacity={0.7}
-            onPress={() => setShowPaymentHistory(!showPaymentHistory)}>
-            <View style={styles.paymentHistoryLeft}>
-              <MoneySvg width={ms(24)} height={ms(24)} color="#000" />
-              <Text variant="body1" weight="semiBold" style={styles.paymentHistoryText}>
-                Payment History
-              </Text>
-            </View>
-            {showPaymentHistory ? (
-              <ChevronUp size={ms(24)} color={COLORS.text.primary} />
-            ) : (
-              <ChevronDown size={ms(24)} color={COLORS.text.primary} />
-            )}
-          </TouchableOpacity>
-          {showPaymentHistory && (
-            <View style={styles.paymentLogsWrapper}>
-              {paymentLogs.map(log => {
-                const icon = getIconForMode(log.payment_mode, log.note);
-                const name = getNameForMode(log.payment_mode, log.note);
-                return (
-                  <TouchableOpacity
-                    key={log.id}
-                    style={styles.logCard}
-                    activeOpacity={0.7}
-                    onPress={() =>
-                      navigation.navigate("PaymentHistory", { bookingId: booking.id })
-                    }>
-                    <View style={styles.logLeftCol}>
-                      <Image source={icon} style={styles.logIcon} />
-                      <Text variant="body2" weight="semiBold" style={styles.logName}>
-                        {name}
-                      </Text>
-                    </View>
-                    <Text variant="body2" weight="semiBold" style={styles.logDate}>
-                      {new Date(log.created_at).toLocaleDateString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </Text>
-                    <Text variant="body1" weight="semiBold" style={styles.logAmount}>
-                      ₹{log.amount}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-        </View>
-      )}
-      <Modal visible={showCancelModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCancelModal(false)} />
-          <View style={styles.cancelModalContainer}>
-            <View style={styles.modalHeader}>
-              <Text variant="body1" weight="bold" style={styles.modalTitle}>
-                BOOKING CANCELLATION
-              </Text>
-              <TouchableOpacity onPress={() => setShowCancelModal(false)}>
-                <X size={ms(20)} color={COLORS.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text variant="body1" weight="bold" style={styles.modalMessage}>
-              Are you sure you want to cancel this booking?
-            </Text>
-
-            <Text variant="body2" color={COLORS.text.muted} style={styles.modalSubtext}>
-              Once cancelled, this booking cannot be restored, and refund will be processed as per
-              our cancellation policy.
-            </Text>
-
-            <View style={styles.modalActionRow}>
-              <TouchableOpacity
-                style={styles.modalBackBtn}
-                onPress={() => setShowCancelModal(false)}>
-                <Text variant="h3" family="nichrome" style={styles.modalBackText}>
-                  Back
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalConfirmBtn}
-                onPress={async () => {
-                  setShowCancelModal(false);
-                  const trace = await perf().startTrace("cancel_booking");
-                  try {
-                    const success = await cancelBooking();
-                    if (success) {
-                      navigation.goBack();
-                    }
-                  } finally {
-                    await trace.stop();
-                  }
-                }}>
-                <Text variant="h3" family="nichrome" color="#FFF" style={styles.modalConfirmText}>
-                  Yes, cancel
-                </Text>
-              </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
       </Modal>
-    </ScreenContainer>
+    </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
+  swipeActionsContainer: {
+    width: ms(60),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  swipeActionDelete: {
+    backgroundColor: "#FFEBEB",
+    width: ms(44),
+    height: ms(44),
+    borderRadius: ms(12),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  overlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  bottomSheetContainer: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: ms(24),
+    borderTopRightRadius: ms(24),
+    padding: ms(24),
+    paddingBottom: Platform.OS === "ios" ? ms(40) : ms(24),
+  },
+  deleteModalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  deleteModalLeft: {
+    flex: 1,
+  },
+  deleteModalTitle: {
+    fontSize: fs(18),
+    color: "#E55959",
+    marginBottom: vs(4),
+  },
+  deleteModalAmount: {
+    fontSize: fs(32),
+    color: "#000",
+    marginBottom: vs(8),
+  },
+  deleteModalWarning: {
+    fontSize: fs(14),
+    color: "#666",
+    lineHeight: vs(20),
+  },
+  deleteModalRight: {
+    justifyContent: "flex-end",
+  },
+  deleteConfirmBtn: {
+    backgroundColor: "#E55959",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: hs(20),
+    paddingVertical: vs(14),
+    borderRadius: ms(16),
+  },
+  deleteConfirmBtnText: {
+    color: "#fff",
+    fontSize: fs(16),
+  },
   root: {
     flex: 1,
     backgroundColor: COLORS.background,
