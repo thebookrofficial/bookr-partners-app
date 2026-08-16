@@ -546,7 +546,7 @@ export const OfflineBookingSheet = ({
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={styles.keyboardAvoid}>
-            <View style={[styles.bottomSheetContainer, { paddingBottom: vs(30) + insets.bottom }]}>
+            <View style={styles.bottomSheetContainer}>
               <View style={styles.sheetHeader}>
                 <TouchableOpacity onPress={onClose} style={styles.backButton}>
                   <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
