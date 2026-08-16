@@ -16,19 +16,9 @@ import {
   Linking,
   TouchableWithoutFeedback,
   Image,
-  Keyboard,
 } from "react-native";
-import { Text } from "@/components/ui";
-import {
-  User,
-  Phone,
-  Wallet,
-  ArrowLeft,
-  Users,
-  X,
-  Calendar,
-  ArrowRightToLine,
-} from "lucide-react-native";
+import { Text, GlobalKeyboardAccessory } from "@/components/ui";
+import { User, Phone, Wallet, ArrowLeft, Users, X, Calendar } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/theme";
@@ -83,20 +73,6 @@ export const StaycationOfflineBookingSheet = ({
   const [searchResults, setSearchResults] = useState<{ name: string; phone: string }[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const isSelectingFromResults = useRef(false);
-
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-
-  useEffect(() => {
-    const subs = [
-      Keyboard.addListener("keyboardWillShow", () => setIsKeyboardVisible(true)),
-      Keyboard.addListener("keyboardDidShow", () => setIsKeyboardVisible(true)),
-      Keyboard.addListener("keyboardWillHide", () => setIsKeyboardVisible(false)),
-      Keyboard.addListener("keyboardDidHide", () => setIsKeyboardVisible(false)),
-    ];
-    return () => {
-      subs.forEach(s => s.remove());
-    };
-  }, []);
 
   const lookupGuestsByName = async (vId: string, q: string) => {
     try {
@@ -764,7 +740,7 @@ export const StaycationOfflineBookingSheet = ({
         animationType="slide"
         onRequestClose={onClose}
         statusBarTranslucent={true}>
-        <View style={{ flex: 1 }}>
+        <View style={styles.flex1}>
           <KeyboardAvoidingView
             style={styles.overlay}
             behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -929,7 +905,6 @@ export const StaycationOfflineBookingSheet = ({
                           placeholderTextColor={COLORS.text.muted}
                           keyboardType="phone-pad"
                           value={phone}
-                          onFocus={() => setIsKeyboardVisible(true)}
                           onChangeText={text => {
                             let clean = text.replace(/\D/g, "");
                             if (
@@ -967,7 +942,6 @@ export const StaycationOfflineBookingSheet = ({
                           value={name}
                           onChangeText={handleNameChange}
                           onFocus={() => {
-                            setIsKeyboardVisible(true);
                             if (name.trim().length >= 1 && searchResults.length > 0) {
                               setShowSearchResults(true);
                             }
@@ -1042,7 +1016,6 @@ export const StaycationOfflineBookingSheet = ({
                             placeholderTextColor={COLORS.text.muted}
                             keyboardType="numeric"
                             value={totalPayment}
-                            onFocus={() => setIsKeyboardVisible(true)}
                             onChangeText={setTotalPayment}
                           />
                         </View>
@@ -1069,7 +1042,6 @@ export const StaycationOfflineBookingSheet = ({
                             value={advancePaid}
                             onFocus={() => {
                               setIsAdvanceActive(true);
-                              setIsKeyboardVisible(true);
                             }}
                             onChangeText={text => {
                               const val = parseFloat(text) || 0;
@@ -1183,53 +1155,24 @@ export const StaycationOfflineBookingSheet = ({
                 </View>
               </ScrollView>
 
-              {!isKeyboardVisible && (
-                <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
-                  <TouchableOpacity
-                    style={styles.bookNowBtn}
-                    onPress={handleBookNow}
-                    disabled={isLoading}>
-                    {isLoading ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <Text weight="bold" family="bison" style={styles.bookNowBtnText}>
-                        BOOK NOW
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              )}
-              {isKeyboardVisible && (
-                <View
-                  style={{
-                    alignItems: "flex-end",
-                    padding: hs(10),
-                    paddingBottom: vs(10),
-                    backgroundColor: "transparent",
-                  }}>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={{
-                      backgroundColor: COLORS.primary,
-                      width: ms(44),
-                      height: ms(44),
-                      borderRadius: ms(10),
-                      justifyContent: "center",
-                      alignItems: "center",
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.15,
-                      shadowRadius: 4,
-                      elevation: 4,
-                    }}
-                    onPress={() => Keyboard.dismiss()}>
-                    <ArrowRightToLine size={ms(24)} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              )}
+              <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
+                <TouchableOpacity
+                  style={styles.bookNowBtn}
+                  onPress={handleBookNow}
+                  disabled={isLoading}>
+                  {isLoading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text weight="bold" family="bison" style={styles.bookNowBtnText}>
+                      BOOK NOW
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </KeyboardAvoidingView>
         </View>
+        <GlobalKeyboardAccessory />
 
         <CustomDatePickerModal
           isVisible={!!showDatePicker}
@@ -1327,6 +1270,8 @@ export const StaycationOfflineBookingSheet = ({
 };
 
 const styles = StyleSheet.create({
+  flex1: { flex: 1 },
+  disabledOpacity: { opacity: 0.7 },
   overlay: { flex: 1, backgroundColor: COLORS.background },
   sheetContainer: {
     flex: 1,

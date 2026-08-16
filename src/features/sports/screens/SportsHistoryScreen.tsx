@@ -9,9 +9,8 @@ import {
   ScrollView,
   RefreshControl,
   TextInput,
-  Platform,
 } from "react-native";
-import { HistorySkeleton, GlobalKeyboardAccessory } from "@/components/ui";
+import { HistorySkeleton } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -271,7 +270,6 @@ export const SportsHistoryScreen = () => {
           setCustomRange(range);
         }}
       />
-      {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
     </ScreenContainer>
   );
 };

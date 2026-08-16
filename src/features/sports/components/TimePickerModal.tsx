@@ -24,6 +24,7 @@ interface TimePickerModalProps {
   onSelectTime: (time: string) => void;
   isHourDisabled?: (hour: string, index: number) => boolean;
   isFetching?: boolean;
+  useModal?: boolean;
 }
 
 export const TimePickerModal = ({
@@ -35,6 +36,7 @@ export const TimePickerModal = ({
   onSelectTime,
   isHourDisabled,
   isFetching,
+  useModal = true,
 }: TimePickerModalProps) => {
   const formatDisplayHour = (hr: string) => {
     // If it already contains a colon, we assume it has minutes and just lowercase the AM/PM
@@ -48,57 +50,62 @@ export const TimePickerModal = ({
     return hr.toLowerCase();
   };
 
-  return (
-    <Modal visible={visible} transparent animationType="fade">
+  const content = (
+    <View style={[styles.modalOverlay, !useModal && styles.absoluteOverlay]} pointerEvents="auto">
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback>
-            <View style={styles.timePickerContainer}>
-              <Text variant="body1" weight="bold" style={styles.pickerHeader}>
-                {title}
-              </Text>
-              {isFetching ? (
-                <ActivityIndicator color={COLORS.primary} style={{ margin: vs(20) }} />
-              ) : (
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  <View style={styles.timePickerGrid}>
-                    {hours.map((hour, index) => {
-                      const isDisabled = isHourDisabled ? isHourDisabled(hour, index) : false;
-                      const isSelected = selectedTime === hour;
-
-                      return (
-                        <TouchableOpacity
-                          key={hour}
-                          style={[
-                            styles.timePickerItem,
-                            isDisabled && styles.timePickerItemDisabled,
-                            isSelected && styles.timePickerItemActive,
-                          ]}
-                          disabled={isDisabled}
-                          onPress={() => {
-                            onSelectTime(hour);
-                            onClose();
-                          }}>
-                          <Text
-                            style={[
-                              styles.timePickerItemText,
-                              isDisabled && { color: COLORS.text.secondary },
-                              isSelected && styles.timePickerItemTextActive,
-                            ]}>
-                            {formatDisplayHour(hour)}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-              )}
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
+        <View style={StyleSheet.absoluteFillObject} />
       </TouchableWithoutFeedback>
-    </Modal>
+      <View style={styles.timePickerContainer}>
+        <Text variant="h3" weight="bold" style={styles.pickerHeader}>
+          {title}
+        </Text>
+        {isFetching ? (
+          <View style={{ paddingVertical: 20 }}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.timePickerGrid}>
+            {hours.map((hour, idx) => {
+              const displayHour = formatDisplayHour(hour);
+              const isDisabled = isHourDisabled ? isHourDisabled(hour, idx) : false;
+
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  style={[
+                    styles.timePickerItem,
+                    selectedTime === hour && styles.timePickerItemActive,
+                    isDisabled && { opacity: 0.3 },
+                  ]}
+                  onPress={() => !isDisabled && onSelectTime(hour)}
+                  activeOpacity={isDisabled ? 1 : 0.7}
+                  disabled={isDisabled}>
+                  <Text
+                    weight={selectedTime === hour ? "bold" : "medium"}
+                    color={selectedTime === hour ? "#fff" : COLORS.text.primary}
+                    style={{ fontSize: fs(14) }}>
+                    {displayHour}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+      </View>
+    </View>
   );
+
+  if (useModal) {
+    return (
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        {content}
+      </Modal>
+    );
+  }
+
+  return visible ? content : null;
 };
 
 const styles = StyleSheet.create({
@@ -107,6 +114,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  absoluteOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
   },
   timePickerContainer: {
     width: "90%",

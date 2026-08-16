@@ -17,7 +17,7 @@ import {
   Modal,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, GlobalKeyboardAccessory } from "@/components/ui";
+import { Text } from "@/components/ui";
 import { ArrowLeft, Trash2, ChevronUp, ChevronDown, Phone } from "lucide-react-native";
 import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -601,7 +601,6 @@ export const StaycationBookingDetailsScreen = () => {
             )}
           </View>
         )}
-        {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
       </ScreenContainer>
 
       {/* Delete Confirmation Modal */}

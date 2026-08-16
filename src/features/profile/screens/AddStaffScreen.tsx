@@ -2,17 +2,9 @@
 // Confidential and Proprietary.
 
 import React, { useState } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Platform,
-} from "react-native";
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Modal } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, TextInput, GlobalKeyboardAccessory } from "@/components/ui";
+import { Text, TextInput } from "@/components/ui";
 import {
   ArrowLeft,
   User,
@@ -298,7 +290,6 @@ export const AddStaffScreen = () => {
       </TouchableOpacity>
 
       <View style={{ height: vs(40) }} />
-      {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
     </ScreenContainer>
   );
 };

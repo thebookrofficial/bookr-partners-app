@@ -13,9 +13,8 @@ import {
   Platform,
   Image,
   ActivityIndicator,
-  Keyboard,
 } from "react-native";
-import { Text } from "@/components/ui";
+import { Text, GlobalKeyboardAccessory } from "@/components/ui";
 import {
   Calendar as CalendarIcon,
   Phone,
@@ -27,7 +26,6 @@ import {
   ArrowLeft,
   Wallet,
   X,
-  ArrowRightToLine,
 } from "lucide-react-native";
 import { TextInput as RNTextInput } from "react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -534,20 +532,6 @@ export const OfflineBookingSheet = ({
     currentDate.getFullYear() === now.getFullYear();
   const currentHour = now.getHours();
 
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-
-  useEffect(() => {
-    const subs = [
-      Keyboard.addListener("keyboardWillShow", () => setIsKeyboardVisible(true)),
-      Keyboard.addListener("keyboardDidShow", () => setIsKeyboardVisible(true)),
-      Keyboard.addListener("keyboardWillHide", () => setIsKeyboardVisible(false)),
-      Keyboard.addListener("keyboardDidHide", () => setIsKeyboardVisible(false)),
-    ];
-    return () => {
-      subs.forEach(s => s.remove());
-    };
-  }, []);
-
   return (
     <>
       <Modal
@@ -585,7 +569,6 @@ export const OfflineBookingSheet = ({
                   isInput={true}
                   prefix=""
                   keyboardType="phone-pad"
-                  onFocus={() => setIsKeyboardVisible(true)}
                   onChangeText={(text: string) => {
                     let clean = text.replace(/\D/g, "");
                     if (
@@ -612,7 +595,6 @@ export const OfflineBookingSheet = ({
                     isInput={true}
                     onChangeText={handleNameChange}
                     onFocus={() => {
-                      setIsKeyboardVisible(true);
                       if (name.trim().length >= 1 && searchResults.length > 0) {
                         setShowSearchResults(true);
                       }
@@ -879,110 +861,100 @@ export const OfflineBookingSheet = ({
                   )}
                 </View>
               </ScrollView>
-              {!isKeyboardVisible && (
-                <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
-                  <TouchableOpacity
-                    style={styles.saveButton}
-                    activeOpacity={0.8}
-                    onPress={handleBookNow}
-                    disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <ActivityIndicator color={COLORS.text.inverse} />
-                    ) : (
-                      <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
-                        BOOK NOW
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              )}
-              {isKeyboardVisible && (
-                <View style={styles.keyboardAccessoryWrapper}>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={styles.keyboardAccessoryButton}
-                    onPress={() => Keyboard.dismiss()}>
-                    <ArrowRightToLine size={ms(24)} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              )}
+              <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  activeOpacity={0.8}
+                  onPress={handleBookNow}
+                  disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <ActivityIndicator color={COLORS.text.inverse} />
+                  ) : (
+                    <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
+                      BOOK NOW
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </KeyboardAvoidingView>
         </TouchableOpacity>
-      </Modal>
 
-      <TimePickerModal
-        visible={!!showHourPicker}
-        onClose={() => setShowHourPicker(null)}
-        title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
-        hours={showHourPicker === "from" ? startTimes : endTimes}
-        selectedTime={showHourPicker === "from" ? fromTime : toTime}
-        onSelectTime={hour => {
-          if (showHourPicker === "from") {
-            setFromTime(hour);
-            const idx = startTimes.indexOf(hour);
-            if (idx !== -1 && idx + 1 < startTimes.length) {
-              setToTime(startTimes[idx + 1]);
+        <TimePickerModal
+          useModal={false}
+          visible={!!showHourPicker}
+          onClose={() => setShowHourPicker(null)}
+          title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
+          hours={showHourPicker === "from" ? startTimes : endTimes}
+          selectedTime={showHourPicker === "from" ? fromTime : toTime}
+          onSelectTime={hour => {
+            if (showHourPicker === "from") {
+              setFromTime(hour);
+              const idx = startTimes.indexOf(hour);
+              if (idx !== -1 && idx + 1 < startTimes.length) {
+                setToTime(startTimes[idx + 1]);
+              } else {
+                setToTime("End Time");
+              }
             } else {
-              setToTime("End Time");
+              setToTime(hour);
             }
-          } else {
-            setToTime(hour);
-          }
-        }}
-        isHourDisabled={(hour, index) => {
-          const hour24 =
-            hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
-          const isPast = isToday && hour24 <= currentHour;
+          }}
+          isHourDisabled={(hour, index) => {
+            const hour24 =
+              hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
+            const isPast = isToday && hour24 <= currentHour;
 
-          if (showHourPicker === "from") {
-            const isBooked = bookedHours.includes(hour);
-            return isBooked || isPast;
-          } else {
-            const fromIndex = startTimes.indexOf(fromTime);
-            if (fromIndex === -1) return true;
-            if (index <= fromIndex) return true;
+            if (showHourPicker === "from") {
+              const isBooked = bookedHours.includes(hour);
+              return isBooked || isPast;
+            } else {
+              const fromIndex = startTimes.indexOf(fromTime);
+              if (fromIndex === -1) return true;
+              if (index <= fromIndex) return true;
 
-            const intermediateHours = startTimes.slice(fromIndex, index);
-            const hasBookingInBetween = intermediateHours.some(h => bookedHours.includes(h));
-            return hasBookingInBetween || (isPast && !bookedHours.includes(hour));
-          }
-        }}
-        isFetching={isFetchingSlots}
-      />
+              const intermediateHours = startTimes.slice(fromIndex, index);
+              const hasBookingInBetween = intermediateHours.some(h => bookedHours.includes(h));
+              return hasBookingInBetween || (isPast && !bookedHours.includes(hour));
+            }
+          }}
+          isFetching={isFetchingSlots}
+        />
 
-      <Modal
-        visible={isDatePickerOpen}
-        transparent={true}
-        animationType="fade"
-        statusBarTranslucent={true}>
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsDatePickerOpen(false)}>
-          <View style={styles.calendarContainer}>
-            <Calendar
-              current={currentDate.toISOString().split("T")[0]}
-              minDate={new Date().toISOString().split("T")[0]}
-              onDayPress={(day: any) => {
-                setCurrentDate(new Date(day.timestamp));
-                setIsDatePickerOpen(false);
-              }}
-              markedDates={{
-                [currentDate.toISOString().split("T")[0]]: {
-                  selected: true,
-                  selectedColor: COLORS.primary,
-                },
-              }}
-            />
+        {isDatePickerOpen && (
+          <View style={[StyleSheet.absoluteFillObject, { zIndex: 999 }]}>
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setIsDatePickerOpen(false)}>
+              <View style={styles.calendarContainer}>
+                <Calendar
+                  current={currentDate.toISOString().split("T")[0]}
+                  minDate={new Date().toISOString().split("T")[0]}
+                  onDayPress={(day: any) => {
+                    setCurrentDate(new Date(day.timestamp));
+                    setIsDatePickerOpen(false);
+                  }}
+                  markedDates={{
+                    [currentDate.toISOString().split("T")[0]]: {
+                      selected: true,
+                      selectedColor: COLORS.primary,
+                    },
+                  }}
+                />
+              </View>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        )}
+
+        <GlobalKeyboardAccessory />
       </Modal>
     </>
   );
 };
 
 const styles = StyleSheet.create({
+  disabledOpacity: { opacity: 0.7 },
   overlay: { flex: 1, backgroundColor: COLORS.background },
   keyboardAvoid: { flex: 1 },
   saveButtonDisabled: { opacity: 0.7 },

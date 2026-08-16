@@ -9,10 +9,9 @@ import {
   TouchableOpacity,
   RefreshControl,
   TextInput,
-  Platform,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, ListSkeleton, GlobalKeyboardAccessory } from "@/components/ui";
+import { Text, ListSkeleton } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import { Search, SlidersHorizontal, ChevronDown } from "lucide-react-native";
 import PersonSvg from "@/assets/icons/ic-round-person.svg";
@@ -240,7 +239,6 @@ export const StaycationHistoryScreen = () => {
           setCustomRange(range);
         }}
       />
-      {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
     </ScreenContainer>
   );
 };

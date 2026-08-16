@@ -9,9 +9,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Platform,
 } from "react-native";
-import { FormSkeleton, GlobalKeyboardAccessory } from "@/components/ui";
+import { FormSkeleton } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -508,7 +507,6 @@ export const BlockUnblockScreen = () => {
           return false;
         }}
       />
-      {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
     </ScreenContainer>
   );
 };
