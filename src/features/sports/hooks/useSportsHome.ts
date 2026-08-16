@@ -206,9 +206,12 @@ export const useSportsHome = (
             return bStatus !== "cancelled" && bStatus !== "refunded";
           });
 
-          const isManual = validBooking
-            ? !validBooking.platform_fee || parseFloat(validBooking.platform_fee) === 0
+          const isOnline = validBooking
+            ? validBooking.booking_source === "online" ||
+              (validBooking.platform_fee && parseFloat(validBooking.platform_fee) > 0)
             : false;
+
+          const isManual = validBooking ? !isOnline : false;
 
           const startH = parseInt(startHStr, 10);
           const startM = parseInt(startMStr, 10);
