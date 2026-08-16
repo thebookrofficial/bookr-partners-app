@@ -9,9 +9,10 @@ import {
   TouchableOpacity,
   RefreshControl,
   TextInput,
+  Platform,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, ListSkeleton } from "@/components/ui";
+import { Text, ListSkeleton, GlobalKeyboardAccessory } from "@/components/ui";
 import { StaycationHeader } from "../components/StaycationHeader";
 import { Search, SlidersHorizontal, ChevronDown } from "lucide-react-native";
 import PersonSvg from "@/assets/icons/ic-round-person.svg";
@@ -142,7 +143,10 @@ export const StaycationHistoryScreen = () => {
         return {
           ...section,
           data: section.data.filter(
-            item => item.name.toLowerCase().includes(query) || item.phone.includes(query),
+            item =>
+              item.name.toLowerCase().includes(query) ||
+              item.phone.includes(query) ||
+              item.paidAmount.toString().includes(query),
           ),
         };
       })
@@ -236,6 +240,7 @@ export const StaycationHistoryScreen = () => {
           setCustomRange(range);
         }}
       />
+      {Platform.OS === "ios" && <GlobalKeyboardAccessory />}
     </ScreenContainer>
   );
 };

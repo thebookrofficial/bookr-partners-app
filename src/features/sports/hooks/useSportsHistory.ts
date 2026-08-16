@@ -3,6 +3,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 export interface MonthGroup {
   month: string;
@@ -269,34 +270,39 @@ export const useSportsHistory = (
 
       finalGroups.sort((a, b) => b.rawMonth - a.rawMonth);
 
-      if (searchQuery.trim() !== "") {
-        const lowerQuery = searchQuery.toLowerCase();
-        finalGroups = finalGroups
-          .map(monthGroup => {
-            const filteredDays = monthGroup.days
-              .map(dayGroup => {
-                const filteredBookings = dayGroup.bookings.filter(
-                  b =>
-                    b.name.toLowerCase().includes(lowerQuery) ||
-                    b.phone.includes(lowerQuery) ||
-                    dayGroup.date.toLowerCase().includes(lowerQuery),
-                );
-                return { ...dayGroup, bookings: filteredBookings };
-              })
-              .filter(dayGroup => dayGroup.bookings.length > 0);
-            const newSettlement = filteredDays.reduce((sum, d) => sum + d.settlement, 0);
-            return { ...monthGroup, days: filteredDays, totalSettlement: newSettlement };
-          })
-          .filter(monthGroup => monthGroup.days.length > 0);
-      }
-
       return finalGroups;
     },
   });
 
+  const filteredHistoryGroups = useMemo(() => {
+    let groups = allHistoryGroups;
+    if (searchQuery.trim() !== "") {
+      const lowerQuery = searchQuery.toLowerCase();
+      groups = groups
+        .map(monthGroup => {
+          const filteredDays = monthGroup.days
+            .map(dayGroup => {
+              const filteredBookings = dayGroup.bookings.filter(
+                b =>
+                  b.name.toLowerCase().includes(lowerQuery) ||
+                  b.phone.includes(lowerQuery) ||
+                  b.price.toString().includes(lowerQuery) ||
+                  dayGroup.date.toLowerCase().includes(lowerQuery),
+              );
+              return { ...dayGroup, bookings: filteredBookings };
+            })
+            .filter(dayGroup => dayGroup.bookings.length > 0);
+          const newSettlement = filteredDays.reduce((sum, d) => sum + d.settlement, 0);
+          return { ...monthGroup, days: filteredDays, totalSettlement: newSettlement };
+        })
+        .filter(monthGroup => monthGroup.days.length > 0);
+    }
+    return groups;
+  }, [allHistoryGroups, searchQuery]);
+
   return {
     currentVenueId: resolvedVenueId || initialVenueId,
-    historyGroups: allHistoryGroups,
+    historyGroups: filteredHistoryGroups,
     loading: isResolvingVenue || isFetchingHistory,
     refetch,
   };
