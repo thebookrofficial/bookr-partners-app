@@ -138,7 +138,8 @@ export const EventScanConfirmationScreen = () => {
       </View>
 
       <View style={styles.content}>
-        <InfoRow label="Pass Type" value={details?.displayPassType} icon={Ticket} />
+        <InfoRow label="Name" value={details?.displayName} icon={User} />
+        <InfoRow label="Mobile No" value={details?.displayPhone} icon={Phone} />
 
         <View style={styles.row}>
           <InfoRow label="Date" value={details?.displayDate} icon={Calendar} fullWidth={false} />
@@ -150,8 +151,7 @@ export const EventScanConfirmationScreen = () => {
           />
         </View>
 
-        <InfoRow label="Name" value={details?.displayName} icon={User} />
-        <InfoRow label="Mobile No" value={details?.displayPhone} icon={Phone} />
+        <InfoRow label="Pass Type" value={details?.displayPassType} icon={Ticket} />
       </View>
 
       <View style={styles.footer}>

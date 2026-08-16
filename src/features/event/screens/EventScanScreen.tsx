@@ -208,7 +208,8 @@ export const EventScanScreen = () => {
 
       const realEventId = event.id;
       setActiveEventId(realEventId);
-      setVenueEventIds(events.map((e: any) => e.id));
+      const fetchedVenueEventIds = events.map((e: any) => e.id);
+      setVenueEventIds(fetchedVenueEventIds);
 
       // B. Pre-fill categories from passes and zones so the tabs ALWAYS exist
       const cats = new Set<string>();
@@ -234,13 +235,13 @@ export const EventScanScreen = () => {
             event_zones (zone_name)
           `,
           )
-          .eq("event_id", realEventId)
+          .in("event_id", fetchedVenueEventIds)
           .eq("booking_status", "completed")
           .order("updated_at", { ascending: false }),
         supabase
           .from("event_guest_invites")
           .select(`id, guest_name, guest_phone, status, created_at`)
-          .eq("event_id", realEventId)
+          .in("event_id", fetchedVenueEventIds)
           .eq("status", "completed")
           .order("created_at", { ascending: false }),
       ]);
@@ -428,7 +429,9 @@ export const EventScanScreen = () => {
   const renderScanItem = ({ item }: { item: Attendee }) => (
     <TouchableOpacity
       style={styles.scanItem}
-      onPress={() => navigation.navigate("EventEntryDetails", { entryId: item.id } as any)}>
+      onPress={() =>
+        navigation.navigate("EventEntryDetails", { entryId: item.id, isFromScan: true } as any)
+      }>
       <View style={styles.avatarContainer}>
         <Image
           source={item.avatarUrl ? { uri: item.avatarUrl } : USER_PROFILE}
@@ -473,6 +476,13 @@ export const EventScanScreen = () => {
     async (code: string) => {
       if (!activeEventId) return;
       try {
+        let finalCode = code.trim();
+        // If the QR code is a web link (e.g. https://thebookr.in/pass/ot2r17u0pyqv), extract the token part
+        if (finalCode.includes("/pass/")) {
+          const parts = finalCode.split("/pass/");
+          finalCode = parts[parts.length - 1].replace(/\/$/, ""); // get the last part and remove trailing slash if any
+        }
+
         const { data: booking } = await supabase
           .from("event_bookings")
           .select(
@@ -482,7 +492,7 @@ export const EventScanScreen = () => {
             event_zones (zone_name)
           `,
           )
-          .eq("qr_code_token", code.trim())
+          .eq("qr_code_token", finalCode)
           .in("event_id", venueEventIds)
           .maybeSingle();
 
@@ -524,7 +534,7 @@ export const EventScanScreen = () => {
           const { data: invite } = await supabase
             .from("event_guest_invites")
             .select("*")
-            .eq("qr_code_token", code.trim())
+            .eq("qr_code_token", finalCode)
             .in("event_id", venueEventIds)
             .maybeSingle();
 

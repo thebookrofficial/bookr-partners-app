@@ -16,6 +16,7 @@ export interface EventEntryDetails {
   transactionId: string;
   transactionDate: string;
   transactionTime: string;
+  totalAmount?: number;
 }
 
 export const useEventEntryDetails = (bookingId: string) => {
@@ -39,7 +40,7 @@ export const useEventEntryDetails = (bookingId: string) => {
         .from("event_bookings")
         .select(
           `
-          id, ticket_count, guest_name, guest_phone, updated_at,
+          id, ticket_count, guest_name, guest_phone, updated_at, total_amount,
           profiles (full_name, phone, avatar_url),
           event_passes (name),
           event_zones (zone_name)
@@ -107,6 +108,7 @@ export const useEventEntryDetails = (bookingId: string) => {
           minute: "2-digit",
           hour12: false,
         }),
+        totalAmount: booking.total_amount || 0,
       };
 
       setData(formattedData);

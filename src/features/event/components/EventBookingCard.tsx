@@ -14,7 +14,6 @@ interface EventBookingCardProps {
   avatarSource?: any;
   isSpot?: boolean;
   phone?: string;
-  price?: number;
   onPress?: () => void;
 }
 
@@ -24,7 +23,6 @@ export const EventBookingCard = ({
   time,
   avatarSource,
   isSpot,
-  price,
   onPress,
 }: EventBookingCardProps) => {
   return (
@@ -57,11 +55,6 @@ export const EventBookingCard = ({
             <Text weight="semiBold" style={styles.time}>
               {time}
             </Text>
-            {price !== undefined && (
-              <Text weight="bold" style={styles.priceInfo}>
-                ₹{price}
-              </Text>
-            )}
           </View>
         </View>
       </View>

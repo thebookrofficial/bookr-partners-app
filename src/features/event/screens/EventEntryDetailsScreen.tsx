@@ -12,7 +12,6 @@ import { Avatar } from "@/components/ui/Avatar";
 import { COLORS } from "@/constants/theme";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useEventEntryDetails } from "../hooks/useEventEntryDetails";
-import { MainScreenProps } from "@/navigation/navigation.types";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -22,8 +21,8 @@ const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
  */
 export const EventEntryDetailsScreen = () => {
   const navigation = useNavigation();
-  const route = useRoute<MainScreenProps<"EventEntryDetails">["route"]>();
-  const bookingId = route.params.entryId;
+  const route = useRoute<any>();
+  const { entryId: bookingId, isFromScan } = route.params;
 
   // console.log("DEBUG - Received Params:", route.params); // Look for 'entryId' here in your terminal
   const { data, loading, error } = useEventEntryDetails(bookingId);
@@ -72,7 +71,7 @@ export const EventEntryDetailsScreen = () => {
         {/* Entry Details Section */}
         <View style={styles.section}>
           <Text variant="body1" family="gilroy" weight="bold" style={styles.sectionTitle}>
-            ENTRY DETAILS
+            {isFromScan ? "SCANNED DETAILS" : "ENTRY DETAILS"}
           </Text>
 
           {/* Mobile No */}
@@ -109,7 +108,7 @@ export const EventEntryDetailsScreen = () => {
           <View style={styles.row}>
             <View style={[styles.detailItem, styles.halfWidth, styles.marginRight]}>
               <Text variant="body1" family="gilroy" weight="medium" style={styles.labelOnly}>
-                Date Of Entry
+                {isFromScan ? "Scanned Date" : "Date Of Entry"}
               </Text>
               <View style={styles.valueContainer}>
                 <Text variant="body1" family="gilroy" weight="semiBold">
@@ -119,7 +118,7 @@ export const EventEntryDetailsScreen = () => {
             </View>
             <View style={[styles.detailItem, styles.halfWidth, styles.marginLeft]}>
               <Text variant="body1" family="gilroy" weight="medium" style={styles.labelOnly}>
-                Entry Time
+                {isFromScan ? "Scanned Time" : "Entry Time"}
               </Text>
               <View style={styles.valueContainer}>
                 <Text variant="body1" family="gilroy" weight="semiBold">
@@ -136,6 +135,15 @@ export const EventEntryDetailsScreen = () => {
             <CreditCard size={ms(20)} color={COLORS.text.primary} />
             <Text variant="body1" family="gilroy" weight="bold" style={styles.paymentTitle}>
               PAYMENT DETAILS
+            </Text>
+          </View>
+
+          <View style={styles.paymentRow}>
+            <Text variant="body1" family="gilroy" weight="semiBold">
+              Ticket Price
+            </Text>
+            <Text variant="body1" family="gilroy" weight="bold" color={COLORS.primary}>
+              ₹{data.totalAmount}
             </Text>
           </View>
 
