@@ -508,28 +508,30 @@ export const SportsDashboardScreen = () => {
             </View>
           </View>
         </View>
-      </Modal>
 
-      <DatePicker
-        isVisible={showStartPicker}
-        onClose={() => setShowStartPicker(false)}
-        minDate={new Date(2000, 0, 1)}
-        selectedDate={tempStart}
-        onSelectDate={date => {
-          setShowStartPicker(false);
-          setTempStart(date);
-        }}
-      />
-      <DatePicker
-        isVisible={showEndPicker}
-        onClose={() => setShowEndPicker(false)}
-        minDate={new Date(2000, 0, 1)}
-        selectedDate={tempEnd}
-        onSelectDate={date => {
-          setShowEndPicker(false);
-          setTempEnd(date);
-        }}
-      />
+        <DatePicker
+          isVisible={showStartPicker}
+          onClose={() => setShowStartPicker(false)}
+          minDate={new Date(2000, 0, 1)}
+          selectedDate={tempStart}
+          onSelectDate={date => {
+            setShowStartPicker(false);
+            setTempStart(date);
+          }}
+          useModal={false}
+        />
+        <DatePicker
+          isVisible={showEndPicker}
+          onClose={() => setShowEndPicker(false)}
+          minDate={new Date(2000, 0, 1)}
+          selectedDate={tempEnd}
+          onSelectDate={date => {
+            setShowEndPicker(false);
+            setTempEnd(date);
+          }}
+          useModal={false}
+        />
+      </Modal>
     </ScreenContainer>
   );
 };

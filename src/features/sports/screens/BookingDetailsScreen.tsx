@@ -17,7 +17,8 @@ import {
   Keyboard,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, DetailsSkeleton } from "@/components/ui";
+import { Text, DetailsSkeleton, GlobalKeyboardAccessory } from "@/components/ui";
+import { useKeyboardStore } from "@/store/keyboardStore";
 import { Clock, Trash2, X, ChevronLeft, Phone, ChevronUp, ChevronDown } from "lucide-react-native";
 import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -43,6 +44,7 @@ import CalendarSvg from "@/assets/icons/ic-solar-calendar-outline.svg";
 export const BookingDetailsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<MainStackParamList, "BookingDetails">>();
+  const setIsNumericFocused = useKeyboardStore(state => state.setIsNumericFocused);
   const { bookingId, idChain } = route.params;
 
   const {
@@ -282,7 +284,6 @@ export const BookingDetailsScreen = () => {
         footer={
           !isKeyboardVisible ? (
             <View style={styles.fixedBottomActions}>
-              {/* 4. Bottom Action Buttons */}
               {!isOnline && (
                 <View style={styles.actionRowBottom}>
                   <TouchableOpacity
@@ -341,7 +342,6 @@ export const BookingDetailsScreen = () => {
             </View>
           ) : null
         }>
-        {/* 0. Screen Header */}
         <View style={styles.screenHeader}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <ChevronLeft size={ms(28)} color={COLORS.text.primary} />
@@ -351,7 +351,6 @@ export const BookingDetailsScreen = () => {
           </Text>
         </View>
 
-        {/* 1. Profile Card */}
         <TouchableOpacity
           style={styles.profileCard}
           activeOpacity={0.7}
@@ -392,7 +391,6 @@ export const BookingDetailsScreen = () => {
           </View>
         </TouchableOpacity>
 
-        {/* 2. Date & Time Slots */}
         <View style={styles.dateTimeRow}>
           <View style={styles.dateCard}>
             <View style={styles.iconBoxLightBlue}>
@@ -428,7 +426,6 @@ export const BookingDetailsScreen = () => {
           </View>
         </View>
 
-        {/* 3. Payment Container */}
         <View style={styles.paymentCard}>
           <View style={styles.amountsRow}>
             <View style={styles.amountBoxLightRed}>
@@ -489,7 +486,8 @@ export const BookingDetailsScreen = () => {
                       style={styles.amountInput}
                       keyboardType="numeric"
                       value={paymentInput}
-                      onFocus={() => setIsKeyboardVisible(true)}
+                      onFocus={() => setIsNumericFocused(true)}
+                      onBlur={() => setIsNumericFocused(false)}
                       onChangeText={text => {
                         const numericValue = text.replace(/[^0-9]/g, "");
                         setPaymentInput(numericValue);
@@ -506,7 +504,6 @@ export const BookingDetailsScreen = () => {
                     Method
                   </Text>
                   <View style={styles.methodsRow}>
-                    {/* Cash */}
                     <TouchableOpacity
                       style={[
                         styles.methodBox,
@@ -530,7 +527,6 @@ export const BookingDetailsScreen = () => {
                         Cash
                       </Text>
                     </TouchableOpacity>
-                    {/* GPay */}
                     <TouchableOpacity
                       style={[
                         styles.methodBox,
@@ -554,7 +550,6 @@ export const BookingDetailsScreen = () => {
                         GPay
                       </Text>
                     </TouchableOpacity>
-                    {/* PhonePe */}
                     <TouchableOpacity
                       style={[
                         styles.methodBox,
@@ -578,7 +573,6 @@ export const BookingDetailsScreen = () => {
                         PhonePe
                       </Text>
                     </TouchableOpacity>
-                    {/* Paytm */}
                     <TouchableOpacity
                       style={[
                         styles.methodBox,
@@ -622,7 +616,6 @@ export const BookingDetailsScreen = () => {
           )}
         </View>
 
-        {/* Payment History Accordion */}
         {paymentLogs.length > 0 && (
           <View style={styles.paymentHistoryContainer}>
             <TouchableOpacity
@@ -669,7 +662,7 @@ export const BookingDetailsScreen = () => {
                         index !== paymentLogs.length - 1 && { marginBottom: vs(8) },
                       ]}>
                       <TouchableOpacity
-                        style={[styles.logCard, { marginBottom: 0 }]}
+                        style={[styles.logCard, styles.logCardNoMargin]}
                         activeOpacity={0.7}
                         onPress={() =>
                           navigation.navigate("PaymentHistory", { bookingId: booking.id })
@@ -751,9 +744,10 @@ export const BookingDetailsScreen = () => {
             </View>
           </View>
         </Modal>
+
+        <GlobalKeyboardAccessory />
       </ScreenContainer>
 
-      {/* Delete Confirmation Modal */}
       <Modal visible={deleteModalVisible} transparent animationType="slide">
         <View style={styles.overlay}>
           <TouchableOpacity
@@ -1411,6 +1405,9 @@ const styles = StyleSheet.create({
     color: "#00B562",
     width: "25%",
     textAlign: "right",
+  },
+  logCardNoMargin: {
+    marginBottom: 0,
   },
   deletePaymentModalContent: {
     backgroundColor: "#fff",

@@ -557,417 +557,421 @@ export const OfflineBookingSheet = ({
         transparent={true}
         onRequestClose={onClose}
         statusBarTranslucent={true}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            style={styles.keyboardAvoid}>
-            <View style={styles.bottomSheetContainer}>
-              <View style={styles.sheetHeader}>
-                <TouchableOpacity onPress={onClose} style={styles.backButton}>
-                  <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
-                </TouchableOpacity>
-                <View style={styles.venueInfo}>
-                  <Text variant="h3" weight="bold" color="#000" style={styles.headerTitle}>
-                    OFFLINE BOOKING
-                  </Text>
+        <View style={{ flex: 1 }}>
+          <TouchableOpacity style={styles.overlay} activeOpacity={1}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={styles.keyboardAvoid}>
+              <View style={styles.bottomSheetContainer}>
+                <View style={styles.sheetHeader}>
+                  <TouchableOpacity onPress={onClose} style={styles.backButton}>
+                    <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
+                  </TouchableOpacity>
+                  <View style={styles.venueInfo}>
+                    <Text variant="h3" weight="bold" color="#000" style={styles.headerTitle}>
+                      OFFLINE BOOKING
+                    </Text>
+                  </View>
                 </View>
-              </View>
 
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={styles.sheetContent}>
-                <SectionHeader icon={UserIcon} text="CUSTOMER DETAILS" />
-                <FieldBox
-                  icon={Phone}
-                  label="Mobile No"
-                  placeholder="Enter Mobile No"
-                  value={mobile}
-                  isInput={true}
-                  prefix=""
-                  keyboardType="phone-pad"
-                  onChangeText={(text: string) => {
-                    let clean = text.replace(/\D/g, "");
-                    if (
-                      text.includes("+") ||
-                      (clean.length > 10 && (clean.startsWith("91") || clean.startsWith("0")))
-                    ) {
-                      clean = clean.slice(-10);
-                    } else if (clean.length > 10) {
-                      clean = clean.slice(0, 10);
-                    }
-                    setMobile(clean);
-                    if (clean.length < 10) {
-                      setName("");
-                    }
-                  }}
-                />
-
-                <View style={styles.autocompleteContainer}>
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={styles.sheetContent}>
+                  <SectionHeader icon={UserIcon} text="CUSTOMER DETAILS" />
                   <FieldBox
-                    icon={UserIcon}
-                    label="Name"
-                    placeholder="Enter customers name"
-                    value={name}
+                    icon={Phone}
+                    label="Mobile No"
+                    placeholder="Enter Mobile No"
+                    value={mobile}
                     isInput={true}
-                    onChangeText={handleNameChange}
-                    onFocus={() => {
-                      if (name.trim().length >= 1 && searchResults.length > 0) {
-                        setShowSearchResults(true);
+                    prefix=""
+                    keyboardType="phone-pad"
+                    onChangeText={(text: string) => {
+                      let clean = text.replace(/\D/g, "");
+                      if (
+                        text.includes("+") ||
+                        (clean.length > 10 && (clean.startsWith("91") || clean.startsWith("0")))
+                      ) {
+                        clean = clean.slice(-10);
+                      } else if (clean.length > 10) {
+                        clean = clean.slice(0, 10);
+                      }
+                      setMobile(clean);
+                      if (clean.length < 10) {
+                        setName("");
                       }
                     }}
-                    onBlur={() => {
-                      setTimeout(() => setShowSearchResults(false), 300);
-                    }}
-                    autoCorrect={false}
-                    spellCheck={false}
-                    autoComplete="off"
                   />
-                  {showSearchResults && searchResults.length > 0 && (
-                    <View style={styles.dropdownContainer}>
-                      <View style={styles.dropdownHeader}>
-                        <Text style={styles.dropdownHeaderText}>Select Customer</Text>
-                        <TouchableOpacity
-                          onPress={() => {
-                            setShowSearchResults(false);
-                          }}>
-                          <X size={ms(20)} color="#000" />
-                        </TouchableOpacity>
-                      </View>
-                      <ScrollView keyboardShouldPersistTaps="always" style={styles.dropdownScroll}>
-                        {searchResults.map((item, index) => (
+
+                  <View style={styles.autocompleteContainer}>
+                    <FieldBox
+                      icon={UserIcon}
+                      label="Name"
+                      placeholder="Enter customers name"
+                      value={name}
+                      isInput={true}
+                      onChangeText={handleNameChange}
+                      onFocus={() => {
+                        if (name.trim().length >= 1 && searchResults.length > 0) {
+                          setShowSearchResults(true);
+                        }
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => setShowSearchResults(false), 300);
+                      }}
+                      autoCorrect={false}
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                    {showSearchResults && searchResults.length > 0 && (
+                      <View style={styles.dropdownContainer}>
+                        <View style={styles.dropdownHeader}>
+                          <Text style={styles.dropdownHeaderText}>Select Customer</Text>
                           <TouchableOpacity
-                            key={`${item.name}_${item.phone}_${index}`}
-                            style={styles.dropdownItem}
                             onPress={() => {
-                              isSelectingFromResults.current = true;
-                              setName(item.name);
-                              const cleanPhone = item.phone.replace(/[^\d]/g, "").slice(-10);
-                              setMobile(cleanPhone);
-                              setSearchResults([]);
                               setShowSearchResults(false);
                             }}>
-                            <Text style={styles.dropdownItemTextLeft}>{item.name}</Text>
-                            <Text style={styles.dropdownItemTextRight}>{item.phone}</Text>
+                            <X size={ms(20)} color="#000" />
                           </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  )}
-                </View>
-
-                <View style={{ marginTop: vs(16) }}>
-                  <SectionHeader icon={CalendarIcon} text="BOOKING DETAILS" />
-                  <FieldBox
-                    icon={CalendarIcon}
-                    label="Date"
-                    value={currentDate.toLocaleDateString("en-GB").replace(/\//g, " / ")}
-                    onPress={() => setIsDatePickerOpen(true)}
-                    rightElement={<ChevronDown size={ms(16)} color="#000" />}
-                  />
-                  <View style={styles.row}>
-                    <View style={styles.flex1}>
-                      <FieldBox
-                        icon={Clock}
-                        label="From"
-                        value={fromTime === "Start Time" ? "" : fromTime}
-                        placeholder="Start Time"
-                        onPress={() => setShowHourPicker("from")}
-                      />
-                    </View>
-                    <View style={styles.flex1}>
-                      <FieldBox
-                        icon={Clock}
-                        label="To"
-                        value={toTime === "End Time" ? "" : toTime}
-                        placeholder="End Time"
-                        onPress={() => setShowHourPicker("to")}
-                      />
-                    </View>
-                  </View>
-                </View>
-
-                <View style={{ marginTop: vs(16) }}>
-                  <SectionHeader icon={Wallet} text="PAYMENT DETAILS" />
-                  <View style={styles.row}>
-                    <View style={styles.flex1}>
-                      <FieldBox
-                        icon={Wallet}
-                        iconColor="#00B562"
-                        iconBg="#E6F7F0"
-                        label="Total Amount"
-                        placeholder="₹ 1000"
-                        value={totalPayment ? `₹${totalPayment}` : ""}
-                        isInput={true}
-                        keyboardType="numeric"
-                        onChangeText={(text: string) =>
-                          setTotalPayment(text.replace(/[^\d.]/g, ""))
-                        }
-                        hasBorder={false}
-                      />
-                    </View>
-                    <View style={styles.flex1}>
-                      <FieldBox
-                        icon={Wallet}
-                        iconColor="#00B562"
-                        iconBg="#E6F7F0"
-                        label="Advance"
-                        placeholder="₹0"
-                        value={advancePaid ? `₹${advancePaid}` : ""}
-                        isInput={true}
-                        keyboardType="numeric"
-                        onFocus={() => {
-                          setIsAdvanceFocused(true);
-                          if (advancePaid === "0" || advancePaid === "0.00") {
-                            setAdvancePaid("");
-                          }
-                        }}
-                        onBlur={() => {
-                          setIsAdvanceFocused(false);
-                        }}
-                        onChangeText={(text: string) => {
-                          const clean = text.replace(/[^\d.]/g, "");
-                          const val = parseFloat(clean) || 0;
-                          const total = parseFloat(totalPayment) || 0;
-                          if (val > total) {
-                            setAdvancePaid(total.toString());
-                          } else {
-                            setAdvancePaid(clean);
-                          }
-                        }}
-                        hasBorder={false}
-                      />
-                    </View>
+                        </View>
+                        <ScrollView
+                          keyboardShouldPersistTaps="always"
+                          style={styles.dropdownScroll}>
+                          {searchResults.map((item, index) => (
+                            <TouchableOpacity
+                              key={`${item.name}_${item.phone}_${index}`}
+                              style={styles.dropdownItem}
+                              onPress={() => {
+                                isSelectingFromResults.current = true;
+                                setName(item.name);
+                                const cleanPhone = item.phone.replace(/[^\d]/g, "").slice(-10);
+                                setMobile(cleanPhone);
+                                setSearchResults([]);
+                                setShowSearchResults(false);
+                              }}>
+                              <Text style={styles.dropdownItemTextLeft}>{item.name}</Text>
+                              <Text style={styles.dropdownItemTextRight}>{item.phone}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
                   </View>
 
-                  {/* Inline Payment Method Selection */}
-                  {(isAdvanceFocused || parseFloat(advancePaid) > 0) && (
-                    <View style={{ marginTop: vs(10), marginBottom: vs(-10) }}>
-                      <Text variant="body2" weight="bold" style={styles.inputLabel}>
-                        Payment Method
-                      </Text>
-                      <View style={styles.methodsRow}>
-                        {/* Cash */}
-                        <TouchableOpacity
-                          style={[
-                            styles.methodBox,
-                            selectedMethod === "cash" && styles.methodBoxSelectedBlue,
-                          ]}
-                          onPress={() => setSelectedMethod("cash")}>
-                          <Image
-                            source={icCash}
-                            style={[
-                              styles.methodIcon,
-                              selectedMethod === "cash" && styles.methodIconSelected,
-                            ]}
-                          />
-                          <Text
-                            variant="body2"
-                            weight="bold"
-                            style={[
-                              styles.methodText,
-                              selectedMethod === "cash" && styles.methodTextSelected,
-                            ]}>
-                            Cash
-                          </Text>
-                        </TouchableOpacity>
-                        {/* GPay */}
-                        <TouchableOpacity
-                          style={[
-                            styles.methodBox,
-                            selectedMethod === "gpay" && styles.methodBoxSelectedBlue,
-                          ]}
-                          onPress={() => setSelectedMethod("gpay")}>
-                          <Image
-                            source={icGpay}
-                            style={[
-                              styles.methodIcon,
-                              selectedMethod === "gpay" && styles.methodIconSelected,
-                            ]}
-                          />
-                          <Text
-                            variant="body2"
-                            weight="bold"
-                            style={[
-                              styles.methodText,
-                              selectedMethod === "gpay" && styles.methodTextSelected,
-                            ]}>
-                            GPay
-                          </Text>
-                        </TouchableOpacity>
-                        {/* PhonePe */}
-                        <TouchableOpacity
-                          style={[
-                            styles.methodBox,
-                            selectedMethod === "phonepe" && styles.methodBoxSelectedBlue,
-                          ]}
-                          onPress={() => setSelectedMethod("phonepe")}>
-                          <Image
-                            source={icPhonepe}
-                            style={[
-                              styles.methodIcon,
-                              selectedMethod === "phonepe" && styles.methodIconSelected,
-                            ]}
-                          />
-                          <Text
-                            variant="body2"
-                            weight="bold"
-                            style={[
-                              styles.methodText,
-                              selectedMethod === "phonepe" && styles.methodTextSelected,
-                            ]}>
-                            PhonePe
-                          </Text>
-                        </TouchableOpacity>
-                        {/* Paytm */}
-                        <TouchableOpacity
-                          style={[
-                            styles.methodBox,
-                            selectedMethod === "paytm" && styles.methodBoxSelectedBlue,
-                          ]}
-                          onPress={() => setSelectedMethod("paytm")}>
-                          <Image
-                            source={icPaytm}
-                            style={[
-                              styles.methodIcon,
-                              selectedMethod === "paytm" && styles.methodIconSelected,
-                            ]}
-                          />
-                          <Text
-                            variant="body2"
-                            weight="bold"
-                            style={[
-                              styles.methodText,
-                              selectedMethod === "paytm" && styles.methodTextSelected,
-                            ]}>
-                            Paytm
-                          </Text>
-                        </TouchableOpacity>
+                  <View style={{ marginTop: vs(16) }}>
+                    <SectionHeader icon={CalendarIcon} text="BOOKING DETAILS" />
+                    <FieldBox
+                      icon={CalendarIcon}
+                      label="Date"
+                      value={currentDate.toLocaleDateString("en-GB").replace(/\//g, " / ")}
+                      onPress={() => setIsDatePickerOpen(true)}
+                      rightElement={<ChevronDown size={ms(16)} color="#000" />}
+                    />
+                    <View style={styles.row}>
+                      <View style={styles.flex1}>
+                        <FieldBox
+                          icon={Clock}
+                          label="From"
+                          value={fromTime === "Start Time" ? "" : fromTime}
+                          placeholder="Start Time"
+                          onPress={() => setShowHourPicker("from")}
+                        />
+                      </View>
+                      <View style={styles.flex1}>
+                        <FieldBox
+                          icon={Clock}
+                          label="To"
+                          value={toTime === "End Time" ? "" : toTime}
+                          placeholder="End Time"
+                          onPress={() => setShowHourPicker("to")}
+                        />
                       </View>
                     </View>
-                  )}
+                  </View>
 
-                  {hasHistory && (
-                    <View style={styles.historyButton}>
-                      <FieldBox
-                        icon={FileText}
-                        label="Previous History"
-                        rightElement={<ChevronRight size={ms(20)} color="#000" />}
-                        hasBorder={true}
-                        iconBg="#E8F0FE"
-                        style={{ paddingVertical: vs(10) }}
-                        onPress={() => {
-                          if (onCheckHistory) {
-                            onCheckHistory();
-                          } else {
-                            onClose();
+                  <View style={{ marginTop: vs(16) }}>
+                    <SectionHeader icon={Wallet} text="PAYMENT DETAILS" />
+                    <View style={styles.row}>
+                      <View style={styles.flex1}>
+                        <FieldBox
+                          icon={Wallet}
+                          iconColor="#00B562"
+                          iconBg="#E6F7F0"
+                          label="Total Amount"
+                          placeholder="₹ 1000"
+                          value={totalPayment ? `₹${totalPayment}` : ""}
+                          isInput={true}
+                          keyboardType="numeric"
+                          onChangeText={(text: string) =>
+                            setTotalPayment(text.replace(/[^\d.]/g, ""))
                           }
-                          // Delay navigation slightly to allow the Modal to start closing,
-                          // avoiding native animation conflicts that swallow the navigation action.
-                          setTimeout(() => {
-                            navigation.navigate("GuestHistory", {
-                              guestId: mobile,
-                              bookingId: "",
-                              vertical: "sports",
-                              venueId: venueId,
-                            });
-                          }, 300);
-                        }}
-                      />
+                          hasBorder={false}
+                        />
+                      </View>
+                      <View style={styles.flex1}>
+                        <FieldBox
+                          icon={Wallet}
+                          iconColor="#00B562"
+                          iconBg="#E6F7F0"
+                          label="Advance"
+                          placeholder="₹0"
+                          value={advancePaid ? `₹${advancePaid}` : ""}
+                          isInput={true}
+                          keyboardType="numeric"
+                          onFocus={() => {
+                            setIsAdvanceFocused(true);
+                            if (advancePaid === "0" || advancePaid === "0.00") {
+                              setAdvancePaid("");
+                            }
+                          }}
+                          onBlur={() => {
+                            setIsAdvanceFocused(false);
+                          }}
+                          onChangeText={(text: string) => {
+                            const clean = text.replace(/[^\d.]/g, "");
+                            const val = parseFloat(clean) || 0;
+                            const total = parseFloat(totalPayment) || 0;
+                            if (val > total) {
+                              setAdvancePaid(total.toString());
+                            } else {
+                              setAdvancePaid(clean);
+                            }
+                          }}
+                          hasBorder={false}
+                        />
+                      </View>
                     </View>
-                  )}
-                </View>
-              </ScrollView>
-              {!isKeyboardVisible && (
-                <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
-                  <TouchableOpacity
-                    style={styles.saveButton}
-                    activeOpacity={0.8}
-                    onPress={handleBookNow}
-                    disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <ActivityIndicator color={COLORS.text.inverse} />
-                    ) : (
-                      <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
-                        BOOK NOW
-                      </Text>
+
+                    {/* Inline Payment Method Selection */}
+                    {(isAdvanceFocused || parseFloat(advancePaid) > 0) && (
+                      <View style={{ marginTop: vs(10), marginBottom: vs(-10) }}>
+                        <Text variant="body2" weight="bold" style={styles.inputLabel}>
+                          Payment Method
+                        </Text>
+                        <View style={styles.methodsRow}>
+                          {/* Cash */}
+                          <TouchableOpacity
+                            style={[
+                              styles.methodBox,
+                              selectedMethod === "cash" && styles.methodBoxSelectedBlue,
+                            ]}
+                            onPress={() => setSelectedMethod("cash")}>
+                            <Image
+                              source={icCash}
+                              style={[
+                                styles.methodIcon,
+                                selectedMethod === "cash" && styles.methodIconSelected,
+                              ]}
+                            />
+                            <Text
+                              variant="body2"
+                              weight="bold"
+                              style={[
+                                styles.methodText,
+                                selectedMethod === "cash" && styles.methodTextSelected,
+                              ]}>
+                              Cash
+                            </Text>
+                          </TouchableOpacity>
+                          {/* GPay */}
+                          <TouchableOpacity
+                            style={[
+                              styles.methodBox,
+                              selectedMethod === "gpay" && styles.methodBoxSelectedBlue,
+                            ]}
+                            onPress={() => setSelectedMethod("gpay")}>
+                            <Image
+                              source={icGpay}
+                              style={[
+                                styles.methodIcon,
+                                selectedMethod === "gpay" && styles.methodIconSelected,
+                              ]}
+                            />
+                            <Text
+                              variant="body2"
+                              weight="bold"
+                              style={[
+                                styles.methodText,
+                                selectedMethod === "gpay" && styles.methodTextSelected,
+                              ]}>
+                              GPay
+                            </Text>
+                          </TouchableOpacity>
+                          {/* PhonePe */}
+                          <TouchableOpacity
+                            style={[
+                              styles.methodBox,
+                              selectedMethod === "phonepe" && styles.methodBoxSelectedBlue,
+                            ]}
+                            onPress={() => setSelectedMethod("phonepe")}>
+                            <Image
+                              source={icPhonepe}
+                              style={[
+                                styles.methodIcon,
+                                selectedMethod === "phonepe" && styles.methodIconSelected,
+                              ]}
+                            />
+                            <Text
+                              variant="body2"
+                              weight="bold"
+                              style={[
+                                styles.methodText,
+                                selectedMethod === "phonepe" && styles.methodTextSelected,
+                              ]}>
+                              PhonePe
+                            </Text>
+                          </TouchableOpacity>
+                          {/* Paytm */}
+                          <TouchableOpacity
+                            style={[
+                              styles.methodBox,
+                              selectedMethod === "paytm" && styles.methodBoxSelectedBlue,
+                            ]}
+                            onPress={() => setSelectedMethod("paytm")}>
+                            <Image
+                              source={icPaytm}
+                              style={[
+                                styles.methodIcon,
+                                selectedMethod === "paytm" && styles.methodIconSelected,
+                              ]}
+                            />
+                            <Text
+                              variant="body2"
+                              weight="bold"
+                              style={[
+                                styles.methodText,
+                                selectedMethod === "paytm" && styles.methodTextSelected,
+                              ]}>
+                              Paytm
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
                     )}
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </KeyboardAvoidingView>
-        </TouchableOpacity>
 
-        <TimePickerModal
-          useModal={false}
-          visible={!!showHourPicker}
-          onClose={() => setShowHourPicker(null)}
-          title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
-          hours={showHourPicker === "from" ? startTimes : endTimes}
-          selectedTime={showHourPicker === "from" ? fromTime : toTime}
-          onSelectTime={hour => {
-            if (showHourPicker === "from") {
-              setFromTime(hour);
-              const idx = startTimes.indexOf(hour);
-              if (idx !== -1 && idx + 1 < startTimes.length) {
-                setToTime(startTimes[idx + 1]);
-              } else {
-                setToTime("End Time");
-              }
-            } else {
-              setToTime(hour);
-            }
-            setShowHourPicker(null);
-          }}
-          isHourDisabled={(hour, index) => {
-            const hour24 =
-              hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
-            const isPast = isToday && hour24 <= currentHour;
-
-            if (showHourPicker === "from") {
-              const isBooked = bookedHours.includes(hour);
-              return isBooked || isPast;
-            } else {
-              const fromIndex = startTimes.indexOf(fromTime);
-              if (fromIndex === -1) return true;
-              if (index <= fromIndex) return true;
-
-              const intermediateHours = startTimes.slice(fromIndex, index);
-              const hasBookingInBetween = intermediateHours.some(h => bookedHours.includes(h));
-              return hasBookingInBetween || (isPast && !bookedHours.includes(hour));
-            }
-          }}
-          isFetching={isFetchingSlots}
-        />
-
-        {isDatePickerOpen && (
-          <View style={[StyleSheet.absoluteFillObject, { zIndex: 999 }]}>
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setIsDatePickerOpen(false)}>
-              <View style={styles.calendarContainer}>
-                <Calendar
-                  current={currentDate.toISOString().split("T")[0]}
-                  minDate={new Date().toISOString().split("T")[0]}
-                  onDayPress={(day: any) => {
-                    setCurrentDate(new Date(day.timestamp));
-                    setIsDatePickerOpen(false);
-                  }}
-                  markedDates={{
-                    [currentDate.toISOString().split("T")[0]]: {
-                      selected: true,
-                      selectedColor: COLORS.primary,
-                    },
-                  }}
-                />
+                    {hasHistory && (
+                      <View style={styles.historyButton}>
+                        <FieldBox
+                          icon={FileText}
+                          label="Previous History"
+                          rightElement={<ChevronRight size={ms(20)} color="#000" />}
+                          hasBorder={true}
+                          iconBg="#E8F0FE"
+                          style={{ paddingVertical: vs(10) }}
+                          onPress={() => {
+                            if (onCheckHistory) {
+                              onCheckHistory();
+                            } else {
+                              onClose();
+                            }
+                            // Delay navigation slightly to allow the Modal to start closing,
+                            // avoiding native animation conflicts that swallow the navigation action.
+                            setTimeout(() => {
+                              navigation.navigate("GuestHistory", {
+                                guestId: mobile,
+                                bookingId: "",
+                                vertical: "sports",
+                                venueId: venueId,
+                              });
+                            }, 300);
+                          }}
+                        />
+                      </View>
+                    )}
+                  </View>
+                </ScrollView>
+                {!isKeyboardVisible && (
+                  <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, vs(16)) }]}>
+                    <TouchableOpacity
+                      style={styles.saveButton}
+                      activeOpacity={0.8}
+                      onPress={handleBookNow}
+                      disabled={isSubmitting}>
+                      {isSubmitting ? (
+                        <ActivityIndicator color={COLORS.text.inverse} />
+                      ) : (
+                        <Text variant="h3" weight="bold" color={COLORS.text.inverse}>
+                          BOOK NOW
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
-            </TouchableOpacity>
-          </View>
-        )}
+            </KeyboardAvoidingView>
+          </TouchableOpacity>
 
-        <GlobalKeyboardAccessory />
+          <TimePickerModal
+            useModal={false}
+            visible={!!showHourPicker}
+            onClose={() => setShowHourPicker(null)}
+            title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
+            hours={showHourPicker === "from" ? startTimes : endTimes}
+            selectedTime={showHourPicker === "from" ? fromTime : toTime}
+            onSelectTime={hour => {
+              if (showHourPicker === "from") {
+                setFromTime(hour);
+                const idx = startTimes.indexOf(hour);
+                if (idx !== -1 && idx + 1 < startTimes.length) {
+                  setToTime(startTimes[idx + 1]);
+                } else {
+                  setToTime("End Time");
+                }
+              } else {
+                setToTime(hour);
+              }
+              setShowHourPicker(null);
+            }}
+            isHourDisabled={(hour, index) => {
+              const hour24 =
+                hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
+              const isPast = isToday && hour24 <= currentHour;
+
+              if (showHourPicker === "from") {
+                const isBooked = bookedHours.includes(hour);
+                return isBooked || isPast;
+              } else {
+                const fromIndex = startTimes.indexOf(fromTime);
+                if (fromIndex === -1) return true;
+                if (index <= fromIndex) return true;
+
+                const intermediateHours = startTimes.slice(fromIndex, index);
+                const hasBookingInBetween = intermediateHours.some(h => bookedHours.includes(h));
+                return hasBookingInBetween || (isPast && !bookedHours.includes(hour));
+              }
+            }}
+            isFetching={isFetchingSlots}
+          />
+
+          {isDatePickerOpen && (
+            <View style={[StyleSheet.absoluteFillObject, { zIndex: 999 }]}>
+              <TouchableOpacity
+                style={styles.modalOverlay}
+                activeOpacity={1}
+                onPress={() => setIsDatePickerOpen(false)}>
+                <View style={styles.calendarContainer}>
+                  <Calendar
+                    current={currentDate.toISOString().split("T")[0]}
+                    minDate={new Date().toISOString().split("T")[0]}
+                    onDayPress={(day: any) => {
+                      setCurrentDate(new Date(day.timestamp));
+                      setIsDatePickerOpen(false);
+                    }}
+                    markedDates={{
+                      [currentDate.toISOString().split("T")[0]]: {
+                        selected: true,
+                        selectedColor: COLORS.primary,
+                      },
+                    }}
+                  />
+                </View>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <GlobalKeyboardAccessory />
+        </View>
       </Modal>
     </>
   );
