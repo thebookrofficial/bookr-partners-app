@@ -182,6 +182,7 @@ export const useEventHomeAssigned = (eventId: string) => {
             name: isSpotBooking && b.guest_name ? b.guest_name : profile?.full_name || "Guest User",
             passType: passTypeDesc,
             date: dateStr,
+            rawDate: b.created_at,
             time: timeStr,
             avatarUrl: isSpotBooking ? undefined : profile?.avatar_url,
             isSpot: isSpotBooking,

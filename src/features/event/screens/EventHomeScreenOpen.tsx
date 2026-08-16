@@ -13,7 +13,10 @@ import { useEventHomeOpen } from "../hooks/useEventHomeOpen";
 import { useNavigation } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import {
+  EventFilterBottomSheet,
+  EventDateFilterOption,
+} from "../components/EventFilterBottomSheet";
 import { Calendar as CalendarIcon, X, ChevronLeft, ChevronRight } from "lucide-react-native";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
@@ -37,18 +40,11 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
   } = useEventHomeOpen(eventId);
 
   // --- Date & Pagination State ---
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateFilter, setDateFilter] = useState<EventDateFilterOption>("all");
+  const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>();
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
-
-  const onDateChange = (event: DateTimePickerEvent, date?: Date) => {
-    setShowDatePicker(false);
-    if (date) {
-      setSelectedDate(date);
-      setCurrentPage(1);
-    }
-  };
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -86,13 +82,38 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
     : bookings.filter(b => b.passType.toLowerCase().includes(currentActiveTab.toLowerCase()));
 
   // Filter SECOND by the selected date (if any)
-  if (selectedDate) {
-    const selectedDateStr = selectedDate.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
+  if (dateFilter !== "all") {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    filteredBookings = filteredBookings.filter(b => {
+      // Use rawDate (ISO string) for robust parsing. Fallback to date just in case.
+      const bDate = new Date(b.rawDate || b.date);
+      bDate.setHours(0, 0, 0, 0);
+
+      if (dateFilter === "today") {
+        return bDate.getTime() === today.getTime();
+      } else if (dateFilter === "yesterday") {
+        return bDate.getTime() === yesterday.getTime();
+      } else if (dateFilter === "last_week") {
+        const lastWeek = new Date(today);
+        lastWeek.setDate(lastWeek.getDate() - 7);
+        return bDate >= lastWeek && bDate <= today;
+      } else if (dateFilter === "last_month") {
+        const lastMonth = new Date(today);
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        return bDate >= lastMonth && bDate <= today;
+      } else if (dateFilter === "custom" && customRange) {
+        const start = new Date(customRange.start);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(customRange.end);
+        end.setHours(0, 0, 0, 0);
+        return bDate >= start && bDate <= end;
+      }
+      return true;
     });
-    filteredBookings = filteredBookings.filter(b => b.date === selectedDateStr);
   }
 
   // Slice for Pagination
@@ -124,31 +145,46 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
             <Text weight="bold" style={styles.dateFilterLabel}>
               Filter By Date
             </Text>
-            <TouchableOpacity
-              style={styles.dateSelector}
-              activeOpacity={0.7}
-              onPress={() => setShowDatePicker(true)}>
-              <CalendarIcon size={ms(16)} color={COLORS.primary} />
-              <Text weight="semiBold" style={styles.dateSelectorText}>
-                {selectedDate
-                  ? selectedDate.toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : "All Dates"}
-              </Text>
-              {selectedDate && (
+            <View style={styles.dateSelector}>
+              <TouchableOpacity
+                style={styles.dateSelectorInner}
+                activeOpacity={0.7}
+                onPress={() => setIsFilterOpen(true)}>
+                <CalendarIcon size={ms(16)} color={COLORS.primary} />
+                <Text weight="semiBold" style={styles.dateSelectorText}>
+                  {dateFilter === "all"
+                    ? "All Dates"
+                    : dateFilter === "today"
+                    ? "Today"
+                    : dateFilter === "yesterday"
+                    ? "Yesterday"
+                    : dateFilter === "last_week"
+                    ? "Last Week"
+                    : dateFilter === "last_month"
+                    ? "Last Month"
+                    : customRange
+                    ? `${customRange.start.toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                      })} - ${customRange.end.toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                      })}`
+                    : "Custom Range"}
+                </Text>
+              </TouchableOpacity>
+              {dateFilter !== "all" && (
                 <TouchableOpacity
-                  onPress={e => {
-                    e.stopPropagation(); // Prevent opening picker when clearing
-                    setSelectedDate(null);
+                  onPress={() => {
+                    setDateFilter("all");
+                    setCustomRange(undefined);
+                    setCurrentPage(1);
                   }}
                   style={styles.clearBtn}>
                   <X size={ms(14)} color={COLORS.danger} />
                 </TouchableOpacity>
               )}
-            </TouchableOpacity>
+            </View>
           </View>
 
           {summaryCategories.length > 1 && (
@@ -199,14 +235,17 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
       </ScreenContainer>
 
       {/* Date Picker Modal */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate || new Date()}
-          mode="date"
-          display="default"
-          onChange={onDateChange}
-        />
-      )}
+      <EventFilterBottomSheet
+        visible={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        currentFilter={dateFilter}
+        currentCustomRange={customRange}
+        onApply={(filter, range) => {
+          setDateFilter(filter);
+          setCustomRange(range);
+          setCurrentPage(1);
+        }}
+      />
     </View>
   );
 };
@@ -237,6 +276,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: hs(12),
     paddingVertical: vs(6),
     borderRadius: ms(8),
+  },
+  dateSelectorInner: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: hs(8),
   },
   dateSelectorText: {
