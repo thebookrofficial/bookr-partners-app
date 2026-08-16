@@ -2,6 +2,7 @@
 // Confidential and Proprietary.
 
 import { useState, useEffect, useCallback } from "react";
+import { Alert } from "react-native";
 import { supabase } from "@/lib/supabase";
 
 export interface SpotEntryDetails {
@@ -127,12 +128,14 @@ export const useEventSpotEntry = (venueId: string) => {
 
       if (error) {
         console.error("DB Insert Error:", error);
+        Alert.alert("Error", error.message || "Failed to create spot entry");
         throw error;
       }
 
       return true;
     } catch (err: any) {
       console.error("Error creating spot entry:", err);
+      Alert.alert("Error", err.message || "An unknown error occurred");
       return false;
     } finally {
       setIsSubmitting(false);

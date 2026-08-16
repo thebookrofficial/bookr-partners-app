@@ -111,7 +111,11 @@ serve(async req => {
       const responseData = await waResponse.json();
       if (!waResponse.ok) {
         console.error("AiSensy Error Payload:", JSON.stringify(responseData));
-        throw new Error(`AiSensy API Failed: ${responseData.message || waResponse.statusText}`);
+        console.warn(
+          `AiSensy API Failed: ${
+            responseData.message || waResponse.statusText
+          }. Invite created but WhatsApp not sent.`,
+        );
       }
     } else {
       console.warn("AISENSY_API_KEY not set. Skipping WhatsApp send.");
