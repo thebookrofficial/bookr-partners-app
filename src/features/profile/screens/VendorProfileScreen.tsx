@@ -184,10 +184,23 @@ export const VendorProfileScreen = () => {
           filteredVenues.map(venue => (
             <ServiceCard
               key={venue.id}
-              title={venue.name}
-              location={venue.address_line}
+              title={
+                venue.vertical === "events" && venue.events && venue.events.length > 0
+                  ? venue.events[0].title
+                  : venue.name
+              }
+              location={
+                venue.vertical === "events" && venue.cities?.name
+                  ? venue.cities.name
+                  : venue.address_line
+              }
               image={
-                venue.cover_image_url
+                venue.vertical === "events" &&
+                venue.events &&
+                venue.events.length > 0 &&
+                venue.events[0].cover_image_url
+                  ? { uri: venue.events[0].cover_image_url }
+                  : venue.cover_image_url
                   ? { uri: venue.cover_image_url }
                   : { uri: "https://via.placeholder.com/150" }
               }

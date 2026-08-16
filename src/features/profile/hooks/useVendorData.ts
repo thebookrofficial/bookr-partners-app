@@ -10,6 +10,7 @@ interface Venue {
   id: string;
   owner_id: string;
   city_id: string;
+  area_id?: string;
   vertical: "sports" | "events" | "dining" | "staycation";
   name: string;
   slug: string;
@@ -19,6 +20,8 @@ interface Venue {
   avg_rating: number;
   total_reviews: number;
   sports_venues?: { sports_type: string }[];
+  events?: { title: string; cover_image_url?: string | null }[];
+  cities?: { name: string };
 }
 
 export const useVendorData = () => {
@@ -56,7 +59,7 @@ export const useVendorData = () => {
         // 3. Fetch Venues (Blueprint Table 6.1)
         let venuesQuery = supabase
           .from("venues")
-          .select("*, sports_venues(sports_type)")
+          .select("*, sports_venues(sports_type), events(title, cover_image_url), cities(name)")
           .eq("status", "active")
           .is("deleted_at", null);
 
