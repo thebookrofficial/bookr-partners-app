@@ -12,6 +12,7 @@ import {
 import { Text } from "./Text";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
+import { useKeyboardStore } from "@/store/keyboardStore";
 
 export interface TextInputProps extends RNTextInputProps {
   label?: React.ReactNode | string; // Updated to allow custom layouts like checkboxes
@@ -34,8 +35,14 @@ export const TextInput = ({
 }: TextInputProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(secureTextEntry);
+  const setIsNumericFocused = useKeyboardStore(state => state.setIsNumericFocused);
 
   const isFilled = variant === "filled";
+  const isNumericType =
+    rest.keyboardType === "numeric" ||
+    rest.keyboardType === "number-pad" ||
+    rest.keyboardType === "decimal-pad" ||
+    rest.keyboardType === "phone-pad";
 
   return (
     <View style={styles.container}>
@@ -64,8 +71,16 @@ export const TextInput = ({
         <RNTextInput
           style={[styles.input, isFilled && styles.filledInput, style]}
           placeholderTextColor={COLORS.text.muted}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onFocus={e => {
+            setIsFocused(true);
+            if (isNumericType) setIsNumericFocused(true);
+            rest.onFocus?.(e);
+          }}
+          onBlur={e => {
+            setIsFocused(false);
+            if (isNumericType) setIsNumericFocused(false);
+            rest.onBlur?.(e);
+          }}
           secureTextEntry={isPasswordVisible}
           editable={editable}
           {...rest}

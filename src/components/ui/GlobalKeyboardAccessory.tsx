@@ -3,10 +3,12 @@ import { View, TouchableOpacity, Keyboard, Platform, StyleSheet } from "react-na
 import { ArrowRightToLine } from "lucide-react-native";
 import { COLORS } from "@/constants/theme";
 import { ms, hs, vs } from "@/utils/responsive.utils";
+import { useKeyboardStore } from "@/store/keyboardStore";
 
 export const GlobalKeyboardAccessory = () => {
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const isNumericFocused = useKeyboardStore(state => state.isNumericFocused);
 
   useEffect(() => {
     // Listen to both willShow (smoother) and didShow (fallback for Modals on iOS)
@@ -38,7 +40,7 @@ export const GlobalKeyboardAccessory = () => {
     };
   }, []);
 
-  if (!isKeyboardVisible) return null;
+  if (!isKeyboardVisible || !isNumericFocused) return null;
 
   return (
     <View style={[styles.container, { bottom: keyboardHeight }]} pointerEvents="box-none">
@@ -46,7 +48,7 @@ export const GlobalKeyboardAccessory = () => {
         activeOpacity={0.8}
         style={styles.button}
         onPress={() => Keyboard.dismiss()}>
-        <ArrowRightToLine size={ms(24)} color="#fff" />
+        <ArrowRightToLine size={ms(28)} color="#fff" />
       </TouchableOpacity>
     </View>
   );
@@ -65,9 +67,9 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: COLORS.primary,
-    width: ms(44),
-    height: ms(44),
-    borderRadius: ms(10),
+    width: ms(52),
+    height: ms(52),
+    borderRadius: ms(12),
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",

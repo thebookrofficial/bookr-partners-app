@@ -27,6 +27,7 @@ import { supabase } from "@/lib/supabase";
 import { useCreateStaycationOfflineBooking } from "../hooks/useCreateStaycationOfflineBooking";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useKeyboardVisible } from "@/hooks/useKeyboardVisible";
+import { useKeyboardStore } from "@/store/keyboardStore";
 
 import MoneySvg from "@/assets/icons/ic-tdesign-money.svg";
 
@@ -68,6 +69,7 @@ export const StaycationOfflineBookingSheet = ({
   const { createBooking, isLoading } = useCreateStaycationOfflineBooking();
   const insets = useSafeAreaInsets();
   const isKeyboardVisible = useKeyboardVisible();
+  const setIsNumericFocused = useKeyboardStore(state => state.setIsNumericFocused);
   const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
     "cash",
   );
@@ -907,6 +909,8 @@ export const StaycationOfflineBookingSheet = ({
                           placeholderTextColor={COLORS.text.muted}
                           keyboardType="phone-pad"
                           value={phone}
+                          onFocus={() => setIsNumericFocused(true)}
+                          onBlur={() => setIsNumericFocused(false)}
                           onChangeText={text => {
                             let clean = text.replace(/\D/g, "");
                             if (
@@ -1018,6 +1022,8 @@ export const StaycationOfflineBookingSheet = ({
                             placeholderTextColor={COLORS.text.muted}
                             keyboardType="numeric"
                             value={totalPayment}
+                            onFocus={() => setIsNumericFocused(true)}
+                            onBlur={() => setIsNumericFocused(false)}
                             onChangeText={setTotalPayment}
                           />
                         </View>
@@ -1044,6 +1050,10 @@ export const StaycationOfflineBookingSheet = ({
                             value={advancePaid}
                             onFocus={() => {
                               setIsAdvanceActive(true);
+                              setIsNumericFocused(true);
+                            }}
+                            onBlur={() => {
+                              setIsNumericFocused(false);
                             }}
                             onChangeText={text => {
                               const val = parseFloat(text) || 0;

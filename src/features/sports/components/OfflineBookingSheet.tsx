@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useKeyboardVisible } from "@/hooks/useKeyboardVisible";
+import { useKeyboardStore } from "@/store/keyboardStore";
 import {
   View,
   StyleSheet,
@@ -115,6 +116,12 @@ const FieldBox = ({
   ...textInputProps
 }: any) => {
   const inputRef = React.useRef<RNTextInput>(null);
+  const setIsNumericFocused = useKeyboardStore(state => state.setIsNumericFocused);
+  const isNumericType =
+    textInputProps.keyboardType === "numeric" ||
+    textInputProps.keyboardType === "number-pad" ||
+    textInputProps.keyboardType === "decimal-pad" ||
+    textInputProps.keyboardType === "phone-pad";
 
   const handlePress = () => {
     if (onPress) {
@@ -152,6 +159,14 @@ const FieldBox = ({
               placeholder={placeholder}
               placeholderTextColor={COLORS.text.muted}
               value={value}
+              onFocus={e => {
+                if (isNumericType) setIsNumericFocused(true);
+                textInputProps.onFocus?.(e);
+              }}
+              onBlur={e => {
+                if (isNumericType) setIsNumericFocused(false);
+                textInputProps.onBlur?.(e);
+              }}
               {...textInputProps}
             />
           </View>
