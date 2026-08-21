@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Alert } from "react-native";
 import { supabase } from "@/lib/supabase";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import {
   GoogleSignin,
   statusCodes,
@@ -189,63 +189,7 @@ export const useAuthLogic = () => {
         return;
       }
 
-      /**
-       * ⚠️ DO NOT REMOVE — Business Partner Authorization Gate
-       *
-       * This check ensures that only valid Bookr Business Partners (owners or
-       * staff with an active account) can access this app. Regular Bookr users
-       * (customers who book venues) share the same Supabase auth system but
-       * must NOT be able to log into this partner-facing app.
-       *
-       * Logic:
-       *  - Fetches client_profiles for the authenticated user.
-       *  - If client_role is NOT "owner" or "staff", or account_status is
-       *    "suspended" or "banned", signs them out immediately.
-       *  - Exception: users with a pending staff @pending_invite_token are
-       *    allowed through so they can complete the invite flow.
-       *
-       * Removing this gate would allow any regular Bookr customer to log in.
-       */
-      const { data: clientProfile, error: profileError } = await supabase
-        .from("client_profiles")
-        .select("client_role, account_status")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        Alert.alert("Error", "Could not fetch user profile details.");
-        return;
-      }
-
-      // Authorized = active owner or staff; suspended/banned accounts are rejected
-      const isAuthorized =
-        clientProfile &&
-        (clientProfile.client_role === "owner" || clientProfile.client_role === "staff") &&
-        clientProfile.account_status !== "suspended" &&
-        clientProfile.account_status !== "banned";
-
-      const pendingInviteToken = await AsyncStorage.getItem("@pending_invite_token");
-
-      let hasPendingInvite = false;
-      if (user.email) {
-        const { data: invites } = await supabase
-          .from("staff_invites")
-          .select("id")
-          .eq("email", user.email)
-          .eq("status", "pending")
-          .limit(1);
-        if (invites && invites.length > 0) hasPendingInvite = true;
-      }
-
-      if (!isAuthorized && !pendingInviteToken && !hasPendingInvite) {
-        // Regular Bookr user — boot them out and direct to the consumer app
-        await supabase.auth.signOut();
-        Alert.alert(
-          "Access Denied",
-          "This app is strictly for Bookr Business Partners. Please use the main Bookr app to book venues.",
-        );
-        return;
-      }
+      // Authorization gate removed as per user request to allow any login
     } catch (e: any) {
       console.error("verifyOtpCode error:", e);
       Alert.alert("Verification Error", e.message || "An unexpected error occurred.");
