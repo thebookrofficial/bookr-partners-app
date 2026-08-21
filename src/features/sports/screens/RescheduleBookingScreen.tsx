@@ -798,6 +798,8 @@ const styles = StyleSheet.create({
   },
   confirmBtn: {
     fontSize: fs(24),
+    lineHeight: fs(30),
+    paddingTop: vs(4),
   },
   paymentCard: {
     marginTop: vs(24),

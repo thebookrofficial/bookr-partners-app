@@ -603,6 +603,8 @@ const styles = StyleSheet.create({
     fontSize: fs(22),
     color: "#FFF",
     letterSpacing: 1,
+    lineHeight: fs(28),
+    paddingTop: vs(4),
   },
   tabText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(12) },
   bookingTypeTitle: {
@@ -648,15 +650,15 @@ const styles = StyleSheet.create({
   inputBoxSmall: {
     backgroundColor: "#F4F7FC",
     borderRadius: ms(10),
-    padding: ms(12),
-    height: vs(40),
+    paddingHorizontal: ms(12),
+    height: vs(48),
     justifyContent: "center",
   },
   inputBoxSmallRow: {
     backgroundColor: "#F4F7FC",
     borderRadius: ms(10),
-    padding: ms(10),
-    height: vs(40),
+    paddingHorizontal: ms(12),
+    height: vs(48),
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -664,8 +666,8 @@ const styles = StyleSheet.create({
   inputBoxFill: {
     backgroundColor: "#F4F7FC",
     borderRadius: ms(10),
-    padding: ms(12),
-    height: vs(40),
+    paddingHorizontal: ms(12),
+    height: vs(48),
     justifyContent: "center",
   },
   inputBoxFillRow: {
@@ -688,14 +690,14 @@ const styles = StyleSheet.create({
   },
   confirmPaymentBtn: {
     backgroundColor: "#000",
-    height: vs(44),
+    height: vs(48),
     borderRadius: ms(10),
     justifyContent: "center",
     alignItems: "center",
   },
   confirmBtn: {
     backgroundColor: "#000",
-    height: vs(44),
+    height: vs(48),
     borderRadius: ms(10),
     justifyContent: "center",
     alignItems: "center",
