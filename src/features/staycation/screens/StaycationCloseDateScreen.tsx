@@ -380,7 +380,7 @@ export const StaycationCloseDateScreen = () => {
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: vs(20),
+    paddingBottom: vs(150),
   },
   section: {
     marginTop: vs(20),

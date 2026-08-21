@@ -9,6 +9,7 @@ import {
   TextInput as RNTextInput,
   ScrollView,
   Dimensions,
+  Pressable,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft } from "lucide-react-native";
@@ -24,7 +25,7 @@ import LoginIllustration from "@/assets/images/login-screen-client-side.svg";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const OTP_LENGTH = 6;
-const TIMER_SECONDS = 30;
+const TIMER_SECONDS = 36;
 
 export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
   const insets = useSafeAreaInsets();
@@ -35,6 +36,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
   const [isFocused, setIsFocused] = useState(false);
   const [timer, setTimer] = useState(TIMER_SECONDS);
 
+  const inputRef = useRef<RNTextInput>(null);
   const hasSubmitted = useRef(false);
 
   useEffect(() => {
@@ -112,7 +114,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
             <Text style={styles.emailText}>{email}</Text>
           </Text>
 
-          <View style={styles.otpContainer}>
+          <Pressable style={styles.otpContainer} onPress={() => inputRef.current?.focus()}>
             {new Array(OTP_LENGTH).fill(0).map((_, index) => {
               const digit = code[index] || "";
               const isCurrentBox = isFocused && code.length === index;
@@ -131,6 +133,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
             })}
 
             <RNTextInput
+              ref={inputRef}
               value={code}
               onChangeText={handleChangeText}
               maxLength={OTP_LENGTH}
@@ -143,7 +146,7 @@ export const OtpScreen = ({ navigation, route }: AuthScreenProps<"Otp">) => {
               autoComplete="one-time-code"
               textContentType="oneTimeCode"
             />
-          </View>
+          </Pressable>
 
           <View style={styles.resendContainer}>
             <Text style={styles.resendLabel}>Didn’t received the OTP? </Text>
@@ -310,6 +313,8 @@ const styles = StyleSheet.create({
     fontSize: fs(24), // Increased from 14
     fontFamily: "Gilroy-Bold",
     color: COLORS.text.primary,
+    lineHeight: fs(30), // Fixes clipping on iOS/iPad
+    paddingTop: vs(2),
   },
   hiddenInput: {
     position: "absolute",

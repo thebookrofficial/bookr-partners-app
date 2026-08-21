@@ -119,7 +119,7 @@ export const FAQScreen = () => {
   };
 
   return (
-    <ScreenContainer backgroundColor={COLORS.background}>
+    <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={10}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <ChevronLeft size={ms(24)} color={COLORS.text.primary} />
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: hs(6),
+    paddingHorizontal: 0,
     paddingVertical: vs(12),
     gap: hs(12),
   },
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   scrollContent: {
-    paddingHorizontal: hs(6),
+    paddingHorizontal: 0,
     paddingBottom: vs(40),
   },
   supportRow: {
