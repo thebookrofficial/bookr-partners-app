@@ -117,13 +117,15 @@ export const LoginScreen = ({ navigation }: AuthScreenProps<"Login">) => {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.socialButton} onPress={loginWithGoogle}>
-            <Image
-              source={{ uri: "https://img.icons8.com/color/48/google-logo.png" }}
-              style={styles.socialIcon}
-            />
-            <Text style={styles.socialButtonText}>Sign in with Google</Text>
-          </TouchableOpacity>
+          {Platform.OS !== "ios" && (
+            <TouchableOpacity style={styles.socialButton} onPress={loginWithGoogle}>
+              <Image
+                source={{ uri: "https://img.icons8.com/color/48/google-logo.png" }}
+                style={styles.socialIcon}
+              />
+              <Text style={styles.socialButtonText}>Sign in with Google</Text>
+            </TouchableOpacity>
+          )}
 
           {Platform.OS === "ios" && (
             <AppleButton
