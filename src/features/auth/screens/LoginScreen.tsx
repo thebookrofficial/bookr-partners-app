@@ -260,6 +260,7 @@ const styles = StyleSheet.create({
   continueButtonText: {
     fontFamily: "Gilroy-Bold",
     fontSize: fs(16),
+    color: "#F8F9FA",
   },
   dividerContainer: {
     flexDirection: "row",

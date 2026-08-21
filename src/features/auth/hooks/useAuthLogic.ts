@@ -112,7 +112,7 @@ export const useAuthLogic = () => {
         requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
       });
 
-      const { identityToken } = appleAuthRequestResponse;
+      const { identityToken, nonce } = appleAuthRequestResponse;
 
       if (!identityToken) {
         throw new Error("No identity token returned from Apple");
@@ -121,6 +121,7 @@ export const useAuthLogic = () => {
       const { error } = await supabase.auth.signInWithIdToken({
         provider: "apple",
         token: identityToken,
+        nonce: nonce,
       });
 
       if (error) {

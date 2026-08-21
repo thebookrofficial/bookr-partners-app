@@ -348,6 +348,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     fontFamily: "Gilroy-Bold",
     fontSize: fs(16),
+    color: "#F8F9FA",
   },
   footer: {
     alignItems: "center",
