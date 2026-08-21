@@ -6,8 +6,8 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 
 import { PayoutDetailsSkeleton } from "@/components/ui";
 import ReactNativeBlobUtil from "react-native-blob-util";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, Button } from "@/components/ui";
-import { hs, vs, ms, fs } from "@/utils/responsive.utils";
+import { Text } from "@/components/ui";
+import { hs, vs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
@@ -226,16 +226,6 @@ export const PayoutDetailsScreen = () => {
             </Text>
           </View>
         </View>
-
-        <View style={styles.footer}>
-          <Button
-            title="Download"
-            variant="primary"
-            style={styles.downloadBtn}
-            textStyle={styles.downloadBtnText}
-            onPress={() => setModalVisible(true)}
-          />
-        </View>
       </ScrollView>
 
       <DownloadPayoutsModal
@@ -300,20 +290,5 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: vs(5),
-  },
-  footer: {
-    marginTop: vs(20),
-    alignItems: "flex-end",
-  },
-  downloadBtn: {
-    backgroundColor: "#000",
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(8),
-    height: vs(34),
-  },
-  downloadBtnText: {
-    fontSize: fs(12),
-    color: "#FFF",
   },
 });

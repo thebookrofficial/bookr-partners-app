@@ -10,7 +10,7 @@ import { COLORS } from "@/constants/theme";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Calendar as CalendarIcon } from "lucide-react-native";
+import { Calendar as CalendarIcon, ArrowLeft } from "lucide-react-native";
 import { useServiceStore } from "@/store/serviceStore";
 import { usePayouts } from "../hooks/usePayouts";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -148,12 +148,17 @@ export const PayoutsScreen = () => {
   return (
     <ScreenContainer backgroundColor={COLORS.background} paddingHorizontal={hs(12)}>
       <View style={styles.header}>
-        <Text variant="h3" weight="bold">
-          {activeVenueName}
-        </Text>
-        <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
-          Payouts
-        </Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
+        </TouchableOpacity>
+        <View>
+          <Text variant="h3" weight="bold">
+            {activeVenueName}
+          </Text>
+          <Text variant="body2" weight="semiBold" color={COLORS.text.muted}>
+            Payouts
+          </Text>
+        </View>
       </View>
 
       <ScrollView
@@ -277,6 +282,12 @@ const styles = StyleSheet.create({
   header: {
     marginTop: vs(10),
     marginBottom: vs(15),
+    flexDirection: "row",
+    alignItems: "center",
+    gap: hs(12),
+  },
+  backButton: {
+    padding: ms(4),
   },
   scrollContent: { paddingBottom: vs(20) },
   sectionTitle: { textTransform: "uppercase", marginTop: vs(15), marginBottom: vs(10) },
