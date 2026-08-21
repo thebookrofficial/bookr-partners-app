@@ -17,18 +17,20 @@ export const EditableAvatar = ({ onEditPress, loading, ...avatarProps }: Editabl
   return (
     <View style={styles.container}>
       <Avatar {...avatarProps} />
-      <TouchableOpacity
-        style={styles.badge}
-        activeOpacity={0.8}
-        onPress={onEditPress}
-        disabled={loading} // Disable button while uploading
-      >
-        {loading ? (
-          <ActivityIndicator size="small" color={COLORS.text.inverse} />
-        ) : (
-          <Camera size={ms(16)} color={COLORS.text.inverse} />
-        )}
-      </TouchableOpacity>
+      {onEditPress && (
+        <TouchableOpacity
+          style={styles.badge}
+          activeOpacity={0.8}
+          onPress={onEditPress}
+          disabled={loading} // Disable button while uploading
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={COLORS.text.inverse} />
+          ) : (
+            <Camera size={ms(16)} color={COLORS.text.inverse} />
+          )}
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

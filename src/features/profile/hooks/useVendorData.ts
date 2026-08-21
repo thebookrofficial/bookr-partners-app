@@ -20,7 +20,7 @@ interface Venue {
   avg_rating: number;
   total_reviews: number;
   sports_venues?: { sports_type: string }[];
-  events?: { title: string; cover_image_url?: string | null }[];
+  events?: { title: string; cover_image_url?: string | null; event_status?: string }[];
   cities?: { name: string };
 }
 
@@ -59,7 +59,9 @@ export const useVendorData = () => {
         // 3. Fetch Venues (Blueprint Table 6.1)
         let venuesQuery = supabase
           .from("venues")
-          .select("*, sports_venues(sports_type), events(title, cover_image_url), cities(name)")
+          .select(
+            "*, sports_venues(sports_type), events(title, cover_image_url, event_status), cities(name)",
+          )
           .eq("status", "active")
           .is("deleted_at", null);
 
@@ -78,7 +80,17 @@ export const useVendorData = () => {
         const { data: venuesData, error: venuesError } = await venuesQuery;
 
         if (venuesError) throw venuesError;
-        setVenues((venuesData as Venue[]) || []);
+
+        // Filter out event venues that do not have any published events
+        const activeVenues = ((venuesData as Venue[]) || []).filter(venue => {
+          if (venue.vertical === "events") {
+            // An event venue must have at least one published event to be visible
+            return venue.events && venue.events.some(e => e.event_status === "published");
+          }
+          return true;
+        });
+
+        setVenues(activeVenues);
       } else {
         setClientProfile(null);
         setVenues([]);
