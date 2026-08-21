@@ -41,6 +41,9 @@ const initializeGoogleSignIn = () => {
     GoogleSignin.configure({
       scopes: ["https://www.googleapis.com/auth/userinfo.email"],
       webClientId: clientId,
+      iosClientId:
+        Config.GOOGLE_IOS_CLIENT_ID ||
+        "1077467918306-tp2i1l8u4u802hrf63g7cngiibrir66l.apps.googleusercontent.com",
       offlineAccess: true, // Required for Supabase auth persistence
     });
   } catch (error) {
