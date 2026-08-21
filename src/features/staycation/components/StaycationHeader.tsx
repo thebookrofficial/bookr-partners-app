@@ -2,8 +2,9 @@
 // Confidential and Proprietary.
 
 import React from "react";
-import { View, StyleSheet, ImageSourcePropType } from "react-native";
+import { View, StyleSheet, ImageSourcePropType, TouchableOpacity } from "react-native";
 import { Text, Avatar } from "@/components/ui";
+import { ArrowLeft } from "lucide-react-native";
 import { hs, vs, fs, ms } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 
@@ -14,9 +15,19 @@ interface StaycationHeaderProps {
   onBack?: () => void;
 }
 
-export const StaycationHeader = ({ title, subtitle, imageSource }: StaycationHeaderProps) => {
+export const StaycationHeader = ({
+  title,
+  subtitle,
+  imageSource,
+  onBack,
+}: StaycationHeaderProps) => {
   return (
     <View style={styles.container}>
+      {onBack && (
+        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+          <ArrowLeft size={ms(24)} color={COLORS.text.primary} />
+        </TouchableOpacity>
+      )}
       <View style={styles.content}>
         <Avatar source={imageSource} size={ms(50)} />
         <View style={styles.textWrapper}>
@@ -43,6 +54,10 @@ const styles = StyleSheet.create({
     minHeight: vs(50),
     marginBottom: vs(15),
     paddingHorizontal: hs(6),
+    gap: hs(12),
+  },
+  backButton: {
+    padding: ms(4),
   },
   content: {
     flex: 1,
