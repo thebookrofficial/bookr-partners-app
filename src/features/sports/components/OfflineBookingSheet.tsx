@@ -46,6 +46,7 @@ import { TimePickerModal } from "./TimePickerModal";
 import { z } from "zod";
 import { SportsService } from "../services/sports.service";
 import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
+import { getShortGroundName } from "../hooks/useSportsHome";
 import perf from "@react-native-firebase/perf";
 import { useDebounce } from "@/hooks/useDebounce";
 
@@ -235,6 +236,14 @@ export const OfflineBookingSheet = ({
   const [toTime, setToTime] = useState("End Time");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
 
+  // Category and Ground state
+  const [internalGroundId, setInternalGroundId] = useState<string>(_groundId);
+  const [selectedCategory, setSelectedCategory] = useState<string>(_sportsType || "");
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [allGrounds, setAllGrounds] = useState<any[]>([]);
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [isGroundDropdownOpen, setIsGroundDropdownOpen] = useState(false);
+
   // Database slots cache for exact bounds matching
   const [allDbSlots, setAllDbSlots] = useState<any[]>([]);
 
@@ -247,8 +256,13 @@ export const OfflineBookingSheet = ({
       const [sh, sm] = slot.start_time.split(":").map(Number);
       const [eh, em] = slot.end_time.split(":").map(Number);
       let diff = eh * 60 + em - (sh * 60 + sm);
+      // FIX: Database sometimes stores end of day slots as 23:59:59
+      if (eh === 23 && (em === 59 || em === 58)) {
+        diff = 24 * 60 - (sh * 60 + sm);
+      }
       if (diff < 0) diff += 24 * 60;
-      if (diff > 0 && diff < minDur) {
+      // Also protect against tiny durations
+      if (diff >= 30 && diff < minDur) {
         minDur = diff;
       }
     });
@@ -311,20 +325,53 @@ export const OfflineBookingSheet = ({
     fetchGuests();
   }, [debouncedName, venueId]);
 
+  // Fetch all grounds to populate category and ground dropdowns
+  useEffect(() => {
+    const fetchGrounds = async () => {
+      try {
+        const groundsData = await SportsService.getGrounds(venueId);
+        setAllGrounds(groundsData || []);
+
+        const categories = Array.from(
+          new Set(groundsData?.map((g: any) => g.sports_type).filter(Boolean)),
+        ) as string[];
+        setAvailableCategories(categories);
+
+        // Auto-select first available if empty
+        if (categories.length > 0 && !selectedCategory) {
+          setSelectedCategory(categories[0]);
+        }
+      } catch (err) {
+        console.error("Error fetching grounds:", err);
+      }
+    };
+    if (isVisible && venueId) {
+      fetchGrounds();
+    }
+  }, [venueId, isVisible, selectedCategory]);
+
+  // Synchronize with external props when sheet opens
+  useEffect(() => {
+    if (isVisible) {
+      if (_sportsType) setSelectedCategory(_sportsType);
+      if (_groundId) setInternalGroundId(_groundId);
+    }
+  }, [isVisible, _sportsType, _groundId]);
+
   useEffect(() => {
     setCurrentDate(initialDate);
   }, [initialDate]);
 
   useEffect(() => {
     const fetchSlotsData = async () => {
-      if (!isVisible || !_groundId) {
+      if (!isVisible || !internalGroundId) {
         setIsFetchingSlots(false);
         return;
       }
       setIsFetchingSlots(true);
       try {
         const dateStr = getLocalDateString(currentDate);
-        const data = await SportsService.getSlots(venueId, _groundId, dateStr);
+        const data = await SportsService.getSlots(venueId, internalGroundId, dateStr);
         setAllDbSlots(data || []);
 
         let minDur = pricing.slotDurationMinutes || 60;
@@ -332,8 +379,12 @@ export const OfflineBookingSheet = ({
           const [sh, sm] = slot.start_time.split(":").map(Number);
           const [eh, em] = slot.end_time.split(":").map(Number);
           let diff = eh * 60 + em - (sh * 60 + sm);
+          // FIX: Database sometimes stores end of day slots as 23:59:59
+          if (eh === 23 && (em === 59 || em === 58)) {
+            diff = 24 * 60 - (sh * 60 + sm);
+          }
           if (diff < 0) diff += 24 * 60;
-          if (diff > 0 && diff < minDur) {
+          if (diff >= 30 && diff < minDur) {
             minDur = diff;
           }
         });
@@ -360,18 +411,18 @@ export const OfflineBookingSheet = ({
       }
     };
     fetchSlotsData();
-  }, [currentDate, _groundId, isVisible, pricing.slotDurationMinutes, venueId]);
+  }, [currentDate, internalGroundId, isVisible, pricing.slotDurationMinutes, venueId]);
 
   const prevGroundId = React.useRef<string | null>(null);
 
   // Clear form ONLY if the ground actually changes to a different one
   useEffect(() => {
     // Only reset if we had a previous ground ID and the new one is different
-    if (prevGroundId.current !== null && _groundId !== prevGroundId.current) {
+    if (prevGroundId.current !== null && internalGroundId !== prevGroundId.current) {
       resetForm();
     }
-    prevGroundId.current = _groundId;
-  }, [_groundId, resetForm]);
+    prevGroundId.current = internalGroundId;
+  }, [internalGroundId, resetForm]);
 
   useEffect(() => {
     const checkGuest = async () => {
@@ -402,26 +453,23 @@ export const OfflineBookingSheet = ({
     checkGuest();
   }, [mobile]);
 
+  // Set pricing based on the currently selected ground
   useEffect(() => {
-    const fetchVenuePricing = async () => {
-      if (!venueId || !isVisible) return;
-      try {
-        const data: any = await SportsService.getVenuePricing(venueId);
-        if (data) {
-          setPricing({
-            day: data.day_price || data.price_per_hour || 0,
-            night: data.night_price || data.price_per_hour || 0,
-            default: data.price_per_hour || 0,
-            slotDurationMinutes: data.slot_duration_minutes || 60,
-          });
-          setAdvancePaid(data.min_advance_amount?.toString() || "");
-        }
-      } catch (err) {
-        console.error("Failed to fetch pricing:", err);
+    if (!isVisible || !internalGroundId || allGrounds.length === 0) return;
+
+    const ground = allGrounds.find(g => g.id === internalGroundId);
+    if (ground) {
+      setPricing({
+        day: Number(ground.price_per_slot) || 0,
+        night: Number(ground.night_price_per_slot) || Number(ground.price_per_slot) || 0,
+        default: Number(ground.price_per_slot) || 0,
+        slotDurationMinutes: Number(ground.slot_duration_minutes) || 60,
+      });
+      if (!isAdvanceFocused) {
+        setAdvancePaid(ground.min_advance_price?.toString() || "");
       }
-    };
-    fetchVenuePricing();
-  }, [venueId, isVisible]);
+    }
+  }, [internalGroundId, allGrounds, isVisible, isAdvanceFocused]);
 
   // AUTO-CALCULATE TOTAL PAYMENT
   useEffect(() => {
@@ -490,7 +538,7 @@ export const OfflineBookingSheet = ({
 
       const bookingParams = {
         venueId,
-        groundId: _groundId,
+        groundId: internalGroundId,
         dateStr: formattedDate,
         startTime24,
         endTime24,
@@ -517,6 +565,8 @@ export const OfflineBookingSheet = ({
         endTimeRaw: endTime24,
         idChain: [],
         sports_booking_type: "offline",
+        sports_type: selectedCategory,
+        ground_id: internalGroundId,
         rawSubtotal: numericTotal,
         rawPaidAmount: numericAdvance,
         rawDiscountAmount: 0,
@@ -659,8 +709,105 @@ export const OfflineBookingSheet = ({
                     )}
                   </View>
 
-                  <View style={{ marginTop: vs(16) }}>
+                  <View style={styles.bookingDetailsSection}>
                     <SectionHeader icon={CalendarIcon} text="BOOKING DETAILS" />
+
+                    <View style={[styles.row, styles.zIndex100]}>
+                      <View
+                        style={[
+                          styles.flex1,
+                          isCategoryDropdownOpen ? styles.zIndex1000 : styles.zIndex1,
+                        ]}>
+                        <FieldBox
+                          icon={CalendarIcon}
+                          label="Category"
+                          value={
+                            selectedCategory
+                              ? selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)
+                              : ""
+                          }
+                          onPress={() => {
+                            setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                            setIsGroundDropdownOpen(false);
+                          }}
+                          rightElement={<ChevronDown size={ms(16)} color="#000" />}
+                        />
+                        {isCategoryDropdownOpen && (
+                          <View style={[styles.dropdownContainer, styles.dropdownOverride]}>
+                            <ScrollView
+                              style={styles.dropdownScroll}
+                              nestedScrollEnabled={true}
+                              keyboardShouldPersistTaps="handled">
+                              {availableCategories.map(cat => (
+                                <TouchableOpacity
+                                  key={cat}
+                                  style={styles.dropdownItem}
+                                  onPress={() => {
+                                    setSelectedCategory(cat);
+                                    setIsCategoryDropdownOpen(false);
+                                    const catGrounds = allGrounds.filter(
+                                      g => g.sports_type === cat,
+                                    );
+                                    if (catGrounds.length > 0) {
+                                      setInternalGroundId(catGrounds[0].id);
+                                    }
+                                  }}>
+                                  <Text style={styles.dropdownItemTextLeft}>
+                                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </ScrollView>
+                          </View>
+                        )}
+                      </View>
+                      <View
+                        style={[
+                          styles.flex1,
+                          isGroundDropdownOpen ? styles.zIndex1000 : styles.zIndex1,
+                        ]}>
+                        <FieldBox
+                          icon={CalendarIcon}
+                          label="Ground"
+                          value={
+                            getShortGroundName(
+                              allGrounds.find(g => g.id === internalGroundId)?.name || "",
+                              selectedCategory || "",
+                            ) || "Select"
+                          }
+                          onPress={() => {
+                            setIsGroundDropdownOpen(!isGroundDropdownOpen);
+                            setIsCategoryDropdownOpen(false);
+                          }}
+                          rightElement={<ChevronDown size={ms(16)} color="#000" />}
+                        />
+                        {isGroundDropdownOpen && (
+                          <View style={[styles.dropdownContainer, styles.dropdownOverride]}>
+                            <ScrollView
+                              style={styles.dropdownScroll}
+                              nestedScrollEnabled={true}
+                              keyboardShouldPersistTaps="handled">
+                              {allGrounds
+                                .filter(g => g.sports_type === selectedCategory)
+                                .map(ground => (
+                                  <TouchableOpacity
+                                    key={ground.id}
+                                    style={styles.dropdownItem}
+                                    onPress={() => {
+                                      setInternalGroundId(ground.id);
+                                      setIsGroundDropdownOpen(false);
+                                    }}>
+                                    <Text style={styles.dropdownItemTextLeft} numberOfLines={1}>
+                                      {getShortGroundName(ground.name, selectedCategory)}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
                     <FieldBox
                       icon={CalendarIcon}
                       label="Date"
@@ -945,7 +1092,7 @@ export const OfflineBookingSheet = ({
           />
 
           {isDatePickerOpen && (
-            <View style={[StyleSheet.absoluteFillObject, { zIndex: 999 }]}>
+            <View style={[styles.timePickerContainer, styles.zIndex999]}>
               <TouchableOpacity
                 style={styles.modalOverlay}
                 activeOpacity={1}
@@ -978,6 +1125,14 @@ export const OfflineBookingSheet = ({
 };
 
 const styles = StyleSheet.create({
+  bookingDetailsSection: { marginTop: vs(16), zIndex: 900 },
+  timePickerContainer: { ...StyleSheet.absoluteFillObject },
+  zIndex999: { zIndex: 999 },
+  zIndex100: { zIndex: 100 },
+  zIndex1000: { zIndex: 1000 },
+  zIndex1: { zIndex: 1 },
+  dropdownOverride: { left: 0, right: 0 },
+  historyFieldBox: { paddingVertical: vs(10) },
   disabledOpacity: { opacity: 0.7 },
   overlay: { flex: 1, backgroundColor: COLORS.background },
   keyboardAvoid: { flex: 1 },

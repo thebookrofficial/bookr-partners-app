@@ -61,8 +61,21 @@ const getLocalDateString = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+export const getShortGroundName = (groundName: string, category: string) => {
+  if (!groundName || !category) return groundName;
+  const lowerCat = category.replace(/_/g, " ").toLowerCase();
+  const lowerGround = groundName.toLowerCase();
+
+  if (lowerGround.startsWith(lowerCat + " ")) {
+    const stripped = groundName.substring(lowerCat.length + 1).trim();
+    return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+  }
+  return groundName;
+};
+
 // Helper to format raw database sports_type into beautiful display names
-const formatCategoryName = (dbName: string) => {
+const formatCategoryName = (dbName: string | null | undefined) => {
+  if (!dbName) return "";
   const MAP: Record<string, string> = {
     football: "Football",
     box_cricket: "Box Cricket",
@@ -128,14 +141,36 @@ export const useSportsHome = (
       let firstGroundId = "";
 
       if (groundsData && groundsData.length > 0) {
-        firstGroundId = groundsData[0].id;
-        setGrounds(groundsData);
-        setActiveGroundId(firstGroundId);
+        // Derive available categories directly from the registered grounds
+        const uniqueCatStrings = Array.from(
+          new Set(groundsData.map((g: any) => g.sports_type).filter(Boolean)),
+        ) as string[];
+        setAvailableCategories(uniqueCatStrings.map(formatCategoryName));
 
-        // BOOM! Fire slots and bookings IMMEDIATELY after grounds load
-        // This completely bypasses the venueDetails and categories waterfall!
-        fetchSlots(firstGroundId, initialVenueId);
-        fetchBookings(firstGroundId, initialVenueId);
+        // Filter grounds by the active category and format names
+        const filteredGrounds = groundsData
+          .filter((g: any) => g.sports_type === dbSportType)
+          .map((g: any) => ({
+            ...g,
+            original_name: g.name,
+            name: getShortGroundName(g.name, g.sports_type),
+          }));
+
+        if (filteredGrounds.length > 0) {
+          firstGroundId = filteredGrounds[0].id;
+          setGrounds(filteredGrounds);
+          setActiveGroundId(firstGroundId);
+
+          // BOOM! Fire slots and bookings IMMEDIATELY after grounds load
+          // This completely bypasses the venueDetails and categories waterfall!
+          fetchSlots(firstGroundId, initialVenueId);
+          fetchBookings(firstGroundId, initialVenueId);
+        } else {
+          setGrounds([]);
+          setActiveGroundId("");
+          setSlots([]);
+          setBookings([]);
+        }
       } else {
         setGrounds([]);
         setActiveGroundId("");
@@ -144,7 +179,7 @@ export const useSportsHome = (
       }
 
       // 3. Now wait for venue details
-      const { initialVenue, matchedVenue } = await venuePromise;
+      const { matchedVenue } = await venuePromise;
 
       if (matchedVenue) {
         setCurrentVenueId(matchedVenue.id);
@@ -156,23 +191,6 @@ export const useSportsHome = (
         });
       } else {
         setVenue(null);
-      }
-
-      // 4. Fire categories fetching asynchronously without blocking UI load!
-      if (initialVenue?.owner_id) {
-        SportsService.getAllVendorSportsCategories(initialVenue.owner_id)
-          .then(allSportsData => {
-            if (allSportsData) {
-              const uniqueTypes = new Set<string>();
-              allSportsData.forEach((v: any) => {
-                const sv = v.sports_venues;
-                if (Array.isArray(sv)) sv.forEach((s: any) => uniqueTypes.add(s.sports_type));
-                else if (sv) uniqueTypes.add(sv.sports_type);
-              });
-              setAvailableCategories(Array.from(uniqueTypes).map(formatCategoryName));
-            }
-          })
-          .catch(err => console.error("Error fetching categories:", err));
       }
     } catch (error) {
       console.error("Error fetching sports home data:", error);
