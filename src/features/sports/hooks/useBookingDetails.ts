@@ -27,6 +27,10 @@ export interface BookingDetailData {
     end_time: string;
     slot_date: string;
     ground_id: string;
+    sports_grounds?: {
+      name: string;
+      sports_type: string;
+    };
   };
   venues: {
     name: string;
@@ -92,7 +96,9 @@ export const useBookingDetails = (bookingId: string, idChain?: string[]) => {
           // OPTIMIZATION: Fetch the full chain in ONE query if we have the idChain!
           const { data, error } = await supabase
             .from("sports_bookings")
-            .select("*, sports_slots!inner(*), profiles(*), venues(*)")
+            .select(
+              "*, sports_slots!inner(*, sports_grounds(name, sports_type)), profiles(*), venues(*)",
+            )
             .in("id", idChain)
             .order("created_at", { ascending: true });
 
@@ -108,7 +114,9 @@ export const useBookingDetails = (bookingId: string, idChain?: string[]) => {
           // 1. Fallback: Fetch the original booking first
           const { data: fallbackBaseBooking, error: baseError } = await supabase
             .from("sports_bookings")
-            .select("*, sports_slots!inner(*), profiles(*), venues(*)")
+            .select(
+              "*, sports_slots!inner(*, sports_grounds(name, sports_type)), profiles(*), venues(*)",
+            )
             .eq("id", bookingId)
             .single();
 
@@ -118,7 +126,7 @@ export const useBookingDetails = (bookingId: string, idChain?: string[]) => {
           // 2. Fetch ALL potentially related bookings for this user/slot/date
           let linkedQuery = supabase
             .from("sports_bookings")
-            .select("*, sports_slots!inner(*)")
+            .select("*, sports_slots!inner(*, sports_grounds(name, sports_type))")
             .eq("sports_slots.slot_date", baseBooking.sports_slots.slot_date)
             .eq("sports_slots.ground_id", baseBooking.sports_slots.ground_id)
             .neq("booking_status", "cancelled")

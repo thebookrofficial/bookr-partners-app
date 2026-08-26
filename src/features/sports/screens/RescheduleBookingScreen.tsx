@@ -365,6 +365,18 @@ export const RescheduleBookingScreen = () => {
     rescheduleDate.getFullYear() === now.getFullYear();
   const currentHour = now.getHours();
 
+  const sportsType =
+    booking?.sports_slots?.sports_grounds?.sports_type ||
+    booking?.venues?.sports_venues?.[0]?.sports_type ||
+    "";
+
+  let groundName = booking?.sports_slots?.sports_grounds?.name || "";
+  const catName = sportsType.toLowerCase();
+  const groundLower = groundName.toLowerCase();
+  if (catName && groundLower.startsWith(catName)) {
+    groundName = groundName.slice(catName.length).trim();
+  }
+
   return (
     <ScreenContainer scrollable backgroundColor={COLORS.background} paddingHorizontal={hs(10)}>
       <View style={styles.header}>
@@ -380,6 +392,32 @@ export const RescheduleBookingScreen = () => {
         <FormSkeleton />
       ) : (
         <View style={styles.content}>
+          {/* Category & Ground Info */}
+          <View
+            style={[styles.inputBoxReadOnly, { flexDirection: "row", paddingVertical: vs(12) }]}>
+            <View style={styles.flex1}>
+              <Text variant="body2" weight="bold" color="#000" style={{ fontSize: 14 }}>
+                Category
+              </Text>
+              <Text variant="body1" weight="semiBold" color="#000" style={{ fontSize: 16 }}>
+                {sportsType ? sportsType.charAt(0).toUpperCase() + sportsType.slice(1) : "-"}
+              </Text>
+            </View>
+            <View style={styles.flex1}>
+              <Text variant="body2" weight="bold" color="#000" style={{ fontSize: 14 }}>
+                Ground
+              </Text>
+              <Text
+                variant="body1"
+                weight="semiBold"
+                color="#000"
+                style={{ fontSize: 16 }}
+                numberOfLines={1}>
+                {groundName || "-"}
+              </Text>
+            </View>
+          </View>
+
           {/* Date Selector */}
           <View style={styles.inputBoxReadOnly}>
             <View style={styles.iconBoxBlue}>

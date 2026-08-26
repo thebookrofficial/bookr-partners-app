@@ -20,6 +20,7 @@ import {
   FileText,
   ChevronRight,
   MapPin,
+  Tag,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -126,10 +127,17 @@ export const SportsInvoiceScreen = () => {
     return blocks.join("  |  ");
   };
 
-  const groundName =
+  let groundName =
     booking.all_slots?.[0]?.sports_grounds?.name ||
     booking.sports_slots?.sports_grounds?.name ||
     "N/A";
+
+  const catLower = sportsType.toLowerCase();
+  const groundLower = groundName.toLowerCase();
+  if (catLower && groundLower.startsWith(catLower)) {
+    groundName = groundName.slice(catLower.length).trim();
+  }
+
   const slotDate = booking.all_slots?.[0]?.slot_date || booking.sports_slots?.slot_date;
 
   return (
@@ -190,53 +198,53 @@ export const SportsInvoiceScreen = () => {
           </View>
         </View>
 
-        {/* Time Slots / Ground Section */}
-        {isOnline ? (
-          <View style={styles.fieldRow}>
-            <View style={[styles.fieldGroup, styles.flex1]}>
-              <View style={styles.labelRow}>
-                <MapPin size={ms(18)} color={COLORS.text.primary} />
-                <Text variant="body2" weight="bold" style={styles.labelText}>
-                  Ground
-                </Text>
-              </View>
-              <View style={styles.infoBox}>
-                <Text variant="body2" weight="semiBold">
-                  {groundName}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.fieldGroup, styles.flex1]}>
-              <View style={styles.labelRow}>
-                <Clock size={ms(18)} color={COLORS.text.primary} />
-                <Text variant="body2" weight="bold" style={styles.labelText}>
-                  Time Slots
-                </Text>
-              </View>
-              <View style={styles.infoBox}>
-                <Text variant="body2" weight="semiBold">
-                  {getTimeRanges()}
-                </Text>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.fieldGroup}>
+        {/* Category & Ground Info */}
+        <View style={styles.fieldRow}>
+          <View style={[styles.fieldGroup, styles.flex1]}>
             <View style={styles.labelRow}>
-              <Clock size={ms(18)} color={COLORS.text.primary} />
+              <Tag size={ms(18)} color={COLORS.text.primary} />
               <Text variant="body2" weight="bold" style={styles.labelText}>
-                Time Slots
+                Category
               </Text>
             </View>
             <View style={styles.infoBox}>
               <Text variant="body2" weight="semiBold">
-                {getTimeRanges()}
+                {sportsType ? sportsType.charAt(0).toUpperCase() + sportsType.slice(1) : "-"}
               </Text>
             </View>
           </View>
-        )}
 
-        {/* Payments Section */}
+          <View style={[styles.fieldGroup, styles.flex1]}>
+            <View style={styles.labelRow}>
+              <MapPin size={ms(18)} color={COLORS.text.primary} />
+              <Text variant="body2" weight="bold" style={styles.labelText}>
+                Ground
+              </Text>
+            </View>
+            <View style={styles.infoBox}>
+              <Text variant="body2" weight="semiBold" numberOfLines={1}>
+                {groundName}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Time Slots Section */}
+        <View style={styles.fieldGroup}>
+          <View style={styles.labelRow}>
+            <Clock size={ms(18)} color={COLORS.text.primary} />
+            <Text variant="body2" weight="bold" style={styles.labelText}>
+              Time Slots
+            </Text>
+          </View>
+          <View style={styles.infoBox}>
+            <Text variant="body2" weight="semiBold">
+              {getTimeRanges()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Payment Summary */}
         {isOnline ? (
           <View style={styles.fieldRow}>
             <View style={[styles.fieldGroup, styles.flex1]}>

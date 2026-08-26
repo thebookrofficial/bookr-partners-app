@@ -19,7 +19,17 @@ import {
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, DetailsSkeleton } from "@/components/ui";
 import { useKeyboardStore } from "@/store/keyboardStore";
-import { Clock, Trash2, X, ChevronLeft, Phone, ChevronUp, ChevronDown } from "lucide-react-native";
+import {
+  Clock,
+  Trash2,
+  X,
+  ChevronLeft,
+  Phone,
+  ChevronUp,
+  ChevronDown,
+  MapPin,
+  Tag,
+} from "lucide-react-native";
 import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -144,8 +154,18 @@ export const BookingDetailsScreen = () => {
   const totalDiscount = Number(booking.discount_amount) || 0;
   const totalFees = booking.platform_fee || 0;
 
-  const sportsType = booking.venues?.sports_venues?.[0]?.sports_type || "";
+  const sportsType =
+    booking.sports_slots?.sports_grounds?.sports_type ||
+    booking.venues?.sports_venues?.[0]?.sports_type ||
+    "";
   const isPickleball = sportsType.toLowerCase().includes("pickleball");
+
+  let groundName = booking.sports_slots?.sports_grounds?.name || "";
+  const catName = sportsType.toLowerCase();
+  const groundLower = groundName.toLowerCase();
+  if (catName && groundLower.startsWith(catName)) {
+    groundName = groundName.slice(catName.length).trim();
+  }
 
   const displayTotalAmount = totalAmount;
   const displayAmountPaid = currentPaid + totalDiscount - (isPickleball ? totalFees : 0);
@@ -390,6 +410,36 @@ export const BookingDetailsScreen = () => {
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+
+        <View style={styles.dateTimeRow}>
+          <View style={styles.dateCard}>
+            <View style={styles.iconBoxLightBlue}>
+              <Tag size={ms(20)} color="#63a1fd" />
+            </View>
+            <View style={styles.dateCardTextCol}>
+              <Text variant="body2" weight="bold" style={styles.labelTitle}>
+                Category
+              </Text>
+              <Text variant="body2" style={styles.labelValue}>
+                {sportsType ? sportsType.charAt(0).toUpperCase() + sportsType.slice(1) : "-"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.dateCard}>
+            <View style={styles.iconBoxLightBlue}>
+              <MapPin size={ms(20)} color="#63a1fd" />
+            </View>
+            <View style={styles.dateCardTextCol}>
+              <Text variant="body2" weight="bold" style={styles.labelTitle}>
+                Ground
+              </Text>
+              <Text variant="body2" style={styles.labelValue} numberOfLines={1}>
+                {groundName || "-"}
+              </Text>
+            </View>
+          </View>
+        </View>
 
         <View style={styles.dateTimeRow}>
           <View style={styles.dateCard}>
