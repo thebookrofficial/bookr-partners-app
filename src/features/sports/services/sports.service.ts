@@ -28,7 +28,9 @@ export const SportsService = {
   async getGrounds(venueId: string) {
     const { data, error } = await supabase
       .from("sports_grounds")
-      .select("id, name")
+      .select(
+        "id, name, sports_type, price_per_slot, night_price_per_slot, min_advance_price, slot_duration_minutes",
+      )
       .eq("venue_id", venueId)
       .order("display_order", { ascending: true });
     if (error) throw error;
