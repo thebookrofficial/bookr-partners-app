@@ -33,7 +33,17 @@ import { useAuthStore } from "@/store";
 // ==========================================
 // 1. NEW HISTORY CARD
 // ==========================================
-const HistoryCard = ({ name, phone, date, time, price, status, onPress }: any) => {
+const HistoryCard = ({
+  name,
+  phone,
+  date,
+  time,
+  price,
+  status,
+  onPress,
+  category,
+  ground,
+}: any) => {
   const isOnline = status?.toLowerCase() === "online";
 
   return (
@@ -70,6 +80,15 @@ const HistoryCard = ({ name, phone, date, time, price, status, onPress }: any) =
         </View>
         <Text style={styles.cardGuestCount}>{time}</Text>
       </View>
+
+      {(category || ground) && (
+        <View style={styles.categoryGroundContainer}>
+          <Text style={styles.categoryGroundText}>
+            {category ? category.charAt(0).toUpperCase() + category.slice(1) : ""}{" "}
+            {category && ground ? "•" : ""} {ground}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
@@ -198,32 +217,11 @@ export const SportsHistoryScreen = () => {
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
-            <TouchableOpacity
-              onPress={() => setIsFilterOpen(true)}
-              style={{ position: "relative" }}>
+            <TouchableOpacity onPress={() => setIsFilterOpen(true)} style={styles.filterButton}>
               <SlidersHorizontal size={ms(20)} color="#000" />
               {dateFilter !== "all" && (
-                <View
-                  style={{
-                    position: "absolute",
-                    top: -ms(6),
-                    right: -ms(6),
-                    backgroundColor: COLORS.primary,
-                    width: ms(16),
-                    height: ms(16),
-                    borderRadius: ms(8),
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}>
-                  <Text
-                    style={{
-                      fontSize: fs(10),
-                      color: "#FFF",
-                      fontFamily: "Gilroy-Bold",
-                      lineHeight: fs(10),
-                    }}>
-                    1
-                  </Text>
+                <View style={styles.filterBadgeContainer}>
+                  <Text style={styles.filterBadgeText}>1</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -235,9 +233,7 @@ export const SportsHistoryScreen = () => {
           {loading ? (
             <HistorySkeleton />
           ) : !currentVenueId ? (
-            <Text style={styles.emptyStateText}>
-              No {selectedCategory} facility setup for this club.
-            </Text>
+            <Text style={styles.emptyStateText}>No facilities setup for this club.</Text>
           ) : historyGroups.length === 0 ? (
             <Text style={styles.emptyStateText}>No history found.</Text>
           ) : (
@@ -263,6 +259,8 @@ export const SportsHistoryScreen = () => {
                             time={booking.timeRanges}
                             price={`₹${booking.price}`}
                             status={booking.status}
+                            category={booking.category}
+                            ground={booking.ground}
                             onPress={() => {
                               if (isOwner) {
                                 navigation.navigate("SportsInvoice", { bookingId: booking.id });
@@ -301,6 +299,38 @@ export const SportsHistoryScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  categoryGroundContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: vs(4),
+    paddingLeft: hs(44),
+  },
+  categoryGroundText: {
+    fontSize: fs(14),
+    fontFamily: "Gilroy-Medium",
+    color: "#666",
+  },
+  filterButton: {
+    position: "relative",
+  },
+  filterBadgeContainer: {
+    position: "absolute",
+    top: -ms(6),
+    right: -ms(6),
+    backgroundColor: COLORS.primary,
+    width: ms(16),
+    height: ms(16),
+    borderRadius: ms(8),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterBadgeText: {
+    fontSize: fs(10),
+    color: "#FFF",
+    fontFamily: "Gilroy-Bold",
+    lineHeight: fs(10),
+  },
   headerZIndex: { zIndex: 10, paddingHorizontal: hs(12) },
 
   stickySearchWrapper: {

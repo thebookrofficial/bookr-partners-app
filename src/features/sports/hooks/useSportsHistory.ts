@@ -24,6 +24,8 @@ export interface AggregatedBooking {
   timeRanges: string;
   price: number;
   status: "Online" | "Offline";
+  category?: string;
+  ground?: string;
 }
 
 export const useSportsHistory = (
@@ -33,52 +35,35 @@ export const useSportsHistory = (
   dateFilter: "all" | "yesterday" | "3_months" | "6_months" | "9_months" | "custom" = "all",
   customRange?: { start: Date; end: Date },
 ) => {
-  // 1. Resolve Category to actual Venue ID
-  const { data: resolvedVenueId, isLoading: isResolvingVenue } = useQuery({
-    queryKey: ["resolveVenue", initialVenueId, category],
+  // 1. Resolve all Venue IDs for the owner
+  const { data: venueIds = [], isLoading: isResolvingVenue } = useQuery({
+    queryKey: ["resolveAllVenues", initialVenueId],
     queryFn: async () => {
-      const CATEGORY_DB_MAP: Record<string, string> = {
-        Football: "football",
-        "Box Cricket": "box_cricket",
-        Pickleball: "pickleball",
-      };
-      const dbSportType = CATEGORY_DB_MAP[category] || category;
-
       const { data: initialVenue } = await supabase
         .from("venues")
-        .select("id, owner_id, sports_venues(sports_type)")
+        .select("id, owner_id")
         .eq("id", initialVenueId)
         .single();
       if (!initialVenue) throw new Error("Owner not found");
 
-      const initialSportType = initialVenue.sports_venues?.[0]?.sports_type;
+      const { data: allVenues } = await supabase
+        .from("venues")
+        .select("id")
+        .eq("owner_id", initialVenue.owner_id);
 
-      if (initialSportType === dbSportType) {
-        return initialVenue.id;
-      } else {
-        const { data: matchedVenue } = await supabase
-          .from("venues")
-          .select("id, sports_venues!inner(sports_type)")
-          .eq("owner_id", initialVenue.owner_id)
-          .eq("sports_venues.sports_type", dbSportType)
-          .limit(1)
-          .maybeSingle();
-
-        if (matchedVenue) return matchedVenue.id;
-        return null;
-      }
+      return (allVenues || []).map(v => v.id);
     },
     staleTime: 1000 * 60 * 5, // 5 minutes cache
   });
 
-  // 2. Fetch History using resolved ID
+  // 2. Fetch History using resolved IDs
   const {
     data: allHistoryGroups = [],
     isLoading: isFetchingHistory,
     refetch,
   } = useQuery({
-    queryKey: ["sportsHistory", resolvedVenueId],
-    enabled: !!resolvedVenueId,
+    queryKey: ["sportsHistory", venueIds],
+    enabled: venueIds.length > 0,
     queryFn: async () => {
       const { data: bookings, error } = await supabase
         .from("sports_bookings")
@@ -87,10 +72,10 @@ export const useSportsHistory = (
           id, guest_name, guest_phone, total_amount, paid_amount, subtotal, discount_amount, platform_fee, booking_status,
           booking_group_id, parent_booking_id, sports_booking_type, booking_source,
           profiles(full_name, phone),
-          sports_slots!inner(slot_date, start_time, end_time)
+          sports_slots!inner(slot_date, start_time, end_time, sports_grounds(name, sports_type))
         `,
         )
-        .eq("venue_id", resolvedVenueId!)
+        .in("venue_id", venueIds)
         .neq("booking_status", "cancelled")
         .order("created_at", { ascending: false });
 
@@ -145,6 +130,8 @@ export const useSportsHistory = (
             slots: [],
             rawBookingType: b.sports_booking_type,
             rawBookingSource: b.booking_source,
+            category: b.sports_slots?.sports_grounds?.sports_type || "",
+            ground: b.sports_slots?.sports_grounds?.name || "",
           };
         }
 
@@ -204,7 +191,15 @@ export const useSportsHistory = (
               status = "Online";
             }
 
-            const isPickleball = category.toLowerCase().includes("pickleball");
+            const cat = u.category || "";
+            let ground = u.ground || "";
+            const catLower = cat.toLowerCase();
+            const groundLower = ground.toLowerCase();
+            if (catLower && groundLower.startsWith(catLower)) {
+              ground = ground.slice(catLower.length).trim();
+            }
+
+            const isPickleball = catLower.includes("pickleball");
             const displayPrice = isPickleball
               ? u.totalPaid + u.totalDiscount - u.totalPlatformFee
               : u.totalPaid + u.totalDiscount;
@@ -216,6 +211,8 @@ export const useSportsHistory = (
               timeRanges,
               price: displayPrice,
               status,
+              category: cat,
+              ground,
             };
           });
           return {
@@ -303,7 +300,7 @@ export const useSportsHistory = (
   }, [allHistoryGroups, searchQuery, dateFilter, customRange]);
 
   return {
-    currentVenueId: resolvedVenueId || initialVenueId,
+    currentVenueId: initialVenueId,
     historyGroups: filteredHistoryGroups,
     loading: isResolvingVenue || isFetchingHistory,
     refetch,
