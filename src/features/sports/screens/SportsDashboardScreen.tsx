@@ -22,7 +22,6 @@ import Svg, { Path } from "react-native-svg";
 // Navigation & DB Imports
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { SportsTabParamList } from "@/navigation/navigation.types";
-import { supabase } from "@/lib/supabase";
 
 import { useServiceStore } from "@/store/serviceStore";
 import { useSportsDashboard } from "../hooks/useSportsDashboard";
@@ -80,7 +79,7 @@ export const SportsDashboardScreen = () => {
   }, [routeCategory, serviceId, storedCategory, setServiceCategory]);
 
   // Dynamic Venue Resolution State
-  const [currentVenueId, setCurrentVenueId] = useState<string>("");
+  const [currentVenueIds, setCurrentVenueIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const {
@@ -88,7 +87,7 @@ export const SportsDashboardScreen = () => {
     grounds,
     loading: dataLoading,
     refetch,
-  } = useSportsDashboard(currentVenueId, timeFilter, groundFilter, selectedCategory, customRange);
+  } = useSportsDashboard(currentVenueIds, timeFilter, groundFilter, selectedCategory, customRange);
 
   const { activeVenueName } = useServiceStore();
 
@@ -104,39 +103,8 @@ export const SportsDashboardScreen = () => {
     const resolveVenue = async () => {
       setLoading(true);
       try {
-        const CATEGORY_DB_MAP: Record<string, string> = {
-          Football: "football",
-          "Box Cricket": "box_cricket",
-          Pickleball: "pickleball",
-        };
-        const dbSportType = CATEGORY_DB_MAP[selectedCategory] || selectedCategory;
-
-        const { data: initialVenue } = await supabase
-          .from("venues")
-          .select("id, owner_id, sports_venues(sports_type)")
-          .eq("id", serviceId)
-          .single();
-        if (!initialVenue) return;
-
-        // Check if the initial venue itself matches the sport type
-        const initialSportType = initialVenue.sports_venues?.[0]?.sports_type;
-        let finalVenueId = "";
-
-        if (initialSportType === dbSportType) {
-          finalVenueId = initialVenue.id;
-        } else {
-          const { data: matchedVenue } = await supabase
-            .from("venues")
-            .select("id, sports_venues!inner(sports_type)")
-            .eq("owner_id", initialVenue.owner_id)
-            .eq("sports_venues.sports_type", dbSportType)
-            .limit(1)
-            .maybeSingle();
-
-          if (matchedVenue) finalVenueId = matchedVenue.id;
-        }
-
-        setCurrentVenueId(finalVenueId);
+        // Just use the current club's serviceId to fetch all its categories
+        setCurrentVenueIds([serviceId]);
       } catch (err) {
         console.error("Dashboard resolution error:", err);
       } finally {
@@ -178,10 +146,8 @@ export const SportsDashboardScreen = () => {
         {/* 2. Conditional Rendering for Dashboard Content */}
         {loading || dataLoading ? (
           <DashboardSkeleton />
-        ) : !currentVenueId ? (
-          <Text style={styles.emptyStateText}>
-            No {selectedCategory} facility setup for this club.
-          </Text>
+        ) : currentVenueIds.length === 0 ? (
+          <Text style={styles.emptyStateText}>No facilities setup for this club.</Text>
         ) : (
           <>
             {/* Selection Row */}

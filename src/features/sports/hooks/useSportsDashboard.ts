@@ -43,7 +43,7 @@ const getLocalISODate = (date: Date) => {
 };
 
 export const useSportsDashboard = (
-  venueId: string,
+  venueIds: string[],
   timeFilter: string,
   groundFilter: string, // This will be the ground NAME or "Overall"
   selectedCategory: string,
@@ -64,7 +64,7 @@ export const useSportsDashboard = (
   const [loading, setLoading] = useState(true);
 
   const fetchDashboardData = useCallback(async () => {
-    if (!venueId) {
+    if (!venueIds || venueIds.length === 0) {
       setLoading(false);
       return;
     }
@@ -75,7 +75,7 @@ export const useSportsDashboard = (
       const { data: groundsData } = await supabase
         .from("sports_grounds")
         .select("id, name")
-        .eq("venue_id", venueId)
+        .in("venue_id", venueIds)
         .order("display_order", { ascending: true });
 
       const resolvedGrounds = groundsData || [];
@@ -125,10 +125,10 @@ export const useSportsDashboard = (
         .select(
           `
           id, user_id, guest_name, total_amount, vendor_payout, booking_status, subtotal, paid_amount, discount_amount, platform_fee, booking_source, booking_group_id, parent_booking_id,
-          sports_slots!inner(slot_date, ground_id)
+          sports_slots!inner(slot_date, ground_id, sports_grounds(sports_type))
         `,
         )
-        .eq("venue_id", venueId)
+        .in("venue_id", venueIds)
         .neq("booking_status", "cancelled")
         .gte("sports_slots.slot_date", getLocalISODate(startDate))
         .lte("sports_slots.slot_date", getLocalISODate(endDate));
@@ -157,23 +157,29 @@ export const useSportsDashboard = (
           groupedBookings[uniqueKey] = {
             ...b,
             date: date, // Keep a flat date for easier access later
+            sports_type: slot?.sports_grounds?.sports_type || "",
             total_amount: Number(b.total_amount || 0),
             vendor_payout: Number(b.vendor_payout || 0),
             subtotal: Number(b.subtotal || 0),
             paid_amount: Number(b.paid_amount || 0),
             discount_amount: Number(b.discount_amount || 0),
             platform_fee: Number(b.platform_fee || 0),
-            merged_count: 1,
+            merged_count: 1, // Number of unique bookings in this group
+            processed_booking_ids: new Set([b.id]),
           };
         } else {
-          // Sum up amounts for the same transaction group
-          groupedBookings[uniqueKey].total_amount += Number(b.total_amount || 0);
-          groupedBookings[uniqueKey].vendor_payout += Number(b.vendor_payout || 0);
-          groupedBookings[uniqueKey].subtotal += Number(b.subtotal || 0);
-          groupedBookings[uniqueKey].paid_amount += Number(b.paid_amount || 0);
-          groupedBookings[uniqueKey].discount_amount += Number(b.discount_amount || 0);
-          groupedBookings[uniqueKey].platform_fee += Number(b.platform_fee || 0);
-          groupedBookings[uniqueKey].merged_count += 1;
+          // Check if we've already processed this exact booking ID (e.g. from multiple slots)
+          if (!groupedBookings[uniqueKey].processed_booking_ids.has(b.id)) {
+            // Sum up amounts for the same transaction group but DIFFERENT bookings
+            groupedBookings[uniqueKey].total_amount += Number(b.total_amount || 0);
+            groupedBookings[uniqueKey].vendor_payout += Number(b.vendor_payout || 0);
+            groupedBookings[uniqueKey].subtotal += Number(b.subtotal || 0);
+            groupedBookings[uniqueKey].paid_amount += Number(b.paid_amount || 0);
+            groupedBookings[uniqueKey].discount_amount += Number(b.discount_amount || 0);
+            groupedBookings[uniqueKey].platform_fee += Number(b.platform_fee || 0);
+            groupedBookings[uniqueKey].merged_count += 1;
+            groupedBookings[uniqueKey].processed_booking_ids.add(b.id);
+          }
         }
       });
 
@@ -197,57 +203,31 @@ export const useSportsDashboard = (
         dateCursor.setDate(dateCursor.getDate() + 1);
       }
 
-      const isPickleball = selectedCategory.toLowerCase().includes("pickleball");
+      const groupedArray = Object.values(groupedBookings);
 
-      Object.values(groupedBookings).forEach((b: any) => {
-        const isOnline = b.booking_source === "online";
-        const isOffline = !isOnline;
+      groupedArray.forEach((group: any) => {
+        const isOnline = group.booking_source === "online";
 
-        if (isOffline) {
-          offlineCount++;
-          totalOfflineRevenue += Number(b.paid_amount || 0);
+        // Handle platform fee dynamically per booking
+        const isPickleball = group.sports_type.toLowerCase().includes("pickleball");
+        let bookingRevenue = 0;
+
+        if (isOnline) {
+          bookingRevenue = group.subtotal;
+          onlineCount += group.merged_count;
+          totalOnlineRevenue += bookingRevenue;
         } else {
-          onlineCount++;
-
-          // --- SYNCED WITH SportsInvoiceScreen.tsx ---
-          const sumPaid = Number(b.paid_amount || 0);
-          const sumDiscount = Number(b.discount_amount || 0);
-          const sumSubtotal = Number(b.subtotal || 0);
-          const sumTotalAmt = Number(b.total_amount || 0);
-          const sumPlatformFee = Number(b.platform_fee || 0);
-
-          // 1. Total Paid = paid_amount + discount - (if Pickleball, platform_fee)
-          const totalPaid = sumPaid + sumDiscount - (isPickleball ? sumPlatformFee : 0);
-
-          // 2. Platform Fee (Comm) = 3.5% of FULL TotalAmt (Matches Invoice Screen)
-          const commission = Number((sumTotalAmt * 0.035).toFixed(2));
-
-          // 3. Gateway Fee = 2% of Subtotal (actual gateway amount)
-          const gateway = Number((sumSubtotal * 0.02).toFixed(2));
-
-          // 4. Payout = Total Paid - Commission - Gateway
-          const payout = totalPaid - commission - gateway;
-
-          totalOnlineRevenue += payout;
+          bookingRevenue = isPickleball
+            ? group.paid_amount + group.discount_amount - group.platform_fee
+            : group.paid_amount + group.discount_amount;
+          offlineCount += group.merged_count;
+          totalOfflineRevenue += bookingRevenue;
         }
 
-        const dateKey = b.date;
+        const dateKey = getLocalISODate(new Date(group.date));
         if (dailyData[dateKey]) {
-          dailyData[dateKey].bookings += 1;
-          if (isOnline) {
-            // Consistency: use same payout calc for graph
-            const totalPaid =
-              Number(b.paid_amount || 0) +
-              Number(b.discount_amount || 0) -
-              (isPickleball ? Number(b.platform_fee || 0) : 0);
-            const payout =
-              totalPaid -
-              Number((Number(b.total_amount || 0) * 0.035).toFixed(2)) -
-              Number((Number(b.subtotal || 0) * 0.02).toFixed(2));
-            dailyData[dateKey].revenue += payout;
-          } else {
-            dailyData[dateKey].revenue += Number(b.total_amount || 0);
-          }
+          dailyData[dateKey].bookings += group.merged_count;
+          dailyData[dateKey].revenue += bookingRevenue;
         }
       });
 
@@ -285,29 +265,12 @@ export const useSportsDashboard = (
         maxBookingValue,
         dateRangeLabel: dateLabel,
       });
-    } catch (err) {
-      console.error("Dashboard data fetch error:", err);
+    } catch (error) {
+      console.error("Dashboard fetch error:", error);
     } finally {
       setLoading(false);
     }
-  }, [venueId, timeFilter, groundFilter, customRange, selectedCategory]);
-
-  useEffect(() => {
-    setLoading(true);
-    setGrounds([]);
-    // Reset metrics to defaults
-    setMetrics({
-      totalBookings: 0,
-      onlineBookings: 0,
-      offlineBookings: 0,
-      onlineRevenue: 0,
-      offlineRevenue: 0,
-      bookingGraphData: [],
-      revenueGraphData: [],
-      maxBookingValue: 0,
-      dateRangeLabel: "",
-    });
-  }, [venueId, timeFilter, groundFilter, customRange]);
+  }, [venueIds, timeFilter, groundFilter, customRange]);
 
   useEffect(() => {
     fetchDashboardData();
