@@ -238,7 +238,9 @@ export const OfflineBookingSheet = ({
 
   // Category and Ground state
   const [internalGroundId, setInternalGroundId] = useState<string>(_groundId);
-  const [selectedCategory, setSelectedCategory] = useState<string>(_sportsType || "");
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    _sportsType ? _sportsType.toLowerCase().replace(/ /g, "_") : "",
+  );
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [allGrounds, setAllGrounds] = useState<any[]>([]);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -353,7 +355,8 @@ export const OfflineBookingSheet = ({
   // Synchronize with external props when sheet opens
   useEffect(() => {
     if (isVisible) {
-      if (_sportsType) setSelectedCategory(_sportsType);
+      // Normalize to DB format (lowercase_underscored) so filter matches sports_type column
+      if (_sportsType) setSelectedCategory(_sportsType.toLowerCase().replace(/ /g, "_"));
       if (_groundId) setInternalGroundId(_groundId);
     }
   }, [isVisible, _sportsType, _groundId]);
@@ -371,7 +374,39 @@ export const OfflineBookingSheet = ({
       setIsFetchingSlots(true);
       try {
         const dateStr = getLocalDateString(currentDate);
-        const data = await SportsService.getSlots(venueId, internalGroundId, dateStr);
+        const allSlots = await SportsService.getAllVenueSlots(venueId, dateStr);
+
+        const parentId = allGrounds.find((g: any) => g.id === internalGroundId)?.parent_ground_id;
+        const childIds = allGrounds
+          .filter((g: any) => g.parent_ground_id === internalGroundId)
+          .map((g: any) => g.id);
+        const parentSlots = parentId ? allSlots.filter((s: any) => s.ground_id === parentId) : [];
+        const childrenSlots =
+          childIds.length > 0 ? allSlots.filter((s: any) => childIds.includes(s.ground_id)) : [];
+
+        const data = allSlots
+          .filter((s: any) => s.ground_id === internalGroundId)
+          .map((slot: any) => {
+            let slotStatus = slot.status;
+            if (slotStatus === "available") {
+              if (parentId) {
+                const matchingParentSlot = parentSlots.find(
+                  (ps: any) => ps.start_time <= slot.start_time && ps.end_time > slot.start_time,
+                );
+                if (matchingParentSlot && matchingParentSlot.status !== "available")
+                  slotStatus = "booked";
+              }
+              if (childIds.length > 0) {
+                const matchingChildSlots = childrenSlots.filter(
+                  (cs: any) => cs.start_time <= slot.start_time && cs.end_time > slot.start_time,
+                );
+                if (matchingChildSlots.some((cs: any) => cs.status !== "available"))
+                  slotStatus = "booked";
+              }
+            }
+            return { ...slot, status: slotStatus };
+          });
+
         setAllDbSlots(data || []);
 
         let minDur = pricing.slotDurationMinutes || 60;
@@ -411,18 +446,27 @@ export const OfflineBookingSheet = ({
       }
     };
     fetchSlotsData();
-  }, [currentDate, internalGroundId, isVisible, pricing.slotDurationMinutes, venueId]);
+  }, [allGrounds, currentDate, internalGroundId, isVisible, pricing.slotDurationMinutes, venueId]);
 
   const prevGroundId = React.useRef<string | null>(null);
 
-  // Clear form ONLY if the ground actually changes to a different one
+  // Clear form ONLY if the ground actually changes to a different one.
+  // Preserve customer details (name & mobile) so the user doesn't have
+  // to re-search every time they switch ground or category.
   useEffect(() => {
-    // Only reset if we had a previous ground ID and the new one is different
     if (prevGroundId.current !== null && internalGroundId !== prevGroundId.current) {
-      resetForm();
+      // Only reset time & payment fields, NOT the customer details
+      setCurrentDate(initialDate);
+      setTotalPayment("");
+      setAdvancePaid("");
+      setFromTime("Start Time");
+      setToTime("End Time");
+      setHasHistory(false);
+      setAllDbSlots([]);
+      setIsFetchingSlots(false);
     }
     prevGroundId.current = internalGroundId;
-  }, [internalGroundId, resetForm]);
+  }, [internalGroundId, initialDate]);
 
   useEffect(() => {
     const checkGuest = async () => {
@@ -550,6 +594,7 @@ export const OfflineBookingSheet = ({
         bookingSource: "offline",
         sportsBookingType: "offline",
         slotDurationMinutes: detectedSlotDuration,
+        sportCategory: _sportsType,
       };
 
       const optimisticBooking = {
@@ -745,9 +790,16 @@ export const OfflineBookingSheet = ({
                                   onPress={() => {
                                     setSelectedCategory(cat);
                                     setIsCategoryDropdownOpen(false);
-                                    const catGrounds = allGrounds.filter(
-                                      g => g.sports_type === cat,
-                                    );
+                                    // Also include child grounds that have a parent with this sports_type
+                                    const catGrounds = allGrounds.filter(g => {
+                                      let type = g.sports_type;
+                                      if (!type && g.parent_ground_id) {
+                                        type = allGrounds.find(
+                                          (p: any) => p.id === g.parent_ground_id,
+                                        )?.sports_type;
+                                      }
+                                      return type === cat;
+                                    });
                                     if (catGrounds.length > 0) {
                                       setInternalGroundId(catGrounds[0].id);
                                     }
@@ -776,35 +828,57 @@ export const OfflineBookingSheet = ({
                             ) || "Select"
                           }
                           onPress={() => {
+                            // Don't open if grounds haven't loaded yet
+                            if (allGrounds.length === 0) return;
                             setIsGroundDropdownOpen(!isGroundDropdownOpen);
                             setIsCategoryDropdownOpen(false);
                           }}
                           rightElement={<ChevronDown size={ms(16)} color="#000" />}
                         />
-                        {isGroundDropdownOpen && (
-                          <View style={[styles.dropdownContainer, styles.dropdownOverride]}>
-                            <ScrollView
-                              style={styles.dropdownScroll}
-                              nestedScrollEnabled={true}
-                              keyboardShouldPersistTaps="handled">
-                              {allGrounds
-                                .filter(g => g.sports_type === selectedCategory)
-                                .map(ground => (
-                                  <TouchableOpacity
-                                    key={ground.id}
-                                    style={styles.dropdownItem}
-                                    onPress={() => {
-                                      setInternalGroundId(ground.id);
-                                      setIsGroundDropdownOpen(false);
-                                    }}>
-                                    <Text style={styles.dropdownItemTextLeft} numberOfLines={1}>
-                                      {getShortGroundName(ground.name, selectedCategory)}
-                                    </Text>
-                                  </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                          </View>
-                        )}
+                        {isGroundDropdownOpen &&
+                          (() => {
+                            const groundsForCategory = allGrounds.filter((g: any) => {
+                              let type = g.sports_type;
+                              if (!type && g.parent_ground_id) {
+                                type = allGrounds.find(
+                                  (p: any) => p.id === g.parent_ground_id,
+                                )?.sports_type;
+                              }
+                              return type === selectedCategory;
+                            });
+                            // Only auto-close if grounds have loaded but none match — prevents
+                            // closing on first render when allGrounds is still loading (empty)
+                            if (allGrounds.length > 0 && groundsForCategory.length === 0) {
+                              setTimeout(() => setIsGroundDropdownOpen(false), 0);
+                              return null;
+                            }
+                            // Still loading — render nothing but keep dropdown open
+                            if (allGrounds.length === 0) {
+                              return null;
+                            }
+                            return (
+                              <View style={[styles.dropdownContainer, styles.dropdownOverride]}>
+                                <ScrollView
+                                  style={styles.dropdownScroll}
+                                  nestedScrollEnabled={true}
+                                  keyboardShouldPersistTaps="handled">
+                                  {groundsForCategory.map(ground => (
+                                    <TouchableOpacity
+                                      key={ground.id}
+                                      style={styles.dropdownItem}
+                                      onPress={() => {
+                                        setInternalGroundId(ground.id);
+                                        setIsGroundDropdownOpen(false);
+                                      }}>
+                                      <Text style={styles.dropdownItemTextLeft} numberOfLines={1}>
+                                        {getShortGroundName(ground.name, selectedCategory)}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  ))}
+                                </ScrollView>
+                              </View>
+                            );
+                          })()}
                       </View>
                     </View>
 
