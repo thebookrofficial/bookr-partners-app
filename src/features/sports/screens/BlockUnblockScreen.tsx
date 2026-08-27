@@ -51,9 +51,9 @@ export const BlockUnblockScreen = () => {
   const { venueId, groundId } = route.params || { venueId: "", groundId: "" };
 
   const { activeVenueName, selectedCategories } = useServiceStore();
-  const selectedCategory = selectedCategories[venueId] || "Football";
 
-  const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
+  const [grounds, setGrounds] = useState<{ id: string; name: string; sports_type?: string }[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId || "");
 
   const { activeBlocks, pastBlocks, loading, blockSlots, unblockSlots, refresh } = useBlockUnblock(
@@ -69,10 +69,29 @@ export const BlockUnblockScreen = () => {
         const data = await SportsService.getGrounds(venueId);
         if (data && data.length > 0) {
           setGrounds(data);
-          if (groundId) {
+
+          const cats = Array.from(
+            new Set(data.map(g => g.sports_type).filter(Boolean)),
+          ) as string[];
+
+          let initialCat = selectedCategories[venueId] || "";
+          if (!initialCat || !cats.includes(initialCat)) {
+            initialCat = cats.length > 0 ? cats[0] : "";
+          }
+          setSelectedCategory(initialCat);
+
+          const filtered = data.filter((g: any) => {
+            let type = g.sports_type;
+            if (!type && g.parent_ground_id) {
+              type = data.find((p: any) => p.id === g.parent_ground_id)?.sports_type;
+            }
+            return type === initialCat;
+          });
+
+          if (groundId && filtered.some(g => g.id === groundId)) {
             setSelectedGroundId(groundId);
-          } else {
-            setSelectedGroundId(data[0].id);
+          } else if (filtered.length > 0) {
+            setSelectedGroundId(filtered[0].id);
           }
         }
       } catch (err) {
@@ -80,7 +99,32 @@ export const BlockUnblockScreen = () => {
       }
     };
     fetchGrounds();
-  }, [venueId, groundId]);
+  }, [venueId, groundId, selectedCategories]);
+
+  const handleCategoryChange = (cat: string) => {
+    setSelectedCategory(cat);
+    const filtered = grounds.filter((g: any) => {
+      let type = g.sports_type;
+      if (!type && g.parent_ground_id) {
+        type = grounds.find((p: any) => p.id === g.parent_ground_id)?.sports_type;
+      }
+      return type === cat;
+    });
+    if (filtered.length > 0) {
+      setSelectedGroundId(filtered[0].id);
+    }
+  };
+
+  const filteredGrounds = grounds.filter((g: any) => {
+    let type = g.sports_type;
+    if (!type && g.parent_ground_id) {
+      type = grounds.find((p: any) => p.id === g.parent_ground_id)?.sports_type;
+    }
+    return type === selectedCategory;
+  });
+  const categories = Array.from(
+    new Set(grounds.map(g => g.sports_type).filter(Boolean)),
+  ) as string[];
 
   const [isSelectingRange, setIsSelectingRange] = useState(false);
   const [slotType, setSlotType] = useState<"Custom" | "All">("All");
@@ -239,14 +283,38 @@ export const BlockUnblockScreen = () => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <ServiceHeader title={activeVenueName} subtitle="Block / Unblock" />
 
+        {/* Category Selector */}
+        {categories.length > 1 && (
+          <View style={[styles.groundScrollWrapper, { marginBottom: vs(8) }]}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.groundScroll}>
+              {categories.map(cat => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.groundPill, selectedCategory === cat && styles.groundPillActive]}
+                  onPress={() => handleCategoryChange(cat)}>
+                  <Text
+                    variant="body2"
+                    weight="semiBold"
+                    color={selectedCategory === cat ? COLORS.text.inverse : COLORS.text.primary}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Ground Selector */}
-        {grounds.length > 0 && (
+        {filteredGrounds.length > 0 && (
           <View style={styles.groundScrollWrapper}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.groundScroll}>
-              {grounds.map(g => (
+              {filteredGrounds.map(g => (
                 <TouchableOpacity
                   key={g.id}
                   style={[styles.groundPill, selectedGroundId === g.id && styles.groundPillActive]}

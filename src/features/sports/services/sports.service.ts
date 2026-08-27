@@ -29,7 +29,7 @@ export const SportsService = {
     const { data, error } = await supabase
       .from("sports_grounds")
       .select(
-        "id, name, sports_type, price_per_slot, night_price_per_slot, min_advance_price, slot_duration_minutes",
+        "id, name, sports_type, price_per_slot, night_price_per_slot, min_advance_price, slot_duration_minutes, parent_ground_id",
       )
       .eq("venue_id", venueId)
       .order("display_order", { ascending: true });
@@ -51,9 +51,22 @@ export const SportsService = {
     return data;
   },
 
+  async getAllVenueSlots(venueId: string, dateStr: string) {
+    const { data, error } = await supabase
+      .from("sports_slots")
+      .select(
+        `id, start_time, end_time, status, ground_id, sports_bookings ( platform_fee, gateway_fee, user_id, booking_status, sports_booking_type, booking_source )`,
+      )
+      .eq("venue_id", venueId)
+      .eq("slot_date", dateStr)
+      .order("start_time", { ascending: true });
+    if (error) throw error;
+    return data;
+  },
+
   async getBookings(
     venueId: string,
-    groundId: string,
+    groundIds: string | string[],
     dateStr: string,
     mode: "exact" | "gt" = "exact",
   ) {
@@ -67,8 +80,13 @@ export const SportsService = {
         sports_slots!inner ( id, start_time, end_time, slot_date, status, ground_id )
       `,
       )
-      .eq("venue_id", venueId)
-      .eq("sports_slots.ground_id", groundId);
+      .eq("venue_id", venueId);
+
+    if (Array.isArray(groundIds)) {
+      query = query.in("sports_slots.ground_id", groundIds);
+    } else {
+      query = query.eq("sports_slots.ground_id", groundIds);
+    }
 
     if (mode === "exact") {
       query = query.eq("sports_slots.slot_date", dateStr);
@@ -109,6 +127,7 @@ export const SportsService = {
           end_time: slot?.end_time,
           slot_date: slot?.slot_date,
           slot_status: slot?.status,
+          ground_id: slot?.ground_id,
         };
       });
   },
@@ -217,6 +236,7 @@ export const SportsService = {
     bookingGroupIdOverride?: string | null;
     isRescheduled?: boolean;
     originalBookingId?: string | null;
+    sportCategory?: string;
   }) {
     const [startH, startM] = params.startTime24.split(":").map(Number);
     const [endH, endM] = params.endTime24.split(":").map(Number);
@@ -357,6 +377,7 @@ export const SportsService = {
         `Manual Offline Booking ${isMultiSlot ? `(Slot ${i + 1}/${totalSlots})` : ""}`,
       is_rescheduled: params.isRescheduled || false,
       original_booking_id: params.originalBookingId || null,
+      sport_category: params.sportCategory || null,
     }));
 
     const { error: bookingError } = await supabase.from("sports_bookings").insert(bookingsToInsert);
@@ -585,6 +606,7 @@ export const SportsService = {
         notesOverride: `Rescheduled from Booking ID: ${oldBooking.id}`,
         isRescheduled: true,
         originalBookingId: oldBooking.id,
+        sportCategory: oldBooking.sport_category || undefined,
       });
 
       return true;

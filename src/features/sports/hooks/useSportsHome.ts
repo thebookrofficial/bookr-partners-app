@@ -15,6 +15,7 @@ interface VenueData {
 interface GroundData {
   id: string;
   name: string;
+  parent_ground_id?: string | null;
 }
 
 export interface SlotData {
@@ -149,11 +150,19 @@ export const useSportsHome = (
 
         // Filter grounds by the active category and format names
         const filteredGrounds = groundsData
-          .filter((g: any) => g.sports_type === dbSportType)
+          .filter((g: any) => {
+            // Inherit sports_type from parent if null
+            let groundType = g.sports_type;
+            if (!groundType && g.parent_ground_id) {
+              const parent = groundsData.find((p: any) => p.id === g.parent_ground_id);
+              if (parent) groundType = parent.sports_type;
+            }
+            return groundType === dbSportType;
+          })
           .map((g: any) => ({
             ...g,
             original_name: g.name,
-            name: getShortGroundName(g.name, g.sports_type),
+            name: getShortGroundName(g.name, dbSportType),
           }));
 
         if (filteredGrounds.length > 0) {
@@ -208,10 +217,18 @@ export const useSportsHome = (
       setSlotsLoading(true);
       try {
         const localDateString = getLocalDateString(selectedDate);
-        const slotsData = await SportsService.getSlots(vId, gId, localDateString);
+        const allSlotsData = await SportsService.getAllVenueSlots(vId, localDateString);
 
-        const rawSlots = slotsData || [];
-        const formattedSlots: SlotData[] = rawSlots.map((slot: any) => {
+        const rawSlots = allSlotsData || [];
+        const currentGroundSlots = rawSlots.filter(s => s.ground_id === gId);
+
+        const parentId = grounds.find(g => g.id === gId)?.parent_ground_id;
+        const childIds = grounds.filter(g => g.parent_ground_id === gId).map(g => g.id);
+        const parentSlots = parentId ? rawSlots.filter(s => s.ground_id === parentId) : [];
+        const childrenSlots =
+          childIds.length > 0 ? rawSlots.filter(s => childIds.includes(s.ground_id)) : [];
+
+        const formattedSlots: SlotData[] = currentGroundSlots.map((slot: any) => {
           const [startHStr, startMStr] = slot.start_time.split(":");
           const hourInt = parseInt(startHStr, 10);
           const ampm = hourInt >= 12 ? "PM" : "AM";
@@ -224,12 +241,12 @@ export const useSportsHome = (
             return bStatus !== "cancelled" && bStatus !== "refunded";
           });
 
-          const isOnline = validBooking
+          let isOnline = validBooking
             ? validBooking.booking_source === "online" ||
               (validBooking.platform_fee && parseFloat(validBooking.platform_fee) > 0)
             : false;
 
-          const isManual = validBooking ? !isOnline : false;
+          let isManual = validBooking ? !isOnline : false;
 
           const startH = parseInt(startHStr, 10);
           const startM = parseInt(startMStr, 10);
@@ -237,10 +254,51 @@ export const useSportsHome = (
           let durationMins = endH * 60 + endM - (startH * 60 + startM);
           if (durationMins < 0) durationMins += 24 * 60;
 
+          let slotStatus = slot.status;
+          if (slotStatus === "available") {
+            let derivedBooking = null;
+
+            // Check Parent Slots overlapping this time
+            if (parentId) {
+              const matchingParentSlot = parentSlots.find(
+                (ps: any) => ps.start_time <= slot.start_time && ps.end_time > slot.start_time,
+              );
+              if (matchingParentSlot && matchingParentSlot.status !== "available") {
+                slotStatus = matchingParentSlot.status; // Derived status
+                derivedBooking = matchingParentSlot.sports_bookings?.find((b: any) => {
+                  const bStatus = (b.booking_status || "").toLowerCase().trim();
+                  return bStatus !== "cancelled" && bStatus !== "refunded";
+                });
+              }
+            }
+
+            // Check Child Slots overlapping this time
+            if (childIds.length > 0 && slotStatus === "available") {
+              const matchingChildSlots = childrenSlots.filter(
+                (cs: any) => cs.start_time <= slot.start_time && cs.end_time > slot.start_time,
+              );
+              const blockedChild = matchingChildSlots.find((cs: any) => cs.status !== "available");
+              if (blockedChild) {
+                slotStatus = blockedChild.status; // Derived status
+                derivedBooking = blockedChild.sports_bookings?.find((b: any) => {
+                  const bStatus = (b.booking_status || "").toLowerCase().trim();
+                  return bStatus !== "cancelled" && bStatus !== "refunded";
+                });
+              }
+            }
+
+            if (derivedBooking) {
+              isOnline =
+                derivedBooking.booking_source === "online" ||
+                (derivedBooking.platform_fee && parseFloat(derivedBooking.platform_fee) > 0);
+              isManual = !isOnline;
+            }
+          }
+
           return {
             id: slot.id,
             time: `${displayHour}${displayMins} ${ampm}`,
-            status: slot.status,
+            status: slotStatus,
             raw_start_time: slot.start_time,
             duration_minutes: durationMins,
             isManualBooking: isManual,
@@ -253,7 +311,7 @@ export const useSportsHome = (
         setSlotsLoading(false);
       }
     },
-    [currentVenueId, activeGroundId, selectedDate],
+    [activeGroundId, currentVenueId, selectedDate, grounds],
   );
 
   const fetchBookings = useCallback(
@@ -263,6 +321,10 @@ export const useSportsHome = (
       if (!gId || !vId) return;
       setBookingsLoading(true);
       try {
+        const parentId = grounds.find(g => g.id === gId)?.parent_ground_id;
+        const childIds = grounds.filter(g => g.parent_ground_id === gId).map(g => g.id);
+        const relevantGroundIds = [gId, ...(parentId ? [parentId] : []), ...childIds];
+
         let mode: "exact" | "gt" = "exact";
         let targetDate = selectedDate;
 
@@ -272,7 +334,12 @@ export const useSportsHome = (
         }
 
         const localDateString = getLocalDateString(targetDate);
-        const bookingsData = await SportsService.getBookings(vId, gId, localDateString, mode);
+        const bookingsData = await SportsService.getBookings(
+          vId,
+          relevantGroundIds,
+          localDateString,
+          mode,
+        );
         const now = new Date();
 
         const isHalfHourVenue = (bookingsData || []).some((bk: any) => {
@@ -467,7 +534,7 @@ export const useSportsHome = (
         setBookingsLoading(false);
       }
     },
-    [currentVenueId, activeGroundId, selectedDate, category, selectedView],
+    [activeGroundId, currentVenueId, grounds, selectedDate, selectedView, category],
   );
 
   useEffect(() => {

@@ -16,6 +16,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs, CustomDatePickerModal, Skeleton, ListSkeleton } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -398,7 +399,6 @@ export const SportsHomeScreen = () => {
                       if (selectedGround) setActiveGroundId(selectedGround.id);
                     }}
                     variant="primary"
-                    fillContainer={true}
                   />
                 </View>
               )}
@@ -478,7 +478,7 @@ export const SportsHomeScreen = () => {
                 ) : (
                   <>
                     {(selectedView === "Upcoming Bookings" || selectedView === "Bookings") && (
-                      <Text variant="body2" weight="bold" style={styles.dateGroupHeader}>
+                      <Text variant="body1" weight="bold" style={styles.dateGroupHeader}>
                         {getFormattedDate(selectedDate)}
                       </Text>
                     )}
