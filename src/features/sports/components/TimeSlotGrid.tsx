@@ -16,6 +16,7 @@ export interface TimeSlotData {
   status: DbSlotStatus | string;
   raw_start_time?: string; // e.g. "14:00:00" from DB
   isManualBooking?: boolean;
+  mapped_hour?: number;
 }
 
 interface TimeSlotGridProps {
@@ -102,7 +103,14 @@ export const TimeSlotGrid = memo(
 
       rawSlots.forEach(slot => {
         if (!slot.raw_start_time) return;
-        const h = parseInt(slot.raw_start_time.split(":")[0], 10);
+        let h = parseInt(slot.raw_start_time.split(":")[0], 10);
+
+        // If hour is between 0 and 5 (12 AM to 5 AM), treat it as the next day's early morning
+        // by adding 24 so it sorts at the very end of the Evening Slots list.
+        if (h < 6) {
+          h += 24;
+        }
+
         if (!slotsByHour[h]) {
           slotsByHour[h] = [];
         }
@@ -133,17 +141,23 @@ export const TimeSlotGrid = memo(
         }
 
         const displayHour = h % 12 === 0 ? 12 : h % 12;
-        const ampm = h >= 12 && h < 24 ? "PM" : "AM";
+        // Even if h is 24, 25 (12 AM, 1 AM next day), it's AM
+        const ampm = h % 24 >= 12 && h % 24 < 24 ? "PM" : "AM";
         const timeStr = `${displayHour} ${ampm}`;
 
         const representative = group[0];
+
+        // Format the raw_start_time back correctly (e.g. 25 -> 01)
+        const originalH = h % 24;
 
         result.push({
           id: representative.id,
           time: timeStr,
           status,
-          raw_start_time: `${h.toString().padStart(2, "0")}:00:00`,
+          raw_start_time: `${originalH.toString().padStart(2, "0")}:00:00`,
           isManualBooking,
+          // Store the mapped hour so we can filter correctly for Day vs Evening slots
+          mapped_hour: h,
         });
       });
 
@@ -162,21 +176,15 @@ export const TimeSlotGrid = memo(
       return Math.floor((availableWidth - (NUM_COLUMNS - 1) * SLOT_GAP - 1) / NUM_COLUMNS);
     }, [containerWidth]);
 
-    const now = new Date();
-    const isToday =
-      selectedDate.getDate() === now.getDate() &&
-      selectedDate.getMonth() === now.getMonth() &&
-      selectedDate.getFullYear() === now.getFullYear();
-    const currentHour = now.getHours();
-    const currentMinutes = now.getMinutes();
+    // Removed unused isToday, currentHour, and now variables as we use Date objects directly within the map
 
-    const daySlots = slots.filter(s => {
-      const h = parseInt(s.raw_start_time?.split(":")[0] || "0", 10);
+    const daySlots = slots.filter((s: any) => {
+      const h = s.mapped_hour;
       return h < 18;
     });
 
-    const eveningSlots = slots.filter(s => {
-      const h = parseInt(s.raw_start_time?.split(":")[0] || "0", 10);
+    const eveningSlots = slots.filter((s: any) => {
+      const h = s.mapped_hour;
       return h >= 18;
     });
 
@@ -201,13 +209,20 @@ export const TimeSlotGrid = memo(
           </TouchableOpacity>
           {!isCollapsed && (
             <View style={styles.grid}>
-              {groupData.map((slot: TimeSlotData) => {
+              {groupData.map((slot: any) => {
                 let isPast = false;
-                if (isToday && slot.raw_start_time) {
-                  const [hours, minutes] = slot.raw_start_time.split(":").map(Number);
-                  if (hours < currentHour || (hours === currentHour && minutes < currentMinutes)) {
-                    isPast = true;
+                if (slot.raw_start_time) {
+                  const [hStr, mStr] = slot.raw_start_time.split(":");
+                  const parsedHour = parseInt(hStr, 10);
+                  const parsedMin = parseInt(mStr, 10);
+
+                  const slotDate = new Date(selectedDate);
+                  slotDate.setHours(parsedHour, parsedMin, 0, 0);
+                  if (parsedHour < 6) {
+                    slotDate.setDate(slotDate.getDate() + 1);
                   }
+
+                  isPast = slotDate <= new Date();
                 }
 
                 const isUnavailable = isPast || slot.status === "maintenance";

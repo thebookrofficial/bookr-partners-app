@@ -487,6 +487,7 @@ export const SportsHomeScreen = () => {
                         key={booking.id}
                         name={booking.name}
                         phone={booking.phone}
+                        subtitle={booking.subtitle}
                         date={booking.date}
                         time={booking.time}
                         price={booking.price}

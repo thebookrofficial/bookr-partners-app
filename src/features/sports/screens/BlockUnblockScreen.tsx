@@ -179,7 +179,7 @@ export const BlockUnblockScreen = () => {
   }, [selectedGroundId, venueId, selectedCategory]);
 
   const HOURS = React.useMemo(
-    () => generateTimeSlots(6, 24, slotDurationMinutes),
+    () => generateTimeSlots(6, 27, slotDurationMinutes),
     [slotDurationMinutes],
   );
 

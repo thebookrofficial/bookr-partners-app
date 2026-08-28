@@ -166,6 +166,9 @@ export const BookingDetailsScreen = () => {
   if (catName && groundLower.startsWith(catName)) {
     groundName = groundName.slice(catName.length).trim();
   }
+  if (groundName.startsWith("-")) {
+    groundName = groundName.slice(1).trim();
+  }
 
   const displayTotalAmount = totalAmount;
   const displayAmountPaid = currentPaid + totalDiscount - (isPickleball ? totalFees : 0);

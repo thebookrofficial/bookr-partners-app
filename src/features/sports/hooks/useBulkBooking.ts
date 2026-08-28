@@ -29,7 +29,7 @@ export const useBulkBooking = () => {
     setIsSubmitting(true);
     try {
       const slotDuration = params.slotDurationMinutes || 60;
-      const HOURS = generateTimeSlots(6, 24, slotDuration);
+      const HOURS = generateTimeSlots(6, 27, slotDuration);
       if (!params.ownerId) throw new Error("Authentication error: Could not identify vendor.");
 
       const { venueId, groundId } = params;

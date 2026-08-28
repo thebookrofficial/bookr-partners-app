@@ -144,7 +144,7 @@ const CreateBulkBooking = ({
   }, [venueId]);
 
   const HOURS = React.useMemo(
-    () => generateTimeSlots(6, 24, slotDurationMinutes),
+    () => generateTimeSlots(6, 27, slotDurationMinutes),
     [slotDurationMinutes],
   );
 
@@ -717,23 +717,26 @@ const CreateBulkBooking = ({
           }
         }}
         isHourDisabled={(hour, _index) => {
-          const now = new Date();
-          const currentHour24 = now.getHours();
-          const currentMinute = now.getMinutes();
-
           const hour12h = hour;
           let [h, ampm] = hour12h.split(" ");
-          let hour24 = parseInt(h, 10);
-          if (ampm === "PM" && hour24 !== 12) hour24 += 12;
-          if (ampm === "AM" && hour24 === 12) hour24 = 0;
+          let parsedHour = parseInt(h, 10);
+          if (ampm === "PM" && parsedHour !== 12) parsedHour += 12;
+          if (ampm === "AM" && parsedHour === 12) parsedHour = 0;
 
-          const isPast =
-            fromDate.toDateString() === now.toDateString() &&
-            (hour24 < currentHour24 || (hour24 === currentHour24 && currentMinute > 0));
+          const parsedMin = hour12h.includes(":") ? parseInt(hour12h.split(":")[1], 10) : 0;
+
+          const slotDate = new Date(fromDate);
+          slotDate.setHours(parsedHour, parsedMin, 0, 0);
+          // Slots from 12 AM to 5 AM belong to the next calendar day
+          if (parsedHour < 6) {
+            slotDate.setDate(slotDate.getDate() + 1);
+          }
+          const isPast = slotDate <= new Date();
 
           const isBooked = bookedSlots.some(bookedTime => {
-            const [bookedHour] = bookedTime.split(":").map(Number);
-            return bookedHour === hour24;
+            const [bookedHourStr] = bookedTime.split(":");
+            let bookedHour = parseInt(bookedHourStr, 10);
+            return bookedHour === parsedHour;
           });
 
           return isPast || isBooked;

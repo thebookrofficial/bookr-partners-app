@@ -182,12 +182,22 @@ export const ViewBulkBooking = ({ bookingId: _bookingId, type }: ViewBulkBooking
             baseBooking.guest_name || "G"
           }&background=63A1FD&color=fff`;
 
+      let fetchedGroundName = baseBooking.sports_slots?.sports_grounds?.name || "Ground";
+      const catName = (baseBooking.sport_category || selectedCategory).toLowerCase();
+      const groundLower = fetchedGroundName.toLowerCase();
+      if (catName && groundLower.startsWith(catName)) {
+        fetchedGroundName = fetchedGroundName.slice(catName.length).trim();
+      }
+      if (fetchedGroundName.startsWith("-")) {
+        fetchedGroundName = fetchedGroundName.slice(1).trim();
+      }
+
       setData({
-        name: baseBooking.profiles?.full_name || baseBooking.guest_name || "Guest",
+        name: baseBooking.profiles?.full_name || baseBooking.guest_name || "Guest User",
         phone: baseBooking.profiles?.phone || baseBooking.guest_phone || "N/A",
         avatar: computedAvatar,
         category: baseBooking.sport_category || selectedCategory,
-        groundName: baseBooking.sports_slots?.sports_grounds?.name || "Ground",
+        groundName: fetchedGroundName,
         fromDate: formatDate(minDate),
         toDate: formatDate(maxDate),
         fromTime: formatTime(firstTime),

@@ -272,11 +272,11 @@ export const OfflineBookingSheet = ({
   }, [allDbSlots, pricing.slotDurationMinutes]);
 
   const startTimes = useMemo(() => {
-    return generateTimeSlots(6, 24, detectedSlotDuration);
+    return generateTimeSlots(6, 27, detectedSlotDuration);
   }, [detectedSlotDuration]);
 
   const endTimes = useMemo(() => {
-    return generateTimeSlots(6, 24, detectedSlotDuration);
+    return generateTimeSlots(6, 27, detectedSlotDuration);
   }, [detectedSlotDuration]);
 
   const getLocalDateString = (date: Date) => {
@@ -637,12 +637,7 @@ export const OfflineBookingSheet = ({
   };
 
   // Get current real-world time for disabling past hours
-  const now = new Date();
-  const isToday =
-    currentDate.getDate() === now.getDate() &&
-    currentDate.getMonth() === now.getMonth() &&
-    currentDate.getFullYear() === now.getFullYear();
-  const currentHour = now.getHours();
+  // Removed unused isToday and currentHour as we now use Date objects directly
 
   return (
     <>
@@ -1145,9 +1140,17 @@ export const OfflineBookingSheet = ({
               setShowHourPicker(null);
             }}
             isHourDisabled={(hour, index) => {
-              const hour24 =
-                hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
-              const isPast = isToday && hour24 <= currentHour;
+              const [hStr, mStr] = parseTimeTo24Hour(hour).split(":");
+              const parsedHour = parseInt(hStr, 10);
+              const parsedMin = parseInt(mStr, 10);
+
+              const slotDate = new Date(currentDate);
+              slotDate.setHours(parsedHour, parsedMin, 0, 0);
+              // Slots from 12 AM to 5 AM belong to the next calendar day
+              if (parsedHour < 6) {
+                slotDate.setDate(slotDate.getDate() + 1);
+              }
+              const isPast = slotDate <= new Date();
 
               if (showHourPicker === "from") {
                 const isBooked = bookedHours.includes(hour);

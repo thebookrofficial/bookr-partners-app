@@ -384,7 +384,13 @@ export const useSportsHome = (
               return `${displayHour}${displayMins} ${ampm}`;
             };
 
-            const formattedDate = new Date(b.slot_date).toLocaleDateString("en-GB", {
+            let [startH] = b.start_time.split(":").map(Number);
+            const displayDateObj = new Date(b.slot_date);
+            if (startH < 6) {
+              displayDateObj.setDate(displayDateObj.getDate() + 1);
+            }
+
+            const formattedDate = displayDateObj.toLocaleDateString("en-GB", {
               weekday: "short",
               day: "numeric",
               month: "short",
@@ -405,12 +411,25 @@ export const useSportsHome = (
 
             const slotEndTime = new Date(b.slot_date);
             slotEndTime.setHours(endH, endM, 0, 0);
+            if (endH < 6) {
+              slotEndTime.setDate(slotEndTime.getDate() + 1);
+            }
 
             const isDisabled = now > slotEndTime;
             const isUnpaid = Number(b.paid_amount || 0) < Number(b.total_amount || 0);
 
             const finalName = isOffline ? b.guest_name : b.full_name || "Guest User";
             const finalPhone = isOffline ? b.guest_phone || "" : b.phone || "";
+
+            let fetchedGroundName = b.sports_slots?.sports_grounds?.name || "";
+            const groundLower = fetchedGroundName.toLowerCase();
+            const catName = category.toLowerCase();
+            if (catName && groundLower.startsWith(catName)) {
+              fetchedGroundName = fetchedGroundName.slice(catName.length).trim();
+            }
+            if (fetchedGroundName.startsWith("-")) {
+              fetchedGroundName = fetchedGroundName.slice(1).trim();
+            }
 
             // For online Pickleball, use subtotal. Otherwise use paid_amount + discount_amount.
             const displayPrice =
@@ -422,6 +441,7 @@ export const useSportsHome = (
               id: b.id,
               name: finalName,
               phone: finalPhone,
+              subtitle: fetchedGroundName || undefined,
               date: formattedDate,
               time: `${formatTime(b.start_time)} - ${formatTime(b.end_time)}`,
               price: `₹${displayPrice}`,
