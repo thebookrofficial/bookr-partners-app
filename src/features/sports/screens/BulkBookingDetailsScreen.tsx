@@ -63,7 +63,6 @@ const CreateBulkBooking = ({
   const navigation = useNavigation();
 
   const { selectedCategories, setServiceCategory } = useServiceStore();
-  const selectedCategory = selectedCategories[venueId] || "Football";
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
   const [ownerId, setOwnerId] = useState<string | undefined>();
@@ -109,10 +108,42 @@ const CreateBulkBooking = ({
     fetchGrounds();
   }, [venueId]);
 
-  const categories = Array.from(
-    new Set(grounds.map(g => g.sports_type).filter(Boolean)),
-  ) as string[];
-  const filteredGrounds = grounds.filter(g => g.sports_type === selectedCategory);
+  const categories = React.useMemo(() => {
+    return Array.from(
+      new Set(
+        grounds
+          .map((g: any) => {
+            if (g.sports_type) return g.sports_type.toLowerCase();
+            if (g.parent_ground_id) {
+              const parent = grounds.find((p: any) => p.id === g.parent_ground_id);
+              if (parent?.sports_type) return parent.sports_type.toLowerCase();
+            }
+            return null;
+          })
+          .filter(Boolean),
+      ),
+    ) as string[];
+  }, [grounds]);
+
+  const selectedCategory = React.useMemo(() => {
+    const stored = selectedCategories[venueId]?.toLowerCase();
+    if (stored && categories.includes(stored)) return stored;
+
+    const footballIdx = categories.indexOf("football");
+    if (footballIdx !== -1) return categories[footballIdx];
+
+    return categories.length > 0 ? categories[0] : "football";
+  }, [selectedCategories, venueId, categories]);
+
+  const filteredGrounds = React.useMemo(() => {
+    return grounds.filter((g: any) => {
+      let type = g.sports_type;
+      if (!type && g.parent_ground_id) {
+        type = grounds.find((p: any) => p.id === g.parent_ground_id)?.sports_type;
+      }
+      return type?.toLowerCase() === selectedCategory;
+    });
+  }, [grounds, selectedCategory]);
 
   useEffect(() => {
     if (
@@ -811,7 +842,7 @@ const CreateBulkBooking = ({
             onPress={() => setIsCategoryOpen(false)}
           />
           <View style={styles.dropdownMenu}>
-            {categories.map(cat => (
+            {categories.map((cat: string) => (
               <TouchableOpacity
                 key={cat}
                 style={styles.dropdownItem}
