@@ -46,6 +46,7 @@ import { TimePickerModal } from "./TimePickerModal";
 import { z } from "zod";
 import { SportsService } from "../services/sports.service";
 import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
+import { calculateSlotPrice } from "../utils/pricing.utils";
 import { getShortGroundName } from "../hooks/useSportsHome";
 import perf from "@react-native-firebase/perf";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -535,25 +536,38 @@ export const OfflineBookingSheet = ({
     const selectedHours = startTimes.slice(startIdx, endIdx);
     let total = 0;
 
+    const ground = allGrounds.find(g => g.id === internalGroundId);
+
     selectedHours.forEach(hour => {
-      // Day Session: 6 AM to 5 PM
-      // Night Session: 5 PM to 12 AM
       const hIdx = startTimes.indexOf(hour);
       // For fallback comparison, find the index of 5 PM or closest match
       const fivePMIdx = startTimes.findIndex(h => h.includes("5 PM") || h.includes("5:00 PM"));
-
       const boundaryIdx = fivePMIdx !== -1 ? fivePMIdx : startTimes.length / 2;
       const multiplier = (detectedSlotDuration || 60) / 60;
 
-      if (hIdx < boundaryIdx) {
-        total += (pricing.day || pricing.default) * multiplier;
+      if (ground && ground.custom_pricing) {
+        total += calculateSlotPrice(ground, hour, boundaryIdx, hIdx) * multiplier;
       } else {
-        total += (pricing.night || pricing.default) * multiplier;
+        // Safe fallback in case ground object isn't perfectly mapped yet
+        if (hIdx < boundaryIdx) {
+          total += (pricing.day || pricing.default) * multiplier;
+        } else {
+          total += (pricing.night || pricing.default) * multiplier;
+        }
       }
     });
 
     setTotalPayment(total.toString());
-  }, [fromTime, toTime, pricing, startTimes, endTimes, detectedSlotDuration]);
+  }, [
+    fromTime,
+    toTime,
+    pricing,
+    startTimes,
+    endTimes,
+    detectedSlotDuration,
+    allGrounds,
+    internalGroundId,
+  ]);
 
   const handleBookNow = async () => {
     const cleanMobile = mobile.replace(/[^\d]/g, "");
@@ -1124,6 +1138,8 @@ export const OfflineBookingSheet = ({
             onClose={() => setShowHourPicker(null)}
             title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
             hours={showHourPicker === "from" ? startTimes : endTimes}
+            ground={allGrounds.find(g => g.id === internalGroundId)}
+            allGrounds={allGrounds}
             selectedTime={showHourPicker === "from" ? fromTime : toTime}
             onSelectTime={hour => {
               if (showHourPicker === "from") {
@@ -1139,7 +1155,7 @@ export const OfflineBookingSheet = ({
               }
               setShowHourPicker(null);
             }}
-            isHourDisabled={(hour, index) => {
+            isHourDisabled={(hour, _index) => {
               const [hStr, mStr] = parseTimeTo24Hour(hour).split(":");
               const parsedHour = parseInt(hStr, 10);
               const parsedMin = parseInt(mStr, 10);
@@ -1150,19 +1166,19 @@ export const OfflineBookingSheet = ({
               if (parsedHour < 6) {
                 slotDate.setDate(slotDate.getDate() + 1);
               }
-              const isPast = slotDate <= new Date();
 
               if (showHourPicker === "from") {
                 const isBooked = bookedHours.includes(hour);
-                return isBooked || isPast;
+                return isBooked;
               } else {
                 const fromIndex = startTimes.indexOf(fromTime);
-                if (fromIndex === -1) return true;
-                if (index <= fromIndex) return true;
+                const toIndex = endTimes.indexOf(hour);
+                if (fromIndex === -1 || toIndex === -1) return true;
+                if (toIndex <= fromIndex) return true;
 
-                const intermediateHours = startTimes.slice(fromIndex, index);
+                const intermediateHours = startTimes.slice(fromIndex, toIndex + 1);
                 const hasBookingInBetween = intermediateHours.some(h => bookedHours.includes(h));
-                return hasBookingInBetween || (isPast && !bookedHours.includes(hour));
+                return hasBookingInBetween;
               }
             }}
             isFetching={isFetchingSlots}

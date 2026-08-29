@@ -15,6 +15,8 @@ import { Text } from "@/components/ui";
 import { COLORS } from "@/constants/theme";
 import { vs, ms, fs } from "@/utils/responsive.utils";
 
+import { getValidSlotsForGround } from "../utils/pricing.utils";
+
 interface TimePickerModalProps {
   visible: boolean;
   onClose: () => void;
@@ -25,6 +27,8 @@ interface TimePickerModalProps {
   isHourDisabled?: (hour: string, index: number) => boolean;
   isFetching?: boolean;
   useModal?: boolean;
+  ground?: any;
+  allGrounds?: any[];
 }
 
 export const TimePickerModal = ({
@@ -37,6 +41,8 @@ export const TimePickerModal = ({
   isHourDisabled,
   isFetching,
   useModal = true,
+  ground,
+  allGrounds,
 }: TimePickerModalProps) => {
   const formatDisplayHour = (hr: string) => {
     // If it already contains a colon, we assume it has minutes and just lowercase the AM/PM
@@ -49,6 +55,10 @@ export const TimePickerModal = ({
     }
     return hr.toLowerCase();
   };
+
+  const validHours = React.useMemo(() => {
+    return ground ? getValidSlotsForGround(ground, hours, allGrounds) : hours;
+  }, [ground, hours, allGrounds]);
 
   const content = (
     <View style={[styles.modalOverlay, !useModal && styles.absoluteOverlay]} pointerEvents="auto">
@@ -67,7 +77,7 @@ export const TimePickerModal = ({
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.timePickerGrid}>
-            {hours.map((hour, idx) => {
+            {validHours.map((hour, idx) => {
               const displayHour = formatDisplayHour(hour);
               const isDisabled = isHourDisabled ? isHourDisabled(hour, idx) : false;
 

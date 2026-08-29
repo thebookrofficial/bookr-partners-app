@@ -69,34 +69,9 @@ const SlotPill = memo(
 
 // Accordion removed as per new Figma layout
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ChevronDown } from "lucide-react-native";
-
 export const TimeSlotGrid = memo(
   ({ slots: rawSlots, selectedDate, onSlotPress }: TimeSlotGridProps) => {
     const [containerWidth, setContainerWidth] = useState(0);
-    const [collapsedGroups, setCollapsedGroups] = useState<{ [key: string]: boolean }>({});
-
-    // Load persisted state
-    React.useEffect(() => {
-      AsyncStorage.getItem("TimeSlotGrid_CollapsedState").then(data => {
-        if (data) {
-          try {
-            setCollapsedGroups(JSON.parse(data));
-          } catch (e) {}
-        }
-      });
-    }, []);
-
-    const toggleGroup = (title: string) => {
-      setCollapsedGroups(prev => {
-        const newState = { ...prev, [title]: !prev[title] };
-        AsyncStorage.setItem("TimeSlotGrid_CollapsedState", JSON.stringify(newState)).catch(e =>
-          console.error("Failed to save slot collapse state", e),
-        );
-        return newState;
-      });
-    };
 
     const slots = useMemo(() => {
       const slotsByHour: { [hour: number]: TimeSlotData[] } = {};
@@ -190,64 +165,52 @@ export const TimeSlotGrid = memo(
 
     const renderGroup = (title: string, groupData: TimeSlotData[]) => {
       if (groupData.length === 0) return null;
-      const isCollapsed = !!collapsedGroups[title];
 
       return (
         <View style={styles.groupContainer}>
-          <TouchableOpacity
-            style={styles.groupHeaderRow}
-            activeOpacity={0.7}
-            onPress={() => toggleGroup(title)}>
+          <View style={styles.groupHeaderRow}>
             <Text variant="body1" weight="bold" style={styles.groupTitle}>
               {title}
             </Text>
-            <ChevronDown
-              size={ms(20)}
-              color="#000"
-              style={{ transform: [{ rotate: isCollapsed ? "0deg" : "180deg" }] }}
-            />
-          </TouchableOpacity>
-          {!isCollapsed && (
-            <View style={styles.grid}>
-              {groupData.map((slot: any) => {
-                let isPast = false;
-                if (slot.raw_start_time) {
-                  const [hStr, mStr] = slot.raw_start_time.split(":");
-                  const parsedHour = parseInt(hStr, 10);
-                  const parsedMin = parseInt(mStr, 10);
+          </View>
+          <View style={styles.grid}>
+            {groupData.map((slot: any) => {
+              let isPast = false;
+              if (slot.raw_start_time) {
+                const [hStr, mStr] = slot.raw_start_time.split(":");
+                const parsedHour = parseInt(hStr, 10);
+                const parsedMin = parseInt(mStr, 10);
 
-                  const slotDate = new Date(selectedDate);
-                  slotDate.setHours(parsedHour, parsedMin, 0, 0);
-                  if (parsedHour < 6) {
-                    slotDate.setDate(slotDate.getDate() + 1);
-                  }
-
-                  isPast = slotDate <= new Date();
+                const slotDate = new Date(selectedDate);
+                slotDate.setHours(parsedHour, parsedMin, 0, 0);
+                if (parsedHour < 6) {
+                  slotDate.setDate(slotDate.getDate() + 1);
                 }
 
-                const isUnavailable = isPast || slot.status === "maintenance";
-                const isAvailable = !isUnavailable && slot.status === "available";
-                const isBlocked = !isUnavailable && slot.status === "blocked";
-                const isOnline =
-                  !isUnavailable && slot.status === "booked" && !slot.isManualBooking;
-                const isManual = !isUnavailable && slot.status === "booked" && slot.isManualBooking;
+                isPast = slotDate <= new Date();
+              }
 
-                return (
-                  <SlotPill
-                    key={slot.id}
-                    slot={slot}
-                    isUnavailable={isUnavailable}
-                    isAvailable={isAvailable}
-                    isBlocked={isBlocked}
-                    isOnline={isOnline}
-                    isManual={isManual}
-                    onSlotPress={onSlotPress}
-                    slotWidth={slotWidth}
-                  />
-                );
-              })}
-            </View>
-          )}
+              const isUnavailable = isPast || slot.status === "maintenance";
+              const isAvailable = !isUnavailable && slot.status === "available";
+              const isBlocked = !isUnavailable && slot.status === "blocked";
+              const isOnline = !isUnavailable && slot.status === "booked" && !slot.isManualBooking;
+              const isManual = !isUnavailable && slot.status === "booked" && slot.isManualBooking;
+
+              return (
+                <SlotPill
+                  key={slot.id}
+                  slot={slot}
+                  isUnavailable={isUnavailable}
+                  isAvailable={isAvailable}
+                  isBlocked={isBlocked}
+                  isOnline={isOnline}
+                  isManual={isManual}
+                  onSlotPress={onSlotPress}
+                  slotWidth={slotWidth}
+                />
+              );
+            })}
+          </View>
         </View>
       );
     };
@@ -286,7 +249,7 @@ const styles = StyleSheet.create({
   slotOnline: { backgroundColor: COLORS.primary },
   slotManual: { backgroundColor: COLORS.danger },
   slotUnavailable: { backgroundColor: "#EBEBEB", borderWidth: 1, borderColor: "#EBEBEB" },
-  slotBlocked: { backgroundColor: "#BEBEBE" },
+  slotBlocked: { backgroundColor: "#000000" },
 
   // Nested Accordion Styles
   nestedContainer: { width: "100%", marginBottom: 0 },

@@ -28,6 +28,7 @@ import { TimePickerModal } from "../components/TimePickerModal";
 import { SportsService } from "../services/sports.service";
 import { useBookingDetails } from "../hooks/useBookingDetails";
 import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
+import { calculateSlotPrice } from "../utils/pricing.utils";
 import perf from "@react-native-firebase/perf";
 import { useKeyboardStore } from "@/store/keyboardStore";
 
@@ -56,7 +57,7 @@ export const RescheduleBookingScreen = () => {
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [pricing, setPricing] = useState({ day: 0, night: 0, default: 0, slotDurationMinutes: 60 });
 
-  const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
+  const [grounds, setGrounds] = useState<any[]>([]);
   const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId);
   const [bookedHours, setBookedHours] = useState<string[]>([]);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
@@ -254,15 +255,21 @@ export const RescheduleBookingScreen = () => {
     let total = 0;
     const durationMultiplier = pricing.slotDurationMinutes ? pricing.slotDurationMinutes / 60 : 1;
 
+    const ground = grounds.find(g => g.id === selectedGroundId);
+
     selectedHours.forEach(hour => {
       const hIdx = HOURS.indexOf(hour);
       const fivePMIdx = HOURS.findIndex(h => h.includes("5 PM") || h.includes("5:00 PM"));
       const boundaryIdx = fivePMIdx !== -1 ? fivePMIdx : HOURS.length / 2;
 
-      if (hIdx < boundaryIdx) {
-        total += (pricing.day || pricing.default) * durationMultiplier;
+      if (ground && ground.custom_pricing) {
+        total += calculateSlotPrice(ground, hour, boundaryIdx, hIdx) * durationMultiplier;
       } else {
-        total += (pricing.night || pricing.default) * durationMultiplier;
+        if (hIdx < boundaryIdx) {
+          total += (pricing.day || pricing.default) * durationMultiplier;
+        } else {
+          total += (pricing.night || pricing.default) * durationMultiplier;
+        }
       }
     });
 
@@ -272,6 +279,8 @@ export const RescheduleBookingScreen = () => {
     toTime,
     pricing,
     HOURS,
+    grounds,
+    selectedGroundId,
     booking?.sports_slots?.start_time,
     booking?.sports_slots?.end_time,
     booking?.total_amount,
@@ -715,7 +724,9 @@ export const RescheduleBookingScreen = () => {
         visible={!!showHourPicker}
         onClose={() => setShowHourPicker(null)}
         title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
-        hours={showHourPicker === "from" ? HOURS : HOURS}
+        hours={HOURS}
+        ground={grounds.find(g => g.id === selectedGroundId)}
+        allGrounds={grounds}
         selectedTime={showHourPicker === "from" ? fromTime : toTime}
         onSelectTime={(hour: string) => {
           if (showHourPicker === "from") {
@@ -730,7 +741,7 @@ export const RescheduleBookingScreen = () => {
             setToTime(hour);
           }
         }}
-        isHourDisabled={(hour, index) => {
+        isHourDisabled={(hour, _index) => {
           const hour24 =
             hour === "12 AM" ? 24 : parseInt(parseTimeTo24Hour(hour).split(":")[0], 10);
           const isPast = isToday && hour24 <= currentHour;
@@ -740,10 +751,11 @@ export const RescheduleBookingScreen = () => {
             return isBooked || isPast;
           } else {
             const fromIndex = HOURS.indexOf(fromTime);
-            if (fromIndex === -1) return true;
-            if (index <= fromIndex) return true;
+            const toIndex = HOURS.indexOf(hour);
+            if (fromIndex === -1 || toIndex === -1) return true;
+            if (toIndex <= fromIndex) return true;
 
-            const intermediateHours = HOURS.slice(fromIndex, index);
+            const intermediateHours = HOURS.slice(fromIndex, toIndex + 1);
             const hasBookingInBetween = intermediateHours.some(h => bookedHours.includes(h));
             return hasBookingInBetween || (isPast && !bookedHours.includes(hour));
           }

@@ -243,6 +243,26 @@ export const SportsHomeScreen = () => {
     return isToday ? `Today, ${dateString}` : dateString;
   };
 
+  const enrichedSlots = React.useMemo(() => {
+    return slots.map((slot: any) => {
+      if (slot.status === "booked") {
+        const foundBooking = bookings.find((b: any) => {
+          if (!b.startTimeRaw || !b.endTimeRaw) return false;
+          return slot.raw_start_time >= b.startTimeRaw && slot.raw_start_time < b.endTimeRaw;
+        });
+
+        if (foundBooking) {
+          const isOnline =
+            foundBooking.isOnline === true ||
+            (!foundBooking.isOfflineRecord && foundBooking.sports_booking_type !== "offline");
+
+          return { ...slot, isManualBooking: !isOnline };
+        }
+      }
+      return slot;
+    });
+  }, [slots, bookings]);
+
   return (
     <View style={styles.root}>
       <ScreenContainer
@@ -253,7 +273,7 @@ export const SportsHomeScreen = () => {
         onRefresh={onRefresh}
         hideTabBarOnScroll>
         <Pressable
-          style={{ flex: 1 }}
+          style={styles.flex1}
           onPress={() => {
             if (isDropdownOpen) setIsDropdownOpen(false);
             if (isCategoryDropdownOpen) setIsCategoryDropdownOpen(false);
@@ -438,7 +458,7 @@ export const SportsHomeScreen = () => {
                         </Text>
                       ) : (
                         <TimeSlotGrid
-                          slots={slots as any}
+                          slots={enrichedSlots as any}
                           selectedDate={selectedDate}
                           onSlotPress={slot => {
                             if (slot.status === "booked" || slot.status === "blocked") {
@@ -586,6 +606,7 @@ export const SportsHomeScreen = () => {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
+  flex1: { flex: 1 },
   centerContainer: {
     flex: 1,
     justifyContent: "center",

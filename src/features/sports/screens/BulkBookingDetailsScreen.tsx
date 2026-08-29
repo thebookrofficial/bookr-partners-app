@@ -40,6 +40,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { ViewBulkBooking } from "../components/ViewBulkBooking";
 import { TimePickerModal } from "../components/TimePickerModal";
 import { generateTimeSlots } from "../utils/time.utils";
+import { calculateSlotPrice } from "../utils/pricing.utils";
 import { SportsService } from "../services/sports.service";
 
 const icCash = require("@/assets/icons/pay-50.png");
@@ -76,7 +77,18 @@ const CreateBulkBooking = ({
   const isSelectingFromResults = React.useRef(false);
 
   // NEW: State for Grounds inside the form
-  const [grounds, setGrounds] = useState<{ id: string; name: string; sports_type?: string }[]>([]);
+  const [grounds, setGrounds] = useState<
+    {
+      id: string;
+      name: string;
+      sports_type?: string;
+      slot_duration_minutes?: number;
+      custom_pricing?: any;
+      price_per_slot?: number;
+      night_price_per_slot?: number;
+      parent_ground_id?: string;
+    }[]
+  >([]);
   const [selectedGroundId, setSelectedGroundId] = useState<string>(initialGroundId || "");
   const [showGroundPicker, setShowGroundPicker] = useState(false);
 
@@ -84,7 +96,9 @@ const CreateBulkBooking = ({
     const fetchGrounds = async () => {
       const { data } = await supabase
         .from("sports_grounds")
-        .select("id, name, sports_type")
+        .select(
+          "id, name, sports_type, slot_duration_minutes, custom_pricing, price_per_slot, night_price_per_slot, parent_ground_id",
+        )
         .eq("venue_id", venueId)
         .order("display_order", { ascending: true });
 
@@ -121,27 +135,11 @@ const CreateBulkBooking = ({
   const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
     "cash",
   );
-  const [stagedPayments, setStagedPayments] = useState<
-    { mode: "cash" | "upi" | "gpay" | "phonepe" | "paytm"; amount: number }[]
-  >([]);
+  const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState<"from" | "to" | null>(null);
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
-  const [isAddingPayment, setIsAddingPayment] = useState(false);
-  const [slotDurationMinutes, setSlotDurationMinutes] = useState(60);
-
-  useEffect(() => {
-    const fetchPricing = async () => {
-      try {
-        const data = await SportsService.getVenuePricing(venueId);
-        if (data && data.slot_duration_minutes) {
-          setSlotDurationMinutes(data.slot_duration_minutes);
-        }
-      } catch (err) {
-        console.error("Failed to fetch venue config:", err);
-      }
-    };
-    fetchPricing();
-  }, [venueId]);
+  const selectedGround = filteredGrounds.find(g => g.id === selectedGroundId);
+  const slotDurationMinutes = selectedGround?.slot_duration_minutes || 60;
 
   const HOURS = React.useMemo(
     () => generateTimeSlots(6, 27, slotDurationMinutes),
@@ -183,14 +181,48 @@ const CreateBulkBooking = ({
 
   const { confirmBulkBooking, isSubmitting } = useBulkBooking();
 
-  const totalSlots =
-    (bookingType === "single"
+  const totalDays =
+    bookingType === "single"
       ? 1
-      : Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1) *
-    (HOURS.indexOf(toTime) - HOURS.indexOf(fromTime));
+      : toDate
+      ? Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+      : 1;
+
+  const startIndex = HOURS.indexOf(fromTime);
+  const endIndex = HOURS.indexOf(toTime);
+  const numSlotsPerDay = Math.max(0, endIndex - startIndex);
+  const totalSlots = totalDays * numSlotsPerDay;
   const slotMultiplier = slotDurationMinutes / 60;
-  const totalPayment = totalSlots * pricePerHour * slotMultiplier;
-  const amountPaid = stagedPayments.reduce((sum, p) => sum + p.amount, 0);
+
+  // Calculate total payment dynamically using custom pricing
+  const totalPayment = React.useMemo(() => {
+    if (!selectedGround || numSlotsPerDay <= 0) return 0;
+    let singleDayTotal = 0;
+    const selectedSlots = HOURS.slice(startIndex, endIndex);
+    selectedSlots.forEach(slot => {
+      singleDayTotal += calculateSlotPrice(selectedGround, slot, -1, -1, grounds) * slotMultiplier;
+    });
+    return singleDayTotal * totalDays;
+  }, [
+    selectedGround,
+    numSlotsPerDay,
+    HOURS,
+    startIndex,
+    endIndex,
+    totalDays,
+    grounds,
+    slotMultiplier,
+  ]);
+
+  // Update pricePerHour state implicitly if totalPayment changes
+  React.useEffect(() => {
+    if (totalSlots > 0 && slotMultiplier > 0) {
+      setPricePerHour(totalPayment / (totalSlots * slotMultiplier));
+    } else {
+      setPricePerHour(0);
+    }
+  }, [totalPayment, totalSlots, slotMultiplier]);
+  const amountPaid = parseFloat(amountPaidInput || "0");
   const remainingAmount = totalPayment - amountPaid;
 
   const { activeVenueName } = useServiceStore();
@@ -250,22 +282,14 @@ const CreateBulkBooking = ({
     lookupGuest();
   }, [mobile]);
 
-  const handleAddPayment = () => {
-    const newPayments = [...stagedPayments];
-    const amount = parseFloat(amountPaidInput || "0");
-    if (amount > 0) {
-      newPayments.push({ mode: selectedMethod, amount: amount });
-    }
-    setStagedPayments(newPayments);
-    setAmountPaidInput("");
-    setIsAddingPayment(false);
-  };
-
   const onConfirm = async () => {
     if (!mobile || !name || totalSlots <= 0 || !selectedGroundId) {
       Alert.alert("Missing Info", "Please ensure dates, times, ground, and guest info are valid.");
       return;
     }
+    const amount = parseFloat(amountPaidInput || "0");
+    const initialPayments = amount > 0 ? [{ mode: selectedMethod, amount }] : [];
+
     const trace = await perf().startTrace("bulk_booking_confirm");
     try {
       const success = await confirmBulkBooking({
@@ -280,7 +304,7 @@ const CreateBulkBooking = ({
         fromTime,
         toTime,
         totalAmountPerSlot: pricePerHour * slotMultiplier,
-        initialPayments: stagedPayments,
+        initialPayments,
         slotDurationMinutes,
       });
       if (success) navigation.goBack();
@@ -547,31 +571,29 @@ const CreateBulkBooking = ({
               <Text style={styles.labelSecondary}>(Remaining: ₹ {remainingAmount})</Text>
             )}
           </View>
-          <View style={styles.inputBoxFillRow}>
-            <Text style={[styles.inputText, styles.textSuccessFlex]}>₹ {amountPaid}</Text>
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={() => setIsAddingPayment(!isAddingPayment)}>
-              <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
-              {isAddingPayment ? (
-                <Minus size={ms(18)} color="#E55959" />
-              ) : (
-                <Plus size={ms(18)} color="#00B562" />
-              )}
-            </TouchableOpacity>
-          </View>
-          {isAddingPayment && (
-            <View style={styles.paymentInputContainer}>
-              <TextInput
-                variant="filled"
-                label="Amount"
-                value={amountPaidInput}
-                onChangeText={setAmountPaidInput}
-                keyboardType="numeric"
-                placeholder="₹ 0"
-                style={{ marginBottom: vs(10) }}
-              />
+          <TextInput
+            variant="filled"
+            value={amountPaidInput}
+            onChangeText={setAmountPaidInput}
+            keyboardType="numeric"
+            placeholder="₹ 0"
+            style={styles.inputFill}
+            rightIcon={
+              <TouchableOpacity
+                style={styles.addBtn}
+                onPress={() => setIsAddingPayment(!isAddingPayment)}>
+                <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
+                {isAddingPayment ? (
+                  <Minus size={ms(18)} color="#E55959" />
+                ) : (
+                  <Plus size={ms(18)} color="#00B562" />
+                )}
+              </TouchableOpacity>
+            }
+          />
 
+          {isAddingPayment && (
+            <View style={{ marginTop: vs(10), marginBottom: vs(-10) }}>
               <Text variant="body2" weight="bold" style={styles.inputLabel}>
                 Payment Method
               </Text>
@@ -600,6 +622,7 @@ const CreateBulkBooking = ({
                     Cash
                   </Text>
                 </TouchableOpacity>
+
                 {/* GPay */}
                 <TouchableOpacity
                   style={[
@@ -624,6 +647,7 @@ const CreateBulkBooking = ({
                     GPay
                   </Text>
                 </TouchableOpacity>
+
                 {/* PhonePe */}
                 <TouchableOpacity
                   style={[
@@ -648,6 +672,7 @@ const CreateBulkBooking = ({
                     PhonePe
                   </Text>
                 </TouchableOpacity>
+
                 {/* Paytm */}
                 <TouchableOpacity
                   style={[
@@ -673,10 +698,6 @@ const CreateBulkBooking = ({
                   </Text>
                 </TouchableOpacity>
               </View>
-
-              <TouchableOpacity style={styles.confirmPaymentBtn} onPress={handleAddPayment}>
-                <Text style={styles.bisonText}>SAVE PAYMENT</Text>
-              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -688,7 +709,6 @@ const CreateBulkBooking = ({
             <Text style={styles.bisonText}>CONFIRM BULK BOOKING</Text>
           )}
         </TouchableOpacity>
-
         <View style={{ height: vs(40) }} />
       </ScrollView>
 
@@ -697,9 +717,14 @@ const CreateBulkBooking = ({
         isVisible={!!showDatePicker}
         onClose={() => setShowDatePicker(null)}
         selectedDate={showDatePicker === "from" ? fromDate : toDate}
+        minDate={showDatePicker === "to" ? fromDate : new Date()}
         onSelectDate={date => {
-          if (showDatePicker === "from") setFromDate(date);
-          else setToDate(date);
+          if (showDatePicker === "from") {
+            setFromDate(date);
+            if (date > toDate) setToDate(date);
+          } else {
+            setToDate(date);
+          }
         }}
       />
 
@@ -712,11 +737,22 @@ const CreateBulkBooking = ({
         onSelectTime={hour => {
           if (showHourPicker === "from") {
             setFromTime(hour);
+            const newFromIndex = HOURS.indexOf(hour);
+            const currentToIndex = HOURS.indexOf(toTime);
+            if (newFromIndex >= currentToIndex) {
+              setToTime(HOURS[Math.min(newFromIndex + 1, HOURS.length - 1)]);
+            }
           } else {
             setToTime(hour);
           }
+          setShowHourPicker(null);
         }}
         isHourDisabled={(hour, _index) => {
+          if (showHourPicker === "to") {
+            const fromIndex = HOURS.indexOf(fromTime);
+            if (_index <= fromIndex) return true;
+          }
+
           const hour12h = hour;
           let [h, ampm] = hour12h.split(" ");
           let parsedHour = parseInt(h, 10);
@@ -849,7 +885,7 @@ const styles = StyleSheet.create({
   inputLabel: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: "#666", marginBottom: vs(4) },
   subLabel: { fontFamily: "Gilroy-Medium", fontSize: fs(16), color: "#000", marginBottom: vs(4) },
   inputText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(16), color: "#000" },
-  addText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(16), color: "#00B562" },
+  addText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#4A5568" },
   textDanger: { color: "#E55959" },
   textSuccessFlex: { color: "#00B562", flex: 1 },
   textPrimary: { color: "#63A1FD" },
@@ -911,14 +947,7 @@ const styles = StyleSheet.create({
   },
   splitRow: { flexDirection: "row", gap: hs(10) },
   addBtn: { flexDirection: "row", alignItems: "center", gap: hs(4) },
-  paymentInputContainer: {
-    backgroundColor: "#EDF4FE",
-    padding: hs(12),
-    borderRadius: ms(8),
-    marginTop: vs(8),
-    borderWidth: 1,
-    borderColor: "#CBDFFE",
-  },
+
   methodsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -926,21 +955,35 @@ const styles = StyleSheet.create({
     marginBottom: vs(12),
   },
   methodBox: {
-    flex: 1,
-    height: vs(50),
-    marginHorizontal: hs(4),
-    backgroundColor: "#F4F7FC",
-    borderRadius: ms(8),
-    borderWidth: 1,
-    borderColor: "#EBEBEB",
     alignItems: "center",
     justifyContent: "center",
+    width: "23%",
+    aspectRatio: 1,
+    backgroundColor: "#fff",
+    borderRadius: ms(10),
+    borderWidth: 1,
+    borderColor: "#D1E0FB",
   },
-  methodBoxSelectedBlue: { backgroundColor: "#EDF4FE", borderColor: "#63A1FD" },
-  methodIcon: { width: ms(24), height: ms(24), resizeMode: "contain", opacity: 0.5 },
-  methodIconSelected: { opacity: 1 },
-  methodText: { fontSize: fs(10), color: "#666", marginTop: vs(2) },
-  methodTextSelected: { color: "#000" },
+  methodBoxSelectedBlue: {
+    backgroundColor: "#63A1FD",
+    borderColor: "#63A1FD",
+  },
+  methodIcon: {
+    width: ms(36),
+    height: ms(36),
+    resizeMode: "contain",
+  },
+  methodIconSelected: {
+    tintColor: undefined,
+  },
+  methodText: {
+    fontSize: fs(12),
+    marginTop: vs(4),
+    color: "#000",
+  },
+  methodTextSelected: {
+    color: "#fff",
+  },
   confirmPaymentBtn: {
     backgroundColor: "#000",
     height: vs(48),

@@ -27,6 +27,7 @@ import perf from "@react-native-firebase/perf";
 // Sub-components & Hooks
 import { ClosedDatesAlert } from "../components/block-unblock/ClosedDatesAlert";
 import { TimePickerModal } from "../components/TimePickerModal";
+import { OptionsPickerModal } from "../components/OptionsPickerModal";
 import { useBlockUnblock, BlockedEntry } from "../hooks/useBlockUnblock";
 import { SportsService } from "../services/sports.service";
 import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
@@ -192,6 +193,8 @@ export const BlockUnblockScreen = () => {
   const [fromTime, setFromTime] = useState("6 AM");
   const [toTime, setToTime] = useState("4 PM");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showGroundPicker, setShowGroundPicker] = useState(false);
 
   const handleDateChange = (selectedDate: Date) => {
     const activePicker = showDatePicker;
@@ -283,54 +286,6 @@ export const BlockUnblockScreen = () => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <ServiceHeader title={activeVenueName} subtitle="Block / Unblock" />
 
-        {/* Category Selector */}
-        {categories.length > 1 && (
-          <View style={[styles.groundScrollWrapper, { marginBottom: vs(8) }]}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.groundScroll}>
-              {categories.map(cat => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.groundPill, selectedCategory === cat && styles.groundPillActive]}
-                  onPress={() => handleCategoryChange(cat)}>
-                  <Text
-                    variant="body2"
-                    weight="semiBold"
-                    color={selectedCategory === cat ? COLORS.text.inverse : COLORS.text.primary}>
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Ground Selector */}
-        {filteredGrounds.length > 0 && (
-          <View style={styles.groundScrollWrapper}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.groundScroll}>
-              {filteredGrounds.map(g => (
-                <TouchableOpacity
-                  key={g.id}
-                  style={[styles.groundPill, selectedGroundId === g.id && styles.groundPillActive]}
-                  onPress={() => setSelectedGroundId(g.id)}>
-                  <Text
-                    variant="body2"
-                    weight="semiBold"
-                    color={selectedGroundId === g.id ? COLORS.text.inverse : COLORS.text.primary}>
-                    {g.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
         {/* 1. CLOSED DATES (Active Blocks) */}
         <View style={styles.section}>
           <Text variant="body1" weight="bold" style={styles.sectionTitle}>
@@ -371,16 +326,39 @@ export const BlockUnblockScreen = () => {
             SET CLOSE DATE
           </Text>
 
-          <View style={styles.fieldGroup}>
-            <Text variant="body2" weight="medium" style={styles.label}>
-              Ground
-            </Text>
-            <View style={styles.inputBox}>
-              <Text variant="body2" weight="semiBold" color={COLORS.text.primary}>
-                {selectedGroundName}
+          {categories.length > 1 && (
+            <View style={styles.fieldGroup}>
+              <Text variant="body2" weight="medium" style={styles.label}>
+                Category
               </Text>
+              <TouchableOpacity
+                style={styles.inputBoxAction}
+                onPress={() => setShowCategoryPicker(true)}>
+                <Text variant="body2" weight="semiBold" style={styles.flex1}>
+                  {selectedCategory
+                    ? selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)
+                    : ""}
+                </Text>
+                <ChevronRight size={ms(16)} color={COLORS.text.primary} />
+              </TouchableOpacity>
             </View>
-          </View>
+          )}
+
+          {filteredGrounds.length > 0 && (
+            <View style={styles.fieldGroup}>
+              <Text variant="body2" weight="medium" style={styles.label}>
+                Ground
+              </Text>
+              <TouchableOpacity
+                style={styles.inputBoxAction}
+                onPress={() => setShowGroundPicker(true)}>
+                <Text variant="body2" weight="semiBold" style={styles.flex1}>
+                  {selectedGroundName}
+                </Text>
+                <ChevronRight size={ms(16)} color={COLORS.text.primary} />
+              </TouchableOpacity>
+            </View>
+          )}
 
           <View style={styles.fieldGroup}>
             <Text variant="body2" weight="medium" style={styles.label}>
@@ -566,6 +544,7 @@ export const BlockUnblockScreen = () => {
           } else {
             setToTime(hour);
           }
+          setShowHourPicker(null);
         }}
         isHourDisabled={(hour, index) => {
           if (showHourPicker === "to") {
@@ -574,6 +553,27 @@ export const BlockUnblockScreen = () => {
           }
           return false;
         }}
+      />
+
+      <OptionsPickerModal
+        visible={showCategoryPicker}
+        onClose={() => setShowCategoryPicker(false)}
+        title="Select Category"
+        options={categories.map(cat => ({
+          label: cat.charAt(0).toUpperCase() + cat.slice(1),
+          value: cat,
+        }))}
+        selectedValue={selectedCategory}
+        onSelectOption={handleCategoryChange}
+      />
+
+      <OptionsPickerModal
+        visible={showGroundPicker}
+        onClose={() => setShowGroundPicker(false)}
+        title="Select Ground"
+        options={filteredGrounds.map(g => ({ label: g.name, value: g.id }))}
+        selectedValue={selectedGroundId}
+        onSelectOption={setSelectedGroundId}
       />
     </ScreenContainer>
   );

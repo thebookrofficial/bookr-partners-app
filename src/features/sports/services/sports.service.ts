@@ -29,7 +29,7 @@ export const SportsService = {
     const { data, error } = await supabase
       .from("sports_grounds")
       .select(
-        "id, name, sports_type, price_per_slot, night_price_per_slot, min_advance_price, slot_duration_minutes, parent_ground_id",
+        "id, name, sports_type, price_per_slot, night_price_per_slot, min_advance_price, slot_duration_minutes, parent_ground_id, custom_pricing",
       )
       .eq("venue_id", venueId)
       .order("display_order", { ascending: true });
