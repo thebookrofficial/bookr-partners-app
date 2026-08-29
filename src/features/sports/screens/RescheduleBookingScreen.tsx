@@ -59,6 +59,7 @@ export const RescheduleBookingScreen = () => {
 
   const [grounds, setGrounds] = useState<any[]>([]);
   const [selectedGroundId, setSelectedGroundId] = useState<string>(groundId);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [bookedHours, setBookedHours] = useState<string[]>([]);
   const [isFetchingSlots, setIsFetchingSlots] = useState(false);
 
@@ -66,6 +67,36 @@ export const RescheduleBookingScreen = () => {
     () => generateTimeSlots(6, 24, pricing.slotDurationMinutes),
     [pricing.slotDurationMinutes],
   );
+  const categories = useMemo(() => {
+    return Array.from(
+      new Set(
+        grounds
+          .map((g: any) => {
+            if (g.sports_type) return g.sports_type;
+            if (g.parent_ground_id) {
+              return grounds.find((p: any) => p.id === g.parent_ground_id)?.sports_type;
+            }
+            return null;
+          })
+          .filter(Boolean),
+      ),
+    ) as string[];
+  }, [grounds]);
+
+  useEffect(() => {
+    if (grounds.length > 0 && !selectedCategory) {
+      const initialGround = grounds.find(g => g.id === groundId);
+      let cat = initialGround?.sports_type;
+      if (!cat && initialGround?.parent_ground_id) {
+        cat = grounds.find(p => p.id === initialGround.parent_ground_id)?.sports_type;
+      }
+      if (cat) {
+        setSelectedCategory(cat);
+      } else if (categories.length > 0) {
+        setSelectedCategory(categories[0]);
+      }
+    }
+  }, [grounds, selectedCategory, groundId, categories]);
 
   useEffect(() => {
     const fetchGrounds = async () => {
@@ -202,10 +233,21 @@ export const RescheduleBookingScreen = () => {
   }, [booking, formatHour]);
 
   useEffect(() => {
-    const fetchVenuePricing = async () => {
+    let isActive = true;
+    const fetchPricing = async () => {
+      const ground = grounds.find(g => g.id === selectedGroundId);
+      if (ground) {
+        setPricing({
+          day: Number(ground.price_per_slot) || 0,
+          night: Number(ground.night_price_per_slot) || Number(ground.price_per_slot) || 0,
+          default: Number(ground.price_per_slot) || 0,
+          slotDurationMinutes: Number(ground.slot_duration_minutes) || 60,
+        });
+        return;
+      }
       try {
         const data: any = await SportsService.getVenuePricing(venueId);
-        if (data) {
+        if (data && isActive) {
           setPricing({
             day: data.day_price || data.price_per_hour || 0,
             night: data.night_price || data.price_per_hour || 0,
@@ -217,8 +259,11 @@ export const RescheduleBookingScreen = () => {
         console.error("Failed to fetch pricing:", err);
       }
     };
-    fetchVenuePricing();
-  }, [venueId]);
+    fetchPricing();
+    return () => {
+      isActive = false;
+    };
+  }, [venueId, grounds, selectedGroundId]);
 
   useEffect(() => {
     if (
@@ -235,21 +280,6 @@ export const RescheduleBookingScreen = () => {
     const endIdx = HOURS.indexOf(toTime);
 
     if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) return;
-
-    const origStartIdx = booking?.sports_slots?.start_time
-      ? HOURS.indexOf(formatHour(booking.sports_slots.start_time))
-      : -1;
-    const origEndIdx = booking?.sports_slots?.end_time
-      ? HOURS.indexOf(formatHour(booking.sports_slots.end_time))
-      : -1;
-    const origDurationSlots =
-      origStartIdx !== -1 && origEndIdx !== -1 ? origEndIdx - origStartIdx : -1;
-    const newDurationSlots = endIdx - startIdx;
-
-    if (newDurationSlots === origDurationSlots && booking?.total_amount) {
-      setTotalPrice(booking.total_amount.toString());
-      return;
-    }
 
     const selectedHours = HOURS.slice(startIdx, endIdx);
     let total = 0;
@@ -402,28 +432,32 @@ export const RescheduleBookingScreen = () => {
       ) : (
         <View style={styles.content}>
           {/* Category & Ground Info */}
-          <View
-            style={[styles.inputBoxReadOnly, { flexDirection: "row", paddingVertical: vs(12) }]}>
-            <View style={styles.flex1}>
-              <Text variant="body2" weight="bold" color="#000" style={styles.text14}>
-                Category
-              </Text>
-              <Text variant="body1" weight="semiBold" color="#000" style={styles.text16}>
-                {sportsType ? sportsType.charAt(0).toUpperCase() + sportsType.slice(1) : "-"}
-              </Text>
+          <View style={[styles.row, { marginBottom: vs(16) }]}>
+            <View style={[styles.inputBoxReadOnly, styles.flex1, { paddingVertical: vs(12) }]}>
+              <View>
+                <Text variant="body2" weight="bold" color="#000" style={styles.text14}>
+                  Category
+                </Text>
+                <Text variant="body1" weight="semiBold" color="#000" style={styles.text16}>
+                  {sportsType ? sportsType.charAt(0).toUpperCase() + sportsType.slice(1) : "-"}
+                </Text>
+              </View>
             </View>
-            <View style={styles.flex1}>
-              <Text variant="body2" weight="bold" color="#000" style={styles.text14}>
-                Ground
-              </Text>
-              <Text
-                variant="body1"
-                weight="semiBold"
-                color="#000"
-                style={styles.text16}
-                numberOfLines={1}>
-                {groundName || "-"}
-              </Text>
+            <View style={styles.gap} />
+            <View style={[styles.inputBoxReadOnly, styles.flex1, { paddingVertical: vs(12) }]}>
+              <View>
+                <Text variant="body2" weight="bold" color="#000" style={styles.text14}>
+                  Ground
+                </Text>
+                <Text
+                  variant="body1"
+                  weight="semiBold"
+                  color="#000"
+                  style={styles.text16}
+                  numberOfLines={1}>
+                  {groundName || "-"}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -445,6 +479,33 @@ export const RescheduleBookingScreen = () => {
             </TouchableOpacity>
           </View>
 
+          {/* Select Category */}
+          {categories.length > 0 && (
+            <View style={styles.section}>
+              <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+                Select Category
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.groundsContainer}>
+                {categories.map((c, i) => {
+                  const isSelected = selectedCategory === c;
+                  return (
+                    <TouchableOpacity
+                      key={`cat-${i}`}
+                      onPress={() => setSelectedCategory(c)}
+                      style={[styles.groundPill, isSelected && styles.groundPillSelected]}>
+                      <Text variant="body2" weight="semiBold" color={isSelected ? "#FFF" : "#000"}>
+                        {c.charAt(0).toUpperCase() + c.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Select Ground */}
           <View style={styles.section}>
             <Text variant="body1" weight="bold" style={styles.sectionTitle}>
@@ -454,19 +515,28 @@ export const RescheduleBookingScreen = () => {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.groundsContainer}>
-              {grounds.map(g => {
-                const isSelected = selectedGroundId === g.id;
-                return (
-                  <TouchableOpacity
-                    key={g.id}
-                    onPress={() => setSelectedGroundId(g.id)}
-                    style={[styles.groundPill, isSelected && styles.groundPillSelected]}>
-                    <Text variant="body2" weight="semiBold" color={isSelected ? "#FFF" : "#000"}>
-                      {g.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {grounds
+                .filter(g => {
+                  if (!selectedCategory) return true;
+                  let type = g.sports_type;
+                  if (!type && g.parent_ground_id) {
+                    type = grounds.find((p: any) => p.id === g.parent_ground_id)?.sports_type;
+                  }
+                  return type === selectedCategory;
+                })
+                .map(g => {
+                  const isSelected = selectedGroundId === g.id;
+                  return (
+                    <TouchableOpacity
+                      key={g.id}
+                      onPress={() => setSelectedGroundId(g.id)}
+                      style={[styles.groundPill, isSelected && styles.groundPillSelected]}>
+                      <Text variant="body2" weight="semiBold" color={isSelected ? "#FFF" : "#000"}>
+                        {g.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
             </ScrollView>
           </View>
 
@@ -656,17 +726,6 @@ export const RescheduleBookingScreen = () => {
                     );
                   })}
                 </View>
-
-                <TouchableOpacity
-                  style={styles.saveBtn}
-                  onPress={() => {
-                    Alert.alert("Saved", "Payment details saved locally");
-                    setIsAddingPayment(false);
-                  }}>
-                  <Text variant="body1" weight="semiBold" color="#FFF">
-                    Save
-                  </Text>
-                </TouchableOpacity>
               </>
             )}
           </View>
