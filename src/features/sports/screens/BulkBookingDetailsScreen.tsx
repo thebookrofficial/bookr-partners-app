@@ -39,6 +39,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 // IMPORT THE NEW VIEW COMPONENT
 import { ViewBulkBooking } from "../components/ViewBulkBooking";
 import { TimePickerModal } from "../components/TimePickerModal";
+import { getValidSlotsForGround } from "../utils/pricing.utils";
 import { generateTimeSlots } from "../utils/time.utils";
 import { calculateSlotPrice } from "../utils/pricing.utils";
 import { SportsService } from "../services/sports.service";
@@ -161,6 +162,7 @@ const CreateBulkBooking = ({
   const [toDate, setToDate] = useState(new Date());
   const [fromTime, setFromTime] = useState("7 AM");
   const [toTime, setToTime] = useState("8 AM");
+
   const [pricePerHour, setPricePerHour] = useState(1000);
   const [amountPaidInput, setAmountPaidInput] = useState("");
   const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
@@ -176,6 +178,21 @@ const CreateBulkBooking = ({
     () => generateTimeSlots(6, 27, slotDurationMinutes),
     [slotDurationMinutes],
   );
+  const validHours = React.useMemo(() => {
+    const selectedGround = grounds.find((g: any) => g.id === selectedGroundId);
+    return selectedGround ? getValidSlotsForGround(selectedGround, HOURS, grounds) : HOURS;
+  }, [grounds, selectedGroundId, HOURS]);
+
+  React.useEffect(() => {
+    if (validHours.length > 0) {
+      if (!validHours.includes(fromTime)) {
+        setFromTime(validHours[0]);
+      }
+      if (toTime !== "End Time" && !validHours.includes(toTime)) {
+        setToTime(validHours[Math.min(1, validHours.length - 1)]);
+      }
+    }
+  }, [validHours, fromTime, toTime]);
 
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
 
@@ -765,6 +782,8 @@ const CreateBulkBooking = ({
         title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
         hours={HOURS}
         selectedTime={showHourPicker === "from" ? fromTime : toTime}
+        ground={selectedGround}
+        allGrounds={grounds}
         onSelectTime={hour => {
           if (showHourPicker === "from") {
             setFromTime(hour);

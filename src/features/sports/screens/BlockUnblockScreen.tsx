@@ -30,6 +30,7 @@ import { TimePickerModal } from "../components/TimePickerModal";
 import { OptionsPickerModal } from "../components/OptionsPickerModal";
 import { useBlockUnblock, BlockedEntry } from "../hooks/useBlockUnblock";
 import { SportsService } from "../services/sports.service";
+import { getValidSlotsForGround } from "../utils/pricing.utils";
 import { generateTimeSlots, parseTimeTo24Hour } from "../utils/time.utils";
 
 const formatDisplayDate = (dateStr: string) => {
@@ -183,7 +184,6 @@ export const BlockUnblockScreen = () => {
     () => generateTimeSlots(6, 27, slotDurationMinutes),
     [slotDurationMinutes],
   );
-
   // --- NATIVE DATE PICKER STATES ---
   const [fromDate, setFromDate] = useState<Date>(new Date());
   const [toDate, setToDate] = useState<Date>(new Date());
@@ -192,6 +192,22 @@ export const BlockUnblockScreen = () => {
   // Time States
   const [fromTime, setFromTime] = useState("6 AM");
   const [toTime, setToTime] = useState("4 PM");
+  const validHours = React.useMemo(() => {
+    const selectedGround = grounds.find((g: any) => g.id === selectedGroundId);
+    return selectedGround ? getValidSlotsForGround(selectedGround, HOURS, grounds) : HOURS;
+  }, [grounds, selectedGroundId, HOURS]);
+
+  React.useEffect(() => {
+    if (validHours.length > 0) {
+      if (!validHours.includes(fromTime)) {
+        setFromTime(validHours[0]);
+      }
+      if (toTime !== "End Time" && !validHours.includes(toTime)) {
+        setToTime(validHours[Math.min(1, validHours.length - 1)]);
+      }
+    }
+  }, [validHours, fromTime, toTime]);
+
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showGroundPicker, setShowGroundPicker] = useState(false);
@@ -537,6 +553,8 @@ export const BlockUnblockScreen = () => {
         title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
         hours={HOURS}
         selectedTime={showHourPicker === "from" ? fromTime : toTime}
+        ground={grounds.find((g: any) => g.id === selectedGroundId)}
+        allGrounds={grounds}
         onSelectTime={hour => {
           if (showHourPicker === "from") {
             setFromTime(hour);
