@@ -378,22 +378,22 @@ export const RepeatBookingScreen = () => {
           <View
             style={[styles.inputBoxReadOnly, { flexDirection: "row", paddingVertical: vs(12) }]}>
             <View style={styles.flex1}>
-              <Text variant="body2" weight="bold" color="#000" style={{ fontSize: 14 }}>
+              <Text variant="body2" weight="bold" color="#000" style={styles.text14}>
                 Category
               </Text>
-              <Text variant="body1" weight="semiBold" color="#000" style={{ fontSize: 16 }}>
+              <Text variant="body1" weight="semiBold" color="#000" style={styles.text16}>
                 {sportsType ? sportsType.charAt(0).toUpperCase() + sportsType.slice(1) : "-"}
               </Text>
             </View>
             <View style={styles.flex1}>
-              <Text variant="body2" weight="bold" color="#000" style={{ fontSize: 14 }}>
+              <Text variant="body2" weight="bold" color="#000" style={styles.text14}>
                 Ground
               </Text>
               <Text
                 variant="body1"
                 weight="semiBold"
                 color="#000"
-                style={{ fontSize: 16 }}
+                style={styles.text16}
                 numberOfLines={1}>
                 {groundName || "-"}
               </Text>
@@ -409,10 +409,10 @@ export const RepeatBookingScreen = () => {
               onPress={() => setIsDatePickerOpen(true)}
               activeOpacity={0.7}
               style={styles.flex1}>
-              <Text variant="body1" weight="bold" color="#000" style={{ fontSize: 16 }}>
+              <Text variant="body1" weight="bold" color="#000" style={styles.text16}>
                 Date
               </Text>
-              <Text variant="body1" weight="semiBold" color="#000" style={{ fontSize: 16 }}>
+              <Text variant="body1" weight="semiBold" color="#000" style={styles.text16}>
                 {getFormattedDate(repeatDate)}
               </Text>
             </TouchableOpacity>
@@ -456,10 +456,10 @@ export const RepeatBookingScreen = () => {
                   <Clock size={ms(20)} color="#63A1FD" />
                 </View>
                 <View>
-                  <Text variant="body1" weight="bold" color="#000" style={{ fontSize: 16 }}>
+                  <Text variant="body1" weight="bold" color="#000" style={styles.text16}>
                     From
                   </Text>
-                  <Text variant="body1" weight="semiBold" color="#000" style={{ fontSize: 16 }}>
+                  <Text variant="body1" weight="semiBold" color="#000" style={styles.text16}>
                     {fromTime === "Start Time" ? "--" : fromTime}
                   </Text>
                 </View>
@@ -472,10 +472,10 @@ export const RepeatBookingScreen = () => {
                   <Clock size={ms(20)} color="#63A1FD" />
                 </View>
                 <View>
-                  <Text variant="body1" weight="bold" color="#000" style={{ fontSize: 16 }}>
+                  <Text variant="body1" weight="bold" color="#000" style={styles.text16}>
                     To
                   </Text>
-                  <Text variant="body1" weight="semiBold" color="#000" style={{ fontSize: 16 }}>
+                  <Text variant="body1" weight="semiBold" color="#000" style={styles.text16}>
                     {toTime === "End Time" ? "--" : toTime}
                   </Text>
                 </View>
@@ -908,6 +908,7 @@ const styles = StyleSheet.create({
     marginHorizontal: hs(20),
     borderRadius: ms(15),
     padding: ms(15),
+    overflow: "hidden",
   },
   noPaddingHorizontal: {
     paddingHorizontal: 0,
@@ -928,5 +929,11 @@ const styles = StyleSheet.create({
   slotPillSelected: {
     backgroundColor: "#63A1FD",
     borderColor: "#63A1FD",
+  },
+  text14: {
+    fontSize: 14,
+  },
+  text16: {
+    fontSize: 16,
   },
 });
