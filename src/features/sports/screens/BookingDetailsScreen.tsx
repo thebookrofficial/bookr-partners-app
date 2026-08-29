@@ -714,12 +714,7 @@ export const BookingDetailsScreen = () => {
                       containerStyle={[
                         index !== paymentLogs.length - 1 && { marginBottom: vs(8) },
                       ]}>
-                      <TouchableOpacity
-                        style={[styles.logCard, styles.logCardNoMargin]}
-                        activeOpacity={0.7}
-                        onPress={() =>
-                          navigation.navigate("PaymentHistory", { bookingId: booking.id })
-                        }>
+                      <View style={[styles.logCard, styles.logCardNoMargin]}>
                         <View style={styles.logLeftCol}>
                           <Image source={icon} style={styles.logIcon} />
                           <Text variant="body2" weight="semiBold" style={styles.logName}>
@@ -736,7 +731,7 @@ export const BookingDetailsScreen = () => {
                         <Text variant="body1" weight="semiBold" style={styles.logAmount}>
                           ₹{log.amount}
                         </Text>
-                      </TouchableOpacity>
+                      </View>
                     </Swipeable>
                   );
                 })}
