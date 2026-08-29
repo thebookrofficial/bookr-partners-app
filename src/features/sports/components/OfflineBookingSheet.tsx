@@ -510,9 +510,6 @@ export const OfflineBookingSheet = ({
         default: Number(ground.price_per_slot) || 0,
         slotDurationMinutes: Number(ground.slot_duration_minutes) || 60,
       });
-      if (!isAdvanceFocused) {
-        setAdvancePaid(ground.min_advance_price?.toString() || "");
-      }
     }
   }, [internalGroundId, allGrounds, isVisible, isAdvanceFocused]);
 
