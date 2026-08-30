@@ -82,12 +82,15 @@ export const SportsDashboardScreen = () => {
   const [currentVenueIds, setCurrentVenueIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [dashboardCategory, setDashboardCategory] = useState("Overall");
+
   const {
     metrics,
     grounds,
     loading: dataLoading,
+    availableCategories,
     refetch,
-  } = useSportsDashboard(currentVenueIds, timeFilter, groundFilter, selectedCategory, customRange);
+  } = useSportsDashboard(currentVenueIds, timeFilter, groundFilter, dashboardCategory, customRange);
 
   const { activeVenueName } = useServiceStore();
 
@@ -199,9 +202,59 @@ export const SportsDashboardScreen = () => {
               </TouchableOpacity>
             </Modal>
 
+            {/* Category Row (Conditional) */}
+            {availableCategories && availableCategories.length > 0 && (
+              <View style={styles.groundSection}>
+                <Text variant="h2" weight="bold" color="#000" style={{ marginBottom: vs(12) }}>
+                  Category
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.groundFilterScroll}>
+                  <TouchableOpacity
+                    style={[
+                      styles.groundPill,
+                      dashboardCategory === "Overall" && styles.groundPillActive,
+                    ]}
+                    onPress={() => {
+                      setDashboardCategory("Overall");
+                      setGroundFilter("Overall"); // Reset ground filter on category change
+                    }}>
+                    <Text
+                      variant="body2"
+                      weight="semiBold"
+                      color={dashboardCategory === "Overall" ? "#FFF" : COLORS.text.secondary}>
+                      Overall
+                    </Text>
+                  </TouchableOpacity>
+                  {availableCategories.map(cat => {
+                    const isActive = dashboardCategory.toLowerCase() === cat.toLowerCase();
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[styles.groundPill, isActive && styles.groundPillActive]}
+                        onPress={() => {
+                          setDashboardCategory(cat);
+                          setGroundFilter("Overall"); // Reset ground filter on category change
+                        }}>
+                        <Text
+                          variant="body2"
+                          weight="semiBold"
+                          style={{ textTransform: "capitalize" }}
+                          color={isActive ? "#FFF" : COLORS.text.secondary}>
+                          {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
             {/* Ground Row (Conditional) */}
             {grounds.length > 1 && (
-              <View style={styles.groundSection}>
+              <View style={[styles.groundSection, { marginTop: vs(4) }]}>
                 <Text variant="h2" weight="bold" color="#000" style={{ marginBottom: vs(12) }}>
                   Ground
                 </Text>

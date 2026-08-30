@@ -62,6 +62,7 @@ export const useSportsDashboard = (
   });
   const [grounds, setGrounds] = useState<GroundInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 
   const fetchDashboardData = useCallback(async () => {
     if (!venueIds || venueIds.length === 0) {
@@ -71,14 +72,29 @@ export const useSportsDashboard = (
 
     setLoading(true);
     try {
-      // 1. Fetch Grounds first to resolve filter
+      // 1. Fetch Grounds first to resolve filter and categories
       const { data: groundsData } = await supabase
         .from("sports_grounds")
-        .select("id, name")
+        .select("id, name, sports_type")
         .in("venue_id", venueIds)
         .order("display_order", { ascending: true });
 
-      const resolvedGrounds = groundsData || [];
+      const allGrounds = groundsData || [];
+
+      // Extract unique categories
+      const cats = new Set<string>();
+      allGrounds.forEach(g => {
+        if (g.sports_type) cats.add(g.sports_type.toLowerCase());
+      });
+      setAvailableCategories(Array.from(cats));
+
+      // Filter grounds by selectedCategory
+      let resolvedGrounds = allGrounds;
+      if (selectedCategory && selectedCategory.toLowerCase() !== "overall") {
+        resolvedGrounds = allGrounds.filter(
+          g => g.sports_type && g.sports_type.toLowerCase() === selectedCategory.toLowerCase(),
+        );
+      }
       setGrounds(resolvedGrounds);
 
       let targetGroundId = "";
@@ -129,7 +145,7 @@ export const useSportsDashboard = (
         `,
         )
         .in("venue_id", venueIds)
-        .neq("booking_status", "cancelled")
+        .eq("booking_status", "confirmed")
         .gte("sports_slots.slot_date", getLocalISODate(startDate))
         .lte("sports_slots.slot_date", getLocalISODate(endDate));
 
@@ -140,115 +156,220 @@ export const useSportsDashboard = (
       const { data: bookings, error } = await query;
       if (error) throw error;
 
-      // --- 4. SMART GROUPING ALGORITHM (Align with Home Screen) ---
-      const groupedBookings: Record<string, any> = {};
+      /**
+       * Groups sports booking records by their logical booking identity.
+       *
+       * WHY:
+       * A single booking can generate multiple sports_bookings rows when it
+       * contains multiple slots, is created as a bulk booking, or is linked
+       * through a parent booking. Grouping by `${date}_${groupKey}` caused the
+       * same logical booking to be counted multiple times when its slots had
+       * different dates.
+       *
+       * The dashboard's overall booking metrics must therefore be calculated
+       * at booking level, while the graph can independently use slot dates.
+       */
+      const bookingGroups: Record<string, any> = {};
 
       (bookings || []).forEach((b: any) => {
-        // ROBUST DATA ACCESS: slot_date might be in an object or a single-item array
         const slot = Array.isArray(b.sports_slots) ? b.sports_slots[0] : b.sports_slots;
+
         const date = slot?.slot_date;
+        const bType = slot?.sports_grounds?.sports_type || "";
 
-        if (!date) return; // Skip if no date found
+        if (!date) return;
 
-        const groupKey = b.booking_group_id || b.parent_booking_id || b.id;
-        const uniqueKey = `${date}_${groupKey}`;
-
-        if (!groupedBookings[uniqueKey]) {
-          groupedBookings[uniqueKey] = {
-            ...b,
-            date: date, // Keep a flat date for easier access later
-            sports_type: slot?.sports_grounds?.sports_type || "",
-            total_amount: Number(b.total_amount || 0),
-            vendor_payout: Number(b.vendor_payout || 0),
-            subtotal: Number(b.subtotal || 0),
-            paid_amount: Number(b.paid_amount || 0),
-            discount_amount: Number(b.discount_amount || 0),
-            platform_fee: Number(b.platform_fee || 0),
-            merged_count: 1, // Number of unique bookings in this group
-            processed_booking_ids: new Set([b.id]),
-          };
-        } else {
-          // Check if we've already processed this exact booking ID (e.g. from multiple slots)
-          if (!groupedBookings[uniqueKey].processed_booking_ids.has(b.id)) {
-            // Sum up amounts for the same transaction group but DIFFERENT bookings
-            groupedBookings[uniqueKey].total_amount += Number(b.total_amount || 0);
-            groupedBookings[uniqueKey].vendor_payout += Number(b.vendor_payout || 0);
-            groupedBookings[uniqueKey].subtotal += Number(b.subtotal || 0);
-            groupedBookings[uniqueKey].paid_amount += Number(b.paid_amount || 0);
-            groupedBookings[uniqueKey].discount_amount += Number(b.discount_amount || 0);
-            groupedBookings[uniqueKey].platform_fee += Number(b.platform_fee || 0);
-            groupedBookings[uniqueKey].merged_count += 1;
-            groupedBookings[uniqueKey].processed_booking_ids.add(b.id);
-          }
+        // Filter by selected sports category.
+        if (
+          selectedCategory &&
+          selectedCategory.toLowerCase() !== "overall" &&
+          bType.toLowerCase() !== selectedCategory.toLowerCase()
+        ) {
+          return;
         }
+
+        /**
+         * booking_group_id is the primary logical booking identity.
+         * parent_booking_id is used for linked/rescheduled bookings.
+         * The booking id itself is the final fallback for standalone bookings.
+         */
+        const groupKey = b.booking_group_id || b.parent_booking_id || b.id;
+
+        if (!bookingGroups[groupKey]) {
+          bookingGroups[groupKey] = {
+            booking_source: b.booking_source,
+            sports_type: bType,
+            subtotal: 0,
+            paid_amount: 0,
+            total_amount: 0,
+            discount_amount: 0,
+            platform_fee: 0,
+            vendor_payout: 0,
+
+            /**
+             * Store each booking row only once so that multiple slot rows
+             * belonging to the same logical booking cannot inflate revenue.
+             */
+            processedBookingIds: new Set<string>(),
+
+            /**
+             * Keep the individual slot records separately for daily graph
+             * calculations.
+             */
+            slots: [],
+          };
+        }
+
+        const group = bookingGroups[groupKey];
+
+        // Prevent the same booking record from being financially counted twice.
+        if (!group.processedBookingIds.has(b.id)) {
+          group.processedBookingIds.add(b.id);
+
+          group.subtotal += Number(b.subtotal || 0);
+          group.paid_amount += Number(b.paid_amount || 0);
+          group.total_amount += Number(b.total_amount || 0);
+          group.discount_amount += Number(b.discount_amount || 0);
+          group.platform_fee += Number(b.platform_fee || 0);
+          group.vendor_payout += Number(b.vendor_payout || 0);
+        }
+
+        group.slots.push({
+          bookingId: b.id,
+          date,
+        });
       });
 
-      // 5. Process Data
+      // 5. Process booking-level metrics.
       let onlineCount = 0;
       let offlineCount = 0;
       let totalOnlineRevenue = 0;
       let totalOfflineRevenue = 0;
 
-      const dailyData: Record<string, { bookings: number; revenue: number; day: string }> = {};
+      const dailyData: Record<
+        string,
+        { bookings: number; revenue: number; bookingIds: Set<string> }
+      > = {};
 
-      // Initialize all dates in range with zeros
+      // Initialize all dates in range with zeros.
       const dateCursor = new Date(startDate);
+
       while (dateCursor <= endDate) {
         const dateKey = getLocalISODate(dateCursor);
+
         dailyData[dateKey] = {
           bookings: 0,
           revenue: 0,
-          day: dateCursor.toLocaleDateString("en-US", { weekday: "short" }),
+          bookingIds: new Set<string>(),
         };
+
         dateCursor.setDate(dateCursor.getDate() + 1);
       }
 
-      const groupedArray = Object.values(groupedBookings);
+      const groupedArray = Object.entries(bookingGroups);
 
-      groupedArray.forEach((group: any) => {
+      groupedArray.forEach(([groupKey, group]: [string, any]) => {
         const isOnline = group.booking_source === "online";
 
-        // Handle platform fee dynamically per booking
-        const isPickleball = group.sports_type.toLowerCase().includes("pickleball");
-        let bookingRevenue = 0;
+        /**
+         * Revenue intentionally uses different authoritative fields:
+         *
+         * Online:
+         *   subtotal
+         *
+         * Offline:
+         *   paid_amount
+         *
+         * WHY:
+         * Offline bookings do not use discounts in dashboard revenue, while
+         * online bookings can contain discounts but the dashboard revenue
+         * represents the booking subtotal rather than the customer-paid total.
+         */
+        const bookingRevenue = isOnline ? group.subtotal : group.paid_amount;
 
         if (isOnline) {
-          bookingRevenue = group.subtotal;
-          onlineCount += group.merged_count;
+          onlineCount += 1;
           totalOnlineRevenue += bookingRevenue;
         } else {
-          bookingRevenue = isPickleball
-            ? group.paid_amount + group.discount_amount - group.platform_fee
-            : group.paid_amount + group.discount_amount;
-          offlineCount += group.merged_count;
+          offlineCount += 1;
           totalOfflineRevenue += bookingRevenue;
         }
 
-        const dateKey = getLocalISODate(new Date(group.date));
-        if (dailyData[dateKey]) {
-          dailyData[dateKey].bookings += group.merged_count;
-          dailyData[dateKey].revenue += bookingRevenue;
+        /**
+         * Daily graph data is maintained independently from overall booking
+         * metrics. A booking group may contain slots on multiple dates, so
+         * using the group's first date would produce incorrect graph data.
+         */
+        const dailyRevenueByDate: Record<string, number> = {};
+
+        group.slots.forEach((slot: { bookingId: string; date: string }) => {
+          const dateKey = slot.date;
+
+          if (!dailyData[dateKey]) return;
+
+          dailyData[dateKey].bookingIds.add(groupKey);
+
+          if (!dailyRevenueByDate[dateKey]) {
+            dailyRevenueByDate[dateKey] = 0;
+          }
+
+          /**
+           * Financial values are already aggregated at booking level.
+           * For multi-slot bookings we therefore distribute the booking
+           * revenue across its slot dates rather than adding the complete
+           * booking amount once per slot.
+           */
+        });
+
+        /**
+         * For a booking containing multiple dates, distribute its revenue
+         * equally across its unique slot dates for the graph only.
+         *
+         * This does NOT affect the dashboard's actual revenue totals above.
+         */
+        const uniqueDates = Object.keys(dailyRevenueByDate);
+
+        if (uniqueDates.length > 0) {
+          const revenuePerDate = bookingRevenue / uniqueDates.length;
+
+          uniqueDates.forEach(dateKey => {
+            dailyData[dateKey].revenue += revenuePerDate;
+          });
         }
       });
 
-      // Format for UI
+      // Convert booking Sets into daily booking counts.
+      Object.values(dailyData).forEach(day => {
+        day.bookings = day.bookingIds.size;
+      });
+
+      // Format for UI.
       const bookingGraphData: BookingGraphItem[] = Object.keys(dailyData).map(key => ({
-        date: new Date(key).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
-        day: dailyData[key].day,
+        date: new Date(key).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+        }),
+        day: new Date(key).toLocaleDateString("en-US", {
+          weekday: "short",
+        }),
         value: dailyData[key].bookings,
       }));
 
       const maxBookingValue = Math.max(...bookingGraphData.map(d => d.value), 5);
 
       const revenueItems = Object.keys(dailyData).map(key => ({
-        date: new Date(key).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
+        date: new Date(key).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+        }),
         rawAmount: dailyData[key].revenue,
       }));
+
       const maxRev = Math.max(...revenueItems.map(r => r.rawAmount), 1);
 
       const revenueGraphData: RevenueGraphItem[] = revenueItems.map((r, i) => ({
         date: r.date,
-        value: `+₹${r.rawAmount}`,
+        value: `+₹${Math.round(r.rawAmount)}`,
         fillPct: `${Math.round((r.rawAmount / maxRev) * 100)}%`,
         isBlue: i === revenueItems.length - 1,
         rawAmount: r.rawAmount,
@@ -270,11 +391,11 @@ export const useSportsDashboard = (
     } finally {
       setLoading(false);
     }
-  }, [venueIds, timeFilter, groundFilter, customRange]);
+  }, [venueIds, timeFilter, groundFilter, customRange, selectedCategory]);
 
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  return { metrics, grounds, loading, refetch: fetchDashboardData };
+  return { metrics, grounds, loading, availableCategories, refetch: fetchDashboardData };
 };
