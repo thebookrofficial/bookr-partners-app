@@ -198,6 +198,7 @@ export const useBulkBooking = () => {
               booking_status: "confirmed",
               parent_booking_id: firstBookingId || null,
 
+              sport_category: params.category,
               subtotal: params.totalAmountPerSlot,
               discount_amount: 0,
               total_amount: params.totalAmountPerSlot,
@@ -207,7 +208,6 @@ export const useBulkBooking = () => {
               paid_amount: 0,
               booking_source: "offline", // ADDED: Set booking source to offline
               sports_booking_type: finalBookingType,
-              sport_category: params.category,
               notes: "Bulk Booking Record",
             })
             .select("id")

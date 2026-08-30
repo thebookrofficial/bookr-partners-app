@@ -470,6 +470,7 @@ export const SportsService = {
     addAmount: number;
     paymentMethod?: string;
     slotDurationMinutes?: number;
+    sportCategory?: string;
   }) {
     try {
       // 1. Fetch the old booking to get guest info and booking group
@@ -606,7 +607,7 @@ export const SportsService = {
         notesOverride: `Rescheduled from Booking ID: ${oldBooking.id}`,
         isRescheduled: true,
         originalBookingId: oldBooking.id,
-        sportCategory: oldBooking.sport_category || undefined,
+        sportCategory: params.sportCategory || oldBooking.sport_category || undefined,
       });
 
       return true;

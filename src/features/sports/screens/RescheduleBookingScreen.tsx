@@ -352,6 +352,7 @@ export const RescheduleBookingScreen = () => {
           addAmount: newAdvanceToAdd,
           paymentMethod: newAdvanceToAdd > 0 ? paymentMethod : undefined,
           slotDurationMinutes: pricing.slotDurationMinutes,
+          sportCategory: sportsType,
         });
 
         // Explicitly update old bookings in the chain to "rescheduled" status

@@ -349,6 +349,7 @@ export const RepeatBookingScreen = () => {
           bookingSource: booking.booking_source || "vendor_app",
           sportsBookingType: booking.sports_booking_type || "standard",
           slotDurationMinutes: pricing.slotDurationMinutes,
+          sportCategory: selectedCategory,
         });
       } catch (err: any) {
         Alert.alert("Slot Unavailable", err.message || "Failed to repeat booking");
