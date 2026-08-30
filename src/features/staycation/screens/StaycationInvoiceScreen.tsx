@@ -48,8 +48,11 @@ export const StaycationInvoiceScreen = () => {
   const platformFee = totalPaid * 0.05;
   const gatewayFee = inAppPayments * 0.02;
 
-  // Est Payout: Total Paid - platform fee - gateway charges
-  const estPayout = totalPaid - platformFee - gatewayFee;
+  /**
+   * Estimated vendor payout is calculated from the actual in-app payment
+   * received by Bookr, after deducting the platform and gateway charges.
+   */
+  const estPayout = inAppPayments - platformFee - gatewayFee;
 
   const isResort = booking.venues?.staycation_venues?.[0]?.property_type === "resort";
 
@@ -86,7 +89,7 @@ export const StaycationInvoiceScreen = () => {
               {guestName}
             </Text>
           </View>
-          <Text variant="body2" weight="semiBold" color="#63A1FD" style={styles.statusText}>
+          <Text variant="body1" weight="semiBold" color="#63A1FD" style={styles.statusText}>
             {isOnline ? "Online" : "Manual"}
           </Text>
         </View>
@@ -95,12 +98,12 @@ export const StaycationInvoiceScreen = () => {
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
             <Phone size={ms(18)} color={COLORS.text.primary} fill={COLORS.text.primary} />
-            <Text variant="body2" weight="medium" style={styles.labelText}>
+            <Text variant="body1" weight="medium" style={styles.labelText}>
               Mobile No
             </Text>
           </View>
           <View style={styles.infoBox}>
-            <Text variant="body2" weight="semiBold">
+            <Text variant="body1" weight="semiBold">
               {guestPhone}
             </Text>
           </View>
@@ -110,12 +113,12 @@ export const StaycationInvoiceScreen = () => {
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
             <Calendar size={ms(18)} color={COLORS.text.primary} />
-            <Text variant="body2" weight="bold" style={styles.labelText}>
+            <Text variant="body1" weight="bold" style={styles.labelText}>
               Stay Dates
             </Text>
           </View>
           <View style={styles.infoBox}>
-            <Text variant="body2" weight="semiBold">
+            <Text variant="body1" weight="semiBold">
               {`${formatDate(booking.check_in_date)} - ${formatDate(booking.check_out_date)}`}
             </Text>
           </View>
@@ -126,12 +129,12 @@ export const StaycationInvoiceScreen = () => {
           <View style={[styles.fieldGroup, styles.flex1]}>
             <View style={styles.labelRow}>
               <User size={ms(18)} color={COLORS.text.primary} />
-              <Text variant="body2" weight="bold" style={styles.labelText}>
+              <Text variant="body1" weight="bold" style={styles.labelText}>
                 Guests
               </Text>
             </View>
             <View style={styles.infoBox}>
-              <Text variant="body2" weight="semiBold">
+              <Text variant="body1" weight="semiBold">
                 {booking.guest_count}
               </Text>
             </View>
@@ -140,12 +143,12 @@ export const StaycationInvoiceScreen = () => {
           <View style={[styles.fieldGroup, styles.flex1]}>
             <View style={styles.labelRow}>
               <Clock size={ms(18)} color={COLORS.text.primary} />
-              <Text variant="body2" weight="bold" style={styles.labelText}>
+              <Text variant="body1" weight="bold" style={styles.labelText}>
                 Units
               </Text>
             </View>
             <View style={styles.infoBox}>
-              <Text variant="body2" weight="semiBold">
+              <Text variant="body1" weight="semiBold">
                 {booking.unit_count || 1}
               </Text>
             </View>
@@ -157,12 +160,12 @@ export const StaycationInvoiceScreen = () => {
           <View style={styles.fieldGroup}>
             <View style={styles.labelRow}>
               <Home size={ms(18)} color={COLORS.text.primary} />
-              <Text variant="body2" weight="bold" style={styles.labelText}>
+              <Text variant="body1" weight="bold" style={styles.labelText}>
                 Room Name & Number
               </Text>
             </View>
             <View style={styles.infoBox}>
-              <Text variant="body2" weight="semiBold">
+              <Text variant="body1" weight="semiBold">
                 {`${booking.staycation_rooms?.room_name || "N/A"} - ${
                   booking.staycation_rooms?.room_number || "N/A"
                 }`}
@@ -175,21 +178,21 @@ export const StaycationInvoiceScreen = () => {
         {isOnline ? (
           <View style={styles.fieldRow}>
             <View style={[styles.fieldGroup, styles.flex1]}>
-              <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
-                Total Paid
+              <Text variant="body1" weight="bold" style={styles.standaloneLabel}>
+                Total Amount
               </Text>
               <View style={styles.infoBox}>
-                <Text variant="body2" weight="semiBold">
+                <Text variant="body1" weight="semiBold">
                   ₹ {totalPaid}
                 </Text>
               </View>
             </View>
             <View style={[styles.fieldGroup, styles.flex1]}>
-              <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
+              <Text variant="body1" weight="bold" style={styles.standaloneLabel}>
                 In App Payments
               </Text>
               <View style={styles.infoBox}>
-                <Text variant="body2" weight="semiBold" color="#00B562">
+                <Text variant="body1" weight="semiBold" color="#00B562">
                   ₹ {inAppPayments}
                 </Text>
               </View>
@@ -197,11 +200,11 @@ export const StaycationInvoiceScreen = () => {
           </View>
         ) : (
           <View style={styles.fieldGroup}>
-            <Text variant="body2" weight="bold" style={styles.standaloneLabel}>
+            <Text variant="body1" weight="bold" style={styles.standaloneLabel}>
               Amount Paid
             </Text>
             <View style={styles.infoBox}>
-              <Text variant="body2" weight="semiBold" color="#00B562">
+              <Text variant="body1" weight="semiBold" color="#00B562">
                 ₹ {inAppPayments}
               </Text>
             </View>
@@ -216,10 +219,10 @@ export const StaycationInvoiceScreen = () => {
             </Text>
 
             <View style={styles.payoutRow}>
-              <Text variant="body2" weight="semiBold">
-                Total Paid
+              <Text variant="body1" weight="semiBold">
+                Total Amount
               </Text>
-              <Text variant="body2" weight="medium">
+              <Text variant="body1" weight="medium">
                 ₹{totalPaid}
               </Text>
             </View>
@@ -227,51 +230,51 @@ export const StaycationInvoiceScreen = () => {
             <View style={styles.divider} />
 
             <View style={styles.payoutRow}>
-              <Text variant="body2" weight="semiBold">
+              <Text variant="body1" weight="semiBold">
                 In App Payment
               </Text>
-              <Text variant="body2" weight="medium">
+              <Text variant="body1" weight="medium">
                 ₹{inAppPayments}
               </Text>
             </View>
 
             <View style={styles.payoutRow}>
-              <Text variant="body2" weight="semiBold">
+              <Text variant="body1" weight="semiBold">
                 Discount
               </Text>
-              <Text variant="body2" weight="medium" color="#E55959">
+              <Text variant="body1" weight="medium" color="#E55959">
                 -₹{discountAmount}
               </Text>
             </View>
 
             <View style={styles.payoutRow}>
               <View style={styles.dashedUnderline}>
-                <Text variant="body2" weight="semiBold">
+                <Text variant="body1" weight="semiBold">
                   Platform Fee
                 </Text>
               </View>
-              <Text variant="body2" weight="medium" color="#E55959">
+              <Text variant="body1" weight="medium" color="#E55959">
                 -₹{platformFee.toFixed(2)}
               </Text>
             </View>
 
             <View style={styles.payoutRow}>
               <View style={styles.dashedUnderline}>
-                <Text variant="body2" weight="semiBold">
-                  Gateway Charges
+                <Text variant="body1" weight="semiBold">
+                  Handling Charges
                 </Text>
               </View>
-              <Text variant="body2" weight="medium" color="#E55959">
+              <Text variant="body1" weight="medium" color="#E55959">
                 -₹{gatewayFee.toFixed(2)}
               </Text>
             </View>
             <View style={styles.divider} />
 
             <View style={styles.payoutRow}>
-              <Text variant="body2" weight="bold">
+              <Text variant="body1" weight="bold">
                 EST. Payout Amount
               </Text>
-              <Text variant="body2" weight="bold" color="#00B562">
+              <Text variant="body1" weight="bold" color="#00B562">
                 ₹{estPayout.toFixed(2)}
               </Text>
             </View>
