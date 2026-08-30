@@ -78,7 +78,9 @@ export const FinanceService = {
     let actualPaid = paidAmount;
     let revenueBase = paidAmount;
     let gatewayBase = paidAmount;
-    let gateRate = 0.02;
+
+    let commissionRate = commRate;
+    let gatewayRate = 0.02;
 
     if (vertical === "sports" || vertical === "staycation") {
       actualPaid = subtotal;
@@ -89,29 +91,23 @@ export const FinanceService = {
       gatewayBase = actualPaid;
     }
 
-    /**
-     * Staycation uses a 2% payment gateway charge calculated
-     * specifically on the in-app payment (subtotal).
-     */
-    if (vertical === "staycation") {
-      gatewayBase = subtotal;
-      gateRate = 0.02;
-    }
-
-    /**
-     * Sports uses a 1.5% gateway fee for Pickleball and 2%
-     * for all other sports categories.
-     */
+    // Use database-configured rates for sports.
     if (vertical === "sports") {
-      gateRate = 0.02;
+      commissionRate = Number(b.commission_percentage ?? 3.5) / 100;
 
-      if (b.sports_type?.toLowerCase().includes("pickleball")) {
-        gateRate = 0.015;
-      }
+      gatewayRate = Number(b.gateway_percentage ?? 2) / 100;
     }
 
-    const commission = totalAmount * commRate;
-    const gateway = gatewayBase * gateRate;
+    // Use database-configured rates for staycation.
+    if (vertical === "staycation") {
+      commissionRate = Number(b.commission_percentage ?? 5) / 100;
+
+      gatewayRate = Number(b.gateway_percentage ?? 2) / 100;
+    }
+
+    const commission = totalAmount * commissionRate;
+    const gateway = gatewayBase * gatewayRate;
+
     const payout = revenueBase - commission - gateway;
 
     return {
