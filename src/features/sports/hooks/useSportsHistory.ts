@@ -35,25 +35,32 @@ export const useSportsHistory = (
   dateFilter: "all" | "yesterday" | "3_months" | "6_months" | "9_months" | "custom" = "all",
   customRange?: { start: Date; end: Date },
 ) => {
-  // 1. Resolve all Venue IDs for the owner
-  const { data: venueIds = [], isLoading: isResolvingVenue } = useQuery({
-    queryKey: ["resolveAllVenues", initialVenueId],
+  // 1. Use the specific venue provided, do not fetch all venues for the owner.
+  const venueIds = [initialVenueId];
+  const isResolvingVenue = false;
+
+  // Fetch available categories for this venue
+  const { data: availableCategories = [] } = useQuery({
+    queryKey: ["historyAvailableCategories", venueIds],
+    enabled: venueIds.length > 0,
     queryFn: async () => {
-      const { data: initialVenue } = await supabase
-        .from("venues")
-        .select("id, owner_id")
-        .eq("id", initialVenueId)
-        .single();
-      if (!initialVenue) throw new Error("Owner not found");
+      const { data } = await supabase
+        .from("sports_grounds")
+        .select("id, sports_type, parent_ground_id")
+        .in("venue_id", venueIds);
+      if (!data) return [];
 
-      const { data: allVenues } = await supabase
-        .from("venues")
-        .select("id")
-        .eq("owner_id", initialVenue.owner_id);
-
-      return (allVenues || []).map(v => v.id);
+      const cats = new Set<string>();
+      data.forEach(g => {
+        if (g.sports_type) {
+          cats.add(g.sports_type.toLowerCase());
+        } else if (g.parent_ground_id) {
+          const parent = data.find(p => p.id === g.parent_ground_id);
+          if (parent?.sports_type) cats.add(parent.sports_type.toLowerCase());
+        }
+      });
+      return Array.from(cats);
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes cache
   });
 
   // 2. Fetch History using resolved IDs
@@ -84,7 +91,10 @@ export const useSportsHistory = (
       const groupedByMonth: Record<string, any> = {};
 
       (bookings || []).forEach((b: any) => {
-        const slotDate = b.sports_slots.slot_date;
+        const slotsArray = Array.isArray(b.sports_slots) ? b.sports_slots : [b.sports_slots];
+        const slotDate = slotsArray[0]?.slot_date;
+        if (!slotDate) return;
+
         const dateObj = new Date(slotDate);
 
         const today = new Date();
@@ -130,8 +140,8 @@ export const useSportsHistory = (
             slots: [],
             rawBookingType: b.sports_booking_type,
             rawBookingSource: b.booking_source,
-            category: b.sports_slots?.sports_grounds?.sports_type || "",
-            ground: b.sports_slots?.sports_grounds?.name || "",
+            category: slotsArray[0]?.sports_grounds?.sports_type || "",
+            ground: slotsArray[0]?.sports_grounds?.name || "",
           };
         }
 
@@ -145,7 +155,7 @@ export const useSportsHistory = (
           b.subtotal || 0,
         );
         groupedByMonth[monthStr].days[dateStr].transactions[transactionKey].slots.push(
-          b.sports_slots,
+          ...slotsArray,
         );
       });
 
@@ -275,6 +285,25 @@ export const useSportsHistory = (
         .filter(monthGroup => monthGroup.days.length > 0);
     }
 
+    // Apply category filter
+    if (category && category !== "All") {
+      const lowerCat = category.toLowerCase();
+      groups = groups
+        .map(monthGroup => {
+          const filteredDays = monthGroup.days
+            .map(dayGroup => {
+              const filteredBookings = dayGroup.bookings.filter(
+                b => (b.category || "").toLowerCase() === lowerCat,
+              );
+              return { ...dayGroup, bookings: filteredBookings };
+            })
+            .filter(dayGroup => dayGroup.bookings.length > 0);
+          const newSettlement = filteredDays.reduce((sum, d) => sum + d.settlement, 0);
+          return { ...monthGroup, days: filteredDays, totalSettlement: newSettlement };
+        })
+        .filter(monthGroup => monthGroup.days.length > 0);
+    }
+
     if (searchQuery.trim() !== "") {
       const lowerQuery = searchQuery.toLowerCase();
       groups = groups
@@ -296,13 +325,15 @@ export const useSportsHistory = (
         })
         .filter(monthGroup => monthGroup.days.length > 0);
     }
+
     return groups;
-  }, [allHistoryGroups, searchQuery, dateFilter, customRange]);
+  }, [allHistoryGroups, dateFilter, category, searchQuery, customRange]);
 
   return {
     currentVenueId: initialVenueId,
     historyGroups: filteredHistoryGroups,
     loading: isResolvingVenue || isFetchingHistory,
+    availableCategories,
     refetch,
   };
 };

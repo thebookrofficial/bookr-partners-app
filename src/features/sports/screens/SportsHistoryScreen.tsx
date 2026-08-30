@@ -14,7 +14,7 @@ import { HistorySkeleton } from "@/components/ui";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
-import { Search, ChevronDown, SlidersHorizontal } from "lucide-react-native";
+import { Search, ChevronDown, SlidersHorizontal, X } from "lucide-react-native";
 import PersonSvg from "@/assets/icons/ic-round-person.svg";
 import CalendarSvg from "@/assets/icons/ic-solar-calendar-outline.svg";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
@@ -33,17 +33,7 @@ import { useAuthStore } from "@/store";
 // ==========================================
 // 1. NEW HISTORY CARD
 // ==========================================
-const HistoryCard = ({
-  name,
-  phone,
-  date,
-  time,
-  price,
-  status,
-  onPress,
-  category,
-  ground,
-}: any) => {
+const HistoryCard = ({ name, phone, date, time, price, status, onPress }: any) => {
   const isOnline = status?.toLowerCase() === "online";
 
   return (
@@ -80,15 +70,6 @@ const HistoryCard = ({
         </View>
         <Text style={styles.cardGuestCount}>{time}</Text>
       </View>
-
-      {(category || ground) && (
-        <View style={styles.categoryGroundContainer}>
-          <Text style={styles.categoryGroundText}>
-            {category ? category.charAt(0).toUpperCase() + category.slice(1) : ""}{" "}
-            {category && ground ? "•" : ""} {ground}
-          </Text>
-        </View>
-      )}
     </TouchableOpacity>
   );
 };
@@ -154,7 +135,9 @@ export const SportsHistoryScreen = () => {
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>();
 
   // NEW: State to track which dates are collapsed (Accordion logic)
+  // NEW: State to track which dates are collapsed (Accordion logic)
   const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
 
   const toggleDateAccordion = (dateStr: string) => {
     setCollapsedDates(prev => ({
@@ -166,7 +149,7 @@ export const SportsHistoryScreen = () => {
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
 
   // Pass dynamic IDs and filters to the updated hook
-  const { currentVenueId, historyGroups, loading, refetch } = useSportsHistory(
+  const { currentVenueId, historyGroups, loading, refetch, availableCategories } = useSportsHistory(
     serviceId,
     selectedCategory,
     debouncedSearchQuery,
@@ -181,6 +164,28 @@ export const SportsHistoryScreen = () => {
       setTabBarVisible(true);
     }
   }, [isFocused, setTabBarVisible]);
+
+  // Auto-select the first available category if the current one isn't valid for this vendor
+  React.useEffect(() => {
+    if (availableCategories && availableCategories.length > 0) {
+      const isValid = availableCategories.some(
+        (c: string) => c.toLowerCase() === selectedCategory.toLowerCase(),
+      );
+      if (!isValid) {
+        setServiceCategory(serviceId, availableCategories[0]);
+        if (route.params?.category) {
+          navigation.setParams({ category: undefined } as any);
+        }
+      }
+    }
+  }, [
+    availableCategories,
+    selectedCategory,
+    serviceId,
+    setServiceCategory,
+    route.params?.category,
+    navigation,
+  ]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -203,7 +208,41 @@ export const SportsHistoryScreen = () => {
         }>
         {/* Header */}
         <View style={styles.headerZIndex}>
-          <ServiceHeader title="History" subtitle="" />
+          <ServiceHeader
+            title="History"
+            subtitle=""
+            category={selectedCategory}
+            onCategoryPress={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+          />
+          {isCategoryDropdownOpen && availableCategories && availableCategories.length > 0 && (
+            <View style={styles.categoryDropdownPopover}>
+              <View style={styles.popoverHeader}>
+                <Text variant="body1" weight="bold" style={styles.popoverTitle}>
+                  Sports
+                </Text>
+                <TouchableOpacity onPress={() => setIsCategoryDropdownOpen(false)}>
+                  <X size={ms(20)} color="#000" />
+                </TouchableOpacity>
+              </View>
+              {availableCategories.map((cat: string) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.popoverItem,
+                    selectedCategory.toLowerCase() === cat.toLowerCase() &&
+                      styles.popoverItemActive,
+                  ]}
+                  onPress={() => {
+                    setServiceCategory(serviceId, cat);
+                    setIsCategoryDropdownOpen(false);
+                  }}>
+                  <Text variant="body1" weight="medium" style={styles.popoverItemText}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Sticky Search */}
@@ -259,8 +298,6 @@ export const SportsHistoryScreen = () => {
                             time={booking.timeRanges}
                             price={`₹${booking.price}`}
                             status={booking.status}
-                            category={booking.category}
-                            ground={booking.ground}
                             onPress={() => {
                               if (isOwner) {
                                 navigation.navigate("SportsInvoice", { bookingId: booking.id });
@@ -299,6 +336,43 @@ export const SportsHistoryScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  categoryDropdownPopover: {
+    position: "absolute",
+    top: vs(60),
+    right: 0,
+    width: hs(200),
+    backgroundColor: "#fff",
+    borderRadius: ms(16),
+    paddingVertical: vs(12),
+    paddingHorizontal: hs(16),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 999,
+  },
+  popoverHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: vs(12),
+  },
+  popoverTitle: {
+    color: COLORS.text.primary,
+  },
+  popoverItem: {
+    paddingVertical: vs(10),
+    paddingHorizontal: hs(12),
+    borderRadius: ms(8),
+    marginBottom: vs(4),
+  },
+  popoverItemActive: {
+    backgroundColor: COLORS.primary + "15",
+  },
+  popoverItemText: {
+    color: COLORS.text.primary,
+  },
   categoryGroundContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
