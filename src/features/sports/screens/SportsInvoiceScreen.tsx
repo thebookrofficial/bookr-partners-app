@@ -67,14 +67,20 @@ export const SportsInvoiceScreen = () => {
   const discountAmount = 0; // Hardcoded to 0 for display as platform subsidizes it
 
   // Platform Fee: Always 3.5% of the total service price.
-  const platformFeeRate = 0.035;
-  const platformFee = servicePrice * platformFeeRate;
+  // const platformFeeRate = 0.035;
+  // const platformFee = servicePrice * platformFeeRate;
 
   // Gateway Charges: 2% (Applied strictly to the inAppPayments)
-  const gatewayFee = inAppPayments * 0.02;
+  const commissionPercentage = Number(booking?.commission_percentage ?? 3.5);
+
+  const gatewayPercentage = Number(booking?.gateway_percentage ?? 2);
+
+  const platformFee = Number(booking?.total_amount || 0) * (commissionPercentage / 100);
+
+  const gatewayFee = Number(booking?.subtotal || 0) * (gatewayPercentage / 100);
 
   // Est Payout: Calculate payout on In App Payments, keeping commission on total amount
-  const estPayout = inAppPayments - platformFee - gatewayFee;
+  const estPayout = Number(booking?.subtotal || 0) - platformFee - gatewayFee;
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
