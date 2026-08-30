@@ -30,11 +30,28 @@ export const useBlockUnblock = (venueId: string, groundId: string) => {
       if (isInitialLoad) setLoading(true);
 
       try {
+        const { data: allGrounds } = await supabase
+          .from("sports_grounds")
+          .select("id, parent_ground_id")
+          .eq("venue_id", venueId);
+
+        let relevantGroundIds = [groundId];
+        if (allGrounds) {
+          const current = allGrounds.find((g: any) => g.id === groundId);
+          if (current?.parent_ground_id) {
+            relevantGroundIds.push(current.parent_ground_id);
+          }
+          const children = allGrounds
+            .filter((g: any) => g.parent_ground_id === groundId)
+            .map((g: any) => g.id);
+          relevantGroundIds = relevantGroundIds.concat(children);
+        }
+
         const { data, error } = await supabase
           .from("sports_slots")
-          .select("id, slot_date, start_time, end_time")
+          .select("id, slot_date, start_time, end_time, ground_id")
           .eq("venue_id", venueId)
-          .eq("ground_id", groundId)
+          .in("ground_id", relevantGroundIds)
           .eq("status", "blocked")
           .order("slot_date", { ascending: true })
           .order("start_time", { ascending: true });

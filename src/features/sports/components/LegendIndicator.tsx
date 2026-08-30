@@ -34,6 +34,12 @@ export const LegendIndicator = () => {
           Unavailable
         </Text>
       </View>
+      <View style={styles.legendItem}>
+        <View style={[styles.dot, styles.blocked]} />
+        <Text variant="body2" weight="bold">
+          Blocked
+        </Text>
+      </View>
     </View>
   );
 };
@@ -65,4 +71,5 @@ const styles = StyleSheet.create({
   manual: { backgroundColor: COLORS.danger },
   online: { backgroundColor: COLORS.primary },
   unavailable: { backgroundColor: "#EBEBEB", borderWidth: 1, borderColor: "#EBEBEB" },
+  blocked: { backgroundColor: "#000000" },
 });

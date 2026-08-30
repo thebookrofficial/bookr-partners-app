@@ -39,6 +39,8 @@ export const useSportsInvoice = (bookingId: string) => {
             booking_source,
             payment_type,
             sports_booking_type,
+            sport_category,
+            venue_id,
             booking_group_id,
             parent_booking_id,
             profiles (

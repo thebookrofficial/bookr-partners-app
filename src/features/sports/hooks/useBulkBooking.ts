@@ -18,7 +18,7 @@ interface BulkBookingParams {
   fromTime: string;
   toTime: string;
   totalAmountPerSlot: number;
-  initialPayments: { mode: "cash" | "upi"; amount: number }[];
+  initialPayments: { mode: "cash" | "upi" | "gpay" | "phonepe" | "paytm"; amount: number }[];
   slotDurationMinutes?: number;
 }
 
@@ -29,7 +29,7 @@ export const useBulkBooking = () => {
     setIsSubmitting(true);
     try {
       const slotDuration = params.slotDurationMinutes || 60;
-      const HOURS = generateTimeSlots(6, 24, slotDuration);
+      const HOURS = generateTimeSlots(6, 27, slotDuration);
       if (!params.ownerId) throw new Error("Authentication error: Could not identify vendor.");
 
       const { venueId, groundId } = params;
@@ -62,6 +62,52 @@ export const useBulkBooking = () => {
       if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx)
         throw new Error("Invalid time range.");
       const hourlySlots = HOURS.slice(startIdx, endIdx);
+
+      // Pre-validate turf split availability before creating ANY bookings
+      const { data: allGrounds } = await supabase
+        .from("sports_grounds")
+        .select("id, parent_ground_id")
+        .eq("venue_id", venueId);
+
+      let relevantGroundIds = [groundId];
+      if (allGrounds) {
+        const current = allGrounds.find((g: any) => g.id === groundId);
+        if (current?.parent_ground_id) relevantGroundIds.push(current.parent_ground_id);
+        const children = allGrounds
+          .filter((g: any) => g.parent_ground_id === groundId)
+          .map((g: any) => g.id);
+        relevantGroundIds = relevantGroundIds.concat(children);
+      }
+
+      const { data: overlappingSlots } = await supabase
+        .from("sports_slots")
+        .select("slot_date, start_time, end_time, status")
+        .eq("venue_id", venueId)
+        .in("ground_id", relevantGroundIds)
+        .in("slot_date", dates)
+        .neq("status", "available");
+
+      if (overlappingSlots && overlappingSlots.length > 0) {
+        // Check if any of the requested time range overlaps with the unavailable slots
+        for (const date of dates) {
+          for (const hour of hourlySlots) {
+            const reqStart = parseTimeTo24(hour, false);
+            const nextHour =
+              HOURS[HOURS.indexOf(hour) + 1] || (slotDuration < 60 ? "12:00 AM" : "12 AM");
+            const reqEnd = parseTimeTo24(nextHour, true);
+
+            const conflict = overlappingSlots.find(
+              (s: any) => s.slot_date === date && s.start_time < reqEnd && s.end_time > reqStart,
+            );
+
+            if (conflict) {
+              throw new Error(
+                `Conflict found on ${date} at ${hour}. Turf or its split halves are already booked/blocked.`,
+              );
+            }
+          }
+        }
+      }
 
       let bookingsCreated = 0;
       let firstBookingId: string | null = null;
@@ -152,6 +198,7 @@ export const useBulkBooking = () => {
               booking_status: "confirmed",
               parent_booking_id: firstBookingId || null,
 
+              sport_category: params.category,
               subtotal: params.totalAmountPerSlot,
               discount_amount: 0,
               total_amount: params.totalAmountPerSlot,

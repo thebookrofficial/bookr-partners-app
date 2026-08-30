@@ -9,7 +9,7 @@ import { useAutoStartCheck } from "@/hooks/useAutoStartCheck";
 import { AutoStartPrompt } from "@/components/ui/AutoStartPrompt";
 import { GlobalKeyboardAccessory } from "@/components/ui/GlobalKeyboardAccessory";
 import Config from "react-native-config";
-import { withStallion } from "react-native-stallion";
+// import { withStallion } from "react-native-stallion";
 
 // Sentry Initialization
 Sentry.init({
@@ -89,7 +89,7 @@ function App() {
 }
 
 // 1. Wrap the App with Stallion first
-const StallionApp = withStallion(App);
+const StallionApp = App; // withStallion(App); // Temporarily disabled for QA testing
 
 // 2. Then wrap the StallionApp with Sentry to catch any OTA update errors
 export default Sentry.wrap(StallionApp);

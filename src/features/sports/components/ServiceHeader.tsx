@@ -63,7 +63,7 @@ export const ServiceHeader = ({
           activeOpacity={0.7}
           disabled={!onCategoryPress} // Disables click if no function is passed
         >
-          <Text variant="body2" weight="semiBold" style={styles.categoryText}>
+          <Text variant="body1" weight="semiBold" style={styles.categoryText}>
             {category}
           </Text>
           {/* Only show the dropdown arrow if the press action is available */}

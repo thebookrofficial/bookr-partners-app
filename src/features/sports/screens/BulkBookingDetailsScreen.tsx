@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Image,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, TextInput } from "@/components/ui";
@@ -23,6 +24,7 @@ import {
   Calendar,
   Clock,
   MapPin,
+  X,
 } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
@@ -32,12 +34,20 @@ import { CustomDatePickerModal } from "@/components/ui";
 import { useServiceStore } from "@/store/serviceStore";
 import { supabase } from "@/lib/supabase";
 import perf from "@react-native-firebase/perf";
+import { useDebounce } from "@/hooks/useDebounce";
 
 // IMPORT THE NEW VIEW COMPONENT
 import { ViewBulkBooking } from "../components/ViewBulkBooking";
 import { TimePickerModal } from "../components/TimePickerModal";
+import { getValidSlotsForGround } from "../utils/pricing.utils";
 import { generateTimeSlots } from "../utils/time.utils";
+import { calculateSlotPrice } from "../utils/pricing.utils";
 import { SportsService } from "../services/sports.service";
+
+const icCash = require("@/assets/icons/pay-50.png");
+const icGpay = require("@/assets/icons/google-pay.png");
+const icPhonepe = require("@/assets/icons/icons8-phone-pe-48.png");
+const icPaytm = require("@/assets/icons/paytm.png");
 
 // ==========================================
 // CREATE MODE (Internal Component)
@@ -54,7 +64,6 @@ const CreateBulkBooking = ({
   const navigation = useNavigation();
 
   const { selectedCategories, setServiceCategory } = useServiceStore();
-  const selectedCategory = selectedCategories[venueId] || "Football";
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
   const [ownerId, setOwnerId] = useState<string | undefined>();
@@ -62,8 +71,24 @@ const CreateBulkBooking = ({
     supabase.auth.getUser().then(({ data }) => setOwnerId(data.user?.id));
   }, []);
 
+  // Guest Autocomplete Search State
+  const [searchResults, setSearchResults] = useState<{ name: string; phone: string }[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const isSelectingFromResults = React.useRef(false);
+
   // NEW: State for Grounds inside the form
-  const [grounds, setGrounds] = useState<{ id: string; name: string }[]>([]);
+  const [grounds, setGrounds] = useState<
+    {
+      id: string;
+      name: string;
+      sports_type?: string;
+      slot_duration_minutes?: number;
+      custom_pricing?: any;
+      price_per_slot?: number;
+      night_price_per_slot?: number;
+      parent_ground_id?: string;
+    }[]
+  >([]);
   const [selectedGroundId, setSelectedGroundId] = useState<string>(initialGroundId || "");
   const [showGroundPicker, setShowGroundPicker] = useState(false);
 
@@ -71,17 +96,64 @@ const CreateBulkBooking = ({
     const fetchGrounds = async () => {
       const { data } = await supabase
         .from("sports_grounds")
-        .select("id, name")
+        .select(
+          "id, name, sports_type, slot_duration_minutes, custom_pricing, price_per_slot, night_price_per_slot, parent_ground_id",
+        )
         .eq("venue_id", venueId)
         .order("display_order", { ascending: true });
 
       if (data && data.length > 0) {
         setGrounds(data);
-        if (!selectedGroundId) setSelectedGroundId(data[0].id);
       }
     };
     fetchGrounds();
-  }, [selectedGroundId, venueId]);
+  }, [venueId]);
+
+  const categories = React.useMemo(() => {
+    return Array.from(
+      new Set(
+        grounds
+          .map((g: any) => {
+            if (g.sports_type) return g.sports_type.toLowerCase();
+            if (g.parent_ground_id) {
+              const parent = grounds.find((p: any) => p.id === g.parent_ground_id);
+              if (parent?.sports_type) return parent.sports_type.toLowerCase();
+            }
+            return null;
+          })
+          .filter(Boolean),
+      ),
+    ) as string[];
+  }, [grounds]);
+
+  const selectedCategory = React.useMemo(() => {
+    const stored = selectedCategories[venueId]?.toLowerCase();
+    if (stored && categories.includes(stored)) return stored;
+
+    const footballIdx = categories.indexOf("football");
+    if (footballIdx !== -1) return categories[footballIdx];
+
+    return categories.length > 0 ? categories[0] : "football";
+  }, [selectedCategories, venueId, categories]);
+
+  const filteredGrounds = React.useMemo(() => {
+    return grounds.filter((g: any) => {
+      let type = g.sports_type;
+      if (!type && g.parent_ground_id) {
+        type = grounds.find((p: any) => p.id === g.parent_ground_id)?.sports_type;
+      }
+      return type?.toLowerCase() === selectedCategory;
+    });
+  }, [grounds, selectedCategory]);
+
+  useEffect(() => {
+    if (
+      filteredGrounds.length > 0 &&
+      (!selectedGroundId || !filteredGrounds.some(g => g.id === selectedGroundId))
+    ) {
+      setSelectedGroundId(filteredGrounds[0].id);
+    }
+  }, [selectedCategory, filteredGrounds, selectedGroundId]);
 
   const [bookingType, setBookingType] = useState<"multi" | "single">(type);
   const [mobile, setMobile] = useState("");
@@ -90,35 +162,37 @@ const CreateBulkBooking = ({
   const [toDate, setToDate] = useState(new Date());
   const [fromTime, setFromTime] = useState("7 AM");
   const [toTime, setToTime] = useState("8 AM");
+
   const [pricePerHour, setPricePerHour] = useState(1000);
-  const [cashInput, setCashInput] = useState("");
-  const [onlineInput, setOnlineInput] = useState("");
-  const [stagedPayments, setStagedPayments] = useState<{ mode: "cash" | "upi"; amount: number }[]>(
-    [],
+  const [amountPaidInput, setAmountPaidInput] = useState("");
+  const [selectedMethod, setSelectedMethod] = useState<"cash" | "gpay" | "phonepe" | "paytm">(
+    "cash",
   );
+  const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState<"from" | "to" | null>(null);
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
-  const [isAddingPayment, setIsAddingPayment] = useState(false);
-  const [slotDurationMinutes, setSlotDurationMinutes] = useState(60);
-
-  useEffect(() => {
-    const fetchPricing = async () => {
-      try {
-        const data = await SportsService.getVenuePricing(venueId);
-        if (data && data.slot_duration_minutes) {
-          setSlotDurationMinutes(data.slot_duration_minutes);
-        }
-      } catch (err) {
-        console.error("Failed to fetch venue config:", err);
-      }
-    };
-    fetchPricing();
-  }, [venueId]);
+  const selectedGround = filteredGrounds.find(g => g.id === selectedGroundId);
+  const slotDurationMinutes = selectedGround?.slot_duration_minutes || 60;
 
   const HOURS = React.useMemo(
-    () => generateTimeSlots(6, 24, slotDurationMinutes),
+    () => generateTimeSlots(6, 27, slotDurationMinutes),
     [slotDurationMinutes],
   );
+  const validHours = React.useMemo(() => {
+    const selectedGround = grounds.find((g: any) => g.id === selectedGroundId);
+    return selectedGround ? getValidSlotsForGround(selectedGround, HOURS, grounds) : HOURS;
+  }, [grounds, selectedGroundId, HOURS]);
+
+  React.useEffect(() => {
+    if (validHours.length > 0) {
+      if (!validHours.includes(fromTime)) {
+        setFromTime(validHours[0]);
+      }
+      if (toTime !== "End Time" && !validHours.includes(toTime)) {
+        setToTime(validHours[Math.min(1, validHours.length - 1)]);
+      }
+    }
+  }, [validHours, fromTime, toTime]);
 
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
 
@@ -155,17 +229,76 @@ const CreateBulkBooking = ({
 
   const { confirmBulkBooking, isSubmitting } = useBulkBooking();
 
-  const totalSlots =
-    (bookingType === "single"
+  const totalDays =
+    bookingType === "single"
       ? 1
-      : Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1) *
-    (HOURS.indexOf(toTime) - HOURS.indexOf(fromTime));
+      : toDate
+      ? Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+      : 1;
+
+  const startIndex = HOURS.indexOf(fromTime);
+  const endIndex = HOURS.indexOf(toTime);
+  const numSlotsPerDay = Math.max(0, endIndex - startIndex);
+  const totalSlots = totalDays * numSlotsPerDay;
   const slotMultiplier = slotDurationMinutes / 60;
-  const totalPayment = totalSlots * pricePerHour * slotMultiplier;
-  const amountPaid = stagedPayments.reduce((sum, p) => sum + p.amount, 0);
+
+  // Calculate total payment dynamically using custom pricing
+  const totalPayment = React.useMemo(() => {
+    if (!selectedGround || numSlotsPerDay <= 0) return 0;
+    let singleDayTotal = 0;
+    const selectedSlots = HOURS.slice(startIndex, endIndex);
+    selectedSlots.forEach(slot => {
+      singleDayTotal += calculateSlotPrice(selectedGround, slot, -1, -1, grounds) * slotMultiplier;
+    });
+    return singleDayTotal * totalDays;
+  }, [
+    selectedGround,
+    numSlotsPerDay,
+    HOURS,
+    startIndex,
+    endIndex,
+    totalDays,
+    grounds,
+    slotMultiplier,
+  ]);
+
+  // Update pricePerHour state implicitly if totalPayment changes
+  React.useEffect(() => {
+    if (totalSlots > 0 && slotMultiplier > 0) {
+      setPricePerHour(totalPayment / (totalSlots * slotMultiplier));
+    } else {
+      setPricePerHour(0);
+    }
+  }, [totalPayment, totalSlots, slotMultiplier]);
+  const amountPaid = parseFloat(amountPaidInput || "0");
   const remainingAmount = totalPayment - amountPaid;
 
   const { activeVenueName } = useServiceStore();
+
+  const handleNameChange = (text: string) => {
+    isSelectingFromResults.current = false;
+    setName(text);
+  };
+
+  const debouncedName = useDebounce(name, 500);
+
+  useEffect(() => {
+    const fetchGuests = async () => {
+      if (isSelectingFromResults.current) {
+        return;
+      }
+
+      if (debouncedName.trim().length >= 1) {
+        const results = await SportsService.lookupGuestsByName(venueId, debouncedName);
+        setSearchResults(results);
+        setShowSearchResults(results.length > 0);
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    };
+    fetchGuests();
+  }, [debouncedName, venueId]);
 
   useEffect(() => {
     const lookupGuest = async () => {
@@ -197,23 +330,14 @@ const CreateBulkBooking = ({
     lookupGuest();
   }, [mobile]);
 
-  const handleAddPayment = () => {
-    const newPayments = [...stagedPayments];
-    const cash = parseFloat(cashInput || "0");
-    const online = parseFloat(onlineInput || "0");
-    if (cash > 0) newPayments.push({ mode: "cash", amount: cash });
-    if (online > 0) newPayments.push({ mode: "upi", amount: online });
-    setStagedPayments(newPayments);
-    setCashInput("");
-    setOnlineInput("");
-    setIsAddingPayment(false);
-  };
-
   const onConfirm = async () => {
     if (!mobile || !name || totalSlots <= 0 || !selectedGroundId) {
       Alert.alert("Missing Info", "Please ensure dates, times, ground, and guest info are valid.");
       return;
     }
+    const amount = parseFloat(amountPaidInput || "0");
+    const initialPayments = amount > 0 ? [{ mode: selectedMethod, amount }] : [];
+
     const trace = await perf().startTrace("bulk_booking_confirm");
     try {
       const success = await confirmBulkBooking({
@@ -228,7 +352,7 @@ const CreateBulkBooking = ({
         fromTime,
         toTime,
         totalAmountPerSlot: pricePerHour * slotMultiplier,
-        initialPayments: stagedPayments,
+        initialPayments,
         slotDurationMinutes,
       });
       if (success) navigation.goBack();
@@ -242,7 +366,10 @@ const CreateBulkBooking = ({
 
   return (
     <View style={styles.flex1}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled">
         <ServiceHeader title={activeVenueName} subtitle="Bulk Booking" />
 
         <View style={styles.tabBar}>
@@ -297,33 +424,99 @@ const CreateBulkBooking = ({
           />
         </View>
 
-        <View style={styles.fieldGroup}>
-          <View style={styles.labelRow}>
-            <User size={ms(18)} color="#63A1FD" />
-            <Text style={styles.label}>Name</Text>
+        <View style={styles.autocompleteContainer}>
+          <View style={styles.fieldGroup}>
+            <View style={styles.labelRow}>
+              <User size={ms(18)} color="#63A1FD" />
+              <Text style={styles.label}>Name</Text>
+            </View>
+            <TextInput
+              variant="filled"
+              value={name}
+              onChangeText={handleNameChange}
+              placeholder="Guest Name"
+              style={styles.inputFill}
+              onFocus={() => {
+                if (name.trim().length >= 1 && searchResults.length > 0) {
+                  setShowSearchResults(true);
+                }
+              }}
+              onBlur={() => {
+                setTimeout(() => setShowSearchResults(false), 300);
+              }}
+              autoCorrect={false}
+              spellCheck={false}
+              autoComplete="off"
+            />
           </View>
-          <TextInput
-            variant="filled"
-            value={name}
-            onChangeText={setName}
-            placeholder="Guest Name"
-            style={styles.inputFill}
-          />
+
+          {showSearchResults && searchResults.length > 0 && (
+            <View style={styles.dropdownContainer}>
+              <View style={styles.dropdownHeader}>
+                <Text style={styles.dropdownHeaderText}>Select Customer</Text>
+                <TouchableOpacity onPress={() => setShowSearchResults(false)}>
+                  <X size={ms(20)} color="#000" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView keyboardShouldPersistTaps="always" style={styles.dropdownScroll}>
+                {searchResults.map((item, index) => (
+                  <TouchableOpacity
+                    key={`${item.name}_${item.phone}_${index}`}
+                    style={styles.dropdownItemSearch}
+                    onPress={() => {
+                      isSelectingFromResults.current = true;
+                      setName(item.name);
+                      const cleanPhone = item.phone.replace(/[^\d]/g, "").slice(-10);
+                      setMobile(cleanPhone);
+                      setSearchResults([]);
+                      setShowSearchResults(false);
+                    }}>
+                    <Text style={styles.dropdownItemTextLeft}>{item.name}</Text>
+                    <Text style={styles.dropdownItemTextRight}>{item.phone}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </View>
 
-        {/* --- NEW GROUND SELECTION FIELD --- */}
-        {grounds.length > 0 && (
+        {/* --- CATEGORY AND GROUND SELECTION --- */}
+        {(categories.length > 1 || filteredGrounds.length > 0) && (
           <View style={styles.fieldGroup}>
             <View style={styles.labelRow}>
               <MapPin size={ms(18)} color="#63A1FD" />
-              <Text style={styles.labelBold}>Select Ground</Text>
+              <Text style={styles.labelBold}>Category & Ground</Text>
             </View>
-            <TouchableOpacity
-              style={styles.inputBoxFillRow}
-              onPress={() => setShowGroundPicker(true)}>
-              <Text style={[styles.inputText, styles.flex1]}>{currentGroundName}</Text>
-              <ChevronDown size={ms(16)} color="#000" />
-            </TouchableOpacity>
+            <View style={styles.splitRow}>
+              {categories.length > 1 && (
+                <View style={[styles.flex1, isCategoryOpen ? { zIndex: 1000 } : { zIndex: 1 }]}>
+                  <Text style={styles.subLabel}>Category</Text>
+                  <TouchableOpacity
+                    style={styles.inputBoxSmallRow}
+                    onPress={() => setIsCategoryOpen(true)}>
+                    <Text style={[styles.inputText, styles.flex1]} numberOfLines={1}>
+                      {selectedCategory
+                        ? selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)
+                        : "Select"}
+                    </Text>
+                    <ChevronDown size={ms(16)} color="#000" />
+                  </TouchableOpacity>
+                </View>
+              )}
+              {filteredGrounds.length > 0 && (
+                <View style={[styles.flex1, showGroundPicker ? { zIndex: 1000 } : { zIndex: 1 }]}>
+                  <Text style={styles.subLabel}>Ground</Text>
+                  <TouchableOpacity
+                    style={styles.inputBoxSmallRow}
+                    onPress={() => setShowGroundPicker(true)}>
+                    <Text style={[styles.inputText, styles.flex1]} numberOfLines={1}>
+                      {currentGroundName}
+                    </Text>
+                    <ChevronDown size={ms(16)} color="#000" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           </View>
         )}
 
@@ -420,45 +613,142 @@ const CreateBulkBooking = ({
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={styles.labelBold}>Amount Paid</Text>
-          <View style={styles.inputBoxFillRow}>
-            <Text style={[styles.inputText, styles.textSuccessFlex]}>₹ {amountPaid}</Text>
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={() => setIsAddingPayment(!isAddingPayment)}>
-              <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
-              {isAddingPayment ? (
-                <Minus size={ms(18)} color="#E55959" />
-              ) : (
-                <Plus size={ms(18)} color="#00B562" />
-              )}
-            </TouchableOpacity>
+          <View style={styles.labelRow}>
+            <Text style={styles.labelBold}>Amount Paid</Text>
+            {amountPaid > 0 && (
+              <Text style={styles.labelSecondary}>(Remaining: ₹ {remainingAmount})</Text>
+            )}
           </View>
-        </View>
+          <TextInput
+            variant="filled"
+            value={amountPaidInput}
+            onChangeText={setAmountPaidInput}
+            keyboardType="numeric"
+            placeholder="₹ 0"
+            style={styles.inputFill}
+            rightIcon={
+              <TouchableOpacity
+                style={styles.addBtn}
+                onPress={() => setIsAddingPayment(!isAddingPayment)}>
+                <Text style={styles.addText}>{isAddingPayment ? "Cancel" : "Add"}</Text>
+                {isAddingPayment ? (
+                  <Minus size={ms(18)} color="#E55959" />
+                ) : (
+                  <Plus size={ms(18)} color="#00B562" />
+                )}
+              </TouchableOpacity>
+            }
+          />
 
-        {isAddingPayment && (
-          <View style={styles.paymentDrawer}>
-            <TextInput
-              variant="filled"
-              label="Cash"
-              value={cashInput}
-              onChangeText={setCashInput}
-              keyboardType="numeric"
-              placeholder="₹"
-            />
-            <TextInput
-              variant="filled"
-              label="Online"
-              value={onlineInput}
-              onChangeText={setOnlineInput}
-              keyboardType="numeric"
-              placeholder="₹"
-            />
-            <TouchableOpacity style={styles.confirmPaymentBtn} onPress={handleAddPayment}>
-              <Text style={styles.bisonText}>SAVE PAYMENT</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          {isAddingPayment && (
+            <View style={{ marginTop: vs(10), marginBottom: vs(-10) }}>
+              <Text variant="body2" weight="bold" style={styles.inputLabel}>
+                Payment Method
+              </Text>
+              <View style={styles.methodsRow}>
+                {/* Cash */}
+                <TouchableOpacity
+                  style={[
+                    styles.methodBox,
+                    selectedMethod === "cash" && styles.methodBoxSelectedBlue,
+                  ]}
+                  onPress={() => setSelectedMethod("cash")}>
+                  <Image
+                    source={icCash}
+                    style={[
+                      styles.methodIcon,
+                      selectedMethod === "cash" && styles.methodIconSelected,
+                    ]}
+                  />
+                  <Text
+                    variant="body2"
+                    weight="bold"
+                    style={[
+                      styles.methodText,
+                      selectedMethod === "cash" && styles.methodTextSelected,
+                    ]}>
+                    Cash
+                  </Text>
+                </TouchableOpacity>
+
+                {/* GPay */}
+                <TouchableOpacity
+                  style={[
+                    styles.methodBox,
+                    selectedMethod === "gpay" && styles.methodBoxSelectedBlue,
+                  ]}
+                  onPress={() => setSelectedMethod("gpay")}>
+                  <Image
+                    source={icGpay}
+                    style={[
+                      styles.methodIcon,
+                      selectedMethod === "gpay" && styles.methodIconSelected,
+                    ]}
+                  />
+                  <Text
+                    variant="body2"
+                    weight="bold"
+                    style={[
+                      styles.methodText,
+                      selectedMethod === "gpay" && styles.methodTextSelected,
+                    ]}>
+                    GPay
+                  </Text>
+                </TouchableOpacity>
+
+                {/* PhonePe */}
+                <TouchableOpacity
+                  style={[
+                    styles.methodBox,
+                    selectedMethod === "phonepe" && styles.methodBoxSelectedBlue,
+                  ]}
+                  onPress={() => setSelectedMethod("phonepe")}>
+                  <Image
+                    source={icPhonepe}
+                    style={[
+                      styles.methodIcon,
+                      selectedMethod === "phonepe" && styles.methodIconSelected,
+                    ]}
+                  />
+                  <Text
+                    variant="body2"
+                    weight="bold"
+                    style={[
+                      styles.methodText,
+                      selectedMethod === "phonepe" && styles.methodTextSelected,
+                    ]}>
+                    PhonePe
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Paytm */}
+                <TouchableOpacity
+                  style={[
+                    styles.methodBox,
+                    selectedMethod === "paytm" && styles.methodBoxSelectedBlue,
+                  ]}
+                  onPress={() => setSelectedMethod("paytm")}>
+                  <Image
+                    source={icPaytm}
+                    style={[
+                      styles.methodIcon,
+                      selectedMethod === "paytm" && styles.methodIconSelected,
+                    ]}
+                  />
+                  <Text
+                    variant="body2"
+                    weight="bold"
+                    style={[
+                      styles.methodText,
+                      selectedMethod === "paytm" && styles.methodTextSelected,
+                    ]}>
+                    Paytm
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
 
         <TouchableOpacity style={styles.confirmBtn} onPress={onConfirm} disabled={isSubmitting}>
           {isSubmitting ? (
@@ -467,7 +757,6 @@ const CreateBulkBooking = ({
             <Text style={styles.bisonText}>CONFIRM BULK BOOKING</Text>
           )}
         </TouchableOpacity>
-
         <View style={{ height: vs(40) }} />
       </ScrollView>
 
@@ -476,9 +765,14 @@ const CreateBulkBooking = ({
         isVisible={!!showDatePicker}
         onClose={() => setShowDatePicker(null)}
         selectedDate={showDatePicker === "from" ? fromDate : toDate}
+        minDate={showDatePicker === "to" ? fromDate : new Date()}
         onSelectDate={date => {
-          if (showDatePicker === "from") setFromDate(date);
-          else setToDate(date);
+          if (showDatePicker === "from") {
+            setFromDate(date);
+            if (date > toDate) setToDate(date);
+          } else {
+            setToDate(date);
+          }
         }}
       />
 
@@ -488,31 +782,47 @@ const CreateBulkBooking = ({
         title={`Select ${showHourPicker === "from" ? "Start" : "End"} Time`}
         hours={HOURS}
         selectedTime={showHourPicker === "from" ? fromTime : toTime}
+        ground={selectedGround}
+        allGrounds={grounds}
         onSelectTime={hour => {
           if (showHourPicker === "from") {
             setFromTime(hour);
+            const newFromIndex = HOURS.indexOf(hour);
+            const currentToIndex = HOURS.indexOf(toTime);
+            if (newFromIndex >= currentToIndex) {
+              setToTime(HOURS[Math.min(newFromIndex + 1, HOURS.length - 1)]);
+            }
           } else {
             setToTime(hour);
           }
+          setShowHourPicker(null);
         }}
         isHourDisabled={(hour, _index) => {
-          const now = new Date();
-          const currentHour24 = now.getHours();
-          const currentMinute = now.getMinutes();
+          if (showHourPicker === "to") {
+            const fromIndex = HOURS.indexOf(fromTime);
+            if (_index <= fromIndex) return true;
+          }
 
           const hour12h = hour;
           let [h, ampm] = hour12h.split(" ");
-          let hour24 = parseInt(h, 10);
-          if (ampm === "PM" && hour24 !== 12) hour24 += 12;
-          if (ampm === "AM" && hour24 === 12) hour24 = 0;
+          let parsedHour = parseInt(h, 10);
+          if (ampm === "PM" && parsedHour !== 12) parsedHour += 12;
+          if (ampm === "AM" && parsedHour === 12) parsedHour = 0;
 
-          const isPast =
-            fromDate.toDateString() === now.toDateString() &&
-            (hour24 < currentHour24 || (hour24 === currentHour24 && currentMinute > 0));
+          const parsedMin = hour12h.includes(":") ? parseInt(hour12h.split(":")[1], 10) : 0;
+
+          const slotDate = new Date(fromDate);
+          slotDate.setHours(parsedHour, parsedMin, 0, 0);
+          // Slots from 12 AM to 5 AM belong to the next calendar day
+          if (parsedHour < 6) {
+            slotDate.setDate(slotDate.getDate() + 1);
+          }
+          const isPast = slotDate <= new Date();
 
           const isBooked = bookedSlots.some(bookedTime => {
-            const [bookedHour] = bookedTime.split(":").map(Number);
-            return bookedHour === hour24;
+            const [bookedHourStr] = bookedTime.split(":");
+            let bookedHour = parseInt(bookedHourStr, 10);
+            return bookedHour === parsedHour;
           });
 
           return isPast || isBooked;
@@ -524,7 +834,7 @@ const CreateBulkBooking = ({
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowGroundPicker(false)}>
           <View style={styles.pickerContainer}>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {grounds.map(g => (
+              {filteredGrounds.map(g => (
                 <TouchableOpacity
                   key={g.id}
                   style={styles.pickerItem}
@@ -551,7 +861,7 @@ const CreateBulkBooking = ({
             onPress={() => setIsCategoryOpen(false)}
           />
           <View style={styles.dropdownMenu}>
-            {["Football", "Box Cricket", "Pickleball"].map(cat => (
+            {categories.map((cat: string) => (
               <TouchableOpacity
                 key={cat}
                 style={styles.dropdownItem}
@@ -606,7 +916,7 @@ const styles = StyleSheet.create({
     lineHeight: fs(28),
     paddingTop: vs(4),
   },
-  tabText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(12) },
+  tabText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(16) },
   bookingTypeTitle: {
     fontFamily: "Gilroy-Bold",
     fontSize: fs(16),
@@ -614,11 +924,18 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: vs(15),
   },
-  label: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: "#000" },
-  labelBold: { fontFamily: "Gilroy-Bold", fontSize: fs(14), color: "#000" },
-  subLabel: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: "#000", marginBottom: vs(4) },
-  inputText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#000" },
-  addText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#00B562" },
+  label: { fontFamily: "Gilroy-Medium", fontSize: fs(16), color: "#000" },
+  labelBold: { fontFamily: "Gilroy-Bold", fontSize: fs(16), color: "#000" },
+  labelSecondary: {
+    fontFamily: "Gilroy-Medium",
+    fontSize: fs(12),
+    color: "#666",
+    marginLeft: hs(6),
+  },
+  inputLabel: { fontFamily: "Gilroy-Medium", fontSize: fs(14), color: "#666", marginBottom: vs(4) },
+  subLabel: { fontFamily: "Gilroy-Medium", fontSize: fs(16), color: "#000", marginBottom: vs(4) },
+  inputText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(16), color: "#000" },
+  addText: { fontFamily: "Gilroy-SemiBold", fontSize: fs(14), color: "#4A5568" },
   textDanger: { color: "#E55959" },
   textSuccessFlex: { color: "#00B562", flex: 1 },
   textPrimary: { color: "#63A1FD" },
@@ -680,13 +997,42 @@ const styles = StyleSheet.create({
   },
   splitRow: { flexDirection: "row", gap: hs(10) },
   addBtn: { flexDirection: "row", alignItems: "center", gap: hs(4) },
-  paymentDrawer: {
-    padding: ms(15),
-    borderWidth: 1,
-    borderColor: "#CBDFFE",
+
+  methodsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: vs(8),
+    marginBottom: vs(12),
+  },
+  methodBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: "23%",
+    aspectRatio: 1,
+    backgroundColor: "#fff",
     borderRadius: ms(10),
-    marginBottom: vs(15),
-    gap: vs(10),
+    borderWidth: 1,
+    borderColor: "#D1E0FB",
+  },
+  methodBoxSelectedBlue: {
+    backgroundColor: "#63A1FD",
+    borderColor: "#63A1FD",
+  },
+  methodIcon: {
+    width: ms(36),
+    height: ms(36),
+    resizeMode: "contain",
+  },
+  methodIconSelected: {
+    tintColor: undefined,
+  },
+  methodText: {
+    fontSize: fs(12),
+    marginTop: vs(4),
+    color: "#000",
+  },
+  methodTextSelected: {
+    color: "#fff",
   },
   confirmPaymentBtn: {
     backgroundColor: "#000",
@@ -694,6 +1040,7 @@ const styles = StyleSheet.create({
     borderRadius: ms(10),
     justifyContent: "center",
     alignItems: "center",
+    marginTop: vs(10),
   },
   confirmBtn: {
     backgroundColor: "#000",
@@ -763,14 +1110,69 @@ const styles = StyleSheet.create({
     height: ms(20),
     borderRadius: ms(10),
     borderWidth: 2,
-    borderColor: "#000",
-    justifyContent: "center",
+    borderColor: "#CBDFFE",
     alignItems: "center",
+    justifyContent: "center",
   },
   radioInner: {
     width: ms(10),
     height: ms(10),
     borderRadius: ms(5),
-    backgroundColor: "#000",
+    backgroundColor: "#0A4BC2",
+  },
+  autocompleteContainer: {
+    position: "relative",
+    zIndex: 1000,
+  },
+  dropdownContainer: {
+    position: "absolute",
+    top: vs(80),
+    left: 0,
+    right: 0,
+    backgroundColor: "#F4F7FC",
+    borderRadius: ms(10),
+    maxHeight: vs(280),
+    zIndex: 1001,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 15,
+  },
+  dropdownHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(12),
+    borderBottomWidth: 1,
+    borderBottomColor: "#cbdffe",
+  },
+  dropdownHeaderText: {
+    fontFamily: "Gilroy-Bold",
+    color: "#000",
+    fontSize: fs(14),
+  },
+  dropdownItemSearch: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: vs(12),
+    paddingHorizontal: hs(16),
+    borderBottomWidth: 1,
+    borderBottomColor: "#EBEBEB",
+  },
+  dropdownItemTextLeft: {
+    fontSize: fs(16),
+    fontFamily: "Gilroy-Medium",
+    color: "#000",
+  },
+  dropdownItemTextRight: {
+    fontSize: fs(16),
+    fontFamily: "Gilroy-Medium",
+    color: "#666",
+  },
+  dropdownScroll: {
+    maxHeight: vs(200),
   },
 });

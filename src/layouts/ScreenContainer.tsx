@@ -107,6 +107,7 @@ export const ScreenContainer = ({
         ) : undefined,
         onScroll: scrollable ? handleScroll : undefined,
         scrollEventThrottle: scrollable ? 16 : undefined,
+        keyboardShouldPersistTaps: "handled" as const,
       }
     : { style: [styles.innerContent, { paddingHorizontal }] };
 

@@ -16,6 +16,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text, PillTabs, CustomDatePickerModal, Skeleton, ListSkeleton } from "@/components/ui";
 import { ServiceHeader } from "../components/ServiceHeader";
@@ -94,9 +95,12 @@ export const SportsHomeScreen = () => {
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isTimeSlotExpanded, setIsTimeSlotExpanded] = useState(true);
   const [highlightedBookingId, setHighlightedBookingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingGroundId, setPendingGroundId] = useState<string | null>(null);
+  const [pendingOptimisticBooking, setPendingOptimisticBooking] = useState<any>(null);
   const shouldReOpenSheet = React.useRef(false);
 
   useEffect(() => {
@@ -148,10 +152,33 @@ export const SportsHomeScreen = () => {
     } else {
       hasRefreshedOnFocus.current = false;
     }
-  }, [isFocused, refresh]);
+  }, [venue, activeVenueName, setActiveVenueName, isFocused, refresh]);
+
+  // If a pending ground ID was set after a category change, select it once grounds load
+  useEffect(() => {
+    if (pendingGroundId && grounds.length > 0) {
+      const found = grounds.find(g => g.id === pendingGroundId);
+      if (found) {
+        setActiveGroundId(pendingGroundId);
+        setPendingGroundId(null);
+      }
+    }
+  }, [grounds, pendingGroundId, setActiveGroundId]);
+
+  // Inject the optimistic booking once the right ground is loaded and active
+  useEffect(() => {
+    if (
+      pendingOptimisticBooking &&
+      activeGroundId === pendingOptimisticBooking.ground_id &&
+      !bookingsLoading
+    ) {
+      addOptimisticBooking(pendingOptimisticBooking);
+      setPendingOptimisticBooking(null);
+    }
+  }, [pendingOptimisticBooking, activeGroundId, bookingsLoading, addOptimisticBooking]);
 
   useEffect(() => {
-    if (isFocused && shouldReOpenSheet.current) {
+    if (route.params?.openBookingSheet && venue) {
       // Delay opening to ensure navigation transition is complete and any previous modal is fully dismissed
       const timer = setTimeout(() => {
         setIsBottomSheetOpen(true);
@@ -159,7 +186,7 @@ export const SportsHomeScreen = () => {
       }, 400);
       return () => clearTimeout(timer);
     }
-  }, [isFocused]);
+  }, [isFocused, route.params?.openBookingSheet, venue]);
 
   useEffect(() => {
     if (venue?.name) {
@@ -180,10 +207,15 @@ export const SportsHomeScreen = () => {
 
   // Auto-select the first available category if the current one isn't valid for this vendor
   useEffect(() => {
-    if (availableCategories.length > 0 && !availableCategories.includes(selectedCategory)) {
-      setServiceCategory(serviceId, availableCategories[0]);
-      if (route.params?.category) {
-        navigation.setParams({ category: undefined } as any);
+    if (availableCategories.length > 0) {
+      const isValid = availableCategories.some(
+        c => c.toLowerCase() === selectedCategory.toLowerCase(),
+      );
+      if (!isValid) {
+        setServiceCategory(serviceId, availableCategories[0]);
+        if (route.params?.category) {
+          navigation.setParams({ category: undefined } as any);
+        }
       }
     }
   }, [
@@ -211,6 +243,26 @@ export const SportsHomeScreen = () => {
     return isToday ? `Today, ${dateString}` : dateString;
   };
 
+  const enrichedSlots = React.useMemo(() => {
+    return slots.map((slot: any) => {
+      if (slot.status === "booked") {
+        const foundBooking = bookings.find((b: any) => {
+          if (!b.startTimeRaw || !b.endTimeRaw) return false;
+          return slot.raw_start_time >= b.startTimeRaw && slot.raw_start_time < b.endTimeRaw;
+        });
+
+        if (foundBooking) {
+          const isOnline =
+            foundBooking.isOnline === true ||
+            (!foundBooking.isOfflineRecord && foundBooking.sports_booking_type !== "offline");
+
+          return { ...slot, isManualBooking: !isOnline };
+        }
+      }
+      return slot;
+    });
+  }, [slots, bookings]);
+
   return (
     <View style={styles.root}>
       <ScreenContainer
@@ -221,19 +273,51 @@ export const SportsHomeScreen = () => {
         onRefresh={onRefresh}
         hideTabBarOnScroll>
         <Pressable
-          style={{ flex: 1 }}
+          style={styles.flex1}
           onPress={() => {
             if (isDropdownOpen) setIsDropdownOpen(false);
+            if (isCategoryDropdownOpen) setIsCategoryDropdownOpen(false);
           }}
           accessible={false}>
-          {/* Dropdown action removed, now it functions as a static label */}
-          <ServiceHeader
-            title={venue?.name || activeVenueName}
-            subtitle="Home"
-            category={selectedCategory}
-            imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
-            showBackBtn={false}
-          />
+          <View style={styles.headerZIndex}>
+            <ServiceHeader
+              title={venue?.name || activeVenueName}
+              subtitle="Home"
+              category={selectedCategory}
+              imageSource={venue?.cover_image_url ? { uri: venue.cover_image_url } : undefined}
+              showBackBtn={false}
+              onCategoryPress={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+            />
+            {isCategoryDropdownOpen && (
+              <View style={styles.categoryDropdownPopover}>
+                <View style={styles.popoverHeader}>
+                  <Text variant="body1" weight="bold" style={styles.popoverTitle}>
+                    Sports
+                  </Text>
+                  <TouchableOpacity onPress={() => setIsCategoryDropdownOpen(false)}>
+                    <X size={ms(20)} color="#000" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.popoverDivider} />
+                {availableCategories.map((cat: string) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      styles.popoverItem,
+                      selectedCategory === cat && styles.popoverItemActive,
+                    ]}
+                    onPress={() => {
+                      setServiceCategory(serviceId, cat);
+                      setIsCategoryDropdownOpen(false);
+                    }}>
+                    <Text variant="body1" weight="medium" style={styles.popoverItemText}>
+                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
 
           {!loading && !venue ? (
             <View style={styles.centerContainer}>
@@ -335,7 +419,6 @@ export const SportsHomeScreen = () => {
                       if (selectedGround) setActiveGroundId(selectedGround.id);
                     }}
                     variant="primary"
-                    fillContainer={true}
                   />
                 </View>
               )}
@@ -375,7 +458,7 @@ export const SportsHomeScreen = () => {
                         </Text>
                       ) : (
                         <TimeSlotGrid
-                          slots={slots as any}
+                          slots={enrichedSlots as any}
                           selectedDate={selectedDate}
                           onSlotPress={slot => {
                             if (slot.status === "booked" || slot.status === "blocked") {
@@ -415,7 +498,7 @@ export const SportsHomeScreen = () => {
                 ) : (
                   <>
                     {(selectedView === "Upcoming Bookings" || selectedView === "Bookings") && (
-                      <Text variant="body2" weight="bold" style={styles.dateGroupHeader}>
+                      <Text variant="body1" weight="bold" style={styles.dateGroupHeader}>
                         {getFormattedDate(selectedDate)}
                       </Text>
                     )}
@@ -424,6 +507,7 @@ export const SportsHomeScreen = () => {
                         key={booking.id}
                         name={booking.name}
                         phone={booking.phone}
+                        subtitle={booking.subtitle}
                         date={booking.date}
                         time={booking.time}
                         price={booking.price}
@@ -473,7 +557,28 @@ export const SportsHomeScreen = () => {
           }}
           onSuccess={async optimisticData => {
             if (optimisticData) {
-              addOptimisticBooking(optimisticData);
+              // Intercept the booking's category/ground to switch views if needed
+              const isDiffCat =
+                optimisticData.sports_type &&
+                optimisticData.sports_type.toLowerCase() !== selectedCategory.toLowerCase();
+
+              if (isDiffCat) {
+                const exactMatch =
+                  availableCategories.find(
+                    c => c.toLowerCase() === optimisticData.sports_type.toLowerCase(),
+                  ) || optimisticData.sports_type;
+                setServiceCategory(serviceId, exactMatch);
+                if (route.params?.category) {
+                  navigation.setParams({ category: undefined } as any);
+                }
+                setPendingGroundId(optimisticData.ground_id);
+                setPendingOptimisticBooking(optimisticData);
+              } else if (optimisticData.ground_id && optimisticData.ground_id !== activeGroundId) {
+                setActiveGroundId(optimisticData.ground_id);
+                setPendingOptimisticBooking(optimisticData);
+              } else {
+                addOptimisticBooking(optimisticData);
+              }
             }
             // Supabase real-time will handle the actual refresh in the background
           }}
@@ -501,6 +606,7 @@ export const SportsHomeScreen = () => {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
+  flex1: { flex: 1 },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
@@ -603,6 +709,26 @@ const styles = StyleSheet.create({
   },
   dateRowZIndex: {
     zIndex: 100,
+  },
+  headerZIndex: {
+    position: "relative",
+    zIndex: 101,
+  },
+  categoryDropdownPopover: {
+    position: "absolute",
+    top: vs(60),
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    borderRadius: ms(12),
+    padding: ms(12),
+    minWidth: ms(160),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
   },
   dropdownToggleWrapper: {
     position: "relative",
