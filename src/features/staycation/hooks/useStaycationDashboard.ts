@@ -177,11 +177,12 @@ export const useStaycationDashboard = (
           paid_amount,
           discount_amount,
           subtotal
-        `,
+          `,
         )
         .eq("venue_id", actualVenueId)
-        .lte("check_in_date", endStr)
-        .gte("check_out_date", startStr);
+        .eq("booking_status", "confirmed")
+        .gte("check_in_date", startStr)
+        .lte("check_in_date", endStr);
 
       if (selectedRoomName !== "All Rooms" && rooms.length > 0) {
         // Filter by base name (e.g., if "Deluxe" is selected, match all rooms like "Deluxe-101", "Deluxe-102")
@@ -214,70 +215,94 @@ export const useStaycationDashboard = (
         return;
       }
 
-      // Filter out cancelled for consistency across all metrics
-      const activeBookings = bookings.filter(b => b.booking_status !== "cancelled");
+      /**
+       * Dashboard statistics are based only on confirmed bookings.
+       *
+       * The dashboard date range represents the booking check-in date.
+       * This prevents future bookings or overlapping stay periods from
+       * being inconsistently included in revenue calculations.
+       */
+      const activeBookings = bookings.filter(b => b.booking_status === "confirmed");
 
-      let totalBookings = activeBookings.length;
+      let totalBookings = 0;
       let onlineBookings = 0;
       let offlineBookings = 0;
       let totalRevenue = 0;
       let onlineRevenue = 0;
       let offlineRevenue = 0;
 
-      // Grouping by date for the graph
-      const dailyData: Record<string, { bookings: number; revenue: number; day: string }> = {};
+      const dailyData: Record<
+        string,
+        {
+          bookings: number;
+          revenue: number;
+          day: string;
+        }
+      > = {};
 
       let loopDate = new Date(startDate);
+
       while (loopDate <= endDate) {
         const dateKey = formatDate(loopDate);
+
         dailyData[dateKey] = {
           bookings: 0,
           revenue: 0,
-          day: loopDate.toLocaleDateString("en-US", { weekday: "short" }),
+          day: loopDate.toLocaleDateString("en-US", {
+            weekday: "short",
+          }),
         };
+
         loopDate.setDate(loopDate.getDate() + 1);
       }
 
-      // For Revenue and Online/Offline counts, we only count ACTIVE (non-cancelled) bookings.
-      const todayStr = formatDate(new Date());
-
       activeBookings.forEach(b => {
-        const isOnline = b.booking_source === "online" || !!b.user_id;
         const bookingDate = b.check_in_date;
 
+        const isOnline = b.booking_source === "online" || !!b.user_id;
+
+        let bookingRevenue = 0;
+
         if (isOnline) {
-          const sumPaid = Number(b.paid_amount || 0);
-          const sumDiscount = Number(b.discount_amount || 0);
-          const sumSubtotal = Number(b.subtotal || 0);
-          const sumTotalAmt = Number(b.total_amount || 0);
-          const totalPaid = sumPaid + sumDiscount;
-          const commission = Number((sumTotalAmt * 0.05).toFixed(2));
-          const gateway = Number((sumSubtotal * 0.02).toFixed(2));
-          const netPayout = totalPaid - commission - gateway;
+          /**
+           * Online revenue is calculated from the in-app payment (subtotal),
+           * after deducting the 5% platform commission on total_amount and
+           * the 2% payment gateway fee on subtotal.
+           */
+          const subtotal = Number(b.subtotal || 0);
+          const totalAmount = Number(b.total_amount || 0);
 
-          // Only include in summary totals if the booking is from YESTERDAY or earlier
-          if (bookingDate < todayStr) {
-            onlineBookings++;
-            onlineRevenue += netPayout;
-            totalRevenue += netPayout;
-          }
+          const commission = totalAmount * 0.05;
+          const gatewayFee = subtotal * 0.02;
 
-          if (dailyData[bookingDate]) {
-            dailyData[bookingDate].bookings += 1;
-            dailyData[bookingDate].revenue += netPayout;
-          }
+          bookingRevenue = Math.max(0, subtotal - commission - gatewayFee);
+
+          onlineBookings += 1;
+          onlineRevenue += bookingRevenue;
+          totalRevenue += bookingRevenue;
         } else {
-          const paidAmount = parseFloat(b.paid_amount || "0") || 0;
-          offlineBookings++;
-          offlineRevenue += paidAmount;
-          totalRevenue += paidAmount;
+          /**
+           * Offline staycation revenue is the actual amount paid.
+           * No platform commission or payment gateway fee is deducted.
+           */
+          bookingRevenue = Number(b.paid_amount || 0);
 
-          if (dailyData[bookingDate]) {
-            dailyData[bookingDate].bookings += 1;
-            dailyData[bookingDate].revenue += paidAmount;
-          }
+          offlineBookings += 1;
+          offlineRevenue += bookingRevenue;
+        }
+
+        totalBookings += 1;
+        totalRevenue += bookingRevenue;
+
+        if (dailyData[bookingDate]) {
+          dailyData[bookingDate].bookings += 1;
+          dailyData[bookingDate].revenue += bookingRevenue;
         }
       });
+
+      totalRevenue = Number(totalRevenue.toFixed(2));
+      onlineRevenue = Number(onlineRevenue.toFixed(2));
+      offlineRevenue = Number(offlineRevenue.toFixed(2));
 
       totalBookings = onlineBookings + offlineBookings;
 
