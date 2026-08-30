@@ -189,11 +189,14 @@ export const useSportsDashboard = (
         }
 
         /**
-         * booking_group_id is the primary logical booking identity.
-         * parent_booking_id is used for linked/rescheduled bookings.
-         * The booking id itself is the final fallback for standalone bookings.
+         * Use booking_group_id as the logical booking identity.
+         *
+         * WHY:
+         * parent_booking_id represents a relationship between bookings and should
+         * not be used to merge otherwise separate confirmed bookings. Standalone
+         * bookings fall back to their own booking id.
          */
-        const groupKey = b.booking_group_id || b.parent_booking_id || b.id;
+        const groupKey = b.booking_group_id || b.id;
 
         if (!bookingGroups[groupKey]) {
           bookingGroups[groupKey] = {
@@ -272,20 +275,21 @@ export const useSportsDashboard = (
         const isOnline = group.booking_source === "online";
 
         /**
-         * Revenue intentionally uses different authoritative fields:
-         *
-         * Online:
-         *   subtotal
-         *
-         * Offline:
-         *   paid_amount
+         * Calculate vendor online revenue after payment gateway and platform fees.
          *
          * WHY:
-         * Offline bookings do not use discounts in dashboard revenue, while
-         * online bookings can contain discounts but the dashboard revenue
-         * represents the booking subtotal rather than the customer-paid total.
+         * Online bookings incur a 2% payment gateway fee on the subtotal and a
+         * 3.5% Bookr commission on the total_amount. The calculation is performed
+         * at the logical booking level before aggregating the dashboard revenue.
+         *
+         * Formula:
+         *   Online Revenue = subtotal - (2% of subtotal) - (3.5% of total_amount)
+         *
+         * Offline revenue remains the actual paid_amount.
          */
-        const bookingRevenue = isOnline ? group.subtotal : group.paid_amount;
+        const bookingRevenue = isOnline
+          ? group.subtotal - group.subtotal * 0.02 - group.total_amount * 0.035
+          : group.paid_amount;
 
         if (isOnline) {
           onlineCount += 1;
