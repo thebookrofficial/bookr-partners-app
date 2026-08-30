@@ -53,8 +53,10 @@ export const useStaycationDashboard = (
   customRange?: { start: Date; end: Date },
 ) => {
   const { clientProfile } = useAuthStore();
+
   const [isLoading, setIsLoading] = useState(true);
   const [rooms, setRooms] = useState<DashboardRoom[]>([]);
+
   const [stats, setStats] = useState<DashboardStats>({
     totalBookings: 0,
     onlineBookings: 0,
@@ -70,6 +72,7 @@ export const useStaycationDashboard = (
 
   const fetchRooms = useCallback(async () => {
     let actualVenueId = venueId;
+
     if (!actualVenueId && clientProfile?.id) {
       const { data: venueData } = await supabase
         .from("venues")
@@ -78,7 +81,10 @@ export const useStaycationDashboard = (
         .eq("owner_id", clientProfile.id)
         .limit(1)
         .maybeSingle();
-      if (venueData) actualVenueId = venueData.id;
+
+      if (venueData) {
+        actualVenueId = venueData.id;
+      }
     }
 
     if (!actualVenueId) return;
@@ -97,6 +103,7 @@ export const useStaycationDashboard = (
           id: r.id,
           name: r.room_name,
         }));
+
         setRooms(roomList);
       }
     } catch (error) {
@@ -109,6 +116,7 @@ export const useStaycationDashboard = (
       setIsLoading(true);
 
       let actualVenueId = venueId;
+
       if (!actualVenueId && clientProfile?.id) {
         let venueQuery = supabase
           .from("venues")
@@ -122,7 +130,9 @@ export const useStaycationDashboard = (
 
         const { data: venueData } = await venueQuery.limit(1).maybeSingle();
 
-        if (venueData) actualVenueId = venueData.id;
+        if (venueData) {
+          actualVenueId = venueData.id;
+        }
       }
 
       if (!actualVenueId) {
@@ -130,9 +140,38 @@ export const useStaycationDashboard = (
         return;
       }
 
+      /**
+       * Fetch dynamic payout configuration for this staycation venue.
+       *
+       * commission_percentage:
+       * Platform commission calculated on total_amount.
+       *
+       * gateway_percentage:
+       * Payment gateway fee calculated on subtotal.
+       *
+       * Defaults are used only when the database value is null.
+       */
+      const { data: staycationVenue, error: staycationVenueError } = await supabase
+        .from("staycation_venues")
+        .select("commission_percentage, gateway_percentage")
+        .eq("venue_id", actualVenueId)
+        .maybeSingle();
+
+      if (staycationVenueError) {
+        throw staycationVenueError;
+      }
+
+      const commissionPercentage = Number(staycationVenue?.commission_percentage ?? 5);
+
+      const gatewayPercentage = Number(staycationVenue?.gateway_percentage ?? 2);
+
+      const commissionRate = commissionPercentage / 100;
+      const gatewayRate = gatewayPercentage / 100;
+
       // Calculate Date Range
       let startDate = new Date();
       let endDate = new Date();
+
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(23, 59, 59, 999);
 
@@ -142,17 +181,22 @@ export const useStaycationDashboard = (
       } else if (timeFilter === "Last week") {
         const currentDay = startDate.getDay();
         const dayOffset = currentDay === 0 ? 7 : currentDay;
+
         startDate.setDate(startDate.getDate() - (dayOffset + 6));
+
         endDate = new Date(startDate);
         endDate.setDate(startDate.getDate() + 6);
         endDate.setHours(23, 59, 59, 999);
       } else if (timeFilter === "Last Month") {
         startDate = new Date(startDate.getFullYear(), startDate.getMonth() - 1, 1);
+
         endDate = new Date(endDate.getFullYear(), endDate.getMonth(), 0);
+
         endDate.setHours(23, 59, 59, 999);
       } else if (timeFilter === "Custom" && customRange) {
         startDate = new Date(customRange.start);
         startDate.setHours(0, 0, 0, 0);
+
         endDate = new Date(customRange.end);
         endDate.setHours(23, 59, 59, 999);
       }
@@ -167,6 +211,7 @@ export const useStaycationDashboard = (
           id,
           total_amount,
           platform_fee,
+          gateway_fee,
           booking_type,
           booking_source,
           user_id,
@@ -177,14 +222,14 @@ export const useStaycationDashboard = (
           paid_amount,
           discount_amount,
           subtotal
-        `,
+          `,
         )
         .eq("venue_id", actualVenueId)
-        .lte("check_in_date", endStr)
-        .gte("check_out_date", startStr);
+        .eq("booking_status", "confirmed")
+        .gte("check_in_date", startStr)
+        .lte("check_in_date", endStr);
 
       if (selectedRoomName !== "All Rooms" && rooms.length > 0) {
-        // Filter by base name (e.g., if "Deluxe" is selected, match all rooms like "Deluxe-101", "Deluxe-102")
         const matchingRoomIds = rooms
           .filter(r => r.name.startsWith(selectedRoomName))
           .map(r => r.id);
@@ -196,7 +241,9 @@ export const useStaycationDashboard = (
 
       const { data: bookings, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       if (!bookings) {
         setStats({
@@ -211,77 +258,102 @@ export const useStaycationDashboard = (
           maxBookingValue: 0,
           dateRangeLabel: "",
         });
+
         return;
       }
 
-      // Filter out cancelled for consistency across all metrics
-      const activeBookings = bookings.filter(b => b.booking_status !== "cancelled");
+      const activeBookings = bookings.filter(b => b.booking_status === "confirmed");
 
-      let totalBookings = activeBookings.length;
+      let totalBookings = 0;
       let onlineBookings = 0;
       let offlineBookings = 0;
       let totalRevenue = 0;
       let onlineRevenue = 0;
       let offlineRevenue = 0;
 
-      // Grouping by date for the graph
-      const dailyData: Record<string, { bookings: number; revenue: number; day: string }> = {};
+      const dailyData: Record<
+        string,
+        {
+          bookings: number;
+          revenue: number;
+          day: string;
+        }
+      > = {};
 
       let loopDate = new Date(startDate);
+
       while (loopDate <= endDate) {
         const dateKey = formatDate(loopDate);
+
         dailyData[dateKey] = {
           bookings: 0,
           revenue: 0,
-          day: loopDate.toLocaleDateString("en-US", { weekday: "short" }),
+          day: loopDate.toLocaleDateString("en-US", {
+            weekday: "short",
+          }),
         };
+
         loopDate.setDate(loopDate.getDate() + 1);
       }
 
-      // For Revenue and Online/Offline counts, we only count ACTIVE (non-cancelled) bookings.
-      const todayStr = formatDate(new Date());
-
       activeBookings.forEach(b => {
-        const isOnline = b.booking_source === "online" || !!b.user_id;
         const bookingDate = b.check_in_date;
 
+        const isOnline = b.booking_source === "online";
+
+        let bookingRevenue = 0;
+
         if (isOnline) {
-          const sumPaid = Number(b.paid_amount || 0);
-          const sumDiscount = Number(b.discount_amount || 0);
-          const sumSubtotal = Number(b.subtotal || 0);
-          const sumTotalAmt = Number(b.total_amount || 0);
-          const totalPaid = sumPaid + sumDiscount;
-          const commission = Number((sumTotalAmt * 0.05).toFixed(2));
-          const gateway = Number((sumSubtotal * 0.02).toFixed(2));
-          const netPayout = totalPaid - commission - gateway;
+          /**
+           * ONLINE REVENUE
+           *
+           * Revenue = subtotal
+           *          - commission on total_amount
+           *          - gateway fee on subtotal
+           *
+           * Commission = total_amount × dynamic commission %
+           * Gateway    = subtotal × dynamic gateway %
+           */
+          const subtotal = Number(b.subtotal || 0);
+          const totalAmount = Number(b.total_amount || 0);
 
-          // Only include in summary totals if the booking is from YESTERDAY or earlier
-          if (bookingDate < todayStr) {
-            onlineBookings++;
-            onlineRevenue += netPayout;
-            totalRevenue += netPayout;
-          }
+          const commission = totalAmount * commissionRate;
+          const gatewayFee = subtotal * gatewayRate;
 
-          if (dailyData[bookingDate]) {
-            dailyData[bookingDate].bookings += 1;
-            dailyData[bookingDate].revenue += netPayout;
-          }
+          bookingRevenue = Math.max(0, subtotal - commission - gatewayFee);
+
+          onlineBookings += 1;
+          onlineRevenue += bookingRevenue;
         } else {
-          const paidAmount = parseFloat(b.paid_amount || "0") || 0;
-          offlineBookings++;
-          offlineRevenue += paidAmount;
-          totalRevenue += paidAmount;
+          /**
+           * OFFLINE REVENUE
+           *
+           * Offline revenue is the actual paid_amount.
+           * No Bookr commission or payment gateway fee is deducted.
+           */
+          bookingRevenue = Number(b.paid_amount || 0);
 
-          if (dailyData[bookingDate]) {
-            dailyData[bookingDate].bookings += 1;
-            dailyData[bookingDate].revenue += paidAmount;
-          }
+          offlineBookings += 1;
+          offlineRevenue += bookingRevenue;
+        }
+
+        totalBookings += 1;
+        totalRevenue += bookingRevenue;
+
+        if (dailyData[bookingDate]) {
+          dailyData[bookingDate].bookings += 1;
+          dailyData[bookingDate].revenue += bookingRevenue;
         }
       });
+
+      totalRevenue = Number(totalRevenue.toFixed(2));
+      onlineRevenue = Number(onlineRevenue.toFixed(2));
+      offlineRevenue = Number(offlineRevenue.toFixed(2));
 
       totalBookings = onlineBookings + offlineBookings;
 
       const dates = Object.keys(dailyData).sort();
+
       let maxBookingValue = 0;
       let maxRevenueValue = 0;
 
@@ -289,8 +361,14 @@ export const useStaycationDashboard = (
 
       dates.forEach(date => {
         const data = dailyData[date];
-        if (data.bookings > maxBookingValue) maxBookingValue = data.bookings;
-        if (data.revenue > maxRevenueValue) maxRevenueValue = data.revenue;
+
+        if (data.bookings > maxBookingValue) {
+          maxBookingValue = data.bookings;
+        }
+
+        if (data.revenue > maxRevenueValue) {
+          maxRevenueValue = data.revenue;
+        }
 
         const formattedDate = new Date(date).toLocaleDateString("en-GB", {
           day: "2-digit",
@@ -306,11 +384,14 @@ export const useStaycationDashboard = (
 
       const revenueGraphData: RevenueGraphItem[] = dates.map((date, idx) => {
         const data = dailyData[date];
+
         const pct = maxRevenueValue > 0 ? (data.revenue / maxRevenueValue) * 100 : 0;
+
         const formattedDate = new Date(date).toLocaleDateString("en-GB", {
           day: "2-digit",
           month: "short",
         });
+
         return {
           date: formattedDate,
           value: `₹${Math.round(data.revenue).toLocaleString("en-IN")}`,
@@ -321,9 +402,11 @@ export const useStaycationDashboard = (
       });
 
       let dateRangeLabel = "";
+
       if (dates.length > 0) {
         const first = bookingGraphData[0].date;
         const last = bookingGraphData[bookingGraphData.length - 1].date;
+
         dateRangeLabel = `${first} - ${last}`;
       }
 
