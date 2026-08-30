@@ -73,16 +73,30 @@ export const FinanceService = {
     const revenueBase = actualPaid + discount;
     const totalAmount = Number(b.total_amount || 0);
 
-    // Determine gateway fee base and rate
-    let gateRate = 0.02; // Default
-    let gatewayBase = b.subtotal || actualPaid;
+    /**
+     * Calculates the vendor payout using the finalized sports settlement rules.
+     *
+     * WHY:
+     * Online sports bookings incur a 2% payment gateway fee on the subtotal
+     * and a 3.5% Bookr commission on the total_amount. The vendor payout must
+     * therefore match the revenue calculation used by the Sports Dashboard.
+     *
+     * Sports formula:
+     *   Gateway Fee = subtotal × 2%
+     *   Commission  = total_amount × 3.5%
+     *   Payout      = subtotal - Gateway Fee - Commission
+     *
+     * Offline sports bookings are not processed by this payout strategy because
+     * SportsPayoutStrategy only fetches online bookings.
+     */
+    let gateRate = 0.02;
+    let gatewayBase = Number(b.subtotal || actualPaid);
 
     if (vertical === "sports" && b.sports_type) {
       if (b.sports_type.toLowerCase().includes("pickleball")) {
         gateRate = 0.015;
       }
     } else if (vertical === "staycation") {
-      // FIX: Staycation should also use subtotal (money swiped) as gateway base
       gatewayBase = Number(b.subtotal || 0);
     }
 
@@ -175,6 +189,13 @@ export const FinanceService = {
 
   /**
    * Fetches historical payouts aggregated by the specified interval.
+   *
+   * Period behavior:
+   * - day: one payout entry per calendar date.
+   * - week: one payout entry per Monday-Sunday week.
+   * - month: one payout entry per calendar month.
+   * - custom range: the caller passes interval="day", so the selected
+   *   startDate/endDate are returned day-wise.
    */
   async getAggregatedPayouts(params: {
     venueId: string;
@@ -183,71 +204,109 @@ export const FinanceService = {
     interval: "day" | "week" | "month";
   }) {
     const vertical = await getVenueVertical(params.venueId);
+
     if (!vertical) return [];
 
     const strategy = getStrategy(vertical);
     const commRate = strategy.getCommissionRate();
 
-    // Fetch raw data to ensure JS math matches the breakdown exactly
     const rawData = await strategy.getBreakdownRawData(
       params.venueId,
       params.startDate,
       params.endDate,
     );
 
+    /**
+     * Merge rows belonging to the same logical booking.
+     *
+     * booking_group_id represents multi-slot/bulk bookings.
+     * A booking without a group remains identified by its own id.
+     */
     const groupedBookings: Record<string, any> = {};
+
     rawData.forEach(b => {
       const status = (b.booking_status || "").toLowerCase().trim();
-      if (status !== "confirmed" && status !== "completed") return;
 
-      const groupKey = b.booking_group_id || b.parent_booking_id || b.id;
+      if (status !== "confirmed" && status !== "completed") {
+        return;
+      }
+
+      const groupKey = b.booking_group_id || b.id;
 
       if (!groupedBookings[groupKey]) {
-        groupedBookings[groupKey] = { ...b, merged_count: 1 };
-      } else {
-        groupedBookings[groupKey].paid_amount += b.paid_amount;
-        groupedBookings[groupKey].subtotal =
-          (groupedBookings[groupKey].subtotal || 0) + (b.subtotal || 0);
-        groupedBookings[groupKey].total_amount += b.total_amount;
-        groupedBookings[groupKey].discount_amount =
-          (groupedBookings[groupKey].discount_amount || 0) + (b.discount_amount || 0);
-        groupedBookings[groupKey].merged_count += 1;
-        groupedBookings[groupKey].unit_count =
-          (groupedBookings[groupKey].unit_count || 0) + (b.unit_count || 1);
+        groupedBookings[groupKey] = {
+          ...b,
+          paid_amount: Number(b.paid_amount || 0),
+          subtotal: Number(b.subtotal || 0),
+          total_amount: Number(b.total_amount || 0),
+          discount_amount: Number(b.discount_amount || 0),
+          merged_count: 1,
+        };
+        return;
       }
+
+      groupedBookings[groupKey].paid_amount += Number(b.paid_amount || 0);
+      groupedBookings[groupKey].subtotal += Number(b.subtotal || 0);
+      groupedBookings[groupKey].total_amount += Number(b.total_amount || 0);
+      groupedBookings[groupKey].discount_amount += Number(b.discount_amount || 0);
+      groupedBookings[groupKey].merged_count += 1;
     });
 
-    const aggregation: Record<string, { total_amount: number; booking_count: number }> = {};
+    const aggregation: Record<
+      string,
+      {
+        total_amount: number;
+        booking_count: number;
+        bookings: string[];
+      }
+    > = {};
 
     Object.values(groupedBookings).forEach((b: any) => {
       const { payout } = this._calculateBookingPayout(b, vertical, commRate);
-      const bookingDate = new Date(b.date);
 
-      let groupKey = "";
+      const bookingDate = b.date;
+
+      if (!bookingDate) {
+        return;
+      }
+
+      let periodKey: string;
+
       if (params.interval === "day") {
-        groupKey = b.date;
+        // Used by both Day and Custom Range.
+        periodKey = bookingDate;
       } else if (params.interval === "week") {
-        const day = bookingDate.getDay();
-        const diff = bookingDate.getDate() - day + (day === 0 ? -6 : 1); // Monday
-        const weekStart = new Date(bookingDate.setDate(diff));
-        groupKey = getLocalISODate(weekStart);
-      } else if (params.interval === "month") {
-        groupKey = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(
-          2,
-          "0",
-        )}-01`;
+        const date = new Date(`${bookingDate}T00:00:00`);
+        const day = date.getDay();
+
+        // Convert Sunday=0 to Monday-based week.
+        const diff = day === 0 ? -6 : 1 - day;
+
+        date.setDate(date.getDate() + diff);
+        periodKey = getLocalISODate(date);
+      } else {
+        // Calendar month.
+        periodKey = `${bookingDate.substring(0, 7)}-01`;
       }
 
-      if (!aggregation[groupKey]) {
-        aggregation[groupKey] = { total_amount: 0, booking_count: 0 };
+      if (!aggregation[periodKey]) {
+        aggregation[periodKey] = {
+          total_amount: 0,
+          booking_count: 0,
+          bookings: [],
+        };
       }
-      aggregation[groupKey].total_amount += payout;
-      aggregation[groupKey].booking_count += vertical === "staycation" ? b.unit_count || 1 : 1;
+
+      aggregation[periodKey].total_amount += payout;
+      aggregation[periodKey].booking_count += vertical === "staycation" ? b.unit_count || 1 : 1;
+
+      aggregation[periodKey].bookings.push(b.id);
     });
 
-    return Object.entries(aggregation)
+    const result = Object.entries(aggregation)
       .map(([dateStr, stats]) => {
-        const date = new Date(dateStr);
+        const date = new Date(`${dateStr}T00:00:00`);
+
         let label = "";
 
         if (params.interval === "day") {
@@ -259,6 +318,7 @@ export const FinanceService = {
         } else if (params.interval === "week") {
           const weekEnd = new Date(date);
           weekEnd.setDate(date.getDate() + 6);
+
           label = `${date.toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
@@ -267,7 +327,7 @@ export const FinanceService = {
             month: "short",
             year: "numeric",
           })}`;
-        } else if (params.interval === "month") {
+        } else {
           label = date.toLocaleDateString("en-GB", {
             month: "long",
             year: "numeric",
@@ -282,6 +342,8 @@ export const FinanceService = {
         };
       })
       .sort((a, b) => b.payout_date.localeCompare(a.payout_date));
+
+    return result;
   },
 
   /**
