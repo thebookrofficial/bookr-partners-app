@@ -13,36 +13,80 @@ jest.mock("@/lib/supabase", () => ({
 describe("FinanceService Payout Logic", () => {
   const mockVenueId = "venue-123";
 
+  const createChainMock = (result: any = { data: null, error: null }) => {
+    const chain: any = {
+      select: jest.fn(),
+      eq: jest.fn(),
+      in: jest.fn(),
+      not: jest.fn(),
+      gte: jest.fn(),
+      lte: jest.fn(),
+      limit: jest.fn(),
+      single: jest.fn(),
+      maybeSingle: jest.fn(),
+    };
+
+    (Object.values(chain) as jest.Mock[]).forEach(fn => {
+      if (fn !== chain.single && fn !== chain.maybeSingle) {
+        fn.mockReturnValue(chain);
+      }
+    });
+
+    chain.single.mockResolvedValue(result);
+    chain.maybeSingle.mockResolvedValue(result);
+
+    return chain;
+  };
+
+  const mockVenueVertical = (
+    vertical: "sports" | "staycation",
+    commissionPercentage = 5,
+    gatewayPercentage = 2,
+  ) => {
+    (supabase.from as jest.Mock).mockImplementation((table: string) => {
+      if (table === "venues") {
+        return createChainMock({
+          data: { vertical },
+          error: null,
+        });
+      }
+
+      if (table === "sports_grounds") {
+        return createChainMock({
+          data: {
+            commission_percentage: commissionPercentage,
+            gateway_percentage: gatewayPercentage,
+          },
+          error: null,
+        });
+      }
+
+      if (table === "staycation_venues") {
+        return createChainMock({
+          data: {
+            commission_percentage: commissionPercentage,
+            gateway_percentage: gatewayPercentage,
+          },
+          error: null,
+        });
+      }
+
+      return createChainMock();
+    });
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Default mock for venue vertical
-    (supabase.from as jest.Mock).mockImplementation(table => {
-      if (table === "venues") {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          single: jest.fn().mockResolvedValue({
-            data: { vertical: "sports" },
-            error: null,
-          }),
-        };
-      }
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn(),
-      };
-    });
+    mockVenueVertical("sports", 3.5, 2);
   });
 
   it("should accurately calculate Turf Full Payment payout", async () => {
-    // Turf: 800 price, 3.5% commission (28), 2% gateway (16) -> 756 payout
     const mockRawData = [
       {
         id: "b1",
         paid_amount: 800,
-        subtotal: 800, // Added subtotal
+        subtotal: 800,
         total_amount: 800,
         payment_type: "full",
         date: "2026-05-28",
@@ -66,17 +110,13 @@ describe("FinanceService Payout Logic", () => {
   });
 
   it("should calculate commission on TOTAL price for Advance Payment", async () => {
-    // Turf Advance: 200 subtotal (money swiped), 1000 total price.
-    // Commission: 3.5% of 1000 = 35.
-    // Gateway: 2% of 200 = 4.
-    // Payout: 200 - 35 - 4 = 161.
     const mockRawData = [
       {
         id: "b3",
         paid_amount: 300,
-        subtotal: 200, // strictly use subtotal
+        subtotal: 200,
         total_amount: 1000,
-        discount_amount: 100, // should be excluded
+        discount_amount: 100,
         payment_type: "advance",
         date: "2026-05-28",
         sports_type: "Cricket",
@@ -98,7 +138,6 @@ describe("FinanceService Payout Logic", () => {
   });
 
   it("should group multi-slot bookings correctly", async () => {
-    // User books 2 slots of 500 each, pays 200 subtotal tied to first slot.
     const mockRawData = [
       {
         id: "b4-1",
@@ -131,43 +170,21 @@ describe("FinanceService Payout Logic", () => {
     );
 
     expect(breakdown.count).toBe(1);
-    expect(breakdown.totalPaid).toBe(200); // Should use sum of subtotals
+    expect(breakdown.totalPaid).toBe(200);
     expect(breakdown.commission).toBe(35);
     expect(breakdown.finalPayout).toBe(161);
   });
 
-  it("should calculate Staycation payout using Subtotal for gateway", async () => {
-    // Mock vertical to staycation
-    (supabase.from as jest.Mock).mockImplementation(table => {
-      if (table === "venues") {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          single: jest.fn().mockResolvedValue({
-            data: { vertical: "staycation" },
-            error: null,
-          }),
-        };
-      }
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn(),
-      };
-    });
+  it("should calculate Staycation payout using configured commission and gateway rates", async () => {
+    mockVenueVertical("staycation", 5, 2);
 
-    // Staycation: 10100 main price.
-    // Subtotal (Money Swiped) = 9900.
-    // Commission (5%) = 10100 * 0.05 = 505.
-    // Gateway (2% of Subtotal) = 9900 * 0.02 = 198.
-    // Final Payout = 9900 - 505 - 198 = 9197.
     const mockRawData = [
       {
         id: "s1",
         paid_amount: 9900,
         subtotal: 9900,
         total_amount: 10100,
-        discount_amount: 200, // excluded
+        discount_amount: 200,
         payment_type: "full",
         date: "2026-05-28",
         booking_status: "confirmed",
