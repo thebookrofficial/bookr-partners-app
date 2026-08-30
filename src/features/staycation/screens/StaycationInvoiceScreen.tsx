@@ -45,8 +45,19 @@ export const StaycationInvoiceScreen = () => {
   const discountAmount = 0; // Hardcoded to 0 for display as platform subsidizes it
 
   // Calculate fees based on 5% commission applied strictly to the total_amount (Total Paid)
-  const platformFee = totalPaid * 0.05;
-  const gatewayFee = inAppPayments * 0.02;
+  // const platformFee = totalPaid * 0.05;
+  // const gatewayFee = inAppPayments * 0.02;
+
+  const staycationVenue = Array.isArray(booking.venues?.staycation_venues)
+    ? booking.venues.staycation_venues[0]
+    : booking.venues?.staycation_venues;
+
+  const commissionPercentage = Number(staycationVenue?.commission_percentage ?? 5) / 100;
+
+  const gatewayPercentage = Number(staycationVenue?.gateway_percentage ?? 2) / 100;
+
+  const platformFee = totalPaid * commissionPercentage;
+  const gatewayFee = inAppPayments * gatewayPercentage;
 
   /**
    * Estimated vendor payout is calculated from the actual in-app payment

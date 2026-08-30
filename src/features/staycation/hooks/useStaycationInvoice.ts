@@ -13,6 +13,7 @@ export const useStaycationInvoice = (bookingId: string) => {
     const fetchBooking = async () => {
       try {
         setLoading(true);
+
         const { data, error: fetchError } = await supabase
           .from("staycation_bookings")
           .select(
@@ -41,7 +42,9 @@ export const useStaycationInvoice = (bookingId: string) => {
             venues (
               name,
               staycation_venues (
-                property_type
+                property_type,
+                commission_percentage,
+                gateway_percentage
               )
             ),
             staycation_rooms (
@@ -54,6 +57,7 @@ export const useStaycationInvoice = (bookingId: string) => {
           .single();
 
         if (fetchError) throw fetchError;
+
         setBooking(data);
       } catch (err: any) {
         console.error("Error fetching staycation invoice:", err);
