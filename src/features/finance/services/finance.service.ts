@@ -58,63 +58,70 @@ const getLocalISODate = (date: Date) => {
  */
 export const FinanceService = {
   /**
-   * Internal helper to calculate payout for a single booking based on vertical rules.
+   * Calculates the vendor payout for a single booking.
+   *
+   * Staycation online payout:
+   * - In-app payment = subtotal
+   * - Bookr commission = 5% of total_amount
+   * - Gateway charge = 2% of subtotal
+   * - Final payout = subtotal - commission - gateway charge
+   *
+   * This keeps payout calculations consistent with the Staycation
+   * Dashboard and Staycation Invoice calculations.
    */
   _calculateBookingPayout(b: any, vertical: Vertical, commRate: number) {
-    let actualPaid = Number(b.paid_amount || 0);
-    let discount = Number(b.discount_amount || 0);
-
-    // Sports & Staycation Correction: Use subtotal and exclude discounts
-    if (vertical === "sports" || vertical === "staycation") {
-      actualPaid = Number(b.subtotal || 0);
-      discount = 0;
-    }
-
-    const revenueBase = actualPaid + discount;
     const totalAmount = Number(b.total_amount || 0);
+    const subtotal = Number(b.subtotal || 0);
+    const paidAmount = Number(b.paid_amount || 0);
+    const discount = Number(b.discount_amount || 0);
+
+    let actualPaid = paidAmount;
+    let revenueBase = paidAmount;
+    let gatewayBase = paidAmount;
+    let gateRate = 0.02;
+
+    if (vertical === "sports" || vertical === "staycation") {
+      actualPaid = subtotal;
+      revenueBase = subtotal;
+      gatewayBase = subtotal;
+    } else {
+      revenueBase = actualPaid + discount;
+      gatewayBase = actualPaid;
+    }
 
     /**
-     * Calculates the vendor payout using the finalized sports settlement rules.
-     *
-     * WHY:
-     * Online sports bookings incur a 2% payment gateway fee on the subtotal
-     * and a 3.5% Bookr commission on the total_amount. The vendor payout must
-     * therefore match the revenue calculation used by the Sports Dashboard.
-     *
-     * Sports formula:
-     *   Gateway Fee = subtotal × 2%
-     *   Commission  = total_amount × 3.5%
-     *   Payout      = subtotal - Gateway Fee - Commission
-     *
-     * Offline sports bookings are not processed by this payout strategy because
-     * SportsPayoutStrategy only fetches online bookings.
+     * Staycation uses a 2% payment gateway charge calculated
+     * specifically on the in-app payment (subtotal).
      */
-    let gateRate = 0.02;
-    let gatewayBase = Number(b.subtotal || actualPaid);
-
-    if (vertical === "sports" && b.sports_type) {
-      if (b.sports_type.toLowerCase().includes("pickleball")) {
-        gateRate = 0.015;
-      }
-    } else if (vertical === "staycation") {
-      gatewayBase = Number(b.subtotal || 0);
+    if (vertical === "staycation") {
+      gatewayBase = subtotal;
+      gateRate = 0.02;
     }
 
-    // Commission is % of the TOTAL PRICE
-    const commission = totalAmount * commRate;
+    /**
+     * Sports uses a 1.5% gateway fee for Pickleball and 2%
+     * for all other sports categories.
+     */
+    if (vertical === "sports") {
+      gateRate = 0.02;
 
-    // Gateway fee
+      if (b.sports_type?.toLowerCase().includes("pickleball")) {
+        gateRate = 0.015;
+      }
+    }
+
+    const commission = totalAmount * commRate;
     const gateway = gatewayBase * gateRate;
     const payout = revenueBase - commission - gateway;
 
     return {
-      payout,
-      actualPaid,
-      discount,
-      revenueBase,
-      totalAmount,
-      commission,
-      gateway,
+      payout: Number(payout.toFixed(2)),
+      actualPaid: Number(actualPaid.toFixed(2)),
+      discount: Number(discount.toFixed(2)),
+      revenueBase: Number(revenueBase.toFixed(2)),
+      totalAmount: Number(totalAmount.toFixed(2)),
+      commission: Number(commission.toFixed(2)),
+      gateway: Number(gateway.toFixed(2)),
     };
   },
 
