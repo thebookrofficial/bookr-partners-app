@@ -12,21 +12,21 @@ import { useNavigation } from "@react-navigation/native";
 interface ServiceHeaderProps {
   title: string;
   subtitle?: string;
-  category?: string;
   imageSource?: ImageSourcePropType;
-  onCategoryPress?: () => void;
   rightComponent?: React.ReactNode;
   showBackBtn?: boolean;
+  sportsCategory?: string;
+  onSportsCategoryPress?: () => void;
 }
 
 export const ServiceHeader = ({
   title,
   subtitle,
-  category,
   imageSource,
-  onCategoryPress,
   rightComponent,
   showBackBtn = true,
+  sportsCategory,
+  onSportsCategoryPress,
 }: ServiceHeaderProps) => {
   const navigation = useNavigation();
 
@@ -56,18 +56,17 @@ export const ServiceHeader = ({
       {/* Render rightComponent if provided, otherwise render the category text/dropdown */}
       {rightComponent ? (
         rightComponent
-      ) : category ? (
+      ) : sportsCategory ? (
         <TouchableOpacity
           style={styles.dropdown}
-          onPress={onCategoryPress}
+          onPress={onSportsCategoryPress}
           activeOpacity={0.7}
-          disabled={!onCategoryPress} // Disables click if no function is passed
-        >
+          disabled={!onSportsCategoryPress}>
           <Text variant="body1" weight="semiBold" style={styles.categoryText}>
-            {category}
+            {sportsCategory.toLowerCase() === "all" ? "All" : sportsCategory}
           </Text>
-          {/* Only show the dropdown arrow if the press action is available */}
-          {onCategoryPress && <ChevronDown size={ms(16)} color={COLORS.text.primary} />}
+
+          {onSportsCategoryPress && <ChevronDown size={ms(16)} color={COLORS.text.primary} />}
         </TouchableOpacity>
       ) : null}
     </View>

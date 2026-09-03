@@ -64,11 +64,8 @@ interface OfflineBookingSheetProps {
 
 const offlineBookingSchema = z
   .object({
-    mobile: z
-      .string()
-      .length(10, "Mobile number must be exactly 10 digits.")
-      .regex(/^\d+$/, "Mobile number can only contain digits."),
-    name: z.string().min(2, "Please provide a valid guest name."),
+    mobile: z.string().optional().or(z.literal("")),
+    name: z.string().optional().or(z.literal("")),
     totalPayment: z.string().refine(val => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Total payment must be greater than zero.",
     }),
@@ -568,9 +565,12 @@ export const OfflineBookingSheet = ({
 
   const handleBookNow = async () => {
     const cleanMobile = mobile.replace(/[^\d]/g, "");
+    const finalName = name.trim() || "Unknown";
+    const finalMobile = cleanMobile || "Unknown";
+
     const validationResult = offlineBookingSchema.safeParse({
-      mobile: cleanMobile,
-      name: name.trim(),
+      mobile: finalMobile,
+      name: finalName,
       totalPayment,
       advancePaid,
       fromTime,
@@ -600,8 +600,8 @@ export const OfflineBookingSheet = ({
         numericTotal,
         advancePaid: numericAdvance,
         paymentMethod: numericAdvance > 0 ? selectedMethod : undefined,
-        guestName: name.trim(),
-        guestPhone: cleanMobile,
+        guestName: finalName,
+        guestPhone: finalMobile,
         bookingSource: "offline",
         sportsBookingType: "offline",
         slotDurationMinutes: detectedSlotDuration,
@@ -610,8 +610,8 @@ export const OfflineBookingSheet = ({
 
       const optimisticBooking = {
         id: `temp-${Date.now()}`,
-        name: name.trim(),
-        phone: cleanMobile,
+        name: finalName,
+        phone: finalMobile,
         date: formattedDate,
         time: `${fromTime} - ${toTime}`,
         price: numericTotal.toString(),
@@ -690,18 +690,7 @@ export const OfflineBookingSheet = ({
                     keyboardType="phone-pad"
                     onChangeText={(text: string) => {
                       let clean = text.replace(/\D/g, "");
-                      if (
-                        text.includes("+") ||
-                        (clean.length > 10 && (clean.startsWith("91") || clean.startsWith("0")))
-                      ) {
-                        clean = clean.slice(-10);
-                      } else if (clean.length > 10) {
-                        clean = clean.slice(0, 10);
-                      }
                       setMobile(clean);
-                      if (clean.length < 10) {
-                        setName("");
-                      }
                     }}
                   />
 

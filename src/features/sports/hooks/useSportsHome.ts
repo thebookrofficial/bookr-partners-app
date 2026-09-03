@@ -99,6 +99,7 @@ export const useSportsHome = (
   const [currentVenueId, setCurrentVenueId] = useState<string>(initialVenueId);
   const [venue, setVenue] = useState<VenueData | null>(null);
   const [grounds, setGrounds] = useState<GroundData[]>([]);
+  const [allGrounds, setAllGrounds] = useState<GroundData[]>([]);
   const [activeGroundId, setActiveGroundId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
@@ -109,11 +110,14 @@ export const useSportsHome = (
   const [bookings, setBookings] = useState<BookingData[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(true);
 
-  // Reset state when venue or category changes to avoid stale data leakage
+  // Reset state when venue or category changes to avoid stale data leakage.
+  // NOTE: We intentionally do NOT clear `venue` on a category change — the venue is the
+  // same physical location regardless of which sport is selected. Clearing it caused
+  // a flash of the "No facility" empty state when switching to/from the "All" category.
   useEffect(() => {
     setLoading(true);
-    setVenue(null);
     setGrounds([]);
+    setAllGrounds([]);
     setActiveGroundId("");
     setSlots([]);
     setBookings([]);
@@ -131,15 +135,20 @@ export const useSportsHome = (
   const fetchVenueDetails = useCallback(async () => {
     setLoading(true);
     try {
-      const dbSportType = category.toLowerCase().replace(" ", "_");
+      const isAllCategory = category.toLowerCase() === "all";
+      const dbSportType = isAllCategory ? "" : category.toLowerCase().replace(/ /g, "_");
 
-      // 1. FIRE INSTANTLY, IN PARALLEL (Do NOT wait for venueDetails to get grounds)
-      const venuePromise = SportsService.getVenueDetails(initialVenueId, dbSportType);
+      // 1. FIRE INSTANTLY, IN PARALLEL for non-"All" (Do NOT wait for venueDetails to get grounds)
+      // For "All" mode: venue is fired after grounds so we can use the first real sport type.
+      const venuePromise = isAllCategory
+        ? null
+        : SportsService.getVenueDetails(initialVenueId, dbSportType);
       const groundsPromise = SportsService.getGrounds(initialVenueId);
 
       // 2. Wait for grounds first (fast) so we can fire slots & bookings ASAP!
       const groundsData = await groundsPromise;
       let firstGroundId = "";
+      let allCategoryVenuePromise: Promise<any> | null = null;
 
       if (groundsData && groundsData.length > 0) {
         // Derive available categories directly from the registered grounds
@@ -148,22 +157,34 @@ export const useSportsHome = (
         ) as string[];
         setAvailableCategories(uniqueCatStrings.map(formatCategoryName));
 
+        // For "All" mode: now we know sport types — fire venue lookup with the first one
+        if (isAllCategory && uniqueCatStrings.length > 0) {
+          allCategoryVenuePromise = SportsService.getVenueDetails(
+            initialVenueId,
+            uniqueCatStrings[0],
+          );
+        }
+
+        // Enrich each ground with inherited sports_type and original_name
+        const enrichedGrounds = groundsData.map((g: any) => {
+          let groundType = g.sports_type;
+          if (!groundType && g.parent_ground_id) {
+            const parent = groundsData.find((p: any) => p.id === g.parent_ground_id);
+            if (parent) groundType = parent.sports_type;
+          }
+          return { ...g, sports_type: groundType || g.sports_type, original_name: g.name };
+        });
+        setAllGrounds(enrichedGrounds);
+
         // Filter grounds by the active category and format names
-        const filteredGrounds = groundsData
-          .filter((g: any) => {
-            // Inherit sports_type from parent if null
-            let groundType = g.sports_type;
-            if (!groundType && g.parent_ground_id) {
-              const parent = groundsData.find((p: any) => p.id === g.parent_ground_id);
-              if (parent) groundType = parent.sports_type;
-            }
-            return groundType === dbSportType;
-          })
-          .map((g: any) => ({
-            ...g,
-            original_name: g.name,
-            name: getShortGroundName(g.name, dbSportType),
-          }));
+        const filteredGrounds = isAllCategory
+          ? enrichedGrounds.map((g: any) => ({ ...g, name: g.name }))
+          : enrichedGrounds
+              .filter((g: any) => g.sports_type === dbSportType)
+              .map((g: any) => ({
+                ...g,
+                name: getShortGroundName(g.name, dbSportType),
+              }));
 
         if (filteredGrounds.length > 0) {
           firstGroundId = filteredGrounds[0].id;
@@ -182,13 +203,16 @@ export const useSportsHome = (
         }
       } else {
         setGrounds([]);
+        setAllGrounds([]);
         setActiveGroundId("");
         setSlots([]);
         setBookings([]);
       }
 
       // 3. Now wait for venue details
-      const { matchedVenue } = await venuePromise;
+      const finalVenuePromise =
+        venuePromise ?? allCategoryVenuePromise ?? Promise.resolve({ matchedVenue: null });
+      const { matchedVenue } = await finalVenuePromise;
 
       if (matchedVenue) {
         setCurrentVenueId(matchedVenue.id);
@@ -198,7 +222,8 @@ export const useSportsHome = (
           vertical: matchedVenue.vertical,
           cover_image_url: matchedVenue.cover_image_url,
         });
-      } else {
+      } else if (!isAllCategory) {
+        // Only null out the venue for a real category miss, not for the "All" aggregate view
         setVenue(null);
       }
     } catch (error) {
@@ -626,6 +651,7 @@ export const useSportsHome = (
   return {
     venue,
     grounds,
+    allGrounds,
     activeGroundId,
     setActiveGroundId,
     selectedDate,

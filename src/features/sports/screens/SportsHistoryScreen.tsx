@@ -211,8 +211,8 @@ export const SportsHistoryScreen = () => {
           <ServiceHeader
             title="History"
             subtitle=""
-            category={selectedCategory}
-            onCategoryPress={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+            sportsCategory={selectedCategory}
+            onSportsCategoryPress={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
           />
           {isCategoryDropdownOpen && availableCategories && availableCategories.length > 0 && (
             <View style={styles.categoryDropdownPopover}>
