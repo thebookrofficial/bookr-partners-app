@@ -1166,6 +1166,17 @@ export const OfflineBookingSheet = ({
 
               if (showHourPicker === "from") {
                 const isBooked = bookedHours.includes(hour);
+
+                // Disable past time slots for today's date (From field only)
+                const now = new Date();
+                const isToday =
+                  currentDate.getFullYear() === now.getFullYear() &&
+                  currentDate.getMonth() === now.getMonth() &&
+                  currentDate.getDate() === now.getDate();
+                if (isToday && slotDate <= now) {
+                  return true;
+                }
+
                 return isBooked;
               } else {
                 const fromIndex = startTimes.indexOf(fromTime);
