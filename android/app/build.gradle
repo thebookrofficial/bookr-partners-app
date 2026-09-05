@@ -96,8 +96,8 @@ android {
         applicationId "com.bookrpartners"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 21
-        versionName "1.1.10"
+        versionCode 22
+        versionName "1.1.11"
     }
     
     signingConfigs {
