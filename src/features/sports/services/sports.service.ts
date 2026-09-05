@@ -29,7 +29,7 @@ export const SportsService = {
     const { data, error } = await supabase
       .from("sports_grounds")
       .select(
-        "id, name, sports_type, price_per_slot, night_price_per_slot, min_advance_price, slot_duration_minutes, parent_ground_id, custom_pricing",
+        "id, name, sports_type, price_per_slot, night_price_per_slot, min_advance_price, slot_duration_minutes, parent_ground_id, custom_pricing, min_players, max_players",
       )
       .eq("venue_id", venueId)
       .order("display_order", { ascending: true });
@@ -237,6 +237,7 @@ export const SportsService = {
     isRescheduled?: boolean;
     originalBookingId?: string | null;
     sportCategory?: string;
+    playerCount?: number;
   }) {
     const [startH, startM] = params.startTime24.split(":").map(Number);
     const [endH, endM] = params.endTime24.split(":").map(Number);
@@ -294,6 +295,7 @@ export const SportsService = {
           end_time: currentEnd,
           price: hourlyPrice,
           status: "booked",
+          player_count: params.playerCount || null,
         })
         .select("id")
         .maybeSingle();
@@ -378,6 +380,7 @@ export const SportsService = {
       is_rescheduled: params.isRescheduled || false,
       original_booking_id: params.originalBookingId || null,
       sport_category: params.sportCategory || null,
+      player_count: params.playerCount || null,
     }));
 
     const { error: bookingError } = await supabase.from("sports_bookings").insert(bookingsToInsert);
@@ -471,6 +474,7 @@ export const SportsService = {
     paymentMethod?: string;
     slotDurationMinutes?: number;
     sportCategory?: string;
+    playerCount?: number;
   }) {
     try {
       // 1. Fetch the old booking to get guest info and booking group
@@ -608,6 +612,7 @@ export const SportsService = {
         isRescheduled: true,
         originalBookingId: oldBooking.id,
         sportCategory: params.sportCategory || oldBooking.sport_category || undefined,
+        playerCount: params.playerCount || oldBooking.player_count || undefined,
       });
 
       return true;

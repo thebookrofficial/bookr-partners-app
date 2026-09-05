@@ -138,11 +138,11 @@ const CreateBulkBooking = ({
 
   const filteredGrounds = React.useMemo(() => {
     return grounds.filter((g: any) => {
-      let type = g.sports_type;
-      if (!type && g.parent_ground_id) {
-        type = grounds.find((p: any) => p.id === g.parent_ground_id)?.sports_type;
+      let sportType = g.sports_type;
+      if (!sportType && g.parent_ground_id) {
+        sportType = grounds.find((p: any) => p.id === g.parent_ground_id)?.sports_type;
       }
-      return type?.toLowerCase() === selectedCategory;
+      return sportType?.toLowerCase() === selectedCategory;
     });
   }, [grounds, selectedCategory]);
 
@@ -162,6 +162,8 @@ const CreateBulkBooking = ({
   const [toDate, setToDate] = useState(new Date());
   const [fromTime, setFromTime] = useState("7 AM");
   const [toTime, setToTime] = useState("8 AM");
+  const [playerCount, setPlayerCount] = useState<number>(1);
+  const [showPlayerCountPicker, setShowPlayerCountPicker] = useState(false);
 
   const [pricePerHour, setPricePerHour] = useState(1000);
   const [amountPaidInput, setAmountPaidInput] = useState("");
@@ -179,8 +181,8 @@ const CreateBulkBooking = ({
     [slotDurationMinutes],
   );
   const validHours = React.useMemo(() => {
-    const selectedGround = grounds.find((g: any) => g.id === selectedGroundId);
-    return selectedGround ? getValidSlotsForGround(selectedGround, HOURS, grounds) : HOURS;
+    const activeGround = grounds.find((g: any) => g.id === selectedGroundId);
+    return activeGround ? getValidSlotsForGround(activeGround, HOURS, grounds) : HOURS;
   }, [grounds, selectedGroundId, HOURS]);
 
   React.useEffect(() => {
@@ -248,7 +250,8 @@ const CreateBulkBooking = ({
     let singleDayTotal = 0;
     const selectedSlots = HOURS.slice(startIndex, endIndex);
     selectedSlots.forEach(slot => {
-      singleDayTotal += calculateSlotPrice(selectedGround, slot, -1, -1, grounds) * slotMultiplier;
+      singleDayTotal +=
+        calculateSlotPrice(selectedGround, slot, -1, -1, grounds, playerCount) * slotMultiplier;
     });
     return singleDayTotal * totalDays;
   }, [
@@ -260,6 +263,7 @@ const CreateBulkBooking = ({
     totalDays,
     grounds,
     slotMultiplier,
+    playerCount,
   ]);
 
   // Update pricePerHour state implicitly if totalPayment changes
@@ -354,6 +358,7 @@ const CreateBulkBooking = ({
         totalAmountPerSlot: pricePerHour * slotMultiplier,
         initialPayments,
         slotDurationMinutes,
+        playerCount: selectedCategory.includes("ps5") ? playerCount : undefined,
       });
       if (success) navigation.goBack();
     } finally {
@@ -489,7 +494,7 @@ const CreateBulkBooking = ({
             </View>
             <View style={styles.splitRow}>
               {categories.length > 1 && (
-                <View style={[styles.flex1, isCategoryOpen ? { zIndex: 1000 } : { zIndex: 1 }]}>
+                <View style={[styles.flex1, isCategoryOpen ? styles.zIndex1000 : styles.zIndex1]}>
                   <Text style={styles.subLabel}>Category</Text>
                   <TouchableOpacity
                     style={styles.inputBoxSmallRow}
@@ -504,7 +509,7 @@ const CreateBulkBooking = ({
                 </View>
               )}
               {filteredGrounds.length > 0 && (
-                <View style={[styles.flex1, showGroundPicker ? { zIndex: 1000 } : { zIndex: 1 }]}>
+                <View style={[styles.flex1, showGroundPicker ? styles.zIndex1000 : styles.zIndex1]}>
                   <Text style={styles.subLabel}>Ground</Text>
                   <TouchableOpacity
                     style={styles.inputBoxSmallRow}
@@ -517,6 +522,23 @@ const CreateBulkBooking = ({
                 </View>
               )}
             </View>
+          </View>
+        )}
+
+        {selectedCategory === "ps5" && (
+          <View style={styles.fieldGroup}>
+            <View style={styles.labelRow}>
+              <User size={ms(18)} color="#63A1FD" />
+              <Text style={styles.labelBold}>Number of Players</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.inputBoxSmallRow, { marginTop: vs(8) }]}
+              onPress={() => setShowPlayerCountPicker(true)}>
+              <Text style={styles.inputText}>
+                {playerCount} Player{playerCount > 1 ? "s" : ""}
+              </Text>
+              <ChevronDown size={ms(16)} color="#000" />
+            </TouchableOpacity>
           </View>
         )}
 
@@ -852,6 +874,31 @@ const CreateBulkBooking = ({
         </TouchableOpacity>
       </Modal>
 
+      {/* --- PS5 PLAYER COUNT PICKER MODAL --- */}
+      <Modal visible={showPlayerCountPicker} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          onPress={() => setShowPlayerCountPicker(false)}>
+          <View style={styles.pickerContainer}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {[1, 2, 3, 4].map(num => (
+                <TouchableOpacity
+                  key={num}
+                  style={styles.pickerItem}
+                  onPress={() => {
+                    setPlayerCount(num);
+                    setShowPlayerCountPicker(false);
+                  }}>
+                  <Text style={[styles.inputText, playerCount === num && styles.textPrimary]}>
+                    {num} Player{num > 1 ? "s" : ""}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* --- FIXED OVERLAY DROPDOWN --- */}
       {isCategoryOpen && (
         <View style={styles.dropdownOverlay}>
@@ -1174,5 +1221,11 @@ const styles = StyleSheet.create({
   },
   dropdownScroll: {
     maxHeight: vs(200),
+  },
+  zIndex1000: {
+    zIndex: 1000,
+  },
+  zIndex1: {
+    zIndex: 1,
   },
 });

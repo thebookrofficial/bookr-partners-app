@@ -234,10 +234,16 @@ export const OfflineBookingSheet = ({
   const [toTime, setToTime] = useState("End Time");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
 
+  // Players per console for PS5
+  const [playerCount, setPlayerCount] = useState<number>(1);
+  const [isPlayerCountDropdownOpen, setIsPlayerCountDropdownOpen] = useState(false);
+
   // Category and Ground state
   const [internalGroundId, setInternalGroundId] = useState<string>(_groundId);
   const [selectedCategory, setSelectedCategory] = useState<string>(
-    _sportsType ? _sportsType.toLowerCase().replace(/ /g, "_") : "",
+    _sportsType && _sportsType.toLowerCase() !== "all"
+      ? _sportsType.toLowerCase().replace(/ /g, "_")
+      : "",
   );
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [allGrounds, setAllGrounds] = useState<any[]>([]);
@@ -332,9 +338,11 @@ export const OfflineBookingSheet = ({
         const groundsData = await SportsService.getGrounds(venueId);
         setAllGrounds(groundsData || []);
 
-        const categories = Array.from(
-          new Set(groundsData?.map((g: any) => g.sports_type).filter(Boolean)),
-        ) as string[];
+        const categories = (
+          Array.from(
+            new Set(groundsData?.map((g: any) => g.sports_type).filter(Boolean)),
+          ) as string[]
+        ).filter(c => c.toLowerCase() !== "all");
         setAvailableCategories(categories);
 
         // Auto-select first available if empty
@@ -354,7 +362,11 @@ export const OfflineBookingSheet = ({
   useEffect(() => {
     if (isVisible) {
       // Normalize to DB format (lowercase_underscored) so filter matches sports_type column
-      if (_sportsType) setSelectedCategory(_sportsType.toLowerCase().replace(/ /g, "_"));
+      if (_sportsType && _sportsType.toLowerCase() !== "all") {
+        setSelectedCategory(_sportsType.toLowerCase().replace(/ /g, "_"));
+      } else {
+        setSelectedCategory(""); // Reset so the auto-select logic can pick the first valid category
+      }
       if (_groundId) setInternalGroundId(_groundId);
     }
   }, [isVisible, _sportsType, _groundId]);
@@ -512,13 +524,7 @@ export const OfflineBookingSheet = ({
 
   // AUTO-CALCULATE TOTAL PAYMENT
   useEffect(() => {
-    if (
-      !fromTime ||
-      !toTime ||
-      fromTime === "Start Time" ||
-      toTime === "End Time" ||
-      pricing.default === 0
-    ) {
+    if (!fromTime || !toTime || fromTime === "Start Time" || toTime === "End Time") {
       return;
     }
 
@@ -540,7 +546,8 @@ export const OfflineBookingSheet = ({
       const multiplier = (detectedSlotDuration || 60) / 60;
 
       if (ground && ground.custom_pricing) {
-        total += calculateSlotPrice(ground, hour, boundaryIdx, hIdx) * multiplier;
+        total +=
+          calculateSlotPrice(ground, hour, boundaryIdx, hIdx, allGrounds, playerCount) * multiplier;
       } else {
         // Safe fallback in case ground object isn't perfectly mapped yet
         if (hIdx < boundaryIdx) {
@@ -561,6 +568,7 @@ export const OfflineBookingSheet = ({
     detectedSlotDuration,
     allGrounds,
     internalGroundId,
+    playerCount,
   ]);
 
   const handleBookNow = async () => {
@@ -606,6 +614,7 @@ export const OfflineBookingSheet = ({
         sportsBookingType: "offline",
         slotDurationMinutes: detectedSlotDuration,
         sportCategory: _sportsType,
+        playerCount: selectedCategory.includes("ps5") ? playerCount : undefined,
       };
 
       const optimisticBooking = {
@@ -876,6 +885,52 @@ export const OfflineBookingSheet = ({
                           })()}
                       </View>
                     </View>
+
+                    {selectedCategory.includes("ps5") && (
+                      <View
+                        style={[
+                          styles.fullWidth,
+                          isPlayerCountDropdownOpen ? styles.zIndex1000 : styles.zIndex1,
+                          { marginBottom: vs(8) },
+                        ]}>
+                        <FieldBox
+                          icon={UserIcon}
+                          label="Players"
+                          value={`${playerCount} Player${playerCount > 1 ? "s" : ""}`}
+                          onPress={() => setIsPlayerCountDropdownOpen(!isPlayerCountDropdownOpen)}
+                          rightElement={<ChevronDown size={ms(16)} color="#000" />}
+                        />
+                        {isPlayerCountDropdownOpen && (
+                          <View style={[styles.dropdownContainer, styles.dropdownOverride]}>
+                            <ScrollView
+                              style={styles.dropdownScroll}
+                              nestedScrollEnabled={true}
+                              keyboardShouldPersistTaps="handled">
+                              {(() => {
+                                const ground = allGrounds.find(
+                                  (g: any) => g.id === internalGroundId,
+                                );
+                                const minP = ground?.min_players || 1;
+                                const maxP = ground?.max_players || 4;
+                                return Array.from({ length: maxP - minP + 1 }, (_, i) => minP + i);
+                              })().map(num => (
+                                <TouchableOpacity
+                                  key={`players_${num}`}
+                                  style={styles.dropdownItem}
+                                  onPress={() => {
+                                    setPlayerCount(num);
+                                    setIsPlayerCountDropdownOpen(false);
+                                  }}>
+                                  <Text style={styles.dropdownItemTextLeft}>
+                                    {num} Player{num > 1 ? "s" : ""}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </ScrollView>
+                          </View>
+                        )}
+                      </View>
+                    )}
 
                     <FieldBox
                       icon={CalendarIcon}

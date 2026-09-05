@@ -479,6 +479,24 @@ export const BookingDetailsScreen = () => {
           </View>
         </View>
 
+        {booking.player_count ? (
+          <View style={styles.dateTimeRow}>
+            <View style={styles.dateCard}>
+              <View style={styles.iconBoxLightBlue}>
+                <PersonSvg width={ms(20)} height={ms(20)} color="#63a1fd" />
+              </View>
+              <View style={styles.dateCardTextCol}>
+                <Text variant="body2" weight="bold" style={styles.labelTitle}>
+                  Players
+                </Text>
+                <Text variant="body2" style={styles.labelValue}>
+                  {booking.player_count} Player{booking.player_count > 1 ? "s" : ""}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.paymentCard}>
           <View style={styles.amountsRow}>
             <View style={styles.amountBoxLightRed}>

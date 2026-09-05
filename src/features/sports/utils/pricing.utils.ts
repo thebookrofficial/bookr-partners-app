@@ -88,6 +88,7 @@ export const calculateSlotPrice = (
   defaultBoundary: number = -1,
   slotIndex: number = -1,
   allGrounds?: any[],
+  playerCount?: number,
 ): number => {
   const customPricing = getParsedCustomPricing(ground, allGrounds);
 
@@ -96,7 +97,12 @@ export const calculateSlotPrice = (
     const slotMinutes = timeToMinutes(slotTime);
 
     for (const session of customPricing) {
-      if (session.selectedDaySlots !== undefined) {
+      if (session.players !== undefined && playerCount !== undefined) {
+        // PS5 Per-Player Pricing format: [{"players": "1", "price": "100"}]
+        if (String(session.players) === String(playerCount)) {
+          return Number(session.price) || 0;
+        }
+      } else if (session.selectedDaySlots !== undefined) {
         // Fallback for old custom_pricing format
         const normalizedSlot = normalizeTime(slotTime);
         const daySlots = (session.selectedDaySlots || []).map(normalizeTime);
@@ -153,7 +159,9 @@ export const getValidSlotsForGround = (
       const normalizedSlot = normalizeTime(slot);
 
       for (const session of customPricing) {
-        if (session.selectedDaySlots !== undefined) {
+        if (session.players !== undefined) {
+          return true;
+        } else if (session.selectedDaySlots !== undefined) {
           // Fallback for old custom_pricing format
           const daySlots = (session.selectedDaySlots || []).map(normalizeTime);
           const nightSlots = (session.selectedNightSlots || []).map(normalizeTime);

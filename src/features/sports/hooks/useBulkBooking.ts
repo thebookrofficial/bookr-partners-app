@@ -20,6 +20,7 @@ interface BulkBookingParams {
   totalAmountPerSlot: number;
   initialPayments: { mode: "cash" | "upi" | "gpay" | "phonepe" | "paytm"; amount: number }[];
   slotDurationMinutes?: number;
+  playerCount?: number;
 }
 
 export const useBulkBooking = () => {
@@ -209,6 +210,7 @@ export const useBulkBooking = () => {
               booking_source: "offline", // ADDED: Set booking source to offline
               sports_booking_type: finalBookingType,
               notes: "Bulk Booking Record",
+              player_count: params.playerCount || null,
             })
             .select("id")
             .single();

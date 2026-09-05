@@ -49,6 +49,8 @@ export const RescheduleBookingScreen = () => {
   const [fromTime, setFromTime] = useState("Start Time");
   const [toTime, setToTime] = useState("End Time");
   const [showHourPicker, setShowHourPicker] = useState<"from" | "to" | null>(null);
+  const [playerCount, setPlayerCount] = useState<number>(1);
+  const [showPlayerCountPicker, setShowPlayerCountPicker] = useState(false);
   const [totalPrice, setTotalPrice] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [isAddingPayment, setIsAddingPayment] = useState(false);
@@ -229,6 +231,9 @@ export const RescheduleBookingScreen = () => {
       if (booking.paid_amount) {
         setAdvanceAmount(booking.paid_amount.toString());
       }
+      if (booking.player_count) {
+        setPlayerCount(booking.player_count);
+      }
     }
   }, [booking, formatHour]);
 
@@ -266,13 +271,7 @@ export const RescheduleBookingScreen = () => {
   }, [venueId, grounds, selectedGroundId]);
 
   useEffect(() => {
-    if (
-      !fromTime ||
-      !toTime ||
-      fromTime === "Start Time" ||
-      toTime === "End Time" ||
-      pricing.default === 0
-    ) {
+    if (!fromTime || !toTime || fromTime === "Start Time" || toTime === "End Time") {
       return;
     }
 
@@ -293,7 +292,9 @@ export const RescheduleBookingScreen = () => {
       const boundaryIdx = fivePMIdx !== -1 ? fivePMIdx : HOURS.length / 2;
 
       if (ground && ground.custom_pricing) {
-        total += calculateSlotPrice(ground, hour, boundaryIdx, hIdx) * durationMultiplier;
+        total +=
+          calculateSlotPrice(ground, hour, boundaryIdx, hIdx, grounds, playerCount) *
+          durationMultiplier;
       } else {
         if (hIdx < boundaryIdx) {
           total += (pricing.day || pricing.default) * durationMultiplier;
@@ -315,6 +316,7 @@ export const RescheduleBookingScreen = () => {
     booking?.sports_slots?.end_time,
     booking?.total_amount,
     formatHour,
+    playerCount,
   ]);
 
   const handleConfirmReschedule = async () => {
@@ -353,6 +355,7 @@ export const RescheduleBookingScreen = () => {
           paymentMethod: newAdvanceToAdd > 0 ? paymentMethod : undefined,
           slotDurationMinutes: pricing.slotDurationMinutes,
           sportCategory: sportsType,
+          playerCount: selectedCategory === "ps5" ? playerCount : undefined,
         });
 
         // Explicitly update old bookings in the chain to "rescheduled" status
@@ -540,6 +543,22 @@ export const RescheduleBookingScreen = () => {
                 })}
             </ScrollView>
           </View>
+
+          {/* PS5 Players */}
+          {selectedCategory === "ps5" && (
+            <View style={styles.section}>
+              <Text variant="body1" weight="bold" style={styles.sectionTitle}>
+                Number of Players
+              </Text>
+              <TouchableOpacity
+                style={[styles.inputBoxReadOnly, { width: "50%", paddingVertical: vs(12) }]}
+                onPress={() => setShowPlayerCountPicker(true)}>
+                <Text variant="body1" weight="semiBold" color="#000" style={styles.text16}>
+                  {playerCount} Player{playerCount > 1 ? "s" : ""}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Select Time */}
           <View style={styles.section}>
@@ -778,6 +797,38 @@ export const RescheduleBookingScreen = () => {
             />
           </View>
         </View>
+      </Modal>
+
+      {/* PS5 PLAYER COUNT PICKER MODAL */}
+      <Modal visible={showPlayerCountPicker} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          onPress={() => setShowPlayerCountPicker(false)}>
+          <View style={styles.calendarContainer}>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ padding: ms(10) }}>
+              {[1, 2, 3, 4].map(num => (
+                <TouchableOpacity
+                  key={num}
+                  style={{
+                    paddingVertical: vs(12),
+                    borderBottomWidth: 1,
+                    borderBottomColor: "#eee",
+                  }}
+                  onPress={() => {
+                    setPlayerCount(num);
+                    setShowPlayerCountPicker(false);
+                  }}>
+                  <Text
+                    variant="body1"
+                    weight={playerCount === num ? "bold" : "semiBold"}
+                    color={playerCount === num ? COLORS.primary : "#000"}>
+                    {num} Player{num > 1 ? "s" : ""}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
       </Modal>
 
       <TimePickerModal

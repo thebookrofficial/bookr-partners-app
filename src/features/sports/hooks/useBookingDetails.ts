@@ -48,6 +48,7 @@ export interface BookingDetailData {
   booking_source?: string;
   payment_type?: string;
   sequence_number?: number;
+  player_count?: number | null;
 }
 
 export interface PaymentLog {
