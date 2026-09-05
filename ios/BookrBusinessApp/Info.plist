@@ -39,6 +39,10 @@
 	<string>Bookr needs access to your gallery to update your business profile picture.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
+	<key>StallionProjectId</key>
+	<string>69eddef6a3e81eefa553da7c</string>
+	<key>StallionAppToken</key>
+	<string>spb_ap_GOGGEEDRhSLL1eVm6DkAQDEiIMM6apmAaOXWP16Iv1</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Gilroy-ExtraBold.otf</string>
@@ -48,29 +52,9 @@
 		<string>MDNichromeTest-BoldOblique.otf</string>
 		<string>MDNichromeTest-Dark.otf</string>
 		<string>MDNichromeTest-DarkOblique.otf</string>
-		<string>AntDesign.ttf</string>
-		<string>Bison-Bold.ttf</string>
-		<string>Entypo.ttf</string>
 		<string>Gilroy-Bold.ttf</string>
-		<string>EvilIcons.ttf</string>
-		<string>Feather.ttf</string>
 		<string>Gilroy-Medium.ttf</string>
 		<string>Gilroy-SemiBold.ttf</string>
-		<string>FontAwesome.ttf</string>
-		<string>FontAwesome5_Brands.ttf</string>
-		<string>FontAwesome5_Regular.ttf</string>
-		<string>FontAwesome5_Solid.ttf</string>
-		<string>FontAwesome6_Brands.ttf</string>
-		<string>FontAwesome6_Regular.ttf</string>
-		<string>FontAwesome6_Solid.ttf</string>
-		<string>Fontisto.ttf</string>
-		<string>Foundation.ttf</string>
-		<string>Ionicons.ttf</string>
-		<string>MaterialCommunityIcons.ttf</string>
-		<string>MaterialIcons.ttf</string>
-		<string>Octicons.ttf</string>
-		<string>SimpleLineIcons.ttf</string>
-		<string>Zocial.ttf</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
