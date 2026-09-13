@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -49,17 +49,7 @@ export const SportsHomeScreen = () => {
     setActiveVenueName,
   } = useServiceStore();
 
-  /*
-   * Keep the service ID stable for the lifetime of this screen.
-   *
-   * Previously:
-   *   route.params?.serviceId || activeServiceId
-   *
-   * This could potentially change when navigation params were modified.
-   */
-  const serviceIdRef = useRef<string>(route.params?.serviceId || activeServiceId || "");
-
-  const serviceId = serviceIdRef.current;
+  const serviceId = route.params?.serviceId || activeServiceId || "";
 
   /*
    * Category is intentionally controlled locally.

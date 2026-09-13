@@ -112,7 +112,7 @@ export const EventSpotEntryScreen = () => {
       Alert.alert("Error", "Please enter a valid ticket amount.");
       return;
     }
-    if (!paidAmount.trim() || isNaN(parseFloat(paidAmount))) {
+    if (paidAmount.trim() && isNaN(parseFloat(paidAmount))) {
       Alert.alert("Error", "Please enter a valid paid amount.");
       return;
     }

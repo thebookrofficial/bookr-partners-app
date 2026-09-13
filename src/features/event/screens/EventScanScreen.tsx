@@ -23,10 +23,13 @@ import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { Button } from "@/components/ui/Button";
 import { EventHeader } from "../components/EventHeader";
-import { Phone, X, Camera as CameraIcon } from "lucide-react-native";
+import { Phone, X, Camera as CameraIcon, Image as ImageIcon } from "lucide-react-native";
 import { useIsFocused, useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { supabase } from "@/lib/supabase";
 import { Camera } from "react-native-camera-kit";
+import jsQR from "jsqr";
+import { launchImageLibrary } from "react-native-image-picker";
+import { Images } from "react-native-nitro-image";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -81,7 +84,7 @@ const CameraDisclosureModal = ({
 );
 
 // --- Camera Component ---
-const FullScreenCamera = ({ onClose, onCodeScanned }: any) => {
+const FullScreenCamera = ({ onClose, onCodeScanned, onGalleryPick, isProcessingGallery }: any) => {
   const isScanning = useRef(true);
 
   return (
@@ -92,7 +95,7 @@ const FullScreenCamera = ({ onClose, onCodeScanned }: any) => {
         scanBarcode={true}
         onReadCode={(event: any) => {
           const code = event.nativeEvent.codeStringValue;
-          if (code && isScanning.current) {
+          if (code && isScanning.current && !isProcessingGallery) {
             isScanning.current = false;
             Vibration.vibrate(100);
             onCodeScanned(code);
@@ -125,11 +128,29 @@ const FullScreenCamera = ({ onClose, onCodeScanned }: any) => {
           <X size={ms(24)} color="#FFF" />
         </TouchableOpacity>
 
-        <Text weight="medium" style={styles.cameraHintText}>
-          Align QR code within the frame
-        </Text>
+        {isProcessingGallery ? (
+          <View style={styles.processingOverlay}>
+            <ActivityIndicator size="large" color="#FFF" />
+            <Text weight="bold" color="#FFF" style={{ marginTop: vs(12) }}>
+              Processing Image...
+            </Text>
+          </View>
+        ) : (
+          <>
+            <Text weight="medium" style={styles.cameraHintText}>
+              Align QR code within the frame
+            </Text>
 
-        {__DEV__ && (
+            <TouchableOpacity style={styles.galleryBtn} onPress={onGalleryPick}>
+              <ImageIcon size={ms(20)} color="#FFF" />
+              <Text color="#FFF" weight="bold" style={{ marginLeft: hs(8) }}>
+                Upload from Gallery
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {__DEV__ && !isProcessingGallery && (
           <TouchableOpacity
             style={styles.simulateBtn}
             onPress={() => onCodeScanned("pay_SnvxbS0ZkGJzEZ")}>
@@ -150,6 +171,7 @@ export const EventScanScreen = () => {
   const isFocused = useIsFocused();
 
   const [serviceId, setServiceId] = useState<string>("");
+  const [isProcessingGallery, setIsProcessingGallery] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -591,12 +613,115 @@ export const EventScanScreen = () => {
     [activeEventId, navigation, venueEventIds, fetchScannedHistory],
   );
 
+  const handleGalleryPick = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: "photo",
+        quality: 1,
+      });
+
+      if (result.didCancel || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const uri = result.assets[0].uri;
+      if (!uri) return;
+
+      setIsProcessingGallery(true);
+
+      // Load image natively using Nitro Image
+      let image = await Images.loadFromFileAsync(uri);
+
+      // Downscale to max 800px to avoid freezing the JS thread
+      const MAX_DIM = 800;
+      if (image.width > MAX_DIM || image.height > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / image.width, MAX_DIM / image.height);
+        image = await image.resizeAsync(
+          Math.round(image.width * ratio),
+          Math.round(image.height * ratio),
+        );
+      }
+
+      // Get raw pixel data
+      const rawData = await image.toRawPixelData();
+      const rawBytes = new Uint8Array(rawData.buffer);
+      const width = rawData.width;
+      const height = rawData.height;
+      const format = rawData.pixelFormat;
+
+      let rgba;
+      const totalPixels = width * height;
+      const bpp = rawBytes.length / totalPixels;
+
+      if (bpp === 4) {
+        rgba = new Uint8ClampedArray(totalPixels * 4);
+        for (let i = 0; i < totalPixels; i++) {
+          const idx = i * 4;
+          if (format === "BGRA" || format === "BGRX") {
+            rgba[idx] = rawBytes[idx + 2];
+            rgba[idx + 1] = rawBytes[idx + 1];
+            rgba[idx + 2] = rawBytes[idx + 0];
+          } else if (format === "ARGB" || format === "XRGB") {
+            rgba[idx] = rawBytes[idx + 1];
+            rgba[idx + 1] = rawBytes[idx + 2];
+            rgba[idx + 2] = rawBytes[idx + 3];
+          } else if (format === "ABGR" || format === "XBGR") {
+            rgba[idx] = rawBytes[idx + 3];
+            rgba[idx + 1] = rawBytes[idx + 2];
+            rgba[idx + 2] = rawBytes[idx + 1];
+          } else {
+            // Default assume RGBA or RGBX
+            rgba[idx] = rawBytes[idx];
+            rgba[idx + 1] = rawBytes[idx + 1];
+            rgba[idx + 2] = rawBytes[idx + 2];
+          }
+          // Force alpha to 255 for qr scanning
+          rgba[idx + 3] = 255;
+        }
+      } else if (bpp === 3) {
+        rgba = new Uint8ClampedArray(totalPixels * 4);
+        for (let i = 0; i < totalPixels; i++) {
+          const idx3 = i * 3;
+          const idx4 = i * 4;
+          if (format === "BGR") {
+            rgba[idx4] = rawBytes[idx3 + 2];
+            rgba[idx4 + 1] = rawBytes[idx3 + 1];
+            rgba[idx4 + 2] = rawBytes[idx3 + 0];
+          } else {
+            // RGB
+            rgba[idx4] = rawBytes[idx3];
+            rgba[idx4 + 1] = rawBytes[idx3 + 1];
+            rgba[idx4 + 2] = rawBytes[idx3 + 2];
+          }
+          rgba[idx4 + 3] = 255;
+        }
+      } else {
+        throw new Error("Unknown pixel format: " + format);
+      }
+
+      const code = jsQR(rgba, width, height);
+      if (code && code.data) {
+        Vibration.vibrate(100);
+        handleCodeScanned(code.data);
+      } else {
+        Alert.alert("No QR Code", "Could not detect a QR code in the selected image.");
+      }
+    } catch (e) {
+      console.error("Gallery scan error:", e);
+      Alert.alert("Error", "Failed to process the image.");
+    } finally {
+      setIsProcessingGallery(false);
+    }
+  };
+
   return (
     <View style={styles.flex1}>
       {isScanningMode ? (
         <FullScreenCamera
           onClose={() => setIsScanningMode(false)}
           onCodeScanned={handleCodeScanned}
+          onGalleryPick={handleGalleryPick}
+          isProcessingGallery={isProcessingGallery}
           isActive={isFocused}
         />
       ) : (
@@ -795,6 +920,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: hs(24),
     paddingVertical: vs(12),
     borderRadius: ms(10),
+  },
+  galleryBtn: {
+    marginTop: vs(20),
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: hs(20),
+    paddingVertical: vs(12),
+    borderRadius: ms(25),
+  },
+  processingOverlay: {
+    marginTop: vs(300),
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.7)",
+    padding: ms(20),
+    borderRadius: ms(16),
   },
   flex1: { flex: 1 },
   blackBg: { backgroundColor: "#000" },
