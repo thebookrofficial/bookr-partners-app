@@ -17,9 +17,14 @@ import { useServiceStore } from "@/store/serviceStore";
 export const StaycationHomeScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<StaycationTabParamList, "StaycationHome">>();
-  const { setActiveVenueName, setActiveStaycationVenueId } = useServiceStore();
+  const { setActiveVenueName, setActiveStaycationVenueId, lastSelectedService } = useServiceStore();
 
   let initialServiceId = route.params?.serviceId;
+
+  if (lastSelectedService?.vertical === "staycation" && lastSelectedService?.serviceId) {
+    initialServiceId = lastSelectedService.serviceId;
+  }
+
   if (!initialServiceId) {
     const parentState = navigation.getParent()?.getState();
     const tabRoute = parentState?.routes.find((r: any) => r.name === "StaycationServiceTabs");

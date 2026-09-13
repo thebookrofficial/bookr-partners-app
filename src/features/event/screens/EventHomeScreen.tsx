@@ -14,7 +14,7 @@ import { useServiceStore } from "@/store/serviceStore";
 export const EventHomeScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { setActiveVenueName } = useServiceStore();
+  const { setActiveVenueName, lastSelectedService } = useServiceStore();
 
   const [loading, setLoading] = useState(true);
   const [eventData, setEventData] = useState<{
@@ -36,6 +36,11 @@ export const EventHomeScreen = () => {
       const fetchBaseEvent = async () => {
         // 1. Resolve serviceId
         let serviceId = route.params?.serviceId;
+
+        if (lastSelectedService?.vertical === "events" && lastSelectedService?.serviceId) {
+          serviceId = lastSelectedService.serviceId;
+        }
+
         if (!serviceId) {
           try {
             const parentState = navigation.getParent()?.getState();
@@ -102,12 +107,17 @@ export const EventHomeScreen = () => {
       return () => {
         isMounted = false;
       };
-    }, [route.params?.serviceId, navigation]),
+    }, [
+      route.params?.serviceId,
+      navigation,
+      lastSelectedService?.vertical,
+      lastSelectedService?.serviceId,
+    ]),
   );
 
   if (loading) {
     return (
-      <View style={{ flex: 1 }}>
+      <View style={styles.loaderContainer}>
         <EventHomeSkeleton />
       </View>
     );
@@ -134,5 +144,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loaderContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  textPrimary: {
+    color: COLORS.text.primary,
   },
 });
