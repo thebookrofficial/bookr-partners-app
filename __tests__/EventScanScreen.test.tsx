@@ -36,6 +36,7 @@ jest.mock("lucide-react-native", () => ({
   X: "X",
   Camera: "CameraIcon",
   ArrowLeft: "ArrowLeft",
+  Image: "ImageIcon",
 }));
 
 // Mock PermissionsAndroid

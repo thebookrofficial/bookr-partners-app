@@ -94,7 +94,40 @@ jest.mock("react-native-camera-kit", () => ({
 
 // Mock Nitro Modules
 jest.mock("react-native-nitro-modules", () => ({
-  NitroModules: {},
+  NitroModules: {
+    createHybridObject: jest.fn(() => ({})),
+  },
+}));
+
+// Mock Nitro Image
+jest.mock("react-native-nitro-image", () => ({
+  Images: {
+    loadFromFileAsync: jest.fn(() =>
+      Promise.resolve({
+        width: 100,
+        height: 100,
+        resizeAsync: jest.fn().mockReturnThis(),
+        toRawPixelData: jest.fn(() =>
+          Promise.resolve({
+            buffer: new ArrayBuffer(0),
+            width: 100,
+            height: 100,
+            pixelFormat: "RGBA",
+          }),
+        ),
+      }),
+    ),
+  },
+}));
+
+// Mock Image Picker
+jest.mock("react-native-image-picker", () => ({
+  launchImageLibrary: jest.fn(() =>
+    Promise.resolve({
+      didCancel: false,
+      assets: [{ uri: "mock-uri" }],
+    }),
+  ),
 }));
 
 // Mock Reanimated
