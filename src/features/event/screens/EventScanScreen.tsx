@@ -354,12 +354,13 @@ export const EventScanScreen = () => {
   }, [fetchScannedHistory]);
 
   // Build tabs cleanly, filtering out duplicates and Guest from the mapped list
-  const seenLabels = new Set<string>(["All", "Guest", "Spot"]);
+  const seenLabels = new Set<string>(["All", "Guest"]);
   const TABS = [
     { label: "All", count: scannedAttendees.length },
     ...ticketCategories
       .filter(cat => {
         if (cat.toLowerCase() === "guest") return false;
+        if (cat.toLowerCase() === "spot") return false;
         if (seenLabels.has(cat)) return false;
         seenLabels.add(cat);
         return true;
@@ -372,10 +373,6 @@ export const EventScanScreen = () => {
       label: "Guest",
       count: scannedAttendees.filter(a => a.categoryName.toLowerCase() === "guest").length,
     },
-    {
-      label: "Spot",
-      count: scannedAttendees.filter(a => a.isSpot).length,
-    },
   ];
 
   const filteredScans = scannedAttendees.filter(a => {
@@ -383,8 +380,6 @@ export const EventScanScreen = () => {
     const matchesTab =
       selectedTab === "All"
         ? true
-        : selectedTab === "Spot"
-        ? a.isSpot
         : a.categoryName === selectedTab ||
           (selectedTab === "Guest" && a.categoryName.toLowerCase() === "guest");
 
@@ -588,16 +583,25 @@ export const EventScanScreen = () => {
             .maybeSingle();
 
           if (invite) {
-            if (invite.status === "scanned") {
+            if (invite.status === "Scanned" || invite.status === "scanned") {
               Alert.alert("Already Scanned", "This invite has already been used.");
               return;
             }
 
-            const { error: updateError } = await supabase
+            const { data: updatedRows, error: updateError } = await supabase
               .from("event_guest_invites")
               .update({ status: "scanned", updated_at: new Date().toISOString() })
-              .eq("id", invite.id);
+              .eq("id", invite.id)
+              .select();
             if (updateError) throw updateError;
+
+            if (!updatedRows || updatedRows.length === 0) {
+              Alert.alert(
+                "Update Failed",
+                "Could not update the record. Check database RLS policies.",
+              );
+              return;
+            }
 
             fetchScannedHistory();
 
