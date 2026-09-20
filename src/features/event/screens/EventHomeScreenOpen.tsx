@@ -13,17 +13,7 @@ import { useEventHomeOpen } from "../hooks/useEventHomeOpen";
 import { useNavigation } from "@react-navigation/native";
 import { MainStackParamList } from "@/navigation/navigation.types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import {
-  EventFilterBottomSheet,
-  EventDateFilterOption,
-} from "../components/EventFilterBottomSheet";
-import {
-  Calendar as CalendarIcon,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-} from "lucide-react-native";
+import { X, ChevronLeft, ChevronRight, Search } from "lucide-react-native";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -42,14 +32,15 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
     summaryCategories,
     activeTab,
     setActiveTab,
+    sessionDateOptions,
+    sessionTimeOptions,
     refresh,
   } = useEventHomeOpen(eventId);
 
   // --- Date & Pagination State ---
-  const [dateFilter, setDateFilter] = useState<EventDateFilterOption>("all");
-  const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>();
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSessionDate, setSelectedSessionDate] = useState("All");
+  const [selectedSessionTime, setSelectedSessionTime] = useState("All Times");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
 
@@ -88,43 +79,7 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
     ? bookings
     : bookings.filter(b => b.passType.toLowerCase().includes(currentActiveTab.toLowerCase()));
 
-  // Filter SECOND by the selected date (if any)
-  if (dateFilter !== "all") {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    filteredBookings = filteredBookings.filter(b => {
-      // Use rawDate (ISO string) for robust parsing. Fallback to date just in case.
-      const bDate = new Date(b.rawDate || b.date);
-      bDate.setHours(0, 0, 0, 0);
-
-      let matchesDate = true;
-      if (dateFilter === "today") {
-        matchesDate = bDate.getTime() === today.getTime();
-      } else if (dateFilter === "yesterday") {
-        matchesDate = bDate.getTime() === yesterday.getTime();
-      } else if (dateFilter === "last_week") {
-        const lastWeek = new Date(today);
-        lastWeek.setDate(lastWeek.getDate() - 7);
-        matchesDate = bDate >= lastWeek && bDate <= today;
-      } else if (dateFilter === "last_month") {
-        const lastMonth = new Date(today);
-        lastMonth.setMonth(lastMonth.getMonth() - 1);
-        matchesDate = bDate >= lastMonth && bDate <= today;
-      } else if (dateFilter === "custom" && customRange) {
-        const start = new Date(customRange.start);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(customRange.end);
-        end.setHours(23, 59, 59, 999);
-        matchesDate = bDate >= start && bDate <= end;
-      }
-      return matchesDate;
-    });
-  }
-
-  // Filter THIRD by search query
+  // Filter SECOND by search query
   if (searchQuery.trim() !== "") {
     const q = searchQuery.toLowerCase();
     filteredBookings = filteredBookings.filter(
@@ -134,6 +89,15 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
         b.id.toLowerCase().includes(q) ||
         b.passType.toLowerCase().includes(q),
     );
+  }
+
+  // Filter THIRD by session date/time if applicable
+  if (selectedSessionDate !== "All") {
+    filteredBookings = filteredBookings.filter(b => b.shortFilterDate === selectedSessionDate);
+  }
+
+  if (selectedSessionTime !== "All Times") {
+    filteredBookings = filteredBookings.filter(b => b.filterTime === selectedSessionTime);
   }
 
   // Slice for Pagination
@@ -180,39 +144,35 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
                 </TouchableOpacity>
               )}
             </View>
-            <View style={styles.dateSelector}>
-              <TouchableOpacity
-                style={styles.filterIconBtn}
-                activeOpacity={0.7}
-                onPress={() => setIsFilterOpen(true)}>
-                <CalendarIcon size={ms(20)} color={COLORS.primary} />
-                {dateFilter !== "all" && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      top: -ms(6),
-                      right: -ms(6),
-                      backgroundColor: COLORS.primary,
-                      width: ms(16),
-                      height: ms(16),
-                      borderRadius: ms(8),
-                      justifyContent: "center",
-                      alignItems: "center",
-                    }}>
-                    <Text
-                      style={{
-                        fontSize: fs(10),
-                        color: "#FFF",
-                        fontFamily: "Gilroy-Bold",
-                        lineHeight: fs(10),
-                      }}>
-                      1
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
           </View>
+
+          {sessionDateOptions.length > 1 && (
+            <View style={styles.tabWrapper}>
+              <PillTabs
+                tabs={["All", ...sessionDateOptions]}
+                activeTab={selectedSessionDate}
+                onTabChange={tab => {
+                  setSelectedSessionDate(tab);
+                  setCurrentPage(1);
+                }}
+                variant="dark"
+              />
+            </View>
+          )}
+
+          {sessionTimeOptions.length > 1 && (
+            <View style={styles.tabWrapper}>
+              <PillTabs
+                tabs={["All Times", ...sessionTimeOptions]}
+                activeTab={selectedSessionTime}
+                onTabChange={tab => {
+                  setSelectedSessionTime(tab);
+                  setCurrentPage(1);
+                }}
+                variant="dark"
+              />
+            </View>
+          )}
 
           {summaryCategories.length > 1 && (
             <View style={styles.tabWrapper}>
@@ -262,17 +222,6 @@ export const EventHomeScreenOpen = ({ eventId }: EventHomeScreenOpenProps) => {
       </ScreenContainer>
 
       {/* Date Picker Modal */}
-      <EventFilterBottomSheet
-        visible={isFilterOpen}
-        onClose={() => setIsFilterOpen(false)}
-        currentFilter={dateFilter}
-        currentCustomRange={customRange}
-        onApply={(filter, range) => {
-          setDateFilter(filter);
-          setCustomRange(range);
-          setCurrentPage(1);
-        }}
-      />
     </View>
   );
 };
@@ -333,7 +282,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.danger,
   },
   tabWrapper: {
-    marginTop: vs(12),
+    marginTop: vs(4),
     paddingHorizontal: hs(6),
   },
   paginationContainer: {
