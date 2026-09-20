@@ -1,21 +1,21 @@
 // Copyright (c) 2026 Bookr. All rights reserved.
 // Confidential and Proprietary.
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Modal,
   ActivityIndicator,
   Alert,
   RefreshControl,
+  TextInput as RNTextInput,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text, TextInput } from "@/components/ui";
 import { EventHeader } from "../components/EventHeader";
-import { Trash2, ChevronDown } from "lucide-react-native";
+import { EventBookingList } from "../components/EventBookingList";
+import { Plus, Search, X } from "lucide-react-native";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -46,71 +46,18 @@ export const EventGuestInviteScreen = () => {
     }, [route.params?.serviceId, navigation]),
   );
 
-  const {
-    invites,
-    loading,
-    isSubmitting,
-    eventTitle,
-    eventImage,
-    passCategories,
-    sendInvite,
-    deleteInvite,
-    refresh,
-  } = useEventInvites(serviceId);
+  const { invites, loading, eventTitle, eventImage, deleteInvite, refresh } =
+    useEventInvites(serviceId);
 
-  // Form State
-  const [guestName, setGuestName] = useState("");
-  const [email, setEmail] = useState("");
-  const [mobileNo, setMobileNo] = useState("");
-  const [passType, setPassType] = useState("");
-  const [quantity, setQuantity] = useState("1");
+  useFocusEffect(
+    useCallback(() => {
+      if (serviceId) {
+        refresh();
+      }
+    }, [serviceId, refresh]),
+  );
 
-  useEffect(() => {
-    if (passCategories.length > 0 && !passType) {
-      setPassType(passCategories[0]);
-    }
-  }, [passCategories, passType]);
-
-  // Dropdown Selection State
-  const [activeDropdown, setActiveDropdown] = useState<{
-    type: "passType" | "quantity";
-    options: string[];
-  } | null>(null);
-
-  const selectOption = (option: string) => {
-    if (!activeDropdown) return;
-    if (activeDropdown.type === "passType") setPassType(option);
-    else setQuantity(option);
-    setActiveDropdown(null);
-  };
-
-  const handleSendInvite = async () => {
-    if (!guestName.trim()) {
-      Alert.alert("Error", "Please enter guest name.");
-      return;
-    }
-    if (!mobileNo.trim() || mobileNo.length < 10) {
-      Alert.alert("Error", "Please enter a valid mobile number.");
-      return;
-    }
-
-    const success = await sendInvite({
-      guestName: guestName.trim(),
-      email: email.trim(),
-      mobileNo: mobileNo.trim(),
-      passType,
-      quantity,
-    });
-
-    if (success) {
-      setGuestName("");
-      setEmail("");
-      setMobileNo("");
-      setPassType(passCategories[0] || "");
-      setQuantity("1");
-      Alert.alert("Success", "Invitation sent to guest via WhatsApp!");
-    }
-  };
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleDeleteInvite = (id: string) => {
     Alert.alert("Confirm Remove", "Are you sure you want to remove this invite?", [
@@ -146,181 +93,77 @@ export const EventGuestInviteScreen = () => {
           />
         </View>
 
-        {/* GUEST INVITATION SECTION */}
-        <View style={styles.section}>
-          <Text weight="bold" style={styles.sectionTitle}>
-            Guest invitation
-          </Text>
-          <Text weight="medium" style={styles.description}>
-            Send Free Entry Qr Codes directly to guest via WhatsApp.
-          </Text>
-        </View>
-
-        {/* INVITE TO FORM */}
-        <View style={styles.section}>
-          <Text weight="bold" style={styles.sectionTitle}>
-            INVITE TO
-          </Text>
-
-          <View style={styles.formGroup}>
-            <Text variant="body2" weight="medium" style={styles.label}>
-              Guest Name
-            </Text>
-            <TextInput
-              variant="filled"
-              value={guestName}
-              onChangeText={setGuestName}
-              placeholder="Ex: Yash Patil"
+        {/* SEARCH BAR */}
+        <View style={styles.controlsContainer}>
+          <View style={styles.searchBarContainer}>
+            <Search size={ms(18)} color={COLORS.text.muted} />
+            <RNTextInput
+              style={styles.searchInput}
+              placeholder="Search Name or Mobile..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor={COLORS.text.muted}
+              autoCapitalize="none"
             />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text variant="body2" weight="medium" style={styles.label}>
-              Email (Optional)
-            </Text>
-            <TextInput
-              variant="filled"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Ex: guest@email.com"
-              keyboardType="email-address"
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text variant="body2" weight="medium" style={styles.label}>
-              Mobile No
-            </Text>
-            <TextInput
-              variant="filled"
-              value={mobileNo}
-              onChangeText={setMobileNo}
-              placeholder="Ex: 9876543210"
-              keyboardType="phone-pad"
-            />
-          </View>
-
-          <View style={styles.row}>
-            <View style={styles.flex1}>
-              <Text variant="body2" weight="medium" style={styles.label}>
-                Pass Type
-              </Text>
-              <TouchableOpacity
-                style={styles.dropdownInput}
-                onPress={() =>
-                  setActiveDropdown({
-                    type: "passType",
-                    options: passCategories.length > 0 ? passCategories : [],
-                  })
-                }>
-                <Text weight="semiBold" style={styles.inputText}>
-                  {passType}
-                </Text>
-                <ChevronDown size={ms(18)} color={COLORS.text.primary} />
+            {searchQuery !== "" && (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <X size={ms(16)} color={COLORS.text.muted} />
               </TouchableOpacity>
-            </View>
-            <View style={styles.quantityCol}>
-              <Text variant="body2" weight="medium" style={styles.label}>
-                Quantity
-              </Text>
-              <TouchableOpacity
-                style={styles.dropdownInput}
-                onPress={() =>
-                  setActiveDropdown({
-                    type: "quantity",
-                    options: ["1", "2", "3", "4", "5", "10"],
-                  })
-                }>
-                <Text weight="semiBold" style={styles.inputText}>
-                  {quantity}
-                </Text>
-                <ChevronDown size={ms(18)} color={COLORS.text.primary} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.primaryBtn, isSubmitting && styles.disabledBtn]}
-            onPress={handleSendInvite}
-            disabled={isSubmitting}>
-            {isSubmitting ? (
-              <ActivityIndicator color={COLORS.text.inverse} />
-            ) : (
-              <Text family="bison" weight="bold" style={styles.btnText}>
-                SEND PASS TO GUEST
-              </Text>
             )}
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* INVITE LIST SECTION */}
-        <View style={styles.section}>
-          <Text weight="bold" style={styles.sectionTitle}>
-            INVITE LIST
-          </Text>
-          {loading ? (
-            <ActivityIndicator size="small" color={COLORS.primary} />
-          ) : invites.length === 0 ? (
-            <Text variant="caption" color={COLORS.text.muted}>
-              No guests invited yet.
-            </Text>
+        <View style={styles.listSection}>
+          {loading && invites.length === 0 ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: vs(20) }} />
           ) : (
-            invites.map((invite, index) => (
-              <View key={invite.id} style={styles.inviteRow}>
-                <Text weight="semiBold" style={styles.indexText}>
-                  {index + 1}
-                </Text>
-                <View style={styles.inviteInfo}>
-                  <Text weight="bold" style={styles.guestNameText}>
-                    {invite.guest_name}
-                  </Text>
-                  <Text weight="semiBold" style={styles.emailText}>
-                    {invite.guest_phone || invite.guest_email}
-                  </Text>
-                </View>
-                <View style={styles.passInfo}>
-                  <Text variant="body2" weight="bold" color={COLORS.primary}>
-                    {invite.pass_type}
-                  </Text>
-                  <Text variant="body2" weight="bold">
-                    Qty: {invite.quantity}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => handleDeleteInvite(invite.id)}>
-                  <Trash2 size={ms(20)} color={COLORS.danger} />
-                </TouchableOpacity>
-              </View>
-            ))
+            <EventBookingList
+              bookings={invites
+                .filter(invite => {
+                  if (!searchQuery.trim()) return true;
+                  const q = searchQuery.toLowerCase();
+                  return (
+                    invite.guest_name.toLowerCase().includes(q) ||
+                    (invite.guest_phone && invite.guest_phone.toLowerCase().includes(q)) ||
+                    (invite.guest_email && invite.guest_email.toLowerCase().includes(q))
+                  );
+                })
+                .map(invite => {
+                  const dt = new Date(invite.created_at);
+                  const dateStr = dt.toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  });
+                  const timeStr = dt.toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  });
+                  return {
+                    id: invite.id,
+                    name: invite.guest_name,
+                    passType: `${invite.pass_type} x ${invite.quantity}`,
+                    time: timeStr,
+                    date: dateStr,
+                    phone: invite.guest_phone || invite.guest_email,
+                  };
+                })}
+              onPress={booking => handleDeleteInvite(booking.id)}
+            />
           )}
         </View>
 
         <View style={{ height: vs(120) }} />
       </ScrollView>
 
-      {/* OPTIONS MODAL */}
-      <Modal
-        visible={!!activeDropdown}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setActiveDropdown(null)}>
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setActiveDropdown(null)}>
-          <View style={styles.optionsContainer}>
-            {Array.from(new Set(activeDropdown?.options || [])).map(option => (
-              <TouchableOpacity
-                key={option}
-                style={styles.optionItem}
-                onPress={() => selectOption(option)}>
-                <Text variant="body1" weight="semiBold">
-                  {option}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate("EventAddGuestInvite", { serviceId })}>
+        <Plus size={ms(24)} color={COLORS.text.inverse} />
+      </TouchableOpacity>
     </ScreenContainer>
   );
 };
@@ -332,113 +175,42 @@ const styles = StyleSheet.create({
   headerWrapper: {
     paddingTop: vs(10),
   },
-  section: {
-    marginTop: vs(20),
-    gap: vs(10),
+  controlsContainer: {
+    marginTop: vs(15),
     paddingHorizontal: hs(6),
   },
-  sectionTitle: {
-    fontSize: fs(16),
-    textTransform: "uppercase",
-    color: COLORS.text.primary,
-  },
-  description: {
-    fontSize: fs(14),
-    color: COLORS.text.primary,
-  },
-  formGroup: {
-    marginTop: vs(10),
-    gap: vs(4),
-  },
-  label: {
-    color: COLORS.text.primary,
-    textTransform: "capitalize",
-  },
-  row: {
-    flexDirection: "row",
-    gap: hs(15),
-    marginTop: vs(15),
-  },
-  flex1: {
-    flex: 1,
-  },
-  quantityCol: {
-    width: hs(100),
-  },
-  dropdownInput: {
+  searchBarContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: COLORS.surface.primary,
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(12),
+    backgroundColor: "#F4F7FC",
+    paddingHorizontal: hs(12),
     height: vs(44),
+    borderRadius: ms(8),
   },
-  inputText: {
+  searchInput: {
+    flex: 1,
+    marginLeft: hs(8),
     fontSize: fs(14),
     color: COLORS.text.primary,
+    fontFamily: "Gilroy-Medium",
   },
-  primaryBtn: {
-    backgroundColor: "#000000",
-    borderRadius: ms(10),
-    paddingVertical: vs(12),
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: vs(20),
+  listSection: {
+    marginTop: vs(10),
   },
-  disabledBtn: {
-    opacity: 0.6,
-  },
-  btnText: {
-    fontSize: fs(20),
-    color: COLORS.text.inverse,
-  },
-  inviteRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surface.primary,
-    borderRadius: ms(10),
-    paddingHorizontal: hs(10),
-    paddingVertical: vs(12),
-    gap: hs(10),
-  },
-  indexText: {
-    fontSize: fs(16),
-    color: COLORS.text.primary,
-  },
-  inviteInfo: {
-    flex: 1,
-  },
-  guestNameText: {
-    fontSize: fs(16),
-    color: COLORS.text.primary,
-  },
-  emailText: {
-    fontSize: fs(14),
-    color: COLORS.text.muted,
-  },
-  passInfo: {
-    alignItems: "flex-end",
-    marginRight: hs(4),
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  fab: {
+    position: "absolute",
+    bottom: vs(120),
+    right: hs(6),
+    width: ms(56),
+    height: ms(56),
+    borderRadius: ms(28),
+    backgroundColor: COLORS.primary,
     justifyContent: "center",
     alignItems: "center",
-  },
-  optionsContainer: {
-    width: "80%",
-    backgroundColor: COLORS.background,
-    borderRadius: ms(12),
-    padding: ms(10),
-    maxHeight: vs(400),
-  },
-  optionItem: {
-    paddingVertical: vs(12),
-    paddingHorizontal: hs(15),
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.surface.primary,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
 });

@@ -60,6 +60,7 @@ import { StaycationEssentialsScreen } from "@/features/staycation/screens/Stayca
 import { StaycationCloseDateScreen } from "@/features/staycation/screens/StaycationCloseDateScreen";
 import { EventHomeScreen } from "@/features/event/screens/EventHomeScreen";
 import { EventGuestInviteScreen } from "@/features/event/screens/EventGuestInviteScreen";
+import { EventAddGuestInviteScreen } from "@/features/event/screens/EventAddGuestInviteScreen";
 import { EventExportBookingsScreen } from "@/features/event/screens/EventExportBookingsScreen";
 import { EventScanScreen } from "@/features/event/screens/EventScanScreen";
 import { EventEntryDetailsScreen } from "@/features/event/screens/EventEntryDetailsScreen";
@@ -407,6 +408,7 @@ const MainNavigator = () => {
       <MainStack.Screen name="StaycationOffers" component={StaycationOffersScreen} />
       <MainStack.Screen name="EventExportBookings" component={EventExportBookingsScreen} />
       <MainStack.Screen name="EventEntryDetails" component={EventEntryDetailsScreen} />
+      <MainStack.Screen name="EventAddGuestInvite" component={EventAddGuestInviteScreen} />
 
       <MainStack.Screen name="EventScanConfirmation" component={EventScanConfirmationScreen} />
       <MainStack.Screen name="GuestHistory" component={GuestHistoryScreen} />

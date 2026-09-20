@@ -283,16 +283,18 @@ export const EventSpotEntryScreen = () => {
           activeOpacity={1}
           onPress={() => setActiveDropdown(null)}>
           <View style={styles.optionsContainer}>
-            {Array.from(new Set(activeDropdown?.options || [])).map(option => (
-              <TouchableOpacity
-                key={option}
-                style={styles.optionItem}
-                onPress={() => selectOption(option)}>
-                <Text variant="body1" weight="semiBold">
-                  {option}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            <ScrollView contentContainerStyle={{ padding: ms(10) }}>
+              {Array.from(new Set(activeDropdown?.options || [])).map(option => (
+                <TouchableOpacity
+                  key={option}
+                  style={styles.optionItem}
+                  onPress={() => selectOption(option)}>
+                  <Text variant="body1" weight="semiBold">
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -403,7 +405,6 @@ const styles = StyleSheet.create({
     width: "80%",
     backgroundColor: COLORS.background,
     borderRadius: ms(12),
-    padding: ms(10),
     maxHeight: vs(400),
   },
   optionItem: {

@@ -12,6 +12,8 @@ export interface BookingListItem {
   time: string;
   date: string;
   rawDate: string; // ISO string for robust filtering
+  shortFilterDate?: string;
+  filterTime?: string;
   avatarUrl?: string;
   isSpot?: boolean;
   phone?: string;
@@ -45,6 +47,8 @@ export const useEventHomeOpen = (eventId: string) => {
   const [summaryCategories, setSummaryCategories] = useState<EventSummaryCategory[]>([]);
   const [chartCategories, setChartCategories] = useState<EventChartCategory[]>([]);
   const [chartData, setChartData] = useState<EventChartData[]>([]);
+  const [sessionDateOptions, setSessionDateOptions] = useState<string[]>([]);
+  const [sessionTimeOptions, setSessionTimeOptions] = useState<string[]>([]);
 
   const [activeTab, setActiveTab] = useState("All");
 
@@ -113,6 +117,7 @@ export const useEventHomeOpen = (eventId: string) => {
             guest_name,
             guest_phone,
             total_amount,
+            event_session_id,
             event_passes ( name ),
             event_zones ( zone_name ),
             profiles ( full_name, avatar_url )
@@ -143,19 +148,74 @@ export const useEventHomeOpen = (eventId: string) => {
           daysData[dStr] = 0;
         }
 
+        const sessionDateSet = new Set<string>();
+        const sessionTimeSet = new Set<string>();
+        const sessions = event?.event_sessions || [];
+
         // 4. Iterate over bookings and tally them up!
         bookingsData?.forEach((b: any) => {
           const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
           const createdAt = new Date(b.created_at);
 
-          const dateStr = createdAt.toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          });
-          const timeStr = createdAt
-            .toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true })
-            .toUpperCase();
+          let dateStr = "";
+          let timeStr = "";
+          let rawDate = b.created_at;
+          let shortFilterDate = "";
+          let filterTime = "";
+
+          const fallbackDate = event?.start_datetime ? new Date(event.start_datetime) : createdAt;
+
+          // Resolve session from event_sessions
+          let matchedSession = null;
+          if (b.event_session_id) {
+            matchedSession = sessions.find((s: any) => String(s.id) === String(b.event_session_id));
+          }
+
+          const sessionDate = matchedSession?.startDate || matchedSession?.date;
+          if (sessionDate) {
+            const sd = new Date(sessionDate);
+            dateStr = sd.toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            });
+            rawDate = sessionDate;
+            shortFilterDate = sd.toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+            });
+            sessionDateSet.add(shortFilterDate);
+          } else {
+            dateStr = fallbackDate.toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            });
+            rawDate = event?.start_datetime || b.created_at;
+            shortFilterDate = fallbackDate.toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+            });
+            sessionDateSet.add(shortFilterDate);
+          }
+
+          if (matchedSession?.startTime) {
+            const [hours, minutes] = matchedSession.startTime.split(":");
+            const stDate = new Date();
+            stDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0);
+            timeStr = stDate
+              .toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true })
+              .toUpperCase();
+            filterTime = timeStr;
+            sessionTimeSet.add(filterTime);
+          } else {
+            timeStr = fallbackDate
+              .toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true })
+              .toUpperCase();
+            filterTime = timeStr;
+            sessionTimeSet.add(filterTime);
+          }
+
           const shortDate = createdAt.toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
@@ -191,7 +251,9 @@ export const useEventHomeOpen = (eventId: string) => {
             name: isSpotBooking && b.guest_name ? b.guest_name : profile?.full_name || "Guest User",
             passType: passTypeDesc,
             date: dateStr,
-            rawDate: b.created_at,
+            rawDate: rawDate,
+            shortFilterDate: shortFilterDate,
+            filterTime: filterTime,
             time: timeStr,
             avatarUrl: isSpotBooking ? undefined : profile?.avatar_url,
             isSpot: isSpotBooking,
@@ -252,6 +314,16 @@ export const useEventHomeOpen = (eventId: string) => {
           });
         }
         setChartData(realChartData);
+
+        const sortedDates = Array.from(sessionDateSet).sort((a, b) => {
+          const timeA = new Date(a + " 2026").getTime();
+          const timeB = new Date(b + " 2026").getTime();
+          return (isNaN(timeA) ? 0 : timeA) - (isNaN(timeB) ? 0 : timeB);
+        });
+        const sortedTimes = Array.from(sessionTimeSet).sort();
+
+        setSessionDateOptions(sortedDates);
+        setSessionTimeOptions(sortedTimes);
       } catch (error) {
         console.error("Error fetching open event data:", error);
       } finally {
@@ -292,6 +364,8 @@ export const useEventHomeOpen = (eventId: string) => {
     summaryCategories,
     chartCategories,
     chartData,
+    sessionDateOptions,
+    sessionTimeOptions,
     activeTab,
     setActiveTab,
     refresh: () => fetchEventData("refresh"),

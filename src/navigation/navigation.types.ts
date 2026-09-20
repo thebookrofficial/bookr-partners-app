@@ -67,6 +67,7 @@ export type MainStackParamList = {
   StaycationOffers: { serviceId: string };
   EventCloseDate: { serviceId: string };
   EventGuestInvite: { serviceId: string };
+  EventAddGuestInvite: { serviceId: string };
   EventExportBookings: { serviceId: string };
   EventEntryDetails: { entryId: string };
   EventScanConfirmation: { attendee: any; isInvite?: boolean };
