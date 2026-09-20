@@ -18,18 +18,22 @@ import {
   Platform,
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
-import { Text } from "@/components/ui";
+import { Text, TextInput } from "@/components/ui";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
 import { Button } from "@/components/ui/Button";
 import { EventHeader } from "../components/EventHeader";
-import { Phone, X, Camera as CameraIcon, Image as ImageIcon } from "lucide-react-native";
+import {
+  Phone,
+  X,
+  Camera as CameraIcon,
+  Flashlight,
+  FlashlightOff,
+  Search,
+} from "lucide-react-native";
 import { useIsFocused, useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { supabase } from "@/lib/supabase";
 import { Camera } from "react-native-camera-kit";
-import jsQR from "jsqr";
-import { launchImageLibrary } from "react-native-image-picker";
-import { Images } from "react-native-nitro-image";
 
 const USER_PROFILE = require("../../../assets/icons/ic-user-profile.png");
 
@@ -84,8 +88,9 @@ const CameraDisclosureModal = ({
 );
 
 // --- Camera Component ---
-const FullScreenCamera = ({ onClose, onCodeScanned, onGalleryPick, isProcessingGallery }: any) => {
+const FullScreenCamera = ({ onClose, onCodeScanned }: any) => {
   const isScanning = useRef(true);
+  const [isTorchOn, setIsTorchOn] = useState(false);
 
   return (
     <View style={styles.cameraRoot}>
@@ -93,9 +98,11 @@ const FullScreenCamera = ({ onClose, onCodeScanned, onGalleryPick, isProcessingG
         testID="camera-view"
         style={StyleSheet.absoluteFillObject}
         scanBarcode={true}
+        zoomMode="on"
+        torchMode={isTorchOn ? "on" : "off"}
         onReadCode={(event: any) => {
           const code = event.nativeEvent.codeStringValue;
-          if (code && isScanning.current && !isProcessingGallery) {
+          if (code && isScanning.current) {
             isScanning.current = false;
             Vibration.vibrate(100);
             onCodeScanned(code);
@@ -128,29 +135,19 @@ const FullScreenCamera = ({ onClose, onCodeScanned, onGalleryPick, isProcessingG
           <X size={ms(24)} color="#FFF" />
         </TouchableOpacity>
 
-        {isProcessingGallery ? (
-          <View style={styles.processingOverlay}>
-            <ActivityIndicator size="large" color="#FFF" />
-            <Text weight="bold" color="#FFF" style={{ marginTop: vs(12) }}>
-              Processing Image...
-            </Text>
-          </View>
-        ) : (
-          <>
-            <Text weight="medium" style={styles.cameraHintText}>
-              Align QR code within the frame
-            </Text>
+        <TouchableOpacity style={styles.cameraTorchBtn} onPress={() => setIsTorchOn(!isTorchOn)}>
+          {isTorchOn ? (
+            <Flashlight size={ms(24)} color="#FFD700" />
+          ) : (
+            <FlashlightOff size={ms(24)} color="#FFF" />
+          )}
+        </TouchableOpacity>
 
-            <TouchableOpacity style={styles.galleryBtn} onPress={onGalleryPick}>
-              <ImageIcon size={ms(20)} color="#FFF" />
-              <Text color="#FFF" weight="bold" style={{ marginLeft: hs(8) }}>
-                Upload from Gallery
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
+        <Text weight="medium" style={styles.cameraHintText}>
+          Align QR code within the frame
+        </Text>
 
-        {__DEV__ && !isProcessingGallery && (
+        {__DEV__ && (
           <TouchableOpacity
             style={styles.simulateBtn}
             onPress={() => onCodeScanned("pay_SnvxbS0ZkGJzEZ")}>
@@ -171,7 +168,6 @@ export const EventScanScreen = () => {
   const isFocused = useIsFocused();
 
   const [serviceId, setServiceId] = useState<string>("");
-  const [isProcessingGallery, setIsProcessingGallery] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -193,6 +189,7 @@ export const EventScanScreen = () => {
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [activeEventTitle, setActiveEventTitle] = useState<string>("");
   const [activeEventImage, setActiveEventImage] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [venueEventIds, setVenueEventIds] = useState<string[]>([]);
   const [scannedAttendees, setScannedAttendees] = useState<Attendee[]>([]);
   const [ticketCategories, setTicketCategories] = useState<string[]>([]);
@@ -276,7 +273,7 @@ export const EventScanScreen = () => {
           .from("event_guest_invites")
           .select(`id, guest_name, guest_phone, status, created_at`)
           .in("event_id", fetchedVenueEventIds)
-          .eq("status", "completed")
+          .eq("status", "scanned")
           .order("created_at", { ascending: false }),
       ]);
 
@@ -381,16 +378,28 @@ export const EventScanScreen = () => {
     },
   ];
 
-  const filteredScans =
-    selectedTab === "All"
-      ? scannedAttendees
-      : selectedTab === "Spot"
-      ? scannedAttendees.filter(a => a.isSpot)
-      : scannedAttendees.filter(
-          a =>
-            a.categoryName === selectedTab ||
-            (selectedTab === "Guest" && a.categoryName.toLowerCase() === "guest"),
-        );
+  const filteredScans = scannedAttendees.filter(a => {
+    // 1. Tab Filtering
+    const matchesTab =
+      selectedTab === "All"
+        ? true
+        : selectedTab === "Spot"
+        ? a.isSpot
+        : a.categoryName === selectedTab ||
+          (selectedTab === "Guest" && a.categoryName.toLowerCase() === "guest");
+
+    if (!matchesTab) return false;
+
+    // 2. Search Query Filtering
+    if (searchQuery.trim() === "") return true;
+
+    const lowerQuery = searchQuery.toLowerCase();
+    const matchesName = a.name.toLowerCase().includes(lowerQuery);
+    const matchesPhone = a.phone.toLowerCase().includes(lowerQuery);
+    const matchesType = a.ticketType.toLowerCase().includes(lowerQuery);
+
+    return matchesName || matchesPhone || matchesType;
+  });
 
   const handleOpenScanner = useCallback(async () => {
     try {
@@ -579,14 +588,14 @@ export const EventScanScreen = () => {
             .maybeSingle();
 
           if (invite) {
-            if (invite.status === "completed") {
+            if (invite.status === "scanned") {
               Alert.alert("Already Scanned", "This invite has already been used.");
               return;
             }
 
             const { error: updateError } = await supabase
               .from("event_guest_invites")
-              .update({ status: "completed" })
+              .update({ status: "scanned", updated_at: new Date().toISOString() })
               .eq("id", invite.id);
             if (updateError) throw updateError;
 
@@ -606,113 +615,13 @@ export const EventScanScreen = () => {
             Alert.alert("Invalid Ticket", "QR code not found for this event.");
           }
         }
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        console.error("Scan Error:", err);
+        Alert.alert("Scan Error", err.message || JSON.stringify(err) || "Failed to scan ticket.");
       }
     },
     [activeEventId, navigation, venueEventIds, fetchScannedHistory],
   );
-
-  const handleGalleryPick = async () => {
-    try {
-      const result = await launchImageLibrary({
-        mediaType: "photo",
-        quality: 1,
-      });
-
-      if (result.didCancel || !result.assets || result.assets.length === 0) {
-        return;
-      }
-
-      const uri = result.assets[0].uri;
-      if (!uri) return;
-
-      setIsProcessingGallery(true);
-
-      // Load image natively using Nitro Image
-      let image = await Images.loadFromFileAsync(uri);
-
-      // Downscale to max 800px to avoid freezing the JS thread
-      const MAX_DIM = 800;
-      if (image.width > MAX_DIM || image.height > MAX_DIM) {
-        const ratio = Math.min(MAX_DIM / image.width, MAX_DIM / image.height);
-        image = await image.resizeAsync(
-          Math.round(image.width * ratio),
-          Math.round(image.height * ratio),
-        );
-      }
-
-      // Get raw pixel data
-      const rawData = await image.toRawPixelData();
-      const rawBytes = new Uint8Array(rawData.buffer);
-      const width = rawData.width;
-      const height = rawData.height;
-      const format = rawData.pixelFormat;
-
-      let rgba;
-      const totalPixels = width * height;
-      const bpp = rawBytes.length / totalPixels;
-
-      if (bpp === 4) {
-        rgba = new Uint8ClampedArray(totalPixels * 4);
-        for (let i = 0; i < totalPixels; i++) {
-          const idx = i * 4;
-          if (format === "BGRA" || format === "BGRX") {
-            rgba[idx] = rawBytes[idx + 2];
-            rgba[idx + 1] = rawBytes[idx + 1];
-            rgba[idx + 2] = rawBytes[idx + 0];
-          } else if (format === "ARGB" || format === "XRGB") {
-            rgba[idx] = rawBytes[idx + 1];
-            rgba[idx + 1] = rawBytes[idx + 2];
-            rgba[idx + 2] = rawBytes[idx + 3];
-          } else if (format === "ABGR" || format === "XBGR") {
-            rgba[idx] = rawBytes[idx + 3];
-            rgba[idx + 1] = rawBytes[idx + 2];
-            rgba[idx + 2] = rawBytes[idx + 1];
-          } else {
-            // Default assume RGBA or RGBX
-            rgba[idx] = rawBytes[idx];
-            rgba[idx + 1] = rawBytes[idx + 1];
-            rgba[idx + 2] = rawBytes[idx + 2];
-          }
-          // Force alpha to 255 for qr scanning
-          rgba[idx + 3] = 255;
-        }
-      } else if (bpp === 3) {
-        rgba = new Uint8ClampedArray(totalPixels * 4);
-        for (let i = 0; i < totalPixels; i++) {
-          const idx3 = i * 3;
-          const idx4 = i * 4;
-          if (format === "BGR") {
-            rgba[idx4] = rawBytes[idx3 + 2];
-            rgba[idx4 + 1] = rawBytes[idx3 + 1];
-            rgba[idx4 + 2] = rawBytes[idx3 + 0];
-          } else {
-            // RGB
-            rgba[idx4] = rawBytes[idx3];
-            rgba[idx4 + 1] = rawBytes[idx3 + 1];
-            rgba[idx4 + 2] = rawBytes[idx3 + 2];
-          }
-          rgba[idx4 + 3] = 255;
-        }
-      } else {
-        throw new Error("Unknown pixel format: " + format);
-      }
-
-      const code = jsQR(rgba, width, height);
-      if (code && code.data) {
-        Vibration.vibrate(100);
-        handleCodeScanned(code.data);
-      } else {
-        Alert.alert("No QR Code", "Could not detect a QR code in the selected image.");
-      }
-    } catch (e) {
-      console.error("Gallery scan error:", e);
-      Alert.alert("Error", "Failed to process the image.");
-    } finally {
-      setIsProcessingGallery(false);
-    }
-  };
 
   return (
     <View style={styles.flex1}>
@@ -720,8 +629,6 @@ export const EventScanScreen = () => {
         <FullScreenCamera
           onClose={() => setIsScanningMode(false)}
           onCodeScanned={handleCodeScanned}
-          onGalleryPick={handleGalleryPick}
-          isProcessingGallery={isProcessingGallery}
           isActive={isFocused}
         />
       ) : (
@@ -742,6 +649,17 @@ export const EventScanScreen = () => {
                 Open Scanner
               </Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchWrapper}>
+            <TextInput
+              variant="filled"
+              placeholder="Search name, phone, or pass..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              leftIcon={<Search size={ms(18)} color={COLORS.text.secondary} />}
+            />
           </View>
 
           <View style={styles.tabsWrapper}>
@@ -775,6 +693,14 @@ export const EventScanScreen = () => {
               }
             />
           )}
+
+          {/* Scanner FAB */}
+          <TouchableOpacity
+            style={styles.fabContainer}
+            onPress={handleOpenScanner}
+            activeOpacity={0.8}>
+            <CameraIcon size={ms(28)} color="#FFF" />
+          </TouchableOpacity>
         </ScreenContainer>
       )}
 
@@ -807,6 +733,7 @@ const styles = StyleSheet.create({
   },
   historyTitle: { fontSize: fs(18), color: COLORS.text.primary },
   debugBtn: { flexDirection: "row", alignItems: "center", gap: hs(4), padding: hs(4) },
+  searchWrapper: { marginBottom: vs(12) },
   tabsWrapper: { marginBottom: vs(10) },
   tabsContainer: { gap: hs(10) },
   tab: {
@@ -896,6 +823,15 @@ const styles = StyleSheet.create({
   cameraCloseBtn: {
     position: "absolute",
     top: vs(50),
+    left: hs(20),
+    padding: ms(10),
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: ms(25),
+    zIndex: 10,
+  },
+  cameraTorchBtn: {
+    position: "absolute",
+    top: vs(50),
     right: hs(20),
     padding: ms(10),
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -913,30 +849,7 @@ const styles = StyleSheet.create({
     borderRadius: ms(20),
     overflow: "hidden",
   },
-  simulateBtn: {
-    position: "absolute",
-    bottom: vs(50),
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: hs(24),
-    paddingVertical: vs(12),
-    borderRadius: ms(10),
-  },
-  galleryBtn: {
-    marginTop: vs(20),
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
-    paddingHorizontal: hs(20),
-    paddingVertical: vs(12),
-    borderRadius: ms(25),
-  },
-  processingOverlay: {
-    marginTop: vs(300),
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.7)",
-    padding: ms(20),
-    borderRadius: ms(16),
-  },
+  simulateBtn: { flex: 1 },
   flex1: { flex: 1 },
   blackBg: { backgroundColor: "#000" },
   dualRowRight: { flex: 1, marginLeft: hs(10) },
@@ -1039,4 +952,21 @@ const styles = StyleSheet.create({
   disclosureButton: { width: "100%", marginBottom: vs(12) },
   disclosureCancel: { padding: ms(8) },
   emptyListText: { textAlign: "center", marginTop: vs(20) },
+  fabContainer: {
+    position: "absolute",
+    bottom: vs(120),
+    right: hs(6),
+    width: ms(60),
+    height: ms(60),
+    borderRadius: ms(30),
+    backgroundColor: COLORS.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6,
+    zIndex: 100,
+  },
 });
