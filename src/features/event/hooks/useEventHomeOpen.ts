@@ -132,7 +132,7 @@ export const useEventHomeOpen = (eventId: string) => {
           `,
           )
           .eq("event_id", eventId)
-          .neq("booking_status", "cancelled")
+          .eq("booking_status", "confirmed")
           .order("created_at", { ascending: false });
 
         if (bookingsError) {
