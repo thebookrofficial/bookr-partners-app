@@ -23,6 +23,8 @@ interface ServiceState {
   setHasNavigatedInitially: (status: boolean) => void;
   isTabBarVisible: boolean;
   setTabBarVisible: (visible: boolean) => void;
+  eventFeatureFlags: { spotEntryEnabled: boolean; guestInviteEnabled: boolean };
+  setEventFeatureFlags: (flags: { spotEntryEnabled: boolean; guestInviteEnabled: boolean }) => void;
 }
 
 export const useServiceStore = create<ServiceState>()(
@@ -49,6 +51,8 @@ export const useServiceStore = create<ServiceState>()(
       setHasNavigatedInitially: status => set({ hasNavigatedInitially: status }),
       isTabBarVisible: true,
       setTabBarVisible: visible => set({ isTabBarVisible: visible }),
+      eventFeatureFlags: { spotEntryEnabled: true, guestInviteEnabled: true },
+      setEventFeatureFlags: flags => set({ eventFeatureFlags: flags }),
     }),
     {
       name: "service-storage",

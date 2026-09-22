@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { COLORS } from "@/constants/theme";
+import { useServiceStore } from "@/store/serviceStore";
 
 export interface BookingListItem {
   id: string;
@@ -42,6 +43,7 @@ export const useEventHomeOpen = (eventId: string) => {
   const [refreshing, setRefreshing] = useState(false);
   const [eventData, setEventData] = useState<any>(null);
   const [bookings, setBookings] = useState<BookingListItem[]>([]);
+  const { setEventFeatureFlags } = useServiceStore();
 
   const [totalBookings, setTotalBookings] = useState({ value: 0, trend: 0 });
   const [summaryCategories, setSummaryCategories] = useState<EventSummaryCategory[]>([]);
@@ -89,6 +91,12 @@ export const useEventHomeOpen = (eventId: string) => {
         }
 
         setEventData(event);
+
+        // Sync feature flags to global store so navigator can react instantly
+        setEventFeatureFlags({
+          spotEntryEnabled: event.spot_entry_enabled !== false,
+          guestInviteEnabled: event.guest_invite_enabled !== false,
+        });
 
         const passesData = event.event_passes || [];
         const zonesData = event.event_zones || [];
@@ -331,7 +339,7 @@ export const useEventHomeOpen = (eventId: string) => {
         if (actionType === "refresh") setRefreshing(false);
       }
     },
-    [eventId],
+    [eventId, setEventFeatureFlags],
   );
 
   useEffect(() => {
@@ -368,6 +376,8 @@ export const useEventHomeOpen = (eventId: string) => {
     sessionTimeOptions,
     activeTab,
     setActiveTab,
+    spotEntryEnabled: eventData?.spot_entry_enabled !== false,
+    guestInviteEnabled: eventData?.guest_invite_enabled !== false,
     refresh: () => fetchEventData("refresh"),
   };
 };

@@ -267,6 +267,7 @@ const StaycationTabNavigator = () => {
 const EventTabNavigator = () => {
   const { clientProfile } = useAuthStore();
   const isOwner = clientProfile?.client_role === "owner";
+  const { eventFeatureFlags } = useServiceStore();
 
   const canAccess = React.useCallback(
     (perm: string) => isOwner || (clientProfile?.permissions || []).includes(perm),
@@ -274,40 +275,45 @@ const EventTabNavigator = () => {
   );
 
   const fullTabs = React.useMemo(
-    () => [
-      {
-        name: "EventHome",
-        label: "Bookings",
-        Icon: TabIcon(FileText),
-        disabled: !canAccess("events:bookings"),
-      },
-      {
-        name: "EventScan",
-        label: "Scan",
-        Icon: TabIcon(ScanLine),
-        disabled: !canAccess("events:scan_page"),
-      },
-      {
-        name: "EventGuestInvite",
-        label: "Invites",
-        Icon: TabIcon(UserPlus),
-        disabled: !canAccess("events:guest_invite"),
-      },
-      {
-        name: "EventSpotEntry",
-        label: "Spot Entry",
-        Icon: TabIcon(MapPin),
-        disabled: !canAccess("events:spot_entry"),
-      },
-      {
-        name: "EventProfile",
-        label: "Profile",
-        Icon: TabIcon(User),
-        disabled: false,
-        isProfile: true,
-      },
-    ],
-    [canAccess],
+    () =>
+      [
+        {
+          name: "EventHome",
+          label: "Bookings",
+          Icon: TabIcon(FileText),
+          disabled: !canAccess("events:bookings"),
+        },
+        {
+          name: "EventScan",
+          label: "Scan",
+          Icon: TabIcon(ScanLine),
+          disabled: !canAccess("events:scan_page"),
+        },
+        eventFeatureFlags.guestInviteEnabled && canAccess("events:guest_invite")
+          ? {
+              name: "EventGuestInvite",
+              label: "Invites",
+              Icon: TabIcon(UserPlus),
+              disabled: false,
+            }
+          : null,
+        eventFeatureFlags.spotEntryEnabled && canAccess("events:spot_entry")
+          ? {
+              name: "EventSpotEntry",
+              label: "Spot Entry",
+              Icon: TabIcon(MapPin),
+              disabled: false,
+            }
+          : null,
+        {
+          name: "EventProfile",
+          label: "Profile",
+          Icon: TabIcon(User),
+          disabled: false,
+          isProfile: true,
+        },
+      ].filter(Boolean),
+    [canAccess, eventFeatureFlags],
   );
 
   const renderTabBar = React.useCallback(
@@ -326,10 +332,10 @@ const EventTabNavigator = () => {
       {canAccess("events:scan_page") && (
         <EventTab.Screen name="EventScan" component={EventScanScreen} />
       )}
-      {canAccess("events:guest_invite") && (
+      {eventFeatureFlags.guestInviteEnabled && canAccess("events:guest_invite") && (
         <EventTab.Screen name="EventGuestInvite" component={EventGuestInviteScreen} />
       )}
-      {canAccess("events:spot_entry") && (
+      {eventFeatureFlags.spotEntryEnabled && canAccess("events:spot_entry") && (
         <EventTab.Screen name="EventSpotEntry" component={EventSpotEntryScreen} />
       )}
       <EventTab.Screen name="EventProfile" component={VendorProfileScreen} />
