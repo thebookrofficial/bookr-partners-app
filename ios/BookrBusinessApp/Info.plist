@@ -20,8 +20,23 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.1077467918306-tp2i1l8u4u802hrf63g7cngiibrir66l</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
@@ -39,10 +54,10 @@
 	<string>Bookr needs access to your gallery to update your business profile picture.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
-	<key>StallionProjectId</key>
-	<string>69eddef6a3e81eefa553da7c</string>
 	<key>StallionAppToken</key>
 	<string>spb_ap_GOGGEEDRhSLL1eVm6DkAQDEiIMM6apmAaOXWP16Iv1</string>
+	<key>StallionProjectId</key>
+	<string>69eddef6a3e81eefa553da7c</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Gilroy-ExtraBold.otf</string>
@@ -78,20 +93,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.1077467918306-tp2i1l8u4u802hrf63g7cngiibrir66l</string>
-			</array>
-		</dict>
-	</array>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>whatsapp</string>
-	</array>
 </dict>
 </plist>
