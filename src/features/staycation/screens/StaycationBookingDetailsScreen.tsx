@@ -246,17 +246,24 @@ export const StaycationBookingDetailsScreen = () => {
   };
 
   const getNameForMethod = (method: string) => {
-    if (method === "gpay") return "GPay";
-    if (method === "phonepe") return "PhonePe";
-    if (method === "paytm") return "Paytm";
-    return "Cash";
+    if (!method) return "Unknown";
+    const m = method.toLowerCase();
+    if (m === "gpay") return "GPay";
+    if (m === "phonepe") return "PhonePe";
+    if (m === "paytm") return "Paytm";
+    if (m === "cash") return "Cash";
+    if (m === "online") return "Online";
+    // Fallback: capitalize the method name
+    return method.charAt(0).toUpperCase() + method.slice(1);
   };
 
   const getIconForLog = (mode: string) => {
-    if (mode === "gpay") return icGpay;
-    if (mode === "phonepe") return icPhonepe;
-    if (mode === "paytm") return icPaytm;
-    if (mode === "upi") return icGpay; // fallback
+    if (!mode) return icCash;
+    const m = mode.toLowerCase();
+    if (m === "gpay") return icGpay;
+    if (m === "phonepe") return icPhonepe;
+    if (m === "paytm") return icPaytm;
+    if (m === "upi" || m === "online" || m === "card") return icGpay; // fallback for digital
     return icCash;
   };
 

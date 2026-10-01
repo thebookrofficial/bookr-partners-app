@@ -81,7 +81,11 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
 
         // Reconstruct Initial Advance Payment
         const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
-        const isOnline = data.booking_source === "online" || !!data.user_id;
+        const isOnline =
+          data.booking_source === "online" ||
+          !!data.user_id ||
+          data.booking_status === "Online" ||
+          data.booking_status === "online";
         const totalPaidAmount = isOnline
           ? Number(data.subtotal) || 0
           : Number(data.paid_amount) || 0;
@@ -91,8 +95,8 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
           const initialLog: PaymentLog = {
             id: `initial-${data.id}`,
             amount: initialAmount,
-            // Assume Online/UPI if user_id exists (app booking), otherwise Cash for manual
-            payment_mode: data.user_id ? "online" : "cash",
+            // Assume Online/UPI if booking is online or has user_id, otherwise Cash for manual
+            payment_mode: isOnline ? "online" : "cash",
             note: "Initial Advance Payment",
             created_at: data.created_at,
             isInitial: true,
