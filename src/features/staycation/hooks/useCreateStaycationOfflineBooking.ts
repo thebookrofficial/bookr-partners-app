@@ -21,6 +21,7 @@ interface CreateOfflineBookingPayload {
   unitCount?: number;
   bookingSource?: "offline" | "online";
   paymentMode?: string;
+  deposit?: number;
 }
 
 export const useCreateStaycationOfflineBooking = () => {
@@ -159,6 +160,7 @@ export const useCreateStaycationOfflineBooking = () => {
           paid_amount: 0,
           guest_name: payload.guestName || "Guest",
           guest_phone: payload.guestPhone || "N/A",
+          deposit: payload.deposit || 0,
           special_requests: `Booking For: ${
             payload.bookingType
           }, Type: ${assignedRoomStr}, Group: ${payload.groupType || "-"}`,
@@ -172,17 +174,23 @@ export const useCreateStaycationOfflineBooking = () => {
         throw new Error("Could not save your booking at this time.");
       }
 
-      // If the user entered an advance payment, insert the payment log to record the specific payment mode
-      if (insertedBooking?.id && safeAdvancePaid > 0 && payload.paymentMode) {
-        let note = "Initial staycation payment";
-        if (payload.paymentMode === "gpay") note = "Initial staycation payment (GPay)";
-        if (payload.paymentMode === "phonepe") note = "Initial staycation payment (PhonePe)";
-        if (payload.paymentMode === "paytm") note = "Initial staycation payment (Paytm)";
+      // If the user entered an advance payment or deposit, insert the payment log to record the specific payment mode
+      const amountToLog =
+        payload.deposit && payload.deposit > 0 ? payload.deposit : safeAdvancePaid;
+
+      if (insertedBooking?.id && amountToLog > 0 && payload.paymentMode) {
+        let note =
+          payload.deposit && payload.deposit > 0
+            ? "Security Deposit"
+            : "Initial staycation payment";
+        if (payload.paymentMode === "gpay") note += " (GPay)";
+        if (payload.paymentMode === "phonepe") note += " (PhonePe)";
+        if (payload.paymentMode === "paytm") note += " (Paytm)";
 
         const { error: logError } = await supabase.from("offline_payment_logs").insert({
           booking_id: insertedBooking.id,
           booking_vertical: "staycation",
-          amount: safeAdvancePaid,
+          amount: amountToLog,
           payment_mode: payload.paymentMode,
           logged_by: profile?.id,
           note: note,

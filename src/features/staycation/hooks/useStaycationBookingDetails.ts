@@ -22,18 +22,19 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
   const [bookingDetails, setBookingDetails] = useState<any>(null);
   const [paymentLogs, setPaymentLogs] = useState<PaymentLog[]>([]);
 
-  const fetchBookingDetails = useCallback(async () => {
-    if (!bookingId) {
-      setIsLoading(false);
-      return;
-    }
+  const fetchBookingDetails = useCallback(
+    async (silent = false) => {
+      if (!bookingId) {
+        setIsLoading(false);
+        return;
+      }
 
-    try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from("staycation_bookings")
-        .select(
-          `
+      try {
+        if (!silent) setIsLoading(true);
+        const { data, error } = await supabase
+          .from("staycation_bookings")
+          .select(
+            `
           id,
           user_id,
           venue_id,
@@ -47,6 +48,7 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
           total_amount,
           paid_amount,
           subtotal,
+          deposit,
           booking_source,
           guest_name,   
           guest_phone,   
@@ -56,56 +58,60 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
           venues!venue_id ( staycation_venues ( property_type ) ),
           profiles:user_id ( full_name, phone, avatar_url, email )
         `,
-        )
-        .eq("id", bookingId)
-        .single();
+          )
+          .eq("id", bookingId)
+          .single();
 
-      if (error) throw error;
-      setBookingDetails(data);
+        if (error) throw error;
+        setBookingDetails(data);
 
-      // Fetch Payment Logs Ledger
-      const { data: logsData, error: logsError } = await supabase
-        .from("offline_payment_logs")
-        .select("id, amount, payment_mode, note, created_at")
-        .eq("booking_id", bookingId)
-        .eq("booking_vertical", "staycation")
-        .order("created_at", { ascending: true });
+        // Fetch Payment Logs Ledger
+        const { data: logsData, error: logsError } = await supabase
+          .from("offline_payment_logs")
+          .select("id, amount, payment_mode, note, created_at")
+          .eq("booking_id", bookingId)
+          .eq("booking_vertical", "staycation")
+          .order("created_at", { ascending: true });
 
-      let fetchedLogs = (logsData as PaymentLog[]) || [];
+        let fetchedLogs = (logsData as PaymentLog[]) || [];
 
-      if (logsError && logsError.code !== "PGRST116") {
-        console.warn("Could not fetch payment logs:", logsError);
+        if (logsError && logsError.code !== "PGRST116") {
+          console.warn("Could not fetch payment logs:", logsError);
+        }
+
+        // Reconstruct Initial Advance Payment
+        const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
+        const isOnline = data.booking_source === "online" || !!data.user_id;
+        const totalPaidAmount = isOnline
+          ? Number(data.subtotal) || 0
+          : Number(data.paid_amount) || 0;
+
+        if (totalPaidAmount > totalLoggedAmount) {
+          const initialAmount = totalPaidAmount - totalLoggedAmount;
+          const initialLog: PaymentLog = {
+            id: `initial-${data.id}`,
+            amount: initialAmount,
+            // Assume Online/UPI if user_id exists (app booking), otherwise Cash for manual
+            payment_mode: data.user_id ? "online" : "cash",
+            note: "Initial Advance Payment",
+            created_at: data.created_at,
+            isInitial: true,
+          };
+
+          // Unshift to put it at the very top of the list (earliest date)
+          fetchedLogs.unshift(initialLog);
+        }
+
+        setPaymentLogs(fetchedLogs);
+      } catch (error: any) {
+        console.error("Error fetching booking details:", error);
+        Alert.alert("Error", "Could not load booking details.");
+      } finally {
+        setIsLoading(false);
       }
-
-      // Reconstruct Initial Advance Payment
-      const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
-      const isOnline = data.booking_source === "online" || !!data.user_id;
-      const totalPaidAmount = isOnline ? Number(data.subtotal) || 0 : Number(data.paid_amount) || 0;
-
-      if (totalPaidAmount > totalLoggedAmount) {
-        const initialAmount = totalPaidAmount - totalLoggedAmount;
-        const initialLog: PaymentLog = {
-          id: `initial-${data.id}`,
-          amount: initialAmount,
-          // Assume Online/UPI if user_id exists (app booking), otherwise Cash for manual
-          payment_mode: data.user_id ? "online" : "cash",
-          note: "Initial Advance Payment",
-          created_at: data.created_at,
-          isInitial: true,
-        };
-
-        // Unshift to put it at the very top of the list (earliest date)
-        fetchedLogs.unshift(initialLog);
-      }
-
-      setPaymentLogs(fetchedLogs);
-    } catch (error: any) {
-      console.error("Error fetching booking details:", error);
-      Alert.alert("Error", "Could not load booking details.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [bookingId]);
+    },
+    [bookingId],
+  );
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
@@ -160,8 +166,8 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
 
       if (updateError) throw updateError;
 
-      // Re-fetch to update UI
-      await fetchBookingDetails();
+      // Re-fetch to update UI silently
+      await fetchBookingDetails(true);
       Alert.alert("Success", "Payment updated successfully!");
       return true;
     } catch (error: any) {
@@ -207,7 +213,7 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
         // We log the error but don't throw, as the booking is already cancelled
       }
 
-      await fetchBookingDetails();
+      await fetchBookingDetails(true);
       Alert.alert("Success", "Booking cancelled successfully.");
       return true;
     } catch (error: any) {
@@ -266,11 +272,32 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
         if (updateError) throw updateError;
       }
 
-      await fetchBookingDetails();
+      await fetchBookingDetails(true);
       return true;
     } catch (error: any) {
       console.error("Error deleting payment log:", error);
       Alert.alert("Error", "Could not delete payment log.");
+      return false;
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const updateDeposit = async (newDepositAmount: number) => {
+    if (!bookingDetails) return false;
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase
+        .from("staycation_bookings")
+        .update({ deposit: newDepositAmount })
+        .eq("id", bookingDetails.id);
+
+      if (error) throw error;
+      await fetchBookingDetails(true);
+      return true;
+    } catch (error: any) {
+      console.error("Error updating deposit:", error);
+      Alert.alert("Error", "Could not update the deposit amount.");
       return false;
     } finally {
       setIsUpdating(false);
@@ -285,6 +312,7 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
     updatePayment,
     deletePaymentLog,
     cancelBooking,
+    updateDeposit,
     refetch: fetchBookingDetails,
   };
 };

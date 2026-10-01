@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/layouts/ScreenContainer";
 import { Text } from "@/components/ui";
-import { ArrowLeft, Trash2, ChevronUp, ChevronDown, Phone } from "lucide-react-native";
+import { ArrowLeft, Trash2, ChevronUp, ChevronDown, Phone, Pencil } from "lucide-react-native";
 import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { hs, vs, ms, fs } from "@/utils/responsive.utils";
 import { COLORS } from "@/constants/theme";
@@ -61,6 +61,7 @@ export const StaycationBookingDetailsScreen = () => {
     updatePayment,
     cancelBooking,
     deletePaymentLog,
+    updateDeposit,
   } = useStaycationBookingDetails(initialBooking?.dbId || initialBooking?.id);
 
   const [isAddingPayment, setIsAddingPayment] = useState(false);
@@ -73,6 +74,9 @@ export const StaycationBookingDetailsScreen = () => {
   );
 
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  const [isEditingDeposit, setIsEditingDeposit] = useState(false);
+  const [editedDepositAmount, setEditedDepositAmount] = useState("");
 
   useEffect(() => {
     const subs = [
@@ -107,6 +111,16 @@ export const StaycationBookingDetailsScreen = () => {
     if (success) {
       setIsAddingPayment(false);
       setPaymentInput("");
+    }
+  };
+
+  const handleDepositSave = async () => {
+    const amount = parseFloat(editedDepositAmount) || 0;
+    if (updateDeposit) {
+      const success = await updateDeposit(amount);
+      if (success) {
+        setIsEditingDeposit(false);
+      }
     }
   };
 
@@ -146,12 +160,15 @@ export const StaycationBookingDetailsScreen = () => {
     !!bookingDetails?.user_id ||
     initialBooking?.status === "Online";
 
-  const amountPaid =
+  const rawAmountPaid =
     bookingDetails != null
       ? (isOnline
           ? parseFloat(bookingDetails.subtotal || "0")
           : parseFloat(bookingDetails.paid_amount || "0")) / units
       : parseFloat(initialBooking?.paidAmount) || 0;
+
+  const depositAmount = parseFloat(bookingDetails?.deposit || initialBooking?.deposit || "0");
+  const amountPaid = Math.max(0, rawAmountPaid - depositAmount);
 
   const remainingAmount = Math.max(0, totalPayment - amountPaid);
 
@@ -191,6 +208,7 @@ export const StaycationBookingDetailsScreen = () => {
     totalPayment: totalPayment.toFixed(0),
     remainingAmount: remainingAmount.toFixed(0),
     amountPaid: amountPaid.toFixed(0),
+    depositAmount: depositAmount.toFixed(0),
     groupType: groupType,
   };
 
@@ -393,19 +411,60 @@ export const StaycationBookingDetailsScreen = () => {
         </View>
 
         <View style={styles.paymentCard}>
-          {/* Total Amount Row */}
-          <View style={styles.totalAmountRow}>
-            <View style={styles.totalIconBox}>
-              <WalletSvg width={ms(22)} height={ms(22)} color="#63a1fd" />
+          <View style={[styles.totalAmountRow, styles.totalAmountRowSplit]}>
+            <View style={styles.totalAmountInner}>
+              <View style={styles.totalIconBox}>
+                <WalletSvg width={ms(22)} height={ms(22)} color="#63a1fd" />
+              </View>
+              <View>
+                <Text variant="body1" weight="bold" style={styles.totalLabel}>
+                  Total Amount
+                </Text>
+                <Text variant="h2" weight="bold" style={styles.totalValue}>
+                  ₹{bookingData.totalPayment}
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text variant="body1" weight="bold" style={styles.totalLabel}>
-                Total Amount
-              </Text>
-              <Text variant="h2" weight="bold" style={styles.totalValue}>
-                ₹{bookingData.totalPayment}
-              </Text>
-            </View>
+
+            {parseFloat(bookingData.depositAmount) > 0 && (
+              <View style={styles.totalAmountInner}>
+                <View style={[styles.totalIconBox, styles.totalIconBoxWarning]}>
+                  <MoneySvg width={ms(22)} height={ms(22)} color="#F59E0B" />
+                </View>
+                <View style={styles.depositCol}>
+                  <View style={styles.depositHeaderRow}>
+                    <Text variant="body1" weight="bold" style={styles.totalLabel}>
+                      Deposit
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setEditedDepositAmount(bookingData.depositAmount);
+                        setIsEditingDeposit(true);
+                      }}
+                      hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                      <Pencil size={ms(14)} color="#888" />
+                    </TouchableOpacity>
+                  </View>
+                  {isEditingDeposit ? (
+                    <TextInput
+                      style={[styles.totalValue, styles.totalValueWarning, styles.depositInput]}
+                      value={editedDepositAmount}
+                      onChangeText={setEditedDepositAmount}
+                      keyboardType="numeric"
+                      onBlur={handleDepositSave}
+                      autoFocus
+                    />
+                  ) : (
+                    <Text
+                      variant="h2"
+                      weight="bold"
+                      style={[styles.totalValue, styles.totalValueWarning]}>
+                      ₹{bookingData.depositAmount}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Pending + Received */}
@@ -774,6 +833,22 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontSize: fs(16), color: "#000", marginBottom: vs(2), fontFamily: "Gilroy-Bold" },
   totalValue: { fontSize: fs(24), color: "#4A80F0", fontFamily: "Gilroy-Medium" },
+  totalAmountRowSplit: {
+    justifyContent: "space-between",
+  },
+  totalAmountInner: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: hs(12),
+  },
+  totalIconBoxWarning: {
+    backgroundColor: "#FFF4E5",
+  },
+  totalValueWarning: {
+    color: "#F59E0B",
+  },
 
   amountsRow: { flexDirection: "row", gap: hs(12), marginBottom: vs(16) },
   amountBoxLightRed: {
@@ -813,6 +888,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#D6FFE9",
     justifyContent: "center",
     alignItems: "center",
+  },
+  amountBoxWarning: {
+    backgroundColor: "#FFF4E5",
+  },
+  amountIconWarning: {
+    backgroundColor: "#FFE5C2",
+  },
+  amountValueWarning: {
+    color: "#F59E0B",
   },
   amountTextCol: { flex: 1 },
   amountLabel: {
@@ -1017,5 +1101,18 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: fs(20),
     fontFamily: "bison",
+  },
+  depositCol: {
+    flex: 1,
+  },
+  depositHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingRight: hs(8),
+  },
+  depositInput: {
+    padding: 0,
+    margin: 0,
   },
 });

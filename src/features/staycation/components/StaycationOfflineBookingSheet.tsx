@@ -172,7 +172,10 @@ export const StaycationOfflineBookingSheet = ({
   const [farmhouseConfig, setFarmhouseConfig] = useState<{
     basePrice: number;
     extraCharge: number;
+    standardOccupancy: number;
     maxOccupancy: number;
+    minOccupancy?: number;
+    securityDeposit: number;
   } | null>(null);
 
   const formatDateLabel = (date: Date) => {
@@ -184,11 +187,21 @@ export const StaycationOfflineBookingSheet = ({
   const currentGuestInt = parseInt(guestCount, 10) || 1;
 
   const maxStandardGuests = isFarmhouse
-    ? farmhouseConfig?.maxOccupancy || 0
+    ? farmhouseConfig?.standardOccupancy || farmhouseConfig?.maxOccupancy || 0
     : activeRoomConfig
     ? activeRoomConfig.maxOccupancy * unitsInt
     : 2;
-  const maxExtraGuests = isFarmhouse ? 10 : activeRoomConfig ? unitsInt : 0;
+  const maxExtraGuests = isFarmhouse
+    ? farmhouseConfig
+      ? Math.max(
+          0,
+          farmhouseConfig.maxOccupancy -
+            (farmhouseConfig.standardOccupancy || farmhouseConfig.maxOccupancy),
+        )
+      : 0
+    : activeRoomConfig
+    ? unitsInt
+    : 0;
   const totalAllowedGuests = maxStandardGuests + maxExtraGuests;
   const extraGuestsCount = Math.max(0, currentGuestInt - maxStandardGuests);
 
@@ -206,18 +219,38 @@ export const StaycationOfflineBookingSheet = ({
   useEffect(() => {
     if (visible && isFarmhouse && venueId) {
       const fetchFarmhouseConfig = async () => {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("staycation_venues")
-          .select("base_price_per_night, extra_guest_charge, max_guests")
+          .select(
+            "base_price_per_night, extra_guest_charge, standard_guest_count, max_guests, security_deposit_amount, min_guests",
+          )
           .eq("venue_id", venueId)
           .maybeSingle();
 
+        if (error) {
+          console.error("Error fetching farmhouse config:", error);
+          return;
+        }
+
         if (data) {
+          const securityDepositVal = data.security_deposit_amount || 0;
           setFarmhouseConfig({
             basePrice: data.base_price_per_night || 0,
             extraCharge: data.extra_guest_charge || 0,
+            standardOccupancy: data.standard_guest_count || data.max_guests || 0,
             maxOccupancy: data.max_guests || 0,
+            minOccupancy: data.min_guests,
+            securityDeposit: securityDepositVal,
           });
+
+          if (data.min_guests) {
+            setGuestCount(data.min_guests.toString());
+          }
+
+          if (securityDepositVal > 0) {
+            setAdvancePaid(securityDepositVal.toString());
+            setIsAdvanceActive(true);
+          }
         }
       };
       fetchFarmhouseConfig();
@@ -599,7 +632,9 @@ export const StaycationOfflineBookingSheet = ({
     const numericTotal = parseFloat(totalPayment);
     const numericAdvance = parseFloat(advancePaid || "0");
 
-    if (numericAdvance > numericTotal) {
+    const hasDeposit = isFarmhouse && (farmhouseConfig?.securityDeposit || 0) > 0;
+
+    if (!hasDeposit && numericAdvance > numericTotal) {
       Alert.alert("Error", "Advance paid cannot exceed total payment.");
       return;
     }
@@ -612,7 +647,8 @@ export const StaycationOfflineBookingSheet = ({
       checkOutDate: checkOutDate,
       guestCount: currentGuestInt,
       totalPayment: parseFloat(totalPayment) || 0,
-      advancePaid: parseFloat(advancePaid) || 0,
+      advancePaid: hasDeposit ? 0 : parseFloat(advancePaid) || 0,
+      deposit: hasDeposit ? parseFloat(advancePaid) || 0 : 0,
       paymentMode: selectedMethod,
       bookingType: bookingFor.toLowerCase(),
       roomType: isFarmhouse ? undefined : roomType,
@@ -623,18 +659,26 @@ export const StaycationOfflineBookingSheet = ({
     });
 
     if (result.success) {
-      const dueAmount = numericTotal - numericAdvance;
+      const dueAmount = numericTotal - (hasDeposit ? 0 : numericAdvance);
       const appLink =
         Platform.OS === "ios"
           ? "https://apps.apple.com/app/bookr/idYOUR_APP_ID"
           : "https://play.google.com/store/apps/details?id=com.bookr_mobile";
       const spicyLine =
         "🔥 Don't let your slot get snatched! Lock in your favorite time instantly on the Bookr app.";
+
+      let paymentSummary = `Total: ₹${numericTotal}\n`;
+      if (hasDeposit) {
+        paymentSummary += `Deposit: ₹${numericAdvance}\nPaid: ₹0\nDue: ₹${dueAmount}`;
+      } else {
+        paymentSummary += `Paid: ₹${numericAdvance}\nDue: ₹${dueAmount}`;
+      }
+
       const shareMessage = `Booking Confirmed! 🎉\nHi ${name.trim()},\nYour slot at ${
         result.venueName || "our venue"
       } is locked in via Bookr.\n\nDate: ${formatDateLabel(checkInDate)} to ${formatDateLabel(
         checkOutDate,
-      )}\n\nPayment Summary:\nTotal: ₹${totalPayment}\nPaid: ₹${advancePaid}\nDue: ₹${dueAmount}\n\n${spicyLine}\n${appLink}\n\nThank you!`;
+      )}\n\nPayment Summary:\n${paymentSummary}\n\n${spicyLine}\n${appLink}\n\nThank you!`;
 
       Alert.alert("Booking Success", "Offline booking created successfully.", [
         {
@@ -818,7 +862,18 @@ export const StaycationOfflineBookingSheet = ({
                               type: "guestCount",
                               options: Array.from(
                                 { length: Math.max(1, totalAllowedGuests) },
-                                (_, i) => (i + 1).toString(),
+                                (_, i) => {
+                                  const num = i + 1;
+                                  if (isFarmhouse && farmhouseConfig) {
+                                    if (
+                                      num > farmhouseConfig.standardOccupancy &&
+                                      num <= farmhouseConfig.maxOccupancy
+                                    ) {
+                                      return `${num} (Extra Guest)`;
+                                    }
+                                  }
+                                  return num.toString();
+                                },
                               ),
                               title: "Select Guest Count",
                             });
@@ -1038,7 +1093,11 @@ export const StaycationOfflineBookingSheet = ({
                         <MoneySvg width={ms(18)} height={ms(18)} color="#00B562" />
                       </View>
                       <View style={styles.gridCardContent}>
-                        <Text style={styles.gridCardLabel}>Advance</Text>
+                        <Text style={styles.gridCardLabel}>
+                          {isFarmhouse && (farmhouseConfig?.securityDeposit || 0) > 0
+                            ? "Deposit"
+                            : "Advance"}
+                        </Text>
                         <View style={styles.currencyRow}>
                           <Text style={styles.currencySymbol}>₹</Text>
                           <TextInput
