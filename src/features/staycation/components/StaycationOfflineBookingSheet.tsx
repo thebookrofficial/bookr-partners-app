@@ -176,6 +176,12 @@ export const StaycationOfflineBookingSheet = ({
     maxOccupancy: number;
     minOccupancy?: number;
     securityDeposit: number;
+    isPackage?: boolean;
+    vendorBaseCost?: number;
+    advancePaymentType?: string;
+    advancePaymentAmount?: number;
+    advancePaymentPercentage?: number;
+    commissionPercentage?: number;
   } | null>(null);
 
   const formatDateLabel = (date: Date) => {
@@ -211,7 +217,9 @@ export const StaycationOfflineBookingSheet = ({
   );
   let extraGuestAmount = 0;
   if (isFarmhouse && farmhouseConfig) {
-    extraGuestAmount = extraGuestsCount * farmhouseConfig.extraCharge * displayNights;
+    extraGuestAmount = farmhouseConfig.isPackage
+      ? 0
+      : extraGuestsCount * farmhouseConfig.extraCharge * displayNights;
   } else if (!isFarmhouse && activeRoomConfig) {
     extraGuestAmount = extraGuestsCount * activeRoomConfig.extraGuestCharge * displayNights;
   }
@@ -222,7 +230,7 @@ export const StaycationOfflineBookingSheet = ({
         const { data, error } = await supabase
           .from("staycation_venues")
           .select(
-            "base_price_per_night, extra_guest_charge, standard_guest_count, max_guests, security_deposit_amount, min_guests",
+            "base_price_per_night, extra_guest_charge, standard_guest_count, max_guests, security_deposit_amount, min_guests, is_package, vendor_base_cost, advance_payment_type, advance_payment_amount, advance_payment_percentage, commission_percentage",
           )
           .eq("venue_id", venueId)
           .maybeSingle();
@@ -241,14 +249,20 @@ export const StaycationOfflineBookingSheet = ({
             maxOccupancy: data.max_guests || 0,
             minOccupancy: data.min_guests,
             securityDeposit: securityDepositVal,
+            isPackage: data.is_package,
+            vendorBaseCost: data.vendor_base_cost || 0,
+            advancePaymentType: data.advance_payment_type || "percentage",
+            advancePaymentAmount: data.advance_payment_amount || 0,
+            advancePaymentPercentage: data.advance_payment_percentage || 0,
+            commissionPercentage: data.commission_percentage || 0,
           });
 
           if (data.min_guests) {
             setGuestCount(data.min_guests.toString());
           }
 
+          // Initial advance paid logic will be handled in the total calculation effect
           if (securityDepositVal > 0) {
-            setAdvancePaid(securityDepositVal.toString());
             setIsAdvanceActive(true);
           }
         }
@@ -266,9 +280,13 @@ export const StaycationOfflineBookingSheet = ({
     let total = 0;
 
     if (isFarmhouse && farmhouseConfig) {
-      const baseCost = farmhouseConfig.basePrice * nights;
-      const extraCost = extraGuestsCount * farmhouseConfig.extraCharge * nights;
-      total = baseCost + extraCost;
+      if (farmhouseConfig.isPackage) {
+        total = farmhouseConfig.basePrice * currentGuestInt * nights;
+      } else {
+        const baseCost = farmhouseConfig.basePrice * nights;
+        const extraCost = extraGuestsCount * farmhouseConfig.extraCharge * nights;
+        total = baseCost + extraCost;
+      }
     } else if (!isFarmhouse && activeRoomConfig) {
       const baseCost = activeRoomConfig.pricePerNight * unitsInt * nights;
       const extraCost = extraGuestsCount * activeRoomConfig.extraGuestCharge * nights;
@@ -639,6 +657,19 @@ export const StaycationOfflineBookingSheet = ({
       return;
     }
 
+    let platformFee = 0;
+    let vendorPayout = numericTotal;
+
+    if (isFarmhouse && farmhouseConfig) {
+      const totalVendorCost = farmhouseConfig.isPackage
+        ? (farmhouseConfig.vendorBaseCost || 0) * currentGuestInt * displayNights
+        : (farmhouseConfig.vendorBaseCost || 0) * displayNights * unitsInt;
+
+      const commissionableAmount = Math.max(0, numericTotal - totalVendorCost);
+      platformFee = commissionableAmount * ((farmhouseConfig.commissionPercentage || 0) / 100);
+      vendorPayout = numericTotal - platformFee;
+    }
+
     const result = await createBooking({
       venueId,
       guestName: name.trim(),
@@ -646,9 +677,9 @@ export const StaycationOfflineBookingSheet = ({
       checkInDate: checkInDate,
       checkOutDate: checkOutDate,
       guestCount: currentGuestInt,
-      totalPayment: parseFloat(totalPayment) || 0,
-      advancePaid: hasDeposit ? 0 : parseFloat(advancePaid) || 0,
-      deposit: hasDeposit ? parseFloat(advancePaid) || 0 : 0,
+      totalPayment: numericTotal,
+      advancePaid: hasDeposit ? 0 : numericAdvance,
+      deposit: hasDeposit ? numericAdvance : 0,
       paymentMode: selectedMethod,
       bookingType: bookingFor.toLowerCase(),
       roomType: isFarmhouse ? undefined : roomType,
@@ -656,6 +687,8 @@ export const StaycationOfflineBookingSheet = ({
       groupType: groupType,
       unitCount: isFarmhouse ? 1 : unitsInt,
       bookingSource: "offline",
+      platformFee: platformFee,
+      vendorPayout: vendorPayout,
     });
 
     if (result.success) {

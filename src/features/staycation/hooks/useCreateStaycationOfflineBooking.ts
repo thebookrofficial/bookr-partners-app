@@ -22,6 +22,8 @@ interface CreateOfflineBookingPayload {
   bookingSource?: "offline" | "online";
   paymentMode?: string;
   deposit?: number;
+  vendorPayout?: number;
+  platformFee?: number;
 }
 
 export const useCreateStaycationOfflineBooking = () => {
@@ -152,10 +154,10 @@ export const useCreateStaycationOfflineBooking = () => {
           guest_count: safeGuestCount,
           subtotal: safeTotalPayment,
           discount_amount: 0,
-          platform_fee: 0,
+          platform_fee: payload.platformFee ?? 0,
           gateway_fee: 0,
           total_amount: safeTotalPayment,
-          vendor_payout: safeTotalPayment,
+          vendor_payout: payload.vendorPayout ?? safeTotalPayment,
           booking_status: safeTotalPayment > 0 ? "confirmed" : "pending",
           paid_amount: 0,
           guest_name: payload.guestName || "Guest",
