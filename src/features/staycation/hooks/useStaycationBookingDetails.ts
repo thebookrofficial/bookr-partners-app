@@ -55,7 +55,7 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
           booking_status,
           created_at,
           special_requests,
-          venues!venue_id ( staycation_venues ( property_type ) ),
+          venues!venue_id ( staycation_venues ( property_type, security_deposit_amount ) ),
           profiles:user_id ( full_name, phone, avatar_url, email )
         `,
           )
@@ -139,9 +139,10 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
 
       const currentPaid = parseFloat(bookingDetails.paid_amount) || 0;
       const totalCost = parseFloat(bookingDetails.total_amount) || 0;
+      const depositAmount = parseFloat(bookingDetails.deposit) || 0;
       const newPaidTotal = currentPaid + totalAdded;
 
-      if (newPaidTotal > totalCost) {
+      if (newPaidTotal > totalCost + depositAmount) {
         Alert.alert("Overpayment", "The amount entered exceeds the remaining balance.");
         return false;
       }
