@@ -86,9 +86,10 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
           !!data.user_id ||
           data.booking_status === "Online" ||
           data.booking_status === "online";
-        const totalPaidAmount = isOnline
-          ? Number(data.subtotal) || 0
-          : Number(data.paid_amount) || 0;
+        const totalPaidAmount = Math.max(
+          Number(data.paid_amount || 0),
+          isOnline ? Number(data.subtotal || 0) : 0,
+        );
 
         if (totalPaidAmount > totalLoggedAmount) {
           const initialAmount = totalPaidAmount - totalLoggedAmount;
@@ -137,7 +138,16 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
     try {
       setIsUpdating(true);
 
-      const currentPaid = parseFloat(bookingDetails.paid_amount) || 0;
+      const isOnline =
+        bookingDetails.booking_source === "online" ||
+        !!bookingDetails.user_id ||
+        bookingDetails.booking_status === "Online" ||
+        bookingDetails.booking_status === "online";
+
+      const currentPaid = Math.max(
+        parseFloat(bookingDetails.paid_amount || "0"),
+        isOnline ? parseFloat(bookingDetails.subtotal || "0") : 0,
+      );
       const totalCost = parseFloat(bookingDetails.total_amount) || 0;
       const depositAmount = parseFloat(bookingDetails.deposit) || 0;
       const newPaidTotal = currentPaid + totalAdded;

@@ -162,9 +162,10 @@ export const StaycationBookingDetailsScreen = () => {
 
   const rawAmountPaid =
     bookingDetails != null
-      ? (isOnline
-          ? parseFloat(bookingDetails.subtotal || "0")
-          : parseFloat(bookingDetails.paid_amount || "0")) / units
+      ? Math.max(
+          parseFloat(bookingDetails.paid_amount || "0"),
+          isOnline ? parseFloat(bookingDetails.subtotal || "0") : 0,
+        ) / units
       : parseFloat(initialBooking?.paidAmount) || 0;
 
   const depositAmount = parseFloat(bookingDetails?.deposit || initialBooking?.deposit || "0");
