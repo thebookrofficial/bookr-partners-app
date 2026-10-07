@@ -60,7 +60,7 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
         const totalAmount = parseFloat(bookingData.total_amount) || 0;
         const rawPaidAmount = parseFloat(bookingData.paid_amount) || 0;
         const rawSubtotal = parseFloat(bookingData.subtotal) || 0;
-        const paidAmount = isOnline ? rawSubtotal : rawPaidAmount;
+        const paidAmount = Math.max(rawPaidAmount, isOnline ? rawSubtotal : 0);
 
         // Priority 1: Cancelled
         if (bookingData.booking_status === "cancelled") {

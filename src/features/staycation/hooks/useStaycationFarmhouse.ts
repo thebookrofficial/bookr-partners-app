@@ -150,7 +150,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
 
         const rawPaid = parseFloat(b.paid_amount) || 0;
         const rawSubtotal = parseFloat(b.subtotal) || 0;
-        const finalPaid = isOnline ? rawSubtotal : rawPaid;
+        const finalPaid = Math.max(rawPaid, isOnline ? rawSubtotal : 0);
 
         const formatted: StaycationBooking = {
           id: b.id,
@@ -300,8 +300,9 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
   useFocusEffect(
     useCallback(() => {
       refetchVenues();
+      fetchBookings();
       // DO NOT put fetchBookings in this dependency array
-    }, [refetchVenues]),
+    }, [refetchVenues, fetchBookings]),
   );
 
   const filteredBookings = useMemo(() => {

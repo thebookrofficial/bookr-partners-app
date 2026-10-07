@@ -164,7 +164,7 @@ export const useStaycationHistory = (
           guestCount: booking.guest_count,
           roomId: booking.room_id,
           vendorPayout: parseFloat(booking.vendor_payout) || 0,
-          paidAmount: isOnline ? rawSubtotal : rawPaid,
+          paidAmount: Math.max(rawPaid, isOnline ? rawSubtotal : 0),
         });
       });
 

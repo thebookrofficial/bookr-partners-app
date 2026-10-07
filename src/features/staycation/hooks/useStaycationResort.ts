@@ -199,7 +199,7 @@ export const useStaycationResort = (
 
         const rawPaid = (parseFloat(b.paid_amount) || 0) / units;
         const rawSubtotal = (parseFloat(b.subtotal) || 0) / units;
-        const finalPaid = isOnline ? rawSubtotal : rawPaid;
+        const finalPaid = Math.max(rawPaid, isOnline ? rawSubtotal : 0);
 
         const formatted: StaycationBooking = {
           id: `${b.id}-unit-${i + 1}`,
@@ -363,7 +363,8 @@ export const useStaycationResort = (
   useFocusEffect(
     useCallback(() => {
       refetchVenues();
-    }, [refetchVenues]),
+      fetchResortData();
+    }, [refetchVenues, fetchResortData]),
   );
 
   return {
