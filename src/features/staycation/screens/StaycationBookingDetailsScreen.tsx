@@ -150,10 +150,12 @@ export const StaycationBookingDetailsScreen = () => {
 
   const units = bookingDetails?.unit_count || 1;
 
-  const totalPayment =
-    bookingDetails?.total_amount != null
+  const totalPayment = Number(
+    (bookingDetails?.total_amount != null
       ? parseFloat(bookingDetails.total_amount) / units
-      : parseFloat(initialBooking?.amount) || 0;
+      : parseFloat(initialBooking?.amount) || 0
+    ).toFixed(2),
+  );
 
   const isOnline =
     bookingDetails?.booking_source === "online" ||
@@ -168,10 +170,12 @@ export const StaycationBookingDetailsScreen = () => {
         ) / units
       : parseFloat(initialBooking?.paidAmount) || 0;
 
-  const depositAmount = parseFloat(bookingDetails?.deposit || initialBooking?.deposit || "0");
-  const amountPaid = Math.max(0, rawAmountPaid - depositAmount);
+  const depositAmount = Number(
+    parseFloat(bookingDetails?.deposit || initialBooking?.deposit || "0").toFixed(2),
+  );
+  const amountPaid = Number(Math.max(0, rawAmountPaid - depositAmount).toFixed(2));
 
-  const remainingAmount = Math.max(0, totalPayment - amountPaid);
+  const remainingAmount = Number(Math.max(0, totalPayment - amountPaid).toFixed(2));
 
   const getGroupType = (requests: string) => {
     if (!requests) return null;

@@ -84,7 +84,7 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
         .select(
           `
             id, user_id, booking_type, booking_status, platform_fee, check_in_date, check_out_date,
-            guest_count, total_amount, paid_amount, subtotal, guest_name, guest_phone, booking_source,
+            guest_count, total_amount, paid_amount, subtotal, deposit, guest_name, guest_phone, booking_source,
             profiles ( full_name, phone, avatar_url )
           `,
         )
@@ -150,7 +150,8 @@ export const useStaycationFarmhouse = (initialVenueId?: string) => {
 
         const rawPaid = parseFloat(b.paid_amount) || 0;
         const rawSubtotal = parseFloat(b.subtotal) || 0;
-        const finalPaid = Math.max(rawPaid, isOnline ? rawSubtotal : 0);
+        const rawDeposit = parseFloat(b.deposit) || 0;
+        const finalPaid = Math.max(0, Math.max(rawPaid, isOnline ? rawSubtotal : 0) - rawDeposit);
 
         const formatted: StaycationBooking = {
           id: b.id,

@@ -79,20 +79,28 @@ export const useStaycationBookingDetails = (bookingId: string | undefined) => {
           console.warn("Could not fetch payment logs:", logsError);
         }
 
-        // Reconstruct Initial Advance Payment
-        const totalLoggedAmount = fetchedLogs.reduce((sum, log) => sum + Number(log.amount), 0);
+        // Reconstruct Initial Advance Payment (Exclude Security Deposit)
+        const totalLoggedAmount = fetchedLogs
+          .filter(log => !log.note?.startsWith("Security Deposit"))
+          .reduce((sum, log) => sum + Number(log.amount), 0);
+
         const isOnline =
           data.booking_source === "online" ||
           !!data.user_id ||
           data.booking_status === "Online" ||
           data.booking_status === "online";
-        const totalPaidAmount = Math.max(
+
+        const rawPaidAmount = Math.max(
           Number(data.paid_amount || 0),
           isOnline ? Number(data.subtotal || 0) : 0,
         );
 
+        const depositAmount = Number(data.deposit || 0);
+        const totalPaidAmount = Math.max(0, rawPaidAmount - depositAmount);
+
         if (totalPaidAmount > totalLoggedAmount) {
-          const initialAmount = totalPaidAmount - totalLoggedAmount;
+          // Fix floating point precision issues (e.g. 1.2000000000002)
+          const initialAmount = Number((totalPaidAmount - totalLoggedAmount).toFixed(2));
           const initialLog: PaymentLog = {
             id: `initial-${data.id}`,
             amount: initialAmount,

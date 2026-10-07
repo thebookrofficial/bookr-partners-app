@@ -86,6 +86,7 @@ export const useStaycationHistory = (
           guest_count,
           total_amount,
           paid_amount,
+          deposit,
           vendor_payout,
           room_id,
           guest_name,
@@ -152,6 +153,8 @@ export const useStaycationHistory = (
         const rawPaid = parseFloat(booking.paid_amount) || 0;
         const rawSubtotal = parseFloat(booking.subtotal) || 0;
 
+        const rawDeposit = parseFloat(booking.deposit) || 0;
+
         formattedBookings.push({
           id: booking.id,
           name: booking.guest_name || profile?.full_name || "Guest",
@@ -164,7 +167,7 @@ export const useStaycationHistory = (
           guestCount: booking.guest_count,
           roomId: booking.room_id,
           vendorPayout: parseFloat(booking.vendor_payout) || 0,
-          paidAmount: Math.max(rawPaid, isOnline ? rawSubtotal : 0),
+          paidAmount: Math.max(0, Math.max(rawPaid, isOnline ? rawSubtotal : 0) - rawDeposit),
         });
       });
 

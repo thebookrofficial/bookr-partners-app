@@ -36,6 +36,7 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
           total_amount,
           paid_amount,
           subtotal,
+          deposit,
           guest_name,
           guest_phone,
           profiles:user_id ( full_name, phone, avatar_url )
@@ -60,7 +61,11 @@ export const useStaycationBooking = (bookingId: string | undefined) => {
         const totalAmount = parseFloat(bookingData.total_amount) || 0;
         const rawPaidAmount = parseFloat(bookingData.paid_amount) || 0;
         const rawSubtotal = parseFloat(bookingData.subtotal) || 0;
-        const paidAmount = Math.max(rawPaidAmount, isOnline ? rawSubtotal : 0);
+        const rawDeposit = parseFloat(bookingData.deposit) || 0;
+        const paidAmount = Math.max(
+          0,
+          Math.max(rawPaidAmount, isOnline ? rawSubtotal : 0) - rawDeposit,
+        );
 
         // Priority 1: Cancelled
         if (bookingData.booking_status === "cancelled") {
