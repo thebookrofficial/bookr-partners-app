@@ -150,10 +150,12 @@ export const StaycationBookingDetailsScreen = () => {
 
   const units = bookingDetails?.unit_count || 1;
 
-  const totalPayment =
-    bookingDetails?.total_amount != null
+  const totalPayment = Number(
+    (bookingDetails?.total_amount != null
       ? parseFloat(bookingDetails.total_amount) / units
-      : parseFloat(initialBooking?.amount) || 0;
+      : parseFloat(initialBooking?.amount) || 0
+    ).toFixed(2),
+  );
 
   const isOnline =
     bookingDetails?.booking_source === "online" ||
@@ -162,15 +164,18 @@ export const StaycationBookingDetailsScreen = () => {
 
   const rawAmountPaid =
     bookingDetails != null
-      ? (isOnline
-          ? parseFloat(bookingDetails.subtotal || "0")
-          : parseFloat(bookingDetails.paid_amount || "0")) / units
+      ? Math.max(
+          parseFloat(bookingDetails.paid_amount || "0"),
+          isOnline ? parseFloat(bookingDetails.subtotal || "0") : 0,
+        ) / units
       : parseFloat(initialBooking?.paidAmount) || 0;
 
-  const depositAmount = parseFloat(bookingDetails?.deposit || initialBooking?.deposit || "0");
-  const amountPaid = Math.max(0, rawAmountPaid - depositAmount);
+  const depositAmount = Number(
+    parseFloat(bookingDetails?.deposit || initialBooking?.deposit || "0").toFixed(2),
+  );
+  const amountPaid = Number(Math.max(0, rawAmountPaid - depositAmount).toFixed(2));
 
-  const remainingAmount = Math.max(0, totalPayment - amountPaid);
+  const remainingAmount = Number(Math.max(0, totalPayment - amountPaid).toFixed(2));
 
   const getGroupType = (requests: string) => {
     if (!requests) return null;
@@ -209,6 +214,11 @@ export const StaycationBookingDetailsScreen = () => {
     remainingAmount: remainingAmount.toFixed(0),
     amountPaid: amountPaid.toFixed(0),
     depositAmount: depositAmount.toFixed(0),
+    venueSecurityDeposit: parseFloat(
+      (Array.isArray(bookingDetails?.venues?.staycation_venues)
+        ? bookingDetails?.venues?.staycation_venues[0]?.security_deposit_amount
+        : bookingDetails?.venues?.staycation_venues?.security_deposit_amount) || "0",
+    ),
     groupType: groupType,
   };
 
@@ -433,7 +443,7 @@ export const StaycationBookingDetailsScreen = () => {
               </View>
             </View>
 
-            {parseFloat(bookingData.depositAmount) > 0 && (
+            {bookingData.venueSecurityDeposit > 0 && (
               <View style={styles.totalAmountInner}>
                 <View style={[styles.totalIconBox, styles.totalIconBoxWarning]}>
                   <MoneySvg width={ms(22)} height={ms(22)} color="#F59E0B" />
@@ -601,7 +611,7 @@ export const StaycationBookingDetailsScreen = () => {
         </View>
 
         {/* Payment History */}
-        {paymentLogs.length > 0 && (
+        {paymentLogs.filter(log => !log.note?.startsWith("Security Deposit")).length > 0 && (
           <View style={styles.paymentHistoryContainer}>
             <TouchableOpacity
               style={styles.paymentHistoryBtn}
@@ -621,48 +631,48 @@ export const StaycationBookingDetailsScreen = () => {
             </TouchableOpacity>
             {showPaymentHistory && (
               <View style={styles.paymentLogsWrapper}>
-                {paymentLogs.map((log, index) => {
-                  const icon = getIconForLog(log.payment_mode);
-                  const renderRightActions = () => (
-                    <View style={styles.swipeActionsContainer}>
-                      <TouchableOpacity
-                        style={styles.swipeActionDelete}
-                        onPress={() => {
-                          setSelectedLogToDelete(log);
-                          setDeleteModalVisible(true);
-                        }}>
-                        <Trash2 size={ms(18)} color="#E55959" />
-                      </TouchableOpacity>
-                    </View>
-                  );
-
-                  return (
-                    <Swipeable
-                      key={log.id}
-                      renderRightActions={renderRightActions}
-                      overshootRight={false}
-                      containerStyle={[
-                        index !== paymentLogs.length - 1 && { marginBottom: vs(20) },
-                      ]}>
-                      <View style={styles.logCard}>
-                        <Image source={icon} style={styles.logIcon} />
-                        <Text variant="body1" weight="bold" style={styles.logName}>
-                          {getNameForMethod(log.payment_mode)}
-                        </Text>
-                        <Text variant="body1" weight="bold" style={styles.logDate}>
-                          {new Date(log.created_at).toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </Text>
-                        <Text variant="h3" weight="bold" style={styles.logAmount}>
-                          ₹{log.amount}
-                        </Text>
+                {paymentLogs
+                  .filter(log => !log.note?.startsWith("Security Deposit"))
+                  .map((log, index, arr) => {
+                    const icon = getIconForLog(log.payment_mode);
+                    const renderRightActions = () => (
+                      <View style={styles.swipeActionsContainer}>
+                        <TouchableOpacity
+                          style={styles.swipeActionDelete}
+                          onPress={() => {
+                            setSelectedLogToDelete(log);
+                            setDeleteModalVisible(true);
+                          }}>
+                          <Trash2 size={ms(18)} color="#E55959" />
+                        </TouchableOpacity>
                       </View>
-                    </Swipeable>
-                  );
-                })}
+                    );
+
+                    return (
+                      <Swipeable
+                        key={log.id}
+                        renderRightActions={renderRightActions}
+                        overshootRight={false}
+                        containerStyle={[index !== arr.length - 1 && { marginBottom: vs(20) }]}>
+                        <View style={styles.logCard}>
+                          <Image source={icon} style={styles.logIcon} />
+                          <Text variant="body1" weight="bold" style={styles.logName}>
+                            {getNameForMethod(log.payment_mode)}
+                          </Text>
+                          <Text variant="body1" weight="bold" style={styles.logDate}>
+                            {new Date(log.created_at).toLocaleDateString("en-GB", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </Text>
+                          <Text variant="h3" weight="bold" style={styles.logAmount}>
+                            ₹{log.amount}
+                          </Text>
+                        </View>
+                      </Swipeable>
+                    );
+                  })}
               </View>
             )}
           </View>

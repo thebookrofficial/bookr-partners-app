@@ -60,6 +60,11 @@ describe("StaycationBookingDetailsScreen", () => {
       full_name: "Test User Profile",
       phone: "9999999999",
     },
+    venues: {
+      staycation_venues: {
+        security_deposit_amount: 1000,
+      },
+    },
   };
 
   beforeEach(() => {
