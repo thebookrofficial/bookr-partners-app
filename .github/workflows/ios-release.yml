@@ -107,6 +107,7 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          SENTRY_DISABLE_AUTO_UPLOAD: true
         run: |
           KEY_ID=$(echo -n "$ASC_KEY_ID" | tr -d '[:space:]')
           ISSUER_ID=$(echo -n "$ASC_ISSUER_ID" | tr -d '[:space:]')
@@ -123,7 +124,9 @@ jobs:
             -allowProvisioningUpdates \
             -authenticationKeyPath "$KEY_PATH" \
             -authenticationKeyID "$KEY_ID" \
-            -authenticationKeyIssuerID "$ISSUER_ID"
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            CODE_SIGN_STYLE="Automatic" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID || '3K7597D25X' }}"
 
       - name: Create ExportOptions.plist
         run: |
