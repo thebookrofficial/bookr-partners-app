@@ -54,10 +54,6 @@
 	<string>Bookr needs access to your gallery to update your business profile picture.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
-	<key>StallionAppToken</key>
-	<string>spb_ap_GOGGEEDRhSLL1eVm6DkAQDEiIMM6apmAaOXWP16Iv1</string>
-	<key>StallionProjectId</key>
-	<string>69eddef6a3e81eefa553da7c</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Gilroy-ExtraBold.otf</string>

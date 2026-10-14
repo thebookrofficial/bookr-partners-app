@@ -4,7 +4,6 @@ import React_RCTAppDelegate
 import ReactAppDependencyProvider
 import FirebaseCore
 import UserNotifications
-import react_native_stallion
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -48,7 +47,7 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
 #if DEBUG
     return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
 #else
-    return StallionModule.getBundleURL(Bundle.main.url(forResource: "main", withExtension: "jsbundle"))
+    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
   }
 }

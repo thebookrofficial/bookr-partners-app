@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { StatusBar, useColorScheme, LogBox } from "react-native";
+import { StatusBar, useColorScheme, LogBox, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppNavigator } from "@/navigation";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
@@ -88,8 +88,8 @@ function App() {
   );
 }
 
-// 1. Wrap the App with Stallion first
-const StallionApp = withStallion(App);
+// 1. Wrap the App with Stallion on Android only (bypassing on iOS to prevent startup crashes)
+const RootApp = Platform.OS === "android" ? withStallion(App) : App;
 
-// 2. Then wrap the StallionApp with Sentry to catch any OTA update errors
-export default Sentry.wrap(StallionApp);
+// 2. Wrap with Sentry
+export default Sentry.wrap(RootApp);
