@@ -1,25 +1,27 @@
-name: iOS Release Pipeline
+name: iOS Build & Release
 
 on:
   workflow_dispatch:
     inputs:
-      upload_to_app_store:
+      upload_to_testflight:
         description: "Upload to TestFlight / App Store Connect"
         required: true
         type: boolean
         default: true
-  push:
-    tags:
-      - "v*.*.*"
 
 jobs:
-  release-ios:
-    name: Build & Upload iOS App
-    runs-on: macos-latest
+  build-release:
+    name: Build & Sign iOS (.ipa)
+    runs-on: macos-14
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Select Xcode 16.1+
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app || sudo xcode-select -s /Applications/Xcode_16.1.app
+          xcodebuild -version
 
       - name: Install pnpm
         uses: pnpm/action-setup@v3
@@ -37,6 +39,19 @@ jobs:
 
       - name: Download Skia Native Binaries
         run: npx install-skia
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install --repo-update
 
       # --- CONFIGURE APP STORE CONNECT API KEY ---
       - name: Setup App Store Connect API Key
@@ -87,112 +102,87 @@ jobs:
               print(f'Wrote {target_file} ({len(key_bytes)} bytes)')
           "
 
-      # --- INSTALL SIGNING CERTIFICATE & PROVISIONING PROFILE ---
-      - name: Install Apple Certificate & Profile
+      # --- BUILD EXPORT ARCHIVE (AUTOMATIC SIGNING VIA API KEY) ---
+      - name: Build Archive
         env:
-          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD || 'temporary_github_keychain_pass' }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
         run: |
-          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEY_ID=$(echo -n "$ASC_KEY_ID" | tr -d '[:space:]')
+          ISSUER_ID=$(echo -n "$ASC_ISSUER_ID" | tr -d '[:space:]')
+          KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8"
 
-          # Decode certificate and provisioning profile
-          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
-          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
+          echo "Using key path: $KEY_PATH (exists: $(test -f "$KEY_PATH" && echo yes || echo no))"
 
-          # Create temporary keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          xcodebuild archive \
+            -workspace ios/BookrBusinessApp.xcworkspace \
+            -scheme BookrBusinessApp \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/BookrBusinessApp.xcarchive \
+            -destination "generic/platform=iOS" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID"
 
-          # Import certificate to keychain
-          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-
-          # Install Provisioning Profile
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
-
-      # --- CACHING & IOS DEPENDENCIES ---
-      - name: Cache CocoaPods
-        uses: actions/cache@v4
-        with:
-          path: ios/Pods
-          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-
-
-      - name: Install CocoaPods
-        run: |
-          cd ios
-          sed -i '' "s/source 'https:\/\/cdn.cocoapods.org\/'/source 'https:\/\/github.com\/CocoaPods\/Specs.git'/g" Podfile
-          pod install --repo-update
-
-      # --- CREATE EXPORT OPTIONS PLIST ---
       - name: Create ExportOptions.plist
         run: |
-          cat << 'EOF' > ios/ExportOptions.plist
+          cat <<EOF > $RUNNER_TEMP/ExportOptions.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-              <key>destination</key>
-              <string>export</string>
               <key>method</key>
               <string>app-store</string>
+              <key>teamID</key>
+              <string>${{ secrets.APPLE_TEAM_ID || '3K7597D25X' }}</string>
               <key>signingStyle</key>
               <string>automatic</string>
-              <key>teamID</key>
-              <string>3K7597D25X</string>
               <key>stripSwiftSymbols</key>
               <true/>
-              <key>compileBitcode</key>
+              <key>uploadBitcode</key>
               <false/>
           </dict>
           </plist>
           EOF
 
-      # --- BUILD ARCHIVE ---
-      - name: Build iOS Archive
-        run: |
-          xcodebuild -workspace ios/BookrBusinessApp.xcworkspace \
-            -scheme BookrBusinessApp \
-            -configuration Release \
-            -archivePath build/BookrBusinessApp.xcarchive \
-            archive \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=3K7597D25X
-
-      # --- EXPORT IPA ---
-      - name: Export IPA
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath build/BookrBusinessApp.xcarchive \
-            -exportOptionsPlist ios/ExportOptions.plist \
-            -exportPath build
-
-      # --- UPLOAD TO APP STORE CONNECT / TESTFLIGHT ---
-      - name: Upload to App Store Connect
-        if: ${{ github.event_name == 'push' || github.event.inputs.upload_to_app_store == 'true' }}
+      - name: Export .ipa
         env:
           ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
         run: |
-          xcrun altool --upload-app \
-            -f build/BookrBusinessApp.ipa \
-            -t ios \
-            --apiKey "$ASC_KEY_ID" \
-            --apiIssuer "$ASC_ISSUER_ID"
+          KEY_ID=$(echo -n "$ASC_KEY_ID" | tr -d '[:space:]')
+          ISSUER_ID=$(echo -n "$ASC_ISSUER_ID" | tr -d '[:space:]')
+          KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8"
 
-      # --- UPLOAD ARTIFACTS ---
-      - name: Upload Build Artifacts
-        if: always()
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/BookrBusinessApp.xcarchive \
+            -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
+            -exportPath $RUNNER_TEMP/build_output \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID"
+
+      # --- ARTIFACT UPLOAD ---
+      - name: Upload .ipa as GitHub Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-ipa-release
-          path: build/BookrBusinessApp.ipa
-          if-no-files-found: ignore
+          name: BookrBusinessApp-iOS
+          path: ${{ runner.temp }}/build_output/*.ipa
+
+      # --- UPLOAD TO TESTFLIGHT / APP STORE CONNECT ---
+      - name: Upload to App Store Connect
+        if: ${{ inputs.upload_to_testflight }}
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          IPA_PATH=$(find $RUNNER_TEMP/build_output -name "*.ipa" | head -n 1)
+          echo "Uploading $IPA_PATH to App Store Connect..."
+
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA_PATH" \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
