@@ -126,7 +126,8 @@ jobs:
             -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID" \
             CODE_SIGN_STYLE="Automatic" \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID || '3K7597D25X' }}"
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID || '3K7597D25X' }}" \
+            CODE_SIGN_IDENTITY="Apple Distribution"
 
       - name: Create ExportOptions.plist
         run: |
