@@ -78,8 +78,8 @@ importers:
         specifier: ^1.1314.0
         version: 1.1314.0(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0)
       react-native-camera-kit:
-        specifier: ^18.0.0
-        version: 18.0.0(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0)
+        specifier: 16.2.1
+        version: 16.2.1(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0)
       react-native-config:
         specifier: ^1.6.1
         version: 1.6.1(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0)
@@ -4921,8 +4921,8 @@ packages:
     resolution: {integrity: sha512-4DLAVto8Qo9L3ggL2vsY9Gk8FFpJWtne8F/3wN8yUb7Xha9/SKS4B+vs7xlhWjKeqZUHws/Vi/q/6IZ8s60kcQ==}
     engines: {node: '>=18'}
 
-  react-native-camera-kit@18.0.0:
-    resolution: {integrity: sha512-FZG9kB8GDGcxTUB2cGhBn2wexIgzevv+PE7zfpLz6i/9kltDCLO/fomLhFvSaQVL2Bnu8AtxbBiI8Im0O8AqDA==}
+  react-native-camera-kit@16.2.1:
+    resolution: {integrity: sha512-OhwK6he0JOP0zcelaEQ02IhAL+0ZLCqmsSxYLMxRwIsMEou4cJx3Ew8yeuZaZkv02Tes9Ws5FCiZFSEY4JKPNA==}
     engines: {node: '>=18'}
     peerDependencies:
       react: '*'
@@ -11746,7 +11746,7 @@ snapshots:
       - react
       - react-native
 
-  react-native-camera-kit@18.0.0(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0):
+  react-native-camera-kit@16.2.1(react-native@0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0))(react@19.1.0):
     dependencies:
       react: 19.1.0
       react-native: 0.81.0(@babel/core@7.29.0)(@react-native-community/cli@20.0.0(typescript@5.9.3))(@react-native/metro-config@0.81.0(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.1.0)
