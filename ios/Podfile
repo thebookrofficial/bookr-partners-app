@@ -22,6 +22,7 @@ target 'BookrBusinessApp' do
   pod 'FirebaseABTesting', :modular_headers => true
   pod 'GoogleDataTransport', :modular_headers => true
   pod 'nanopb', :modular_headers => true
+  pod 'RiveRuntime', '6.15.2'
 
   use_react_native!(
     :path => config[:reactNativePath],

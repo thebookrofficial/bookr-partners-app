@@ -2763,10 +2763,10 @@ PODS:
     - SocketRocket
     - Yoga
   - RecaptchaInterop (101.0.0)
-  - rive-react-native (9.8.3):
+  - rive-react-native (9.8.1):
     - React-Core
-    - RiveRuntime (= 6.18.2)
-  - RiveRuntime (6.18.2)
+    - RiveRuntime (= 6.15.2)
+  - RiveRuntime (6.15.2)
   - RNAppleAuthentication (2.5.1):
     - React-Core
   - RNDateTimePicker (9.1.0):
@@ -3780,8 +3780,8 @@ SPEC CHECKSUMS:
   ReactCommon: c235ebd26d63fde9a2dfa72cee9f8294b910fee1
   ReactNativeCameraKit: 5ed036cbce8caee13d6d26200d1f3c377243d916
   RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
-  rive-react-native: 0498539341b396072f8404d3338fbda9c4e92bc7
-  RiveRuntime: 55c7a7badd9a8389d20fc8a75b7c6accc851b69a
+  rive-react-native: bf2a2450c19d845427c59d0d9b03d01c37b78c27
+  RiveRuntime: b2c29a7e1fbf2aabd1fffcb7b9cf43c4d515a841
   RNAppleAuthentication: d6fe579e5f43cf8db54bdc48518bccea61c592a4
   RNDateTimePicker: e39ae9532555909f20861f3347cfe36b4a0d4b68
   RNFBApp: 8d1edeee2c5d71802978ce645b8260e8324fb192
