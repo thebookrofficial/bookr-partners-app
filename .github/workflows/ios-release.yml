@@ -104,12 +104,14 @@ jobs:
 
       # --- CLEAN UP ORPHANED DEVELOPMENT CERTIFICATES ---
       - name: Clean up Orphaned Development Certificates
+        continue-on-error: true
         env:
           ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
         run: |
-          pip3 install --quiet pyjwt cryptography requests
-          python3 -c "
+          python3 -m venv $RUNNER_TEMP/asc_venv
+          $RUNNER_TEMP/asc_venv/bin/pip install --quiet pyjwt cryptography requests
+          $RUNNER_TEMP/asc_venv/bin/python -c "
           import os, time, jwt, requests
 
           key_id = ''.join(os.environ.get('ASC_KEY_ID', '').split())
