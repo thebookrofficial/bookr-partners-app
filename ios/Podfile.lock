@@ -3095,7 +3095,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - RNSentry (8.11.1):
+  - RNSentry (8.31.0):
     - boost
     - DoubleConversion
     - fast_float
@@ -3122,7 +3122,6 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - Sentry (= 9.13.0)
     - SocketRocket
     - Yoga
   - RNShare (12.3.1):
@@ -3327,9 +3326,6 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - Sentry (9.13.0):
-    - Sentry/Core (= 9.13.0)
-  - Sentry/Core (9.13.0)
   - SocketRocket (0.7.1)
   - SwiftUIIntrospect (1.3.0)
   - Yoga (0.0.0)
@@ -3469,7 +3465,6 @@ SPEC REPOS:
     - PromisesSwift
     - RecaptchaInterop
     - RiveRuntime
-    - Sentry
     - SocketRocket
     - SwiftUIIntrospect
     - ZIPFoundation
@@ -3791,12 +3786,11 @@ SPEC CHECKSUMS:
   RNGoogleSignin: fa028e2f7f3560a657c298fe367ab9511df2fcb0
   RNReanimated: 69c8528cadcd386c00513ce53a21711b9a0a12a4
   RNScreens: 4bf99097e3b75ca8fe3528233c7f0d27bd18611d
-  RNSentry: 33d109aee43773cf0104eca293238b83f7b74676
+  RNSentry: 5ab9026579883279bfa6b5ac712dd9fa8473c073
   RNShare: 0c59c95356b7acfd505b62a2ae0ac9eace17e1ac
   RNSVG: f67438edc98d950e8b1f98b55ad8a0d6efe826da
   RNVectorIcons: 6acc19c833be864e9c70894e101a587fe491150a
   RNWorklets: 036f0f7b322ae077418573983a31e1ea3e90c8e6
-  Sentry: 5c3f67235d4c16fcfab43158a8c1502a18fece9a
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   SwiftUIIntrospect: fee9aa07293ee280373a591e1824e8ddc869ba5d
   Yoga: b01392348aeea02064c21a2762a42893d82b60a7
