@@ -102,6 +102,58 @@ jobs:
               print(f'Wrote {target_file} ({len(key_bytes)} bytes)')
           "
 
+      # --- CLEAN UP ORPHANED DEVELOPMENT CERTIFICATES ---
+      - name: Clean up Orphaned Development Certificates
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          pip3 install --quiet pyjwt cryptography requests
+          python3 -c "
+          import os, time, jwt, requests
+
+          key_id = ''.join(os.environ.get('ASC_KEY_ID', '').split())
+          issuer_id = ''.join(os.environ.get('ASC_ISSUER_ID', '').split())
+          key_path = os.path.expanduser(f'~/.appstoreconnect/private_keys/AuthKey_{key_id}.p8')
+
+          if not os.path.exists(key_path):
+              print(f'Key file {key_path} not found, skipping cleanup')
+              exit(0)
+
+          with open(key_path, 'r') as f:
+              private_key = f.read()
+
+          token = jwt.encode(
+              {
+                  'iss': issuer_id,
+                  'exp': int(time.time()) + 1200,
+                  'aud': 'appstoreconnect-v1'
+              },
+              private_key,
+              algorithm='ES256',
+              headers={'kid': key_id}
+          )
+
+          headers = {'Authorization': f'Bearer {token}'}
+
+          try:
+              url = 'https://api.appstoreconnect.apple.com/v1/certificates?filter[certificateType]=DEVELOPMENT,IOS_DEVELOPMENT'
+              res = requests.get(url, headers=headers)
+              if res.status_code == 200:
+                  certs = res.json().get('data', [])
+                  print(f'Found {len(certs)} existing development certificates')
+                  for cert in certs:
+                      cert_id = cert['id']
+                      display_name = cert.get('attributes', {}).get('displayName', cert_id)
+                      print(f'Revoking orphaned development certificate: {display_name} ({cert_id})')
+                      del_res = requests.delete(f'https://api.appstoreconnect.apple.com/v1/certificates/{cert_id}', headers=headers)
+                      print(f'  Revoke status: {del_res.status_code}')
+              else:
+                  print(f'Could not fetch certificates (status {res.status_code}): {res.text}')
+          except Exception as e:
+              print(f'Warning: Certificate cleanup encountered an error: {e}')
+          "
+
       # --- BUILD EXPORT ARCHIVE (AUTOMATIC SIGNING VIA API KEY) ---
       - name: Build Archive
         env:
@@ -126,8 +178,7 @@ jobs:
             -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID" \
             CODE_SIGN_STYLE="Automatic" \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID || '3K7597D25X' }}" \
-            CODE_SIGN_IDENTITY="Apple Distribution"
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID || '3K7597D25X' }}"
 
       - name: Create ExportOptions.plist
         run: |
