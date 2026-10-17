@@ -49,6 +49,7 @@ export const useVendorData = () => {
         .from("client_profiles")
         .select("*")
         .eq("user_id", user.id)
+        .is("deleted_at", null)
         .maybeSingle();
 
       if (clientError) throw clientError;
@@ -57,12 +58,13 @@ export const useVendorData = () => {
         setClientProfile(clientData);
 
         // 3. Fetch Venues (Blueprint Table 6.1)
+        // For events, venue status is ignored; for other verticals (sports, staycation, dining), status must be 'active'.
         let venuesQuery = supabase
           .from("venues")
           .select(
             "*, sports_venues(sports_type), events(title, cover_image_url, event_status), cities(name)",
           )
-          .eq("status", "active")
+          .or("status.eq.active,vertical.eq.events")
           .is("deleted_at", null);
 
         if (clientData.client_role === "owner") {
@@ -81,16 +83,15 @@ export const useVendorData = () => {
 
         if (venuesError) throw venuesError;
 
-        // Filter out event venues that do not have any published events
-        const activeVenues = ((venuesData as Venue[]) || []).filter(venue => {
+        // Filter event venues purely based on whether they have published events (ignoring venue.status)
+        const visibleVenues = ((venuesData as Venue[]) || []).filter(venue => {
           if (venue.vertical === "events") {
-            // An event venue must have at least one published event to be visible
             return venue.events && venue.events.some(e => e.event_status === "published");
           }
-          return true;
+          return venue.status === "active";
         });
 
-        setVenues(activeVenues);
+        setVenues(visibleVenues);
       } else {
         setClientProfile(null);
         setVenues([]);

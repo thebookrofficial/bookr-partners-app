@@ -103,9 +103,22 @@ export const VendorProfileScreen = () => {
   }, [availableTabs, activeTab]);
 
   const filteredVenues = useMemo(() => {
-    if (activeTab === "All Venues" || activeTab === "All Services") return venues;
+    // Only show event services if their event status is 'published'
+    const validVenues = venues.filter(venue => {
+      if (venue.vertical === "events") {
+        return (
+          venue.events &&
+          venue.events.some(
+            e => (e.event_status || (e as any).status)?.toLowerCase() === "published",
+          )
+        );
+      }
+      return true;
+    });
 
-    return venues.filter(venue => {
+    if (activeTab === "All Venues" || activeTab === "All Services") return validVenues;
+
+    return validVenues.filter(venue => {
       const tabKey = activeTab.toLowerCase();
       return (
         venue.vertical.toLowerCase() === tabKey ||
@@ -181,73 +194,75 @@ export const VendorProfileScreen = () => {
             <ListSkeleton count={4} />
           </View>
         ) : filteredVenues.length > 0 ? (
-          filteredVenues.map(venue => (
-            <ServiceCard
-              key={venue.id}
-              title={
-                venue.vertical === "events" && venue.events && venue.events.length > 0
-                  ? venue.events[0].title
-                  : venue.name
-              }
-              location={
-                venue.vertical === "events" && venue.cities?.name
-                  ? venue.cities.name
-                  : venue.address_line
-              }
-              image={
-                venue.vertical === "events" &&
-                venue.events &&
-                venue.events.length > 0 &&
-                venue.events[0].cover_image_url
-                  ? { uri: venue.events[0].cover_image_url }
-                  : venue.cover_image_url
-                  ? { uri: venue.cover_image_url }
-                  : { uri: "https://via.placeholder.com/150" }
-              }
-              onPress={() => {
-                const baseService = { vertical: venue.vertical, serviceId: venue.id };
-                if (venue.vertical === "sports") {
-                  // CRITICAL FIX: Handle Supabase returning an object instead of an array
-                  const sportsData: any = venue.sports_venues;
-                  const sportsType = Array.isArray(sportsData)
-                    ? sportsData[0]?.sports_type
-                    : sportsData?.sports_type;
+          filteredVenues.map(venue => {
+            const publishedEvent =
+              venue.vertical === "events" && venue.events
+                ? venue.events.find(
+                    e => (e.event_status || (e as any).status)?.toLowerCase() === "published",
+                  ) || venue.events[0]
+                : undefined;
 
-                  const categoryMap: Record<string, string> = {
-                    football: "Football",
-                    box_cricket: "Box Cricket",
-                    pickleball: "Pickleball",
-                    cricket: "Cricket",
-                  };
-
-                  const category = sportsType ? categoryMap[sportsType] || sportsType : undefined;
-
-                  const targetScreen = getTargetScreen(venue.vertical);
-                  setLastSelectedService({ ...baseService, category });
-                  navigation.navigate("SportsServiceTabs", {
-                    screen: targetScreen,
-                    params: { serviceId: venue.id, category },
-                  });
-                } else if (venue.vertical === "staycation") {
-                  const targetScreen = getTargetScreen(venue.vertical);
-                  setLastSelectedService(baseService);
-                  navigation.navigate("StaycationServiceTabs", {
-                    screen: targetScreen,
-                    params: { serviceId: venue.id },
-                  });
-                } else if (venue.vertical === "events") {
-                  const targetScreen = getTargetScreen(venue.vertical);
-                  setLastSelectedService(baseService);
-                  navigation.navigate("EventServiceTabs", {
-                    screen: targetScreen,
-                    params: { serviceId: venue.id },
-                  });
-                } else if ((venue.vertical as string) === "profile") {
-                  navigation.navigate("VendorProfile");
+            return (
+              <ServiceCard
+                key={venue.id}
+                title={publishedEvent ? publishedEvent.title : venue.name}
+                location={
+                  venue.vertical === "events" && venue.cities?.name
+                    ? venue.cities.name
+                    : venue.address_line
                 }
-              }}
-            />
-          ))
+                image={
+                  publishedEvent?.cover_image_url
+                    ? { uri: publishedEvent.cover_image_url }
+                    : venue.cover_image_url
+                    ? { uri: venue.cover_image_url }
+                    : { uri: "https://via.placeholder.com/150" }
+                }
+                onPress={() => {
+                  const baseService = { vertical: venue.vertical, serviceId: venue.id };
+                  if (venue.vertical === "sports") {
+                    // CRITICAL FIX: Handle Supabase returning an object instead of an array
+                    const sportsData: any = venue.sports_venues;
+                    const sportsType = Array.isArray(sportsData)
+                      ? sportsData[0]?.sports_type
+                      : sportsData?.sports_type;
+
+                    const categoryMap: Record<string, string> = {
+                      football: "Football",
+                      box_cricket: "Box Cricket",
+                      pickleball: "Pickleball",
+                      cricket: "Cricket",
+                    };
+
+                    const category = sportsType ? categoryMap[sportsType] || sportsType : undefined;
+
+                    const targetScreen = getTargetScreen(venue.vertical);
+                    setLastSelectedService({ ...baseService, category });
+                    navigation.navigate("SportsServiceTabs", {
+                      screen: targetScreen,
+                      params: { serviceId: venue.id, category },
+                    });
+                  } else if (venue.vertical === "staycation") {
+                    const targetScreen = getTargetScreen(venue.vertical);
+                    setLastSelectedService(baseService);
+                    navigation.navigate("StaycationServiceTabs", {
+                      screen: targetScreen,
+                      params: { serviceId: venue.id },
+                    });
+                  } else if (venue.vertical === "events") {
+                    const targetScreen = getTargetScreen(venue.vertical);
+                    setLastSelectedService(baseService);
+                    navigation.navigate("EventServiceTabs", {
+                      screen: targetScreen,
+                      params: { serviceId: venue.id },
+                    });
+                  } else if ((venue.vertical as string) === "profile") {
+                    navigation.navigate("VendorProfile");
+                  }
+                }}
+              />
+            );
+          })
         ) : (
           <View style={styles.emptyState}>
             <Text variant="body2" color={COLORS.text.muted}>

@@ -566,7 +566,12 @@ export const AppNavigator = () => {
             try {
               const [profileResult, clientResult] = await Promise.all([
                 supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-                supabase.from("client_profiles").select("*").eq("user_id", userId).maybeSingle(),
+                supabase
+                  .from("client_profiles")
+                  .select("*")
+                  .eq("user_id", userId)
+                  .is("deleted_at", null)
+                  .maybeSingle(),
               ]);
 
               if (profileResult.data) {
@@ -588,7 +593,12 @@ export const AppNavigator = () => {
             try {
               const [profileResult, clientResult] = await Promise.all([
                 supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-                supabase.from("client_profiles").select("*").eq("user_id", userId).maybeSingle(),
+                supabase
+                  .from("client_profiles")
+                  .select("*")
+                  .eq("user_id", userId)
+                  .is("deleted_at", null)
+                  .maybeSingle(),
               ]);
 
               if (profileResult.data) {
