@@ -17,6 +17,7 @@
 		4DA3D7C76F974516B109DF54 /* Bison-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B784C70D84824E28BBDFAAEC /* Bison-Bold.ttf */; };
 		6751428CD8314924BB11EC0B /* Gilroy-Light.otf in Resources */ = {isa = PBXBuildFile; fileRef = 22D720302D5245C3BA3FC1FE /* Gilroy-Light.otf */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
+		761780EE2CA45674006654EE /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EF2CA45674006654EE /* SceneDelegate.swift */; };
 		7A33AD6B1A96467FB046CE80 /* Gilroy-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9E652C967412408FB7990CB0 /* Gilroy-SemiBold.ttf */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		94A7F90044273170DE2A2183 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
@@ -53,6 +54,7 @@
 		606C2EF0D57F45BAA6B36371 /* MDNichromeTest-DarkOblique.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "MDNichromeTest-DarkOblique.otf"; path = "../src/assets/fonts/MD-Nichrome/MDNichromeTest-DarkOblique.otf"; sourceTree = "<group>"; };
 		6F9E0EC6AEA14BC3B9792361 /* FontAwesome6_Solid.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = FontAwesome6_Solid.ttf; path = "../node_modules/react-native-vector-icons/Fonts/FontAwesome6_Solid.ttf"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = BookrBusinessApp/AppDelegate.swift; sourceTree = "<group>"; };
+		761780EF2CA45674006654EE /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneDelegate.swift; path = BookrBusinessApp/SceneDelegate.swift; sourceTree = "<group>"; };
 		7ACBF396E6D54C93B16E43B2 /* MDNichromeTest-Bold.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "MDNichromeTest-Bold.otf"; path = "../src/assets/fonts/MD-Nichrome/MDNichromeTest-Bold.otf"; sourceTree = "<group>"; };
 		7E996DFFCF1B4D1D835A1112 /* MDNichromeTest-BoldOblique.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "MDNichromeTest-BoldOblique.otf"; path = "../src/assets/fonts/MD-Nichrome/MDNichromeTest-BoldOblique.otf"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = BookrBusinessApp/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -93,6 +95,7 @@
 				40B78E563028CC26002C2173 /* GoogleService-Info.plist */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				761780EF2CA45674006654EE /* SceneDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
@@ -388,6 +391,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				761780EE2CA45674006654EE /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
