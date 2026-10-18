@@ -77,8 +77,16 @@ export const usePushNotifications = () => {
               }
             });
         }
-      } catch (error) {
-        console.error("Failed to get or store FCM token:", error);
+      } catch (error: any) {
+        // iOS Simulator does not have aps-environment entitlement; ignore gracefully
+        if (
+          error?.message?.includes("aps-environment") ||
+          error?.code === "messaging/unknown"
+        ) {
+          console.warn("APNs remote messages not supported on this simulator/environment.");
+        } else {
+          console.error("Failed to get or store FCM token:", error);
+        }
       }
     }
   };
