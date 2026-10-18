@@ -39,9 +39,17 @@ target 'BookrBusinessApp' do
       # :ccache_enabled => true
     )
 
+    min_ios_version = '15.1'
+
+    # 1. Main Pods project build configurations
+    installer.pods_project.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version
+    end
+
+    # 2. All targets in pods_project
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES' unless target.name.include?('Sentry')
         config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
         
@@ -53,6 +61,40 @@ target 'BookrBusinessApp' do
         cplusflags = config.build_settings['OTHER_CPLUSPLUSFLAGS'] || ['$(inherited)']
         cplusflags = [cplusflags] if cplusflags.is_a?(String)
         config.build_settings['OTHER_CPLUSPLUSFLAGS'] = cplusflags + ['-Wno-error']
+      end
+
+      # Also cover resource bundle targets attached to target
+      if target.respond_to?(:resource_bundle_targets)
+        target.resource_bundle_targets.each do |bundle_target|
+          bundle_target.build_configurations.each do |config|
+            config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version
+          end
+        end
+      end
+    end
+
+    # 3. Target installation results (covers resource bundles, privacy manifests: AsyncStorage_resources, etc.)
+    if installer.respond_to?(:target_installation_results)
+      installer.target_installation_results.pod_target_installation_results.each do |pod_name, target_installation_result|
+        target_installation_result.resource_bundle_targets.each do |resource_bundle_target|
+          resource_bundle_target.build_configurations.each do |config|
+            config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version
+          end
+        end
+      end
+    end
+
+    # 4. If multiple pod projects are generated
+    if installer.respond_to?(:generated_projects)
+      installer.generated_projects.each do |project|
+        project.build_configurations.each do |config|
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version
+        end
+        project.targets.each do |target|
+          target.build_configurations.each do |config|
+            config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version
+          end
+        end
       end
     end
 
