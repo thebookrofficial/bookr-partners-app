@@ -37,6 +37,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
 
+      - name: Create .env for Release
+        env:
+          ENV_SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://v2.thebookr.in' }}
+          ENV_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          ENV_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          ENV_GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          cat << EOF > .env
+          SUPABASE_URL=$ENV_SUPABASE_URL
+          SUPABASE_ANON_KEY=$ENV_SUPABASE_ANON_KEY
+          SENTRY_DSN=$ENV_SENTRY_DSN
+          GOOGLE_WEB_CLIENT_ID=$ENV_GOOGLE_WEB_CLIENT_ID
+          EOF
+          cp .env .env.production
+
       - name: Download Skia Native Binaries
         run: npx install-skia
 

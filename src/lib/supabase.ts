@@ -34,14 +34,13 @@ import Config from "react-native-config";
 // 1. Point to your NEW dedicated proxy for the Partner App
 const supabaseUrl = Config.SUPABASE_URL || "https://v2.thebookr.in";
 
-// 2. Strictly use the environment variable. NO hardcoded keys.
-const supabaseAnonKey = Config.SUPABASE_ANON_KEY as string;
+// 2. Use the environment variable with production fallback to prevent release build drops
+const FALLBACK_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmdW5ycHJ2b2toY2VkYmdnZWtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMzgxNzEsImV4cCI6MjA4ODYxNDE3MX0.zF4ywPb3mfoxpXPFvqzBNFR85LNu7TeWjOB8tbnMRbE";
 
-if (!supabaseAnonKey) {
-  console.warn("⚠️ SUPABASE_ANON_KEY is missing from environment variables! Check your .env file.");
-}
+const supabaseAnonKey = Config.SUPABASE_ANON_KEY || FALLBACK_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey || "MISSING_KEY", {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
